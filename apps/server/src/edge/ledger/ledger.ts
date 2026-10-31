@@ -434,6 +434,18 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private signReadEffects(r:EdgeReceipt):ConfirmedEffects{
     if(r.phase!=='completed'||!r.capability.startsWith('read:'))return{};const sign=this.contactActuator?.sign(r.capability.slice(5));if(!sign)return{};
     const nameOf=(id:string)=>this.host.minds.get(id)?.name??(this.db.soul(id) as {name?:string}|undefined)?.name??'another Soul';
+    const list=(xs:string[])=>xs.length>1?xs.slice(0,-1).join(', ')+' and '+xs.at(-1):xs[0]??'';
+    // Entry 38: a poster wall reads as its posters (title, detail, author, age), a wanted/offered board as its notes with replies
+    // and takers; each attributed to its author (soul id), one learned fact per poster / author, everything in the detail.
+    const sx=sign as {posters?:{s:number;t:string;d:string;by:string;n:string;day:number;age:number;stale:boolean}[];wanted?:{c:'w'|'o';r:number;t:string;by:string;n:string;re:{t:string;by:string;n:string}[];tk?:{by:string;n:string}}[]};
+    if(sx.posters){const ps=[...sx.posters].sort((a,b)=>a.s-b.s).map(p=>({...p,name:nameOf(p.by)})),old=ps.filter(p=>p.stale).length,when=(p:{age:number;stale:boolean})=>p.stale?`up ${p.age} days, out of date`:p.age?`up ${p.age} day${p.age>1?'s':''}`:'put up today';
+      return {summary:ps.length?`Read ${sign.name}: ${ps.length} poster${ps.length>1?'s':''}, by ${list([...new Set(ps.map(p=>p.name))])}${old?`; ${old} out of date`:''} (their words, not world facts).`:`Read ${sign.name}; no posters are up.`,
+        learned:ps.slice(0,5).map(p=>({fact:`${p.name}'s poster on ${sign.name}: "${p.t}"${p.d?` — "${p.d.replace(/\s*\n\s*/g,' / ')}"`:''} (${when(p)})`,about:sign.id,source:`${sign.id}:poster:${p.by}:${p.s}`,provenance:'soul-text' as const,untrusted:true})),
+        detail:{sign:{id:sign.id,name:sign.name,posters:ps.map(p=>({title:p.t,detail:p.d,writtenBy:{soulId:p.by,name:p.name},daysUp:p.age,outOfDate:p.stale})),provenance:'soul-text'}},untrusted:ps.length>0};}
+    if(sx.wanted){const ns=sx.wanted.map(n=>({...n,name:nameOf(n.by),re:n.re.map(r=>({...r,name:nameOf(r.by)})),tk:n.tk?{...n.tk,name:nameOf(n.tk.by)}:undefined})),w=ns.filter(n=>n.c==='w').length,words=(n:typeof ns[number])=>`${n.c==='w'?'wanted':'offered'} "${n.t}"${n.re.map(r=>`, ${r.name} replied "${r.t}"`).join('')}${n.tk?`, taken on by ${n.tk.name}`:''}`;
+      return {summary:ns.length?`Read ${sign.name}: ${w} wanted, ${ns.length-w} offered, by ${list([...new Set(ns.map(n=>n.name))])} (their words, not world facts).`:`Read ${sign.name}; nothing is pinned on it.`,
+        learned:[...new Set(ns.map(n=>n.by))].slice(0,5).map(by=>{const mine=ns.filter(n=>n.by===by);return {fact:`${mine[0].name}'s note${mine.length>1?'s':''} on ${sign.name}: ${mine.map(words).join(' / ')}`.slice(0,300),about:sign.id,source:`${sign.id}:note:${by}`,provenance:'soul-text' as const,untrusted:true};}),
+        detail:{sign:{id:sign.id,name:sign.name,notes:ns.map(n=>({column:n.c==='w'?'wanted':'offered',text:n.t,writtenBy:{soulId:n.by,name:n.name},replies:n.re.map(r=>({text:r.t,writtenBy:{soulId:r.by,name:r.name}})),...(n.tk?{takenBy:{soulId:n.tk.by,name:n.tk.name}}:{})})),provenance:'soul-text'}},untrusted:ns.length>0};}
     // Entry 19: a pinboard reads as its notes, each attributed to its author (by soul id, not the signature line).
     if(sign.notes){const notes=sign.notes.map(n=>({text:n.text.replace(/ — [^—]*$/,''),by:n.by,name:nameOf(n.by)})),names=[...new Set(notes.map(n=>n.name))];
       return {summary:notes.length?`Read ${sign.name}: ${notes.length} note${notes.length>1?'s':''}, by ${names.length>1?names.slice(0,-1).join(', ')+' and '+names.at(-1):names[0]} (their words, not world facts).`:`Read ${sign.name}; nothing is pinned on it.`,

@@ -12,7 +12,10 @@ export const HAND_OPEN_ANGLE=-Math.PI*.48;
 const vec=z.tuple([z.number().finite(),z.number().finite(),z.number().finite()]);
 const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)]),bodyPolicy:z.literal('door-natural-v2').optional()}).strict();
 // A hand that writes or wipes across a flat face (a board): `at` is the face centre, `yaw` its facing.
-const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6)}).strict();
+// Soul Actions entry 38: a poster is put up (or taken down) with both hands: `width`/`height` are the sheet's, `at` its centre on
+// the wall's surface, and `sheet` what is printed on it (so every viewer draws the same paper in the hands as on the wall).
+const sheet=z.object({title:z.string().max(40),detail:z.string().max(80),name:z.string().max(40).optional(),paper:z.number().int().min(0).max(15),age:z.number().min(0).max(99).optional()}).strict();
+const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),sheet:sheet.optional()}).strict();
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
@@ -52,7 +55,32 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
 }
 /** Where a writing or wiping hand is on the face at stroke progress `u` (0..1): rows of small letter strokes, left to
  *  right, with a slight lift back to the next row; a wipe is three overlapping sweeps. Continuous at u=0 and u=1. */
+export const twoHanded=(s?:HandActuatorParams['stroke'])=>s?.kind==='poster'||s?.kind==='unposter';
+/** Entry 38: where both palms are while putting a poster up (u 0..1 of the stroke). Face-local [x right, y up, out from the
+ *  wall]: press the rolled top edge to the wall, unroll it downward with both palms sliding down the sides, press (tape) the
+ *  bottom corners, smooth back up the sides and press (tape) the top corners. Taking down: hands to the top corners, peel, roll
+ *  the sheet up from the top as the hands go down, then lift the roll away toward the chest. Continuous at u=0 and u=1. */
+export const POSTER_ON=.035,POSTER_OFF=.10;
+export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number):{x:number;y:number;o:number;spread:number}{
+ const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.035,yB=-s.height/2+.04,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
+ if(s.kind==='unposter'){
+  if(k<.15)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.15)),spread:1};
+  if(k<.55){const f=seg(.15,.55);return {x:0,y:lerp(yT,yB,f),o:lerp(POSTER_ON,.06,f),spread:1};}
+  const f=seg(.55,1);return {x:0,y:lerp(yB,-.1,f),o:lerp(.06,.22,f),spread:lerp(1,.8,f)};
+ }
+ if(k<.10)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.10)),spread:1};
+ if(k<.50)return {x:0,y:lerp(yT,yB,seg(.10,.50)),o:POSTER_ON,spread:1};
+ if(k<.62)return {x:0,y:yB,o:POSTER_ON-.012*Math.sin(Math.PI*(k-.50)/.12),spread:1};
+ if(k<.86){const f=(k-.62)/.24;return {x:0,y:lerp(yB,yT,smooth(f)),o:POSTER_ON+.03*Math.sin(Math.PI*f),spread:1};}
+ return {x:0,y:yT,o:POSTER_ON-.012*Math.sin(Math.PI*(k-.86)/.14),spread:1};
+}
+export function strokeHands(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):{left:Vec3;right:Vec3}{
+ const right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],l=posterLocal(s,u),half=(s.width/2-.04)*l.spread;
+ const p=(x:number):Vec3=>[at[0]+right[0]*x+out[0]*l.o,at[1]+l.y,at[2]+right[1]*x+out[1]*l.o];
+ return {left:p(-half),right:p(half)};
+}
 export function strokePoint(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):Vec3 {
+ if(twoHanded(s))return strokeHands(at,s,u).right;
  const k=Math.max(0,Math.min(1,u)),right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)];
  let x:number,y:number,lift=0;
  if(s.kind==='wipe'){const pass=Math.min(2,Math.floor(k*3)),f=k*3-pass,dir=pass%2?-1:1;x=dir*(f-.5)*s.width;y=s.height*.3*(1-2*k)+.03*Math.sin(f*Math.PI*6);}
@@ -102,7 +130,7 @@ type Exec={p:HandActuatorParams;motion:HandActuatorMotion;t:number;root:Vec3;yaw
 function clear(rt:Runtime,ex:Exec){const h=rt.world.entities[ex.p.actor]?.human;if(!h)return;delete h.handActuator;delete h.hands;delete h.speed;h.activity='idle';}
 export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
  verb:'hand_actuator_v1',description:'Reach, operate a switch or hinged opening with continuous hand contact, and lower the arm before releasing the body.',schema:handActuatorParams,
- reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},{resource:'entity:'+p.target,mode:'exclusive'}],
+ reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},...(twoHanded(p.stroke)?[{resource:'hand:'+p.actor+':left',mode:'exclusive' as const}]:[]),{resource:'entity:'+p.target,mode:'exclusive'}],
  plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};if(!h||h.grip||h.hands||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
  start(rt,p,_plan,_id){const a=rt.world.entities[p.actor];return {p:structuredClone(p),motion:{...structuredClone(p),startTick:rt.tick,actionId:_id},t:0,root:[...a.pose.p],yaw:a.pose.yaw};},
  step(rt,ex,dt){
@@ -117,7 +145,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   const face=ex.p.opening?heading([-dsin(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side,-dcos(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side]):ex.p.stroke?heading([-dsin(ex.p.stroke.yaw),-dcos(ex.p.stroke.yaw)]):heading([point.hand[0]-a.pose.p[0],point.hand[2]-a.pose.p[2]]),turn=((face-ex.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/.4);
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
-  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
+  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else if(twoHanded(ex.p.stroke)){const two=strokeHands(ex.p.at,ex.p.stroke!,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke!.seconds);h.hands={left:two.left,right:two.right};}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
   if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<HAND_REACH_SECONDS?'reaching':ex.t<HAND_REACH_SECONDS+handSwingSeconds(ex.motion)?'operating':'releasing'};
  },
  cancel(rt,ex){

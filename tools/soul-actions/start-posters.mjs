@@ -1,0 +1,16 @@
+// Entry 38: an owned disposable world with a poster wall and a wanted/offered board side by side, 100 distant full walls and
+// 100 distant full boards. SOUL_POSTERS_LOOK=1 pre-fills the near ones (a look check of the faces; no Souls act).
+import {startWorld} from '../god-skill/dev-world.mjs';import {writeFileSync,mkdirSync} from 'node:fs';import {resolve} from 'node:path';
+const out=process.env.SOUL_POSTERS_SCENE??'<team>/soul-actions/day-38/scene',port=Number(process.env.SOUL_POSTERS_PORT??7873);mkdirSync(out,{recursive:true});
+const look=process.env.SOUL_POSTERS_LOOK==='1';
+const wall=JSON.stringify([0,1,2,3].map(s=>({s,t:`distant show ${s}`,d:'somewhere far',by:'s_z',n:'Zed',day:-s}))),board=JSON.stringify(['w','o'].flatMap(c=>[0,1,2].map(r=>({c,r,t:`${c==='w'?'Wanted':'Offered'}: distant thing ${r}`,by:'s_z',n:'Zed',re:[]}))));
+// the near wall starts with one old poster (Zed's jumble sale, 4 world days before day 0: out of date)
+const near=look?[{s:0,t:'Jumble sale',d:'Saturday, the old barn',by:'s_zed',n:'Zed',day:-4},{s:1,t:'Concert at the bandstand',d:'Tonight at 8 · bring a blanket',by:'s_a',n:'Ada',day:0},{s:2,t:'Pottery class',d:'Saturday 10:00\nat the studio',by:'s_b',n:'Ben',day:-1},{s:3,t:'Lost: blue scarf',d:'ask Ben',by:'s_b',n:'Ben',day:0}]:[{s:0,t:'Jumble sale',d:'Saturday, the old barn',by:'s_zed',n:'Zed',day:-4}];
+const notes=look?[{c:'w',r:0,t:'Wanted: help carrying chairs to the bandstand',by:'s_a',n:'Ada',re:[],tk:{by:'s_c',n:'Cy'}},{c:'o',r:0,t:'Offered: spare blankets for the concert',by:'s_b',n:'Ben',re:[{t:'Two please!',by:'s_c',n:'Cy'}]},{c:'w',r:1,t:'Wanted: a ladder for the weekend',by:'s_c',n:'Cy',re:[]}]:[];
+const genesis={schema:'genesis/1',name:'Soul Actions · Posters',constants:{extent:350,ground:'land'},batches:[{note:'Owned isolated posters acceptance',ops:[
+ {op:'place',def:'core/poster-wall@1',name:'poster-wall',p:[-1.7,4],r:Math.PI,state:{text:'posters',textBy:JSON.stringify(near)}},
+ {op:'place',def:'core/wanted-board@1',name:'wanted-board',p:[2.0,4],r:Math.PI,...(notes.length?{state:{text:'notes',textBy:JSON.stringify(notes)}}:{})},
+ ...Array.from({length:200},(_,i)=>({op:'place',def:i%2?'core/poster-wall@1':'core/wanted-board@1',name:`distant-${i%2?'wall':'board'}-${i}`,p:[60+i%20*5,60+Math.floor(i/20)*5],state:{text:'distant',textBy:i%2?wall:board}}))]}]};
+writeFileSync(out+'/genesis.json',JSON.stringify(genesis));
+Object.assign(process.env,{HOST:'127.0.0.1',AUTH_PROVIDER:'none',INVITE_REQUIRED:'0',MIND_DRIVER:'edge',WORLD_OWNER_ID:'dev:admin',EDGE_SKILL_FILE:resolve('tools/world-launcher/soul/skill.md'),EDGE_INSTRUCTIONS_FILE:resolve('tools/world-launcher/soul/instructions.md'),EDGE_CONTROLLER_CLI_FILE:resolve('tools/world-launcher/soul/eden.mjs'),EDGE_CLI_FILE:resolve('tools/edge-skill/eden-agent.mjs'),MARS_WEB_DIR:resolve('mars/viewer/public'),WEB_DIR:resolve('apps/web/dist'),ANTHROPIC_API_KEY:'',OPENAI_API_KEY:'',ARCHIVE_TAKES:'0',TAKES_PERSIST:'0'});
+const w=await startWorld({slug:'soul-posters',port,data:out+'/data',genesis:out+'/genesis.json',log:out+'/server.log'});writeFileSync(out+'/world.json',JSON.stringify({base:w.base,pid:w.child.pid,dataDir:w.dataDir}));w.child.unref();console.log(JSON.stringify({base:w.base,pid:w.child.pid}));process.exit();

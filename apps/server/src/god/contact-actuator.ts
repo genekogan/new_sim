@@ -1,9 +1,10 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,strokePoint,strokeRoot,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,strokePoint,strokeRoot,twoHanded,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
-import { opSchema, contactStateKey, pinSlot, signupSlot, pollSlot, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
+import { opSchema, contactStateKey, pinSlot, signupSlot, pollSlot, posterSlot, posterList, posterPaper, wantedSlot, wantedList, POSTER_W, POSTER_H, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
+import { posterName, posterFreeSlot, posterTarget, posterAge, posterStale, wantedColumn, wantedFreeRow, wantedTarget } from './poster-boards.ts';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionPatch, actionsOf, actuatedState, boardTextProblem, isListAction, listProblem, pinNotes, pollChoice, pollLines, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
@@ -28,9 +29,24 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // Entry 25: a sign-up name goes on the sheet's next line (or comes off its own); a vote is a tally mark beside the option.
     if(list){const st=actuatedState(e,def),names=pinNotes(st),i=action==='vote'?Math.max(0,pollChoice(st,input.choice)):action==='sign'?names.length:Math.max(0,names.map(n=>n.by).indexOf(soul.soulId)),[dx,dy]=(action==='vote'?pollSlot(i):signupSlot(i)).map(v=>v*wp.s);params.at=[centre[0]+dx*c+s*.04,centre[1]+dy,centre[2]-dx*s+c*.04];}
     if(pin){const notes=pinNotes(actuatedState(e,def)),i=action==='pin'?notes.length:notes.map(n=>n.by).lastIndexOf(soul.soulId),[dx,dy]=pinSlot(Math.max(0,i)).map(v=>v*wp.s);params.at=[centre[0]+dx*c+s*.04,centre[1]+dy,centre[2]-dx*s+c*.04];}
+    // Entry 38: a poster goes up at (or comes down from) its slot with both hands; a wanted/offered note at its column and row,
+    // a reply on the note's lower half, "taken by" across the note.
+    const posters=!!def.tags?.includes('posters'),wanted=!!def.tags?.includes('wanted');
+    const local=(dx:number,dy:number,out:number):[number,number,number]=>[centre[0]+dx*wp.s*c+s*out,centre[1]+dy*wp.s,centre[2]-dx*wp.s*s+c*out];
+    let sheet:{title:string;detail:string;name:string;paper:number;age?:number}|undefined;
+    if(posters){const st=actuatedState(e,def),list=posterList(st),p=action==='pin'?null:posterTarget(st,soul,input.which),slot=action==='pin'?Math.max(0,posterFreeSlot(list)):(p?.s??0),[dx,dy]=posterSlot(slot);
+     params.at=local(dx,dy,.004);
+     const title=action==='pin'?String(input.title??'').trim():p?.t??'',detail=action==='pin'?String(input.detail??'').trim():p?.d??'';
+     sheet={title:title.slice(0,40),detail:detail.slice(0,80),name:(action==='pin'?posterName(soul):p?.n??'').slice(0,40),paper:posterPaper(title,action==='pin'?posterName(soul):p?.n??''),...(p?{age:Math.min(99,posterAge(p))}:{})};}
+    if(wanted){const st=actuatedState(e,def),list=wantedList(st);let col=0,row=0,dx=0,dy=0;
+     if(action==='pin'){const k=wantedColumn(input)??'w';col=k==='o'?1:0;row=Math.max(0,wantedFreeRow(list,k));}
+     else{const n=wantedTarget(st,soul,input.note,action==='unpin'?'own':'any');col=n?.c==='o'?1:0;row=n?.r??0;if(action==='reply'){dx=.06;dy=-.075-.03*(n?.re.length??0);}if(action==='take-on'){dx=.1;dy=-.01;}}
+     const [sx,sy]=wantedSlot(col,row);params.at=local(sx+dx,sy+dy,.04);}
     // Stand clear of the board's own footprint (its depth beyond the face) with a body radius to spare.
     const stand=Math.min(.7,Math.max(STROKE_STAND,(def.size.box[2]/2-(face.at[2]??0))*wp.s+HUMAN_RADIUS+.06-.04));
-    params.stroke=list?{kind:action==='unsign'?'wipe':'write',yaw:wp.yaw,stand,width:action==='vote'?.1:Math.min(.16,(face.w??.4)*wp.s*.45),height:.05,lines:1,seconds:action==='unsign'?1.0:1.4}:pin?{kind:action==='unpin'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.22,(face.w??.6)*wp.s*.25),height:.06,lines:1,seconds:action==='unpin'?1.2:1.6}:{kind:action==='erase'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:Math.min(6,1.2+1.6*lines)};   // 1.2+1.6*3 is 6.000000000000001 in floating point; the schema caps a stroke at 6 s (a three-line note failed)
+    if(posters)params.stroke={kind:action==='unpin'?'unposter':'poster',yaw:wp.yaw,stand:Math.max(.4,stand),width:POSTER_W*wp.s,height:POSTER_H*wp.s,lines:1,seconds:action==='unpin'?3.4:4.2,...(sheet?{sheet}:{})};
+    else if(wanted)params.stroke={kind:action==='unpin'?'wipe':'write',yaw:wp.yaw,stand,width:action==='take-on'?.14:action==='reply'?.16:.22,height:.05,lines:1,seconds:action==='unpin'?1.2:action==='take-on'?1.2:1.6};
+    else params.stroke=list?{kind:action==='unsign'?'wipe':'write',yaw:wp.yaw,stand,width:action==='vote'?.1:Math.min(.16,(face.w??.4)*wp.s*.45),height:.05,lines:1,seconds:action==='unsign'?1.0:1.4}:pin?{kind:action==='unpin'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.22,(face.w??.6)*wp.s*.25),height:.06,lines:1,seconds:action==='unpin'?1.2:1.6}:{kind:action==='erase'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:Math.min(6,1.2+1.6*lines)};   // 1.2+1.6*3 is 6.000000000000001 in floating point; the schema caps a stroke at 6 s (a three-line note failed)
     root=strokeRoot(params.at,params.stroke,wp.y);
    }else if(def.components.opening){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];tint?:string}[]})?.shapes:undefined;
@@ -47,7 +63,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   sign(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),sign=def?.components.sign as {lines?:string[]}|undefined;if(!e||!def||!sign)return null;
    const text=typeof e.state?.text==='string'&&e.state.text.trim()?e.state.text:(sign.lines??[]).join('\n');
-   return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,...(def.tags?.includes('pinboard')?{notes:pinNotes(e.state??{})}:{}),...(def.tags?.includes('signup')?{title:String(e.state?.title??''),text:[String(e.state?.title??'Sign up'),...pinNotes(e.state??{}).map((n,i)=>`${i+1}. ${n.text}`)].join('\n')}:{}),...(def.tags?.includes('poll')?{title:String(e.state?.title??''),text:[String(e.state?.title??''),pollLines(e.state??{})].join('\n')}:{}),by:typeof e.state?.textBy==='string'&&e.state.textBy&&!def.tags?.some(t=>t==='poll'||t==='signup')?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
+   return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,...(def.tags?.includes('pinboard')?{notes:pinNotes(e.state??{})}:{}),...(def.tags?.includes('signup')?{title:String(e.state?.title??''),text:[String(e.state?.title??'Sign up'),...pinNotes(e.state??{}).map((n,i)=>`${i+1}. ${n.text}`)].join('\n')}:{}),...(def.tags?.includes('poll')?{title:String(e.state?.title??''),text:[String(e.state?.title??''),pollLines(e.state??{})].join('\n')}:{}),...(def.tags?.includes('posters')?{posters:posterList(e.state??{}).map(p=>({...p,age:posterAge(p),stale:posterStale(p)}))}:{}),...(def.tags?.includes('wanted')?{wanted:wantedList(e.state??{})}:{}),by:typeof e.state?.textBy==='string'&&e.state.textBy&&!def.tags?.some(t=>t==='poll'||t==='signup'||t==='posters'||t==='wanted')?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
   },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
@@ -70,7 +86,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(!e||!def||!a||binding(intent.target)!==intent.binding)return fail('contact.target-changed','The target changed during the approach; no action was applied.');
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
-   const hand=b?.human?.hands?.left??b?.human?.hands?.right;
+   const hand=twoHanded(motion?.stroke)?b?.human?.hands?.right:b?.human?.hands?.left??b?.human?.hands?.right;
    const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);

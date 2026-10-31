@@ -1,4 +1,4 @@
-import {handActuatorFrame,type HandActuatorMotion} from '../../../mars/viewer/engine/social/hand-actuator.ts';
+import {handActuatorFrame,HAND_REACH_SECONDS,type HandActuatorMotion} from '../../../mars/viewer/engine/social/hand-actuator.ts';
 // The entity world's picture (spec <eden4>/28 §8): terrain baked from the
 // same ground recipe the server uses, water, a horizon ring, and one mesh per
 // placed entity drawn from its def. Diffs arrive over the hub as
@@ -107,8 +107,13 @@ export class WorldEntityLayer {
   drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
     // M01: no per-frame array; leaf parts found once per drawn object; an unchanged angle (the release and
     // idle hand-off) leaves the leaf and its matrices alone. The angle is still the depicted tick's.
+    const peeled=new Set<THREE.Object3D>();
     for(const id in entities){
-      const m=entities[id].state.handActuator as HandActuatorMotion|undefined;if(!m?.opening)continue;
+      const m=entities[id].state.handActuator as HandActuatorMotion|undefined;
+      // Soul Actions entry 38: a poster being taken down is drawn in the hands (humans.ts) from the moment the peel starts;
+      // the wall's own copy of it is hidden until the wall redraws without it at the depicted commit
+      if(m?.stroke?.kind==='unposter'&&m.abortedAt===undefined&&(tick-m.startTick)*dt>=HAND_REACH_SECONDS){const d=this.drawn.get(m.target);if(d){let best:THREE.Object3D|null=null,bd=.12;d.obj.traverse(o=>{if(!o.name.startsWith('poster-slot-'))return;const p=o.getWorldPosition(new THREE.Vector3()),dd=Math.hypot(p.x-m.at[0],p.y-m.at[1],p.z-m.at[2]);if(dd<bd){bd=dd;best=o;}});if(best){(best as THREE.Object3D).visible=false;peeled.add(best);}}continue;}
+      if(!m?.opening)continue;
       const d=this.drawn.get(m.target);if(!d)continue;
       const angle=handActuatorFrame(m,(tick-m.startTick)*dt).angle;
       let leaf=this.leaves.get(d.obj);
@@ -118,8 +123,13 @@ export class WorldEntityLayer {
       for(const o of leaf.parts)o.rotation.y=angle;d.obj.updateMatrixWorld(true);
       this.stats.leafWrites++;
     }
+    for(const o of this.peeled)if(!peeled.has(o))o.visible=true;
+    this.peeled=peeled;
   }
+  private peeled=new Set<THREE.Object3D>();
   private readonly leaves=new WeakMap<THREE.Object3D,{parts:THREE.Object3D[];angle:number}>();
+  /** Entry 38: redraw every drawn thing whose def has this tag (posters age by the world day shown). */
+  redrawTagged(tag:string){const m=this.model;if(!m)return;for(const id of this.drawn.keys()){const e=m.entities.get(id),def=e&&m.resolvedDef(e.def);if(e&&def?.tags.includes(tag))this.draw(e,false,true);}}
   /** Does this placed thing publish a lamp pool or a lighthouse beam (world-env's scan)? */
   private lit(id:string){const e=this.model?.entities.get(id),def=e&&this.model!.resolvedDef(e.def);return !!def&&(defLights(def.components).length>0||!!def.tags?.includes('lighthouse'));}
   /** M01: bumped only by a diff that can change a lamp pool (world-env's immediate repaint); other diffs keep its 2 Hz gate. */

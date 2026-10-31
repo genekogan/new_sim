@@ -9,7 +9,8 @@ import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
 import { apiPath } from '../../world-path.ts';
 import { artOf, brokenLinkLines, coverWhenReady, imageBroken, imageFailed, imageLoaded, videoTexture, whenImageFails } from '../art-media.ts';
-import { frameMediaKind, pinSlot, signupSlot, pollSlot, pollOptions } from '@sim/world-compiler';
+import { frameMediaKind, pinSlot, signupSlot, pollSlot, pollOptions, posterSlot, posterList, posterPaper, wantedSlot, wantedList, POSTER_W, POSTER_H, type WantedRec } from '@sim/world-compiler';
+import { posterMesh, posterAgeDays } from '../../../../../mars/viewer/app/engine-view/poster-sheet.ts';
 
 type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean; slot?: number };
 const texCache = new Map<string, THREE.Texture>();
@@ -127,6 +128,65 @@ export function pollTexture(title: string, options: string[], counts: number[], 
   });
   return done(c, key);
 }
+/** Soul Actions entry 38: the poster wall's own face: painted vertical boards with gaps, the torn scraps and staple marks of
+ *  older posters, a little grime toward the foot. The posters themselves are separate meshes (poster-sheet.ts). */
+export function posterWallTexture(f: Face): THREE.Texture {
+  const key = JSON.stringify(['poster-wall', f.w, f.h, f.bg]); const hit = texCache.get(key); if (hit) return hit;
+  const { c, g, cw, ch, px } = canvasOf(f, 2048); let seed = 23; const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 13), 1103515245) + 12345 | 0) >>> 0) / 4294967296;
+  g.fillStyle = f.bg ?? '#4c6a58'; g.fillRect(0, 0, cw, ch);
+  const plank = 0.16 * px;
+  for (let x = 0, i = 0; x < cw; x += plank, i++) {
+    g.fillStyle = `rgba(${i % 2 ? '255,255,255' : '0,0,0'},${0.025 + rnd() * 0.04})`; g.fillRect(x, 0, plank, ch);
+    for (let k = 0; k < 40; k++) { g.strokeStyle = `rgba(0,0,0,${0.03 + rnd() * 0.05})`; g.lineWidth = 1 + rnd() * 2; const xx = x + rnd() * plank; g.beginPath(); g.moveTo(xx, 0); g.bezierCurveTo(xx + (rnd() - 0.5) * 12, ch * 0.3, xx + (rnd() - 0.5) * 12, ch * 0.7, xx + (rnd() - 0.5) * 10, ch); g.stroke(); }
+    g.fillStyle = 'rgba(15,20,16,0.55)'; g.fillRect(x - 2, 0, 4, ch);
+  }
+  // scraps of older posters: pale torn fragments with a hint of print, and the staples that held them
+  const scrapInk = ['#b8432f', '#2f4f8f', '#30614a', '#2b2118'];
+  for (let i = 0; i < 26; i++) {
+    const x = rnd() * cw, y = rnd() * ch, w = (0.03 + rnd() * 0.09) * px, h = (0.02 + rnd() * 0.07) * px;
+    g.save(); g.translate(x, y); g.rotate((rnd() - 0.5) * 0.5); g.fillStyle = ['#e9e1c8', '#ece4a8', '#d4dfe2', '#e8cfd0', '#efede4'][Math.floor(rnd() * 5)]; g.globalAlpha = 0.55 + rnd() * 0.3;
+    g.beginPath(); g.moveTo(-w / 2, -h / 2); for (let k = 0; k <= 8; k++) g.lineTo(-w / 2 + (w * k) / 8, -h / 2 + (rnd() - 0.5) * 10); for (let k = 8; k >= 0; k--) g.lineTo(-w / 2 + (w * k) / 8, h / 2 + (rnd() - 0.5) * 14); g.closePath(); g.fill();
+    if (rnd() < 0.6) { g.fillStyle = scrapInk[Math.floor(rnd() * 4)]; g.globalAlpha *= 0.5; g.fillRect(-w * 0.35, -h * 0.2, w * 0.7 * rnd(), h * 0.18); }
+    g.restore();
+  }
+  g.globalAlpha = 1;
+  for (let i = 0; i < 90; i++) { const x = rnd() * cw, y = rnd() * ch; g.strokeStyle = 'rgba(190,190,180,0.7)'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + 9, y + (rnd() - 0.5) * 3); g.stroke(); }
+  const grime = g.createLinearGradient(0, ch * 0.7, 0, ch); grime.addColorStop(0, 'rgba(30,25,15,0)'); grime.addColorStop(1, 'rgba(30,25,15,0.35)'); g.fillStyle = grime; g.fillRect(0, 0, cw, ch);
+  return done(c, key);
+}
+/** Entry 38: the wanted/offered board: cork, two painted headers (WANTED, OFFERED), each note a signed card in its column's
+ *  slot (wantedSlot, where the hand went), replies under it in a different hand, "TAKEN" stamped across a taken note. */
+export function wantedTexture(notes: WantedRec[], f: Face): THREE.Texture {
+  const key = JSON.stringify(['wanted', notes, f.w, f.h, f.bg]); const hit = texCache.get(key); if (hit) return hit;
+  const { c, g, cw, ch, px } = canvasOf(f, 1536); let seed = 5; const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 13), 1103515245) + 12345 | 0) >>> 0) / 4294967296;
+  g.fillStyle = f.bg ?? '#b88a5a'; g.fillRect(0, 0, cw, ch);
+  for (let i = 0; i < 5200; i++) { g.fillStyle = rnd() < 0.5 ? 'rgba(70,40,15,0.22)' : 'rgba(235,200,150,0.18)'; g.fillRect(rnd() * cw, rnd() * ch, 2 + rnd() * 3, 2 + rnd() * 3); }
+  g.fillStyle = 'rgba(60,35,15,0.5)'; g.fillRect(cw / 2 - 3, 0.12 * px, 6, ch);   // the line between the columns
+  for (const [col, label, paint] of [[0, 'WANTED', '#8e2f22'], [1, 'OFFERED', '#2f6046']] as const) {
+    const [sx] = wantedSlot(col, 0), x = (sx / f.w + 0.5) * cw, w = 0.5 * px, h = 0.085 * px, y = 0.07 * px;
+    g.fillStyle = 'rgba(20,10,5,0.35)'; g.fillRect(x - w / 2 + 5, y - h / 2 + 6, w, h); g.fillStyle = paint; g.fillRect(x - w / 2, y - h / 2, w, h);
+    g.fillStyle = '#f3ead2'; g.font = `800 ${Math.round(0.058 * px)}px Georgia, 'Times New Roman', serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(label, x, y + 2, w * 0.9);
+  }
+  const papers = ['#fbf6e4', '#fdf0a6', '#d9ecf7', '#f8dbe0', '#e3f2d6'], hash = (t: string) => { let h = 2166136261; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+  for (const n of notes) {
+    const [sx, sy] = wantedSlot(n.c === 'o' ? 1 : 0, n.r), x = (sx / f.w + 0.5) * cw, y = (0.5 - sy / f.h) * ch, w = 0.62 * px, h = 0.25 * px, r = hash(n.t + n.n);
+    g.save(); g.translate(x, y); g.rotate((r - 0.5) * 0.06);
+    g.fillStyle = 'rgba(30,15,5,0.35)'; g.fillRect(-w / 2 + 6, -h / 2 + 8, w, h); g.fillStyle = papers[Math.floor(r * papers.length)]; g.fillRect(-w / 2, -h / 2, w, h);
+    const words = n.t.replace(/^(?:wanted|offered)\s*[:\-–—]?\s*/i, '');
+    g.fillStyle = '#26221e'; g.textAlign = 'left'; g.textBaseline = 'top';
+    let size = 44, wrapped: string[] = [];
+    for (; size >= 24; size -= 2) { g.font = `600 ${size}px 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive`; wrapped = []; for (const word of words.split(/\s+/)) { const last = wrapped.at(-1); if (last !== undefined && g.measureText(last + ' ' + word).width <= w - 40) wrapped[wrapped.length - 1] = last + ' ' + word; else wrapped.push(word); } if (wrapped.length <= 2) break; }
+    wrapped.slice(0, 2).forEach((l, k) => g.fillText(l, -w / 2 + 20, -h / 2 + 14 + k * size * 1.1));
+    g.font = `italic 600 26px Georgia, serif`; g.fillStyle = '#5a3d22'; g.textAlign = 'right'; g.fillText('— ' + n.n, w / 2 - 18, -h / 2 + 18 + Math.min(2, wrapped.length) * size * 1.1);
+    // replies, each in the replier's own blue ink, signed
+    n.re.slice(0, 2).forEach((re, k) => { g.textAlign = 'left'; g.fillStyle = '#1d3f8f'; g.font = `500 27px 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive`; g.fillText(`↳ ${re.t} — ${re.n}`, -w / 2 + 34, h / 2 - 72 + k * 33, w - 60); });
+    g.fillStyle = ['#c62f2a', '#2a62c6', '#2f9a4a'][Math.floor(r * 3)]; g.beginPath(); g.arc(0, -h / 2 + 10, 11, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); g.arc(-3, -h / 2 + 7, 3.5, 0, Math.PI * 2); g.fill();
+    if (n.tk) { g.save(); g.translate(w * 0.17, -h * 0.02); g.rotate(-0.16); g.strokeStyle = 'rgba(178,34,34,0.85)'; g.lineWidth = 6; g.strokeRect(-w * 0.22, -32, w * 0.44, 64); g.fillStyle = 'rgba(178,34,34,0.88)'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 34px 'Courier New', monospace`; g.fillText(`TAKEN · ${n.tk.n}`.toUpperCase(), 0, 2, w * 0.42); g.restore(); }
+    g.restore();
+  }
+  return done(c, key);
+}
 function paintingTexture(seed: number, bg: string): THREE.Texture {
   const key = `painting:${seed}:${bg}`; const hit = texCache.get(key); if (hit) return hit;
   const c = document.createElement('canvas'); c.width = 128; c.height = 96; const g = c.getContext('2d')!;
@@ -161,6 +221,8 @@ registerMesh({
       else if (f.media && f.slot !== undefined) map = textTexture([''], f);
       else if (f.media && text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
       else if (f.media) map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');
+      else if (ctx.def.tags.includes('posters')) map = posterWallTexture(f);
+      else if (ctx.def.tags.includes('wanted')) map = wantedTexture(wantedList(st), f);
       else if (ctx.def.tags.includes('pinboard')) map = pinboardTexture(typeof st.text === 'string' ? st.text.split('\n') : [], f);
       else if (ctx.def.tags.includes('signup')) map = signupTexture(String(st.title ?? ''), typeof st.text === 'string' && st.text ? st.text.split('\n') : [], f);
       else if (ctx.def.tags.includes('poll')) { const opts = pollOptions(st), votes = typeof st.textBy === 'string' && st.textBy ? st.textBy.split(',').map((v) => Number(v.split(':')[1])) : []; map = pollTexture(String(st.title ?? ''), opts, opts.map((_, i) => votes.filter((v) => v === i).length), f); }
@@ -171,6 +233,11 @@ registerMesh({
       plane.position.set(...f.at); plane.rotation.set(f.pitch ?? 0, f.yaw ?? 0, 0, 'YXZ'); plane.name = 'sign-face';
       if (art) { plane.userData.art = art; coverWhenReady(map, plane.geometry as THREE.PlaneGeometry, f.w / f.h); }
       root.add(plane);
+      // entry 38: each poster is its own paper on the wall, in its slot (the place the hands put it)
+      if (ctx.def.tags.includes('posters')) for (const p of posterList(st)) {
+        const [dx, dy] = posterSlot(p.s), mesh = posterMesh({ t: p.t, d: p.d, n: p.n, paper: posterPaper(p.t, p.n), age: posterAgeDays(p.day) }, POSTER_W, POSTER_H);
+        mesh.position.set(f.at[0] + dx, f.at[1] + dy, f.at[2] + 0.004); mesh.name = 'poster-slot-' + p.s; mesh.userData.poster = p; root.add(mesh);
+      }
     }
     return root;
   },

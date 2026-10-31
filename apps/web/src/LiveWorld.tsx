@@ -1,3 +1,4 @@
+import { setPosterDay } from '../../../mars/viewer/app/engine-view/poster-sheet.ts';
 import {WorldContextViews} from './WorldContextViews.ts';
 import { whenAssetsSettled } from './gen-mesh/gltf-assets.ts';
 import {ALL_OPTIONAL_APPEARANCE_PROFILES,type OptionalAppearanceProfiles} from './optional-appearance-profiles-all.ts';
@@ -569,7 +570,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
     // Current unbound live viewers retain their observed layout. Historical
     // bound segments load their verified base; old unbound history uses neutral ground.
-    let dayTicks: number | null = null;
+    let dayTicks: number | null = null, dayOrigin: number | null = null;
     let base: ReturnType<typeof parseSceneInfo>['scene'] = null, sceneSettled = false, people: TakePeople | WorldLightPeople | null = null;
     let peopleKitRetryAt=0;
     let appearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES;
@@ -609,7 +610,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       clearNewcomerMarkers();restMarkers?.dispose();restMarkers=null;publication=verifiedPublication??null;expansionSceneInfo=info;
       refreshCameraGround();
       people?.dispose();people=null;applied=null;
-      base=info.scene;nativeBoat=info.shore?.metadata.boat&&info.shore.appearance?{layout:info.shore.metadata.boat.layout,proposal:info.shore.appearance.boat}:undefined;dayTicks=info.clock?.dayTicks??null;broadcast.reset();followView.reset();followed=null;
+      base=info.scene;nativeBoat=info.shore?.metadata.boat&&info.shore.appearance?{layout:info.shore.metadata.boat.layout,proposal:info.shore.appearance.boat}:undefined;dayTicks=info.clock?.dayTicks??null;dayOrigin=info.clock?.origin??null;broadcast.reset();followView.reset();followed=null;
       capturedPlatforms=info.platforms??null;
       geometry.dispose();geometry=new WorldGeometry(base,info.ground,info.commons,info.shore,info.assetRoot);scene.add(geometry.group);light.fit(geometry.bounds);light.setCommonsReadability(geometry.hasAuthoredCommons);dressForkLand(geometry.group);  // MARSLAND-FORK: layer 3 around the Mars fork
       // Cosmetic paths require the verified full public capture and exact Core
@@ -861,6 +862,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const datetime = clock ? shiftIso(clock, clockOffset) : null;
           light.update(shotClockAt(clock?shiftIso(clock,clockOffset,true):null,shotHour??visitorPreviewHour()));
           entityLayer.sites.setWorldClock(datetime,dayTicks?86400/(dayTicks*dt):1);
+          // Soul Actions entry 38: posters age by the world day shown (redrawn only when that day changes)
+          if(dayTicks&&dayOrigin!==null&&setPosterDay(Math.floor(Math.max(0,depictedTick-dayOrigin)/dayTicks)))entityLayer.redrawTagged('posters');
           const godLit=!!godLiving&&entityLayer.active;light.setNightLighting(!!expansion||godLit);if(!godLit)setNightLightStrength(expansion?light.daylight:1);houseWindows?.setNight(nightLightStrength());
           shown.current = { tick: depictedTick, datetime, take, entities: sampled.entities };
           brokenTake = null;
