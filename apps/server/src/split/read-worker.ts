@@ -231,7 +231,13 @@ function health(res: ServerResponse) {
   const mainGen = lag[0];
   const tick = tickNow();
   send(res, tick >= 0 ? 200 : 503, {ok: tick >= 0, worker: wd.index, gen, lagGens: Math.max(0, mainGen - gen), tick, subset: wd.mode === 1, mode: wd.mode, served: cost.served, forwarded: cost.forwarded,
-    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, byRead: Object.fromEntries(Object.entries(byRead).map(([k, v]) => [k, {...v, cpuMs: Math.round(v.cpuMs * 10) / 10, maxCpuMs: Math.round(v.maxCpuMs)}])), cpuMs: Math.round(c2.cpuMs), threadCpuMs: Math.round(cpuMs()), bg: {...bg, cpuMs: Math.round(bg.cpuMs)}, ingest: {deltas: cost.deltas, cpuMs: Math.round(cost.ingestCpuMs), maxCpuMs: Math.round(cost.maxIngestCpuMs)}, verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null, god: RL ? R2.readBridgeCost(RL) : null}} : {})});
+    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, db: dbFacts(), ...c2, byRead: Object.fromEntries(Object.entries(byRead).map(([k, v]) => [k, {...v, cpuMs: Math.round(v.cpuMs * 10) / 10, maxCpuMs: Math.round(v.maxCpuMs)}])), cpuMs: Math.round(c2.cpuMs), threadCpuMs: Math.round(cpuMs()), bg: {...bg, cpuMs: Math.round(bg.cpuMs)}, ingest: {deltas: cost.deltas, cpuMs: Math.round(cost.ingestCpuMs), maxCpuMs: Math.round(cost.maxIngestCpuMs)}, verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null, god: RL ? R2.readBridgeCost(RL) : null}} : {})});
+}
+/** The worker's read-only view of the database: in a read transaction (a pinned WAL snapshot: it would read old rows
+ *  forever) and the newest receipt row it sees (diagnosis: compare with main's). */
+function dbFacts() {
+  const d = RH?.db.db as unknown as {isTransaction?: boolean; prepare(q: string): {get(): unknown}} | undefined; if (!d) return null;
+  try {return {inTx: d.isTransaction ?? null, receiptsMaxRowid: (d.prepare('SELECT max(rowid) AS n FROM edge_receipts_v1').get() as {n: number | null}).n};} catch (e) {return {error: String(e).slice(0, 120)};}
 }
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-length', 'upgrade', 'expect']);
 /** Ask the main thread (through Admission) and relay its answer. */
