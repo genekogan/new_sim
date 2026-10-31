@@ -39,7 +39,6 @@ import { setKitViewerContract } from '@sim/generators';
 import { rehearseRestore, standby } from './standby.ts';
 import { coreLibrary } from '@sim/world-compiler';
 import { startWatchdog, writeLiveNow } from './load/watchdog.ts';
-import { bootPhase } from './load/boot-progress.ts';
 import { LoadMonitor } from './load/monitor.ts';
 import { Admission } from './load/admission.ts';
 import { WakingLimit } from './load/waking.ts';

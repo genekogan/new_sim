@@ -253,7 +253,9 @@ export function admissionMiddleware(adm: Admission, level: () => Level, bearer: 
     const line = r.cls === 'C1' && !r.god ? crowded?.(token) : null;
     if (line) { stamp(c, lv, token); c.header('Cache-Control', 'no-store'); c.header('Retry-After', String(Math.max(1, Math.min(line.eta_s, 60))));
       return c.json({contract: 'eden-edge/1', error: {code: 'world.crowded', message: crowdedNote(line), position: line.position, eta_s: line.eta_s}, world: worldBlock(lv, Math.max(1, Math.min(line.eta_s, 60)))}, 503); }
-    if (c.req.method !== 'GET' && c.req.method !== 'HEAD') await c.req.text().catch(() => '');   // read the body before the turn: its I/O is not request CPU
+    // the body is NOT pre-read here: god/ingestion.ts and edge/body/routes.ts measure/stream the raw body with their own
+    // reader, and a stream Hono has already consumed is locked (R2 integration: every POST /v1/god/* answered 500). Body
+    // I/O therefore counts inside the handler's turn; the launcher caps bodies at 64 KB, so the cost is negligible.
     // the client went away = its socket closed (not `incoming.destroyed`: a fully read request body is destroyed too)
     const env = c.env as {incoming?: {socket?: {destroyed?: boolean}}} | undefined, hint = Number(c.req.header('x-sim-timeout-ms'));
     const t = adm.request({key: r.god ? 'god' : 'soul:' + token, god: r.god, route: r, hintMs: Number.isFinite(hint) ? hint : undefined, closed: () => env?.incoming ? env.incoming.socket?.destroyed === true : c.req.raw.signal?.aborted === true});

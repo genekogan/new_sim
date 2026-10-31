@@ -18,7 +18,7 @@ test('request classes follow LOAD-CONTRACT §2', () => {
 });
 
 test('ceilings: address rate, listen per Soul / account / address, account rate, world budget, body, token', () => {
-  let t = 0; const c = soulCeilings({ now: () => t, log: () => {}, limitsFor: () => ({ ipPer10s: 5, worldBudgetRps: 3, accountHeavyPerMin: 8 }) });
+  let t = 0; const c = soulCeilings({ now: () => t, log: () => {}, limitsFor: () => ({ ipPer10s: 5, worldBudgetRps: 3, accountHeavyPerMin: 8, soulListen: 2, accountListen: 8 }) });
   const soul = (tok, ip = '1.1.1.1', m = 'POST') => req(m, { authorization: `Bearer sim_s_${tok}_x`, 'x-forwarded-for': ip });
   const ok = (r) => { assert.ok(r && !r.refuse, JSON.stringify(r?.refuse?.body)); r.release(); return r; };
   for (let i = 0; i < 6; i++) ok(c.check(soul(`a${i}`, `9.9.9.${i}`), "w", "/v1/edge/act", true));   // the budget's 2 s burst, 6 Souls

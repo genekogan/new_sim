@@ -66,8 +66,8 @@ export const SOUL_CEILINGS = Object.freeze({
   ipPer10s: 120,            // Soul API requests per address per world per 10 s
   ipConcurrent: 10,         // API requests in flight + WebSockets per address
   ipListen: 8,              // listen/wait long-polls per address
-  soulListen: 2,            // listen/wait per Soul token
-  accountListen: 8,         // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
+  soulListen: 4,            // listen/wait per Soul token
+  accountListen: 12,        // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
   accountHeavyPerMin: 120,  // C1/C2 per account (as above) per minute
   worldBudgetRps: 10,       // C1/C2 forwarded to the world per second, every Soul together (bursts of 2 s)
   maxBodyKb: 64,            // a Soul API request body (body uploads excepted)
