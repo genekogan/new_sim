@@ -1,0 +1,81 @@
+# Worlds and the launcher
+
+A world is one world-server process (`apps/server/src/main.ts`) with its own database, clock and log. What kind of world
+it is comes from configuration:
+
+| Setting | Effect |
+|---|---|
+| `WORLD_KEY` | `toy`, `mars`, `littlemartians`, `eden` select authored worlds with their own content; any other key is an entity world on the green field |
+| `ENABLE_WORLD_ENGINE=1` | God mode and the entity world model (on for every non-authored key) |
+| `ENGINE` | `mars` (the vendored Mars engine) or `toy` (default) |
+| `WORLD_ID`, `WORLD_PATH`, `PUBLIC_URL` | Identity and public address; the world derives its base URL from `PUBLIC_URL` + `WORLD_PATH` |
+| `MIND_DRIVER` | `edge` (default) or `central`; see [brain](brain.md) |
+| `GENESIS_FILE` | A template the world is built from on first boot |
+
+## The world launcher (`tools/world-launcher`)
+
+`launcher.mjs` runs many worlds behind one address. In production it is served under `/worlds`
+(`https://sim.eden.art/worlds`); locally it listens on port 4980 and starts worlds on ports 5101–5149.
+
+- **Homepage and list.** `GET <base>/` serves the web app's world list; `<base>/__sim/worlds.json` lists worlds and
+  `<base>/__sim/templates.json` the templates.
+- **Creating a world.** `POST <base>/__sim/worlds` with a signed-in session. The launcher checks account limits, allocates
+  a slug and directory, starts the child with the creator as `WORLD_OWNER_ID` and the chosen template as `GENESIS_FILE`, and
+  claims the world for its creator.
+- **Proxying.** `<base>/w/<slug>/*` is proxied to the child (HTTP, SSE and WebSocket). A request to a sleeping world
+  starts it.
+- **Sleeping.** Children are restarted after a crash (with backoff), paused after a period without visitors, and may be
+  released to exit later; the next visit wakes them. Unwatched worlds run at a slower clock
+  (`SIM_UNWATCHED_PACE`, 0.25 by default for children); on return, the time of day jumps to the present
+  (`apps/server/src/clock-catchup.ts`) without simulating the gap.
+- **Registry.** `<data>/worlds.json` records each world (slug, owner, template, flags). Reserved slugs include `toy`,
+  `mars`, `littlemartians`, `eden`, `assets`, `api`, `god` and `launcher`.
+- **Owner and operator API.** Handoff, archive and unlisting, and the loopback-only `op.mjs` commands: see
+  [API](api.md#world-owner-api-served-by-the-launcher).
+- **Keeper.** `keeper.mjs` holds the public port and hands over between launcher generations one world at a time, with
+  the first world as a canary and rollback on failure. Release mechanics are in [release](../release.md).
+
+### What a child runs with
+
+`children.mjs` builds each child's environment: `ENGINE=mars`, `ENABLE_WORLD_ENGINE=1`, `BRAIN_MODE=fake` with empty
+provider keys, `SEED_NATIVES=0`, `SOUL_LIFECYCLE=1`, `EDGE_FADING=1`, `SIM_UNWATCHED_PACE=0.25`, Clerk sign-in
+(`AUTH_PROVIDER=clerk`, `ACCOUNT_AUTH_REQUIRED=1`, `ACCOUNT_REGISTRY_PATH`), the world's identity and paths, the
+served skill and CLI files, the site relay settings (`SIM_SITE_URL`, `SIM_SITE_KEY`), and the Eyes settings when the
+launcher's own environment sets them (see [Souls](souls.md#eyes)).
+
+### Account limits
+
+The launcher counts the worlds each signed-in account owns before allocating anything (`creation-policy.mjs`):
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--max-worlds-per-account` | 5 | Worlds one account may own |
+| `--new-account-hours` | 24 | How long an account counts as new (from its first sign-in on this launcher) |
+| `--new-account-world-limit` | 2 | Total cap while new |
+| `--new-account-create-limit` | 1 | Worlds created per window while new |
+| `--new-account-window-minutes` | 60 | That window |
+
+Refusals: 409 `account-world-limit`, 429 `new-account-velocity` with `Retry-After`. A god label (`godName`) already
+shown on another account's world is refused with 409 `god-name-taken`.
+
+### The original worlds
+
+The original `eden`, `mars` and `littlemartians` worlds run as **forks** under the launcher (`fork-world.mjs`): a copy
+of that world's data served at `<base>/w/<key>` with Clerk sign-in, its own account registry, edge minds and the fake
+brain. A fork's boot must never shrink its history or change its Soul rows.
+
+## Travel between worlds
+
+A Soul can visit another world of the same launcher site (`apps/server/src/travel/`, mounted on worlds with god mode
+and the edge API). Its **home world** stays the authority on where it is.
+
+1. The origin checks the request and marks the Soul `departing`.
+2. It sends a small **passport** (name, description, owner, portable body look, recent travel log) through the
+   launcher's loopback relay (`/__sim/site/relay`) to the destination's `/v1/site/arrive`.
+3. The destination reuses the Soul's earlier local incarnation or creates one through the normal lifecycle, and returns
+   a new Soul token for the agent.
+4. The origin marks its incarnation `away` and tells the home world. On refusal or timeout nothing moves.
+
+Each world keeps its own history; only the passport moves. A god may close a world to visitors
+(`POST /v1/god/visitors {open:false}`, refusal `travel.closed`); leaving and coming home always work. The CLI's
+`travel <world>` and `travel home` switch the agent's folder to the new world. Uploaded bodies stay home.

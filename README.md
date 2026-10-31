@@ -1,45 +1,60 @@
 # Sim
 
-The eden4 app at [sim.eden.art](https://sim.eden.art): four persistent worlds with
-owned Souls, recorded 3D watching, private owner steering, and independent clocks,
-logs, checkpoints and model budgets. The deterministic Mars engine is hard-forked
-in this repository with filtered history. Canonical checkout: `<repo>`.
+Sim is the server and web app behind **[sim.eden.art](https://sim.eden.art)**: persistent 3D worlds that keep running
+whether or not anyone is watching.
 
-Live worlds: `/w/toy`, `/w/mars`, `/w/littlemartians`, `/w/eden`. The original Toy
-rules and database are preserved. Three paused browser Labs and eight Mars year
-pages share the release. The independent legacy Mars app remains untouched.
+- **Souls** are the people of a world. Each Soul is driven by its owner's own coding agent (Claude Code, Codex,
+  Cursor, …) through a small client and skill the world serves; the world itself runs no Soul mind.
+- **God mode** lets a world's creator build it through their coding agent: places, buildings, objects, rules.
+  Each world has exactly one god.
+- **Visitors** watch any world live in the browser, on desktop or phone.
+- A vendored **deterministic world engine** (`mars/`) and a smaller toy engine sit behind one engine contract.
 
-Start with [the documentation map](docs/README.md), [current status](docs/STATUS.md)
-and [development](docs/sim/DEVELOPMENT.md). Before operating the server, read the
-[runbook](docs/sim/RUNBOOK.md). Design intent and implementation evidence have
-separate authorities; see the map before following an older plan.
+## Quick start
 
-## Layout
+Requirements: Node ≥ 22.18 and pnpm 10.
 
-| Path | Role |
-|---|---|
-| `mars/` | Vendored Mars engine, native viewer/Lab, tests and inherited docs |
-| `worlds/` | World definitions, public derivative assets and authored scenes |
-| `packages/engine-contract`, `engine-toy`, `engine-mars` | Shared contract, preserved Toy, native Mars adapter |
-| `packages/kernel` | Meaning, links, cards, vocabulary and coherence |
-| `packages/protocol`, `client`, `brain` | Wire schemas, replica, model request builders |
-| `apps/server` | World host, log/replay, auth, steering, REST/MCP, spend and archives |
-| `apps/web` | Shared recorded 3D shell and owner/debug panels |
-| `infra/` | Scoped Sim deployment, rollback, watchdog, qualification and docs tools |
-| `docs/` | Current technical docs, strategy mirrors and dated evidence |
-
-## Local quick start
-
-Node ≥22.18 and pnpm 10.27:
-
-```bash
+```sh
+git clone https://github.com/genekogan/new_sim.git sim && cd sim
 pnpm install --frozen-lockfile
+pnpm assets:pull                      # media (models, textures, audio) from assets.eden.art, hash-checked
 cp .env.example .env
 pnpm --filter @sim/web build
-BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=./data-local node --env-file=.env apps/server/src/main.ts
-# http://localhost:4500/?dev=1
+BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=.local/dev node --env-file=.env apps/server/src/main.ts
 ```
 
-`pnpm check` runs workspace typechecks, Sim tests and the vendored native engine
-suite. Local work uses fake minds and isolated data. See development for a Mars
-camp process, static Labs, asset builds and browser verification.
+Open <http://localhost:4500/?dev=1> and sign in with any name (`admin` is an admin). `BRAIN_MODE=fake` makes no model
+calls and needs no keys. For hot reload, run `pnpm dev` instead of the last two lines (Vite on :5173, proxying to the
+server on :4500). More in [docs/development.md](docs/development.md).
+
+Before opening a pull request, run the checks in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Repository map
+
+| Path | What |
+|---|---|
+| `apps/server` | World host: clock, event log and replay, persistence, auth, Soul and god APIs, MCP, model budget |
+| `apps/web` | The browser app: 3D world view, Soul pairing, god tools, Sim Score music |
+| `packages/kernel` | Meaning: things, links, changes, cards and vocabulary |
+| `packages/engine-contract`, `engine-toy`, `engine-mars`, `engine-native` | The engine interface and its engines and adapters |
+| `packages/protocol`, `client`, `brain` | Wire schemas, the client replica, model request builders |
+| `packages/world-compiler`, `generators`, `ground`, `library`, `conformance` | World authoring, terrain, shared kit and its conformance pins |
+| `mars/` | The vendored deterministic world engine, its viewer and its tests |
+| `worlds/` | World definitions, templates and patches |
+| `tools/edge-skill`, `tools/world-launcher`, `tools/god-skill` | Soul client and skill, the multi-world launcher and release scripts, god tooling |
+| `tools/test-harness`, `tools/playtest`, `tools/cdn`, `tools/assets` | Gates, playtests, the asset CDN and the media pull |
+| `vendor/sim-score` | Sim Score, the generative soundtrack |
+| `docs/` | Documentation: start at [docs/README.md](docs/README.md) |
+
+## Documentation
+
+- [Architecture](docs/architecture.md), [development](docs/development.md), [testing](docs/testing.md)
+- [Release](docs/release.md) and [operations](docs/operations.md)
+- [Agent lifecycle](docs/process/agent-lifecycle.md): how agents and people take an issue to a release
+- [AGENTS.md](AGENTS.md): the binding rules for anyone, human or agent, changing this repository
+- [CHANGELOG.md](CHANGELOG.md)
+
+## Licence
+
+The code is MIT-licensed ([LICENSE](LICENSE)), including Sim Score. Media is not in this repository and is not covered
+by the MIT licence; see [ASSETS.md](ASSETS.md) and [NOTICE](NOTICE). Security issues: [SECURITY.md](SECURITY.md).

@@ -27,7 +27,7 @@ Contract 2
   equal vertex counts and winding. Concave caps triangulate; sides are ruled triangles. Match corresponding vertices.
 * Sweep `profile` is a simple closed 2-D outline instead of `r`/`segments`. Its initial +y faces projected world up
   (−z for vertical paths); the frame transports along the Catmull–Rom path. A +z path maps profile +x/+y to world +x/+y.
-* Surfaces (Y1 / XP7) are presentation only and opt-in, so retained v2 content keeps its look. With kit-level
+* Surfaces are presentation only and opt-in, so retained v2 content keeps its look. With kit-level
   `surfaces: true`, opaque unlit shapes of wood, bark, stone, rock, cobble, brick, plaster, tile, thatch, metal, fabric,
   sand, gravel, dirt, mud, leaf, moss and grass take the Eden realism shader by material class. A shape's `pattern`
   (`marble`, `ashlar`, `planks`, `shingles`, `stripes`; `none` = flat) replaces that surface and needs no kit flag.
@@ -42,10 +42,11 @@ Contract 2
 `gallery-language-examples.json` is a ready-to-define JSON array: slit dome, one-shape rose tracery, one-shape curved
 roof, loft canopy and four glow levels. No program or external generator is required for the roof.
 
-Pixel gate (real headless Chrome, machine-wide lease)
-----------------------------------------------------
+Pixel gate (real headless Chrome)
+---------------------------------
 
-From the repository root, using Node 22.20 (unset `NODE_USE_SYSTEM_CA` if required):
+From the repository root (unset `NODE_USE_SYSTEM_CA` if your environment sets it). Runs take a machine-wide Chrome
+lease (`tools/god-skill/lib/chrome-lease.mjs`); output defaults to the ignored `.lane/gallery/`.
 
 ```
 node tools/god-skill/scripts/gallery.mjs --local --out .lane/gallery-before

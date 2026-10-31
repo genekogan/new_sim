@@ -1,0 +1,117 @@
+# Testing
+
+Sim has five layers of checks. Run the cheapest one that proves your change, and let the proof tier decide what a PR
+needs.
+
+| Layer | What | Where it runs |
+|---|---|---|
+| Unit and typecheck | `node --test` suites per package, `tsc` per package | your machine, CI |
+| Gates | walk, bundle, conformance | your machine (focused), CI, the remote gate |
+| Browser e2e | Markdown scenarios against an isolated client fixture | your machine, CI |
+| Remote gate | the complete suite for a release head, on Modal | the release workflow |
+| Playtests | coding agents play Souls and gods in a fake-mind world, reviewed by agents | a quiet machine or a cloud session |
+
+All of them use fake minds and isolated data directories. None touches production.
+
+## Unit tests and typecheck
+
+```sh
+pnpm typecheck                               # every package (tsc --noEmit)
+pnpm --filter @sim/server test               # one package
+node --test apps/server/src/god/buildsafe.test.ts   # one file
+pnpm test:mars                               # the vendored engine's deterministic suite
+pnpm test:client                             # Soul client and client-eval suites
+pnpm test                                    # everything (slow; prefer the focused forms)
+```
+
+`pretest` checks that the media the tests read is in place (`pnpm assets:pull` fixes it). Server tests run with
+`--test-concurrency=1`. Prefer `node --test` on the files you touched while iterating; the full suite belongs to CI
+and the remote gate.
+
+## Walk gate
+
+Walkability is a release invariant. `apps/server/src/god/walk-audit.ts` audits fixed fixture copies of several worlds,
+a fresh genesis and a generated fuzz world (every building type at several yaws and grounds, packed, furnished,
+stacked and nested), and the gate fails when any place is worse than `tools/test-harness/walk/baseline/`: more
+destinations a Soul cannot walk to and back, more one-way links, more goalless things, or floating things.
+
+```sh
+node tools/test-harness/walk/walk.mjs                       # audit and compare (about a minute)
+node tools/test-harness/walk/walk.mjs --world fuzz,bench-hamlet
+node tools/test-harness/walk/walk.mjs --write               # accept a deliberate change as the new baseline
+node tools/test-harness/walk/walk.mjs --from <gate out>/candidate/out/suite/walk --write
+```
+
+The fixtures are part of the `test` media set (`pnpm assets:pull --set test`). A baseline change, better or worse, is
+its own reviewed commit before the final gate.
+
+## Bundle gate
+
+`tools/test-harness/bundle-budget/` measures the web build's code chunks (keyed by name without the content hash, raw
+and gzip) against the reviewed `baseline.json`. It fails when a chunk or the total grows by 10 % or more beyond a small
+slack, or when a large new chunk appears.
+
+```sh
+node tools/test-harness/bundle-budget/budget.mjs --build --check     # build apps/web, compare, exit 1 on offenders
+node tools/test-harness/bundle-budget/budget.mjs --build --write     # accept a deliberate change
+```
+
+The gate never writes the baseline; only a reviewed commit does.
+
+## Conformance
+
+`packages/conformance` bakes, places and furnishes every core library def revision at its parameter endpoints and
+checks its geometry budgets. Known failures are pinned by exact def hash in `packages/conformance/conformance/*.json`.
+A change that alters a def revision fails until a new supplement in that folder re-pins its documented tuples, in the
+same change, with the reason in its note and in the folder's README. Never edit an older supplement.
+
+```sh
+pnpm --filter @sim/conformance test
+node packages/conformance/bin/conformance.mjs --shard 1/4 --out .local/conformance-1.json   # bounded sweep
+```
+
+## Browser e2e
+
+[testing/e2e.md](testing/e2e.md): Markdown scenarios in `e2e/scenarios/` drive an isolated client fixture in headless
+Chromium and write a proof bundle under `.e2e/runs/`. The `e2e` repo skill runs and authors them. Rendering
+diagnostics for camera follow and temporal stability are in `tools/render-checks/`. The engine's own browser tests
+are in `mars/viewer/e2e/`.
+
+## Remote gate
+
+[testing/remote-gate.md](testing/remote-gate.md): `tools/test-harness/release-gate.sh` runs the complete suite for a
+candidate and its baseline on Modal and compares them. Clean means 0 new failures, 0 blockers and 0 unexpected skips.
+The release head always takes the full scope; candidates may use `--scope auto`. The baseline comes from a cache, and
+docs/tools-only changes are never gated ([Modal policy](process/modal-policy.md)).
+
+## Playtests and the swarm director
+
+- [testing/playtests.md](testing/playtests.md): batteries, personas and casts play Souls and gods as coding-agent
+  seats in a fake-mind world; Reviewer and Developer passes produce findings and scorecards. Measure on a quiet
+  machine, two repeats per arm. [testing/playtests-cloud.md](testing/playtests-cloud.md) runs them in a cloud session.
+- [testing/swarm-director.md](testing/swarm-director.md): `node tools/playtest/playtest.mjs direct <cast>` directs
+  several Souls live from a cast file; the `sim-director` skill does it from a chat session.
+- How to run and judge them: [process/playtest-method.md](process/playtest-method.md).
+
+## What to run when
+
+| Change | Run before the PR |
+|---|---|
+| Docs, tools only | links resolve; the tool's own tests if it has them |
+| Server or package logic | `node --test` on touched files, `tsc -p` of touched packages |
+| Anything that can move geometry, navigation or god builds | add the walk gate |
+| Web app | `pnpm --filter @sim/web build`, the bundle gate, an uncut clip of the changed journey |
+| Library defs, generators, compiler | conformance, plus a supplement when a revision changes |
+| Soul behaviour, navigation, engines | the above plus a scenario playtest with two repeats per arm |
+| Release head | the remote gate, then the release workflow (live walks and cdn-walk) |
+
+Don't re-run a check that passed on the same tree.
+
+## Proof tiers
+
+A PR's tier comes from the paths it changes, mapped in [process/PROOF-POLICY.yml](process/PROOF-POLICY.yml);
+`node tools/proof/tier.mjs` prints the tier of your diff, and a `tier:Tn` label can raise it. In short: T0 (docs,
+tools) needs lint; T1 (logic) focused tests and typecheck; T2 (visible behaviour) adds an uncut real-speed clip on a
+fake-mind world; T3 (Soul behaviour, navigation, engines) adds a scenario playtest, a reviewer pass and maintainer
+sign-off; T4 is the release head. "Done" means walked on the real URL with real input
+([agent lifecycle](process/agent-lifecycle.md)).

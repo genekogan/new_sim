@@ -1,56 +1,51 @@
-# Documentation map
+# Sim documentation
 
-Reviewed against the delivered merge code and receipts on **2026-10-03**.
-Releases, the release gate and walkability (V3-walk): [../AGENTS.md](../AGENTS.md); conformance pins:
-[packages/conformance/conformance/README.md](../packages/conformance/conformance/README.md). Live version: `https://sim.eden.art/worlds/__sim/healthz`.
-Sim runs four persistent worlds; the Mars engine is vendored under `mars/`.
-The canonical checkout is `<repo>`. Original `<old-sim-repo>`, `~/Mars` and
-`~/Dev/littlemartians` are read-only references for this tranche.
+The code is the authority. When a doc and the code disagree, the code wins: fix the doc in the same change.
 
 ## Read by task
 
-| Task | Start here |
+| I want to… | Read |
 |---|---|
-| Understand what is live and what remains | [STATUS](STATUS.md) → [qualification](MERGE-QUALIFICATION-20261003.md) |
-| Change the shell or engine adapter | [architecture](sim/ARCHITECTURE.md) → [development](sim/DEVELOPMENT.md) → [contract](sim/ENGINE-CONTRACT.md) |
-| Operate, release or roll back | [runbook](sim/RUNBOOK.md) |
-| Steer a Soul or integrate an agent | [API](sim/API.md), [protocol](sim/PROTOCOL.md), the selected world's `/skill.md` and `/cards.md` |
-| Work on choices, private rules or spend | [brain](sim/BRAIN.md), [data](sim/DATA.md) |
-| Resume the authorized merge | [kickoff](eden4/23-MERGE-KICKOFF-PROMPT.md) → [plan v3](eden4/22-MERGE-PLAN.md) → STATUS; local running log `<eden4>/MERGE-LOG.md` |
-| Understand design intent | [strategy index](eden4/README.md), [worlds/bodies](eden4/20-WORLDS-BODIES-AND-LIBRARIES.md), [decision ledger](eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md) |
-| Discuss later designs | [frontier](frontier/README.md), [cloud discussion onboarding](ONBOARDING-CLOUD.md) |
-| Read inherited native engine documentation | [Mars index](mars/README.md), then the actual fork source under `mars/` |
-| Interpret older status claims | [historical milestone notes](MERGE-MILESTONES-20261003.md) and the currency notes in each strategy document |
-| Look up terms | [glossary](GLOSSARY.md) |
-| Review this docs sprint and its limits | [review record](DOCS-REVIEW-20261003.md) |
+| run Sim locally | [development](development.md) |
+| understand how it fits together | [architecture](architecture.md), then the [glossary](glossary.md) |
+| change the server API or protocol | [API](architecture/api.md), [protocol](architecture/protocol.md), [contracts](architecture/contracts.md) |
+| work on Souls or the Soul client | [Souls at the edge](architecture/souls.md) |
+| work on god mode | [god mode](architecture/godmode.md), [safety](architecture/safety.md) |
+| work on worlds or the launcher | [worlds](architecture/worlds.md), [data](architecture/data.md) |
+| touch an engine | [engine contract](architecture/engine-contract.md), the [Mars engine docs](mars/README.md) |
+| touch model calls or the budget | [brain](architecture/brain.md) |
+| know which tests to run | [testing](testing.md) |
+| run a playtest or direct a cast | [playtests](testing/playtests.md), [swarm director](testing/swarm-director.md) |
+| ship a release | [release](release.md) |
+| operate the production host | [operations](operations.md) |
+| take an issue to a merged PR as an agent | [agent lifecycle](process/agent-lifecycle.md), [agent workflow](process/agent-workflow.md) |
+| know what a Mars building or place is | [Mars campus](mars/campus.md) |
 
-## Authority and currency
+## Contents
 
-For behavior, code wins; `docs/sim/` describes that code. For deployment identity,
-query the selected world's `/healthz` and use the release receipts in
-`/srv/sim/ops/<build>/` plus the local running log. STATUS summarizes delivered
-scope and open checkpoints without treating an old build number as current.
+- [architecture.md](architecture.md): system overview
+  - [architecture/](architecture/): [api](architecture/api.md), [protocol](architecture/protocol.md),
+    [engine contract](architecture/engine-contract.md), [brain](architecture/brain.md), [data](architecture/data.md),
+    [worlds](architecture/worlds.md), [souls](architecture/souls.md), [god mode](architecture/godmode.md),
+    [contracts](architecture/contracts.md), [safety](architecture/safety.md)
+- [glossary.md](glossary.md)
+- [development.md](development.md): setup, environment variables, local worlds, media
+- [testing.md](testing.md): unit tests, gates, e2e, playtests, proof tiers
+  - [testing/](testing/): [e2e](testing/e2e.md), [remote gate](testing/remote-gate.md),
+    [playtests](testing/playtests.md), [cloud playtests](testing/playtests-cloud.md),
+    [swarm director](testing/swarm-director.md)
+- [release.md](release.md): the release workflow, `ship.sh`, rollback
+- [operations.md](operations.md): services, health, backups
+  - [operations/](operations/): [runbook](operations/runbook.md), [disaster recovery](operations/disaster-recovery.md),
+    [CDN](operations/cdn.md), [auth](operations/auth.md), [analytics](operations/analytics.md)
+- [process/](process/): how work gets done
+  - [agent lifecycle](process/agent-lifecycle.md), [agent workflow](process/agent-workflow.md), [review](process/review.md),
+    [playtest method](process/playtest-method.md), [Modal policy](process/modal-policy.md),
+    [lessons](process/lessons.md), [PROOF-POLICY.yml](process/PROOF-POLICY.yml)
+- [design/vision.md](design/vision.md): where Sim is heading
+- [mars/](mars/README.md): the vendored deterministic engine
 
-For Gene's decisions, use `eden4/06` and the explicitly adopted kickoff/plan.
-Only Gene moves an item to Decided. Other documents can contain proposals,
-interviews or historical instructions; their presence is not new authorization.
-Broader economy, terrain and ontology proposals remain distinct from delivered
-construction, physical rooms and independent world processes.
-
-`docs/eden4/` is a selected strategy mirror from `<eden4>`; its local source
-log is deliberately not copied. Its README's source-log links point to STATUS
-in this mirror. Research `_handoff` files, databases and raw proof stay local.
-`docs/mars/` contains dated inherited reference material, indexed separately from
-current fork behavior. SNAPSHOT records provenance; a refresh date does not mean
-that every historical claim has become a present-day fact.
-
-## Refreshing the mirrors
-
-Run `infra/sync-docs.sh` from this checkout, review the diff, scan for secrets and
-commit. It selects README and numbered strategy files, published top-level research
-reports/tours and the historical report. It excludes MERGE-LOG, raw proof, audit
-scripts/databases and media. Native docs refresh from the in-repo `mars/` fork;
-local Mars original paths are read-only and are not a runtime dependency.
-Sim-authored reference introductions and the research index are maintained here
-and are not overwritten. The retained exact integration boundary keeps its original
-source-relative links; use the native index for their source context.
+Docs that belong to one folder stay next to its code as that folder's `README.md` (for example
+`tools/core/multiworld/`, `tools/cdn/`, `packages/conformance/conformance/`, `vendor/sim-score/`). Files the server
+serves to agents (`tools/edge-skill/SKILL.md`, `tools/god-skill/SKILL.md`, `tools/world-skill/SKILL.md`, the
+playtest personas and rubric) are product content, not documentation: change them like code.

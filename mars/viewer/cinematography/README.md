@@ -1,16 +1,20 @@
-# Autonomous camera: start here
+# Autonomous activity camera
 
-Read the [durable camera handoff](../../docs/engineering/briefs/autonomous-camera.md)
-before changing this system. It documents architecture/module responsibilities,
-frozen read-only hooks, operator precedence, policies, safety, async Jev/replay,
-release18 status, actual MP4 evidence, reproduction/validation, prioritized TODOs,
-open questions and future-agent takeover.
+A live director that picks shots of running activities. It observes the world and never directs actor behaviour; the Lab
+camera controls ([../../../docs/mars/lab.md](../../../docs/mars/lab.md#camera-and-sound)) are its user-facing side. It
+builds on the engine camera layer (`../engine/camera/`, [camera.md](../../../docs/mars/camera.md)).
 
-The [chronological report](../../docs/engineering/briefs/autonomous-camera.REPORT.md)
-contains source/test/capture provenance and retained failures. Its dated historical
-“not integrated/released” statements do not supersede the handoff's current status.
+| File | Role |
+| --- | --- |
+| `types.ts` | Observation, policy, shot, operator intent and decision types |
+| `observation.ts`, `activity-observation.ts` | Read-only adapters from engine readouts and activity facts |
+| `shots.ts`, `composition.ts`, `physical.ts` | Feasible shots, visual metrics (frontality, foreground), placement and readability checks |
+| `director.ts` | Chooses and holds shots under a policy; operator intent takes precedence |
+| `provider.ts` | Optional asynchronous advisory provider with a timeout; the render loop never awaits it |
+| `jev-client.ts`, `jev-server.ts`, `bridge.mjs` | Optional model-backed advisor over a loopback bridge, run explicitly and budget-capped; server-only code never enters the browser |
+| `lab-driver.ts` | Attaches the director to the Lab hook (reads data, applies render poses only) |
+| `replay.ts` | Resolved program frames; exact replay needs no lookahead or model |
+| `capture*.mjs`, `record-comparison.ts`, `suite-record.ts`, `review.html` | Footage capture and comparison tools |
 
-Camera observes the world; it never directs authoritative actor behavior. Existing
-engine camera and shared Lab/build/deploy paths are integration-owner controlled.
-Gene retired the original session after documentation; future work starts only
-when requested, on an isolated branch, with current ownership/ports verified.
+Tests, from `mars/viewer/`: `node --test cinematography/*.test.ts`. Types: `npx tsc --noEmit -p cinematography/tsconfig.json`
+(a gate stage).

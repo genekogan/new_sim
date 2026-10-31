@@ -1,39 +1,73 @@
-# Speed lane probe
+# Speed probes
 
-Fresh dev Mars and Little Martians templates, fake minds, no production data. The tools refuse URLs outside localhost ports 5890–5899. The matrix pins the templates’ normal arrival cameras with `eye`/`at` (without shot mode), so an idle resident cannot send Broadcast to different views between runs. Run from this lane's worktree after the offline dependency install and the read-only `.lane/mars-web` overlay described in the tranche rules.
+Client load and frame-time measurements on fresh local Mars and Little Martians dev worlds. The fixtures use fake
+minds and no production data. The tools accept only localhost URLs on the fixture ports: 5890–5899 by default,
+or the ports in `SPEED_PORTS`. They always refuse 4930–4990.
+
+## Run
 
 ```sh
-df -h /System/Volumes/Data
-python3 <team>/ops/with-heavy-slot.py --owner speed --purpose speed-build --timeout 1800 -- pnpm --dir <worktrees>/lane-speed build
-node <worktrees>/lane-speed/tools/speed/fixtures.mjs
-python3 <team>/ops/with-heavy-slot.py --owner speed --purpose speed-before --timeout 1800 -- node <worktrees>/lane-speed/tools/speed/matrix.mjs before
-python3 <team>/ops/with-heavy-slot.py --owner speed --purpose speed-after --timeout 1800 -- node <worktrees>/lane-speed/tools/speed/matrix.mjs after
-python3 <team>/ops/with-heavy-slot.py --owner speed --purpose speed-phone --timeout 1800 -- node <worktrees>/lane-speed/tools/speed/matrix.mjs phone
-node <worktrees>/lane-speed/tools/speed/character-transfer.mjs http://127.0.0.1:5890 <team>/scratch/speed/character-transfer.json
+pnpm --filter @sim/web build                    # fixtures serve apps/web/dist
+node tools/speed/fixtures.mjs                   # starts both fixture worlds, prints their PIDs
+node tools/speed/matrix.mjs before|after|phone-before|phone|all [output-dir]
+node tools/speed/character-transfer.mjs http://127.0.0.1:5890 <out.json>
 ```
 
-Another lane can run the same tools on its own ports: `SPEED_PORTS=6342,6343 SPEED_SCRATCH=<dir>` (fixtures, matrix and probe all honour them; the live 4930–4990 are always refused). Phone-tier parts can be isolated with `?phoneOff=detail,lod,cards,bodies,worker`, and the desktop distance detail with `?desktopDetail=0`.
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `SPEED_PORTS` | `5890,5891` | Mars and Little Martians fixture ports |
+| `SPEED_SCRATCH` | (set it) | fixture data, logs, `fixtures.json` and default matrix output |
 
-Fixtures prints the two owned PIDs. Stop those exact processes with SIGTERM when finished. `fixtures.json` contains their public identities and data paths. The fixture starter refuses occupied ports before clearing its own disposable data. It creates one idle resident named Phone probe, slows the clock to 0.1, and never runs an LLM. Keep servers outside the heavy-slot wrapper; only build/probe work takes the slot.
+`fixtures.mjs` refuses occupied ports before clearing its own data. It creates one idle resident (`Phone probe`),
+slows the clock to 0.1 and never calls a model. Stop the two printed PIDs with SIGTERM when finished.
 
-`matrix.mjs all|before|after|phone-before|phone [output-dir]` probes both worlds. `all` runs before, after and phone sequentially under one heavy slot. `before` uses `?loadqueue=0` (legacy deferred loading); `after` uses the nearest-first queue in the same bundle. `phone-before` is useful when investigating a mobile regression. Outputs default to the speed scratch directory.
+`matrix.mjs` probes both worlds with pinned arrival cameras (`eye`/`at`), clear weather and a 60 Mbit/s link.
+`before` loads with `?loadqueue=0` (deferred loading) and `after` with the nearest-first queue, from the same bundle.
+`phone` and `phone-before` add phone emulation, and `all` runs before, after and phone in sequence. Each output
+records the `index.html` hash of the bundle under test.
 
-For a single configuration use `probe.mjs <world-url> --sizes 1440x900 --dprs 1,2 --seconds 4 --settle-max 120 --mbps 60 --out <directory>`. `--mobile` defaults to 390×844, DPR 3, touch input and 4× CPU throttling. The application may cap its actual render pixel ratio below the emulated display DPR; both are reported. Real Chrome uses the speed lease and the hardware GPU. The probe refuses software renderers. It never steals a stale lease.
+`character-transfer.mjs` checks that the character GLBs served gzip-encoded decompress byte for byte to the identity
+response, and records the timings.
 
-Measurement definitions:
-
-- `firstEntityFrameMs`: first observed active-entity renderer call, measured from navigation; the instrumentation installs on a 50 ms poll. `cardDoneMs` is the arrival overlay's ready signal.
-- `settledMs`: **confirmed complete settling**, including all deferred SHAs, outstanding GLB requests, processing stages, three seconds of stable drawn triangles and seven seconds without GLB activity. That quiet confirmation is included in the number. `settled:false` reports a deadline, never a success. The queue is reported separately.
-- Frame p50/p95, renderer CPU time and GPU timer queries are recorded during a still window and a real input orbit. Desktop uses mouse input; phone uses CDP touch input. GPU time is null when the timer extension is unavailable.
-- `network.cdpEncodedBytes` and `glbEncodedBytes` count CDP completed-response transfer bytes through loading/still/orbit, from a fresh context with cache disabled. Continuous WebSocket traffic and partial bodies of aborted startup requests are excluded; those requests remain in the failure log. Resource Timing GLB MB is also retained for comparison with older probes.
-- `textureStorage` reports scene texture payload storage: RGBA8 image dimensions with mip chains are **estimates**, compressed mip blocks are actual byte lengths. It excludes driver overhead, render targets and unknown texture formats, and can overcount distinct texture objects that share a GPU source. This is a texture budget estimate, **not total resident GPU VRAM**. Counts, hardware renderer and JS heap are reported alongside it.
-- Phone checks occur after the timing windows: tap Camera controls, verify the touch help, perform a touch drag, follow the fixture resident, and send explicit fixture speech. Pair credentials stay in memory. The slow fixture playback trails the server by about 15 seconds; the probe allows 30 seconds and records speech/viewer ticks. Bubble boxes/font sizes, clamping and screenshots document readability. Empty/unavailable speech is reported as unverified. A blocked Explore touch button is recorded as a finding; the probe uses the explicitly labeled keyboard shortcut to inspect speech, and UI failures never discard timing results. Error stacks include the phase that triggered them.
-
-Compare equal completed corpora, not triangle plateaus during loading. Keep the hardware, viewport, weather and network settings equal. These are single-run measurements on a shared M3 Max, not device qualification or universal performance guarantees. Chrome mobile emulation throttles CPU, not the physical GPU or available phone RAM.
-
-Focused tests:
+For one configuration:
 
 ```sh
-node --test <worktrees>/lane-speed/apps/web/src/gen-mesh/lazy-assets.test.ts <worktrees>/lane-speed/tools/speed/texture-storage.test.mjs
-node --test <worktrees>/lane-speed/apps/server/src/world-isolation.test.ts
+node tools/speed/probe.mjs <world-url> [--sizes 1440x900] [--dprs 1,2] [--seconds 6] [--mobile] [--cpu 4]
+    [--label <name>] [--out <dir>] [--settle-max 120] [--mbps 60]
+node tools/speed/profile-arrival.mjs <world-url> --out <dir> [--cpu 4] [--mbps 60] [--desktop] [--stranger] [--warm]
+```
+
+`--mobile` means 390×844 at DPR 3, touch input and 4× CPU throttling. The app may cap its render pixel ratio below the
+emulated DPR, and both are reported. Probes need real Chrome on a hardware GPU and refuse software renderers. A
+probe holds a Chrome lease for its whole run, so two probes never share the GPU. `profile-arrival.mjs` records a
+sampled V8 CPU profile from navigation to the arrival card's ready signal (`arrival.cpuprofile`, plus a summary by
+source file and function).
+
+Phone tiers can be isolated with `?phoneOff=detail,lod,cards,bodies,worker`, and desktop distance detail with
+`?desktopDetail=0`.
+
+## Measures
+
+- `firstEntityFrameMs`: the first active-entity render call after navigation (50 ms poll). `cardDoneMs` is the
+  arrival overlay's ready signal.
+- `settledMs`: confirmed complete settling. Every deferred asset and GLB request is done, processing has finished,
+  drawn triangles are stable for 3 s and there has been no GLB activity for 7 s; that quiet time is included.
+  `settled: false` means the deadline was hit.
+- Frame p50/p95, renderer CPU time and GPU timer queries over a still window and a real-input orbit (mouse on
+  desktop, CDP touch on phone). GPU time is null when the timer extension is missing.
+- `network.cdpEncodedBytes` and `glbEncodedBytes`: completed-response transfer bytes from a fresh, cache-disabled
+  context. WebSocket traffic and aborted requests are excluded (aborted requests stay in the failure log).
+- `textureStorage`: an estimate of scene texture payload (`texture-storage.mjs`). RGBA8 mip chains are estimated and
+  compressed mips are actual bytes. It is not total GPU memory.
+- Phone checks after the timing windows: camera controls, touch help, touch drag, following the resident, and
+  fixture speech readability. UI failures are findings and never discard timing results.
+
+Compare equal, fully settled corpora on the same machine, viewport, weather and network settings. Use a quiet
+measurement machine. These are single-run measurements, not device qualification; mobile emulation throttles the
+CPU but not the GPU or memory.
+
+## Tests
+
+```sh
+node --test tools/speed/texture-storage.test.mjs apps/web/src/gen-mesh/lazy-assets.test.ts
 ```

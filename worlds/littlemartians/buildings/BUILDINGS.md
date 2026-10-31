@@ -1,8 +1,8 @@
 # Little Martians buildings — Ceramic Tower and Minaret Temple
 
 A building type of the Little Martians world (`/w/littlemartians`) only. Both are
-rebuilt from scratch as clean procedural geometry after Vanessa Rosa's ceramic
-sculptures. They do not use the scan meshes and are not decimated scans. Only
+rebuilt from scratch as clean procedural geometry after ceramic sculptures by
+Vanessa Rosa (Little Martians). They do not use the scan meshes and are not decimated scans. Only
 the glaze is taken from the scans: the scans' colour and normal texture atlases
 are quilted into seamless glaze textures. Generator: `tools/buildings/` (Blender
 Python). Regenerate with
@@ -125,16 +125,15 @@ textures and validation.json come out byte-identical with Blender 5.1.1.
 
 ## Previews
 
-Rendered by `generate.py` from the exported GLBs (EEVEE, sky and sun, 1.5 m heads for scale):
+Rendered by `generate.py` into `previews/` from the exported GLBs (EEVEE, sky and sun, 1.5 m heads for scale):
 
-- `~/Eden/.merge-work/buildings/worlds/littlemartians/buildings/previews/both.jpg` — both buildings side by side
-- `…/previews/ceramic-tower-front.jpg`, `…/ceramic-tower-back.jpg`, `…/ceramic-tower-section.jpg` (half cut away, rooms and shafts)
-- `…/previews/ceramic-tower-inside-L0.jpg` … `-inside-L3.jpg`, `…/ceramic-tower-up-shaft.jpg`
-- `…/previews/minaret-temple-front.jpg`, `-back.jpg`, `-section.jpg`, `-inside-L0.jpg` … `-inside-L2.jpg`, `-up-shaft.jpg`
-- `…/previews/ceramic-tower-plan.svg`, `minaret-temple-plan.svg` — footprint plans per level (walls cut 1 m above each floor)
+- `both.jpg`: both buildings side by side
+- `ceramic-tower-front.jpg`, `-back.jpg`, `-section.jpg` (half cut away, rooms and shafts), `-inside-L0.jpg` …
+  `-inside-L3.jpg`, `-up-shaft.jpg`
+- `minaret-temple-front.jpg`, `-back.jpg`, `-section.jpg`, `-inside-L0.jpg` … `-inside-L2.jpg`, `-up-shaft.jpg`
+- `ceramic-tower-plan.svg`, `minaret-temple-plan.svg`: footprint plans per level (walls cut 1 m above each floor)
 
-(`…` = `~/Eden/.merge-work/buildings/worlds/littlemartians/buildings`; after the
-merge, the same paths under the main checkout.)
+The GLBs, textures and previews are media: fetch them with `node tools/assets/pull.mjs` or regenerate them.
 
 ## Limitations
 
@@ -148,6 +147,6 @@ merge, the same paths under the main checkout.)
 - The temple's tapering body is footprinted in 1.5 m bands, each using the band's
   narrowest inner face, so the upper hall's wall obstacles step inwards.
 - Wall bands treat the thin top of an arch (narrower than 0.3 m) as wall.
-- Head size is assumed (1.5 m). The lead may rescale.
+- Head size is assumed (1.5 m); rescale uniformly if it changes (see above).
 - The temple's corner ridges and the tower's cornices and crown are ornament.
   They are not listed as obstacles (they sit on or in walls and roofs).

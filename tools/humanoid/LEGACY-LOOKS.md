@@ -1,17 +1,16 @@
-# Legacy resident looks (R11b)
+# Legacy resident looks
 
-Ordinary boots preserve existing bodies. This opt-in migration turns a resident with no
-explicit body into the same classic `core/humanoid@2` look. Height stays 1.75 m, build 1,
-head size 1 and walking speed 1.35 m/s. Existing looks, uploads and non-human bodies are
-skipped. Nothing generates a new body or chooses a random appearance.
+Ordinary boots preserve existing bodies. This opt-in migration gives a resident with no explicit body the classic
+`core/humanoid@2` look: height 1.75 m, build 1, head size 1, walking speed 1.35 m/s. Existing looks, uploads and
+non-human bodies are skipped; nothing generates a new body or picks a random appearance.
 
-The release owner runs it on an already-open, correctly configured world host. Keep the
-usual sole-writer and whole-data backup procedure. Do not open a second process against
-an active database, construct a guessed engine factory, or copy a production database
-to test this operation.
+Run it on an already-open, correctly configured world host, with the usual sole-writer rule and a whole-data backup.
+Never open a second process against an active database, construct a guessed engine factory, or copy a production
+database to test it.
 
-For entity worlds started through `apps/server/src/main.ts`, set one-time environment
-options on that world's ordinary startup:
+## Running
+
+Set the options for one ordinary startup of the world (`apps/server/src/main.ts`):
 
 ```
 LEGACY_LOOKS_MODE=plan LEGACY_LOOKS_SOCIAL_PRESETS=0
@@ -20,45 +19,43 @@ LEGACY_LOOKS_MODE=rollback-plan
 LEGACY_LOOKS_MODE=rollback
 ```
 
-Read the `[legacy-looks]` JSON result. Remove these options after the maintenance boot.
-`plan` and `rollback-plan` make no migration writes. Unsafe residents appear in
-`deferred`; leave them alone and retry when they are safely standing. Apply is idempotent.
-The real clock drains the guarded assignments before the server starts listening.
-The migration planner itself is read-only. An ordinary server boot still performs its
-normal clock, bridge and boot writes, including when the migration mode is `plan`.
+For worlds run by the world launcher, put the same lines in `<DATA_DIR>/legacy-looks.env` instead (only these two keys
+are allowed; the process environment wins when it sets `LEGACY_LOOKS_MODE`). The boot hook runs the mode once, prints a
+`[legacy-looks] <json>` line, writes `<DATA_DIR>/legacy-looks-<mode>-<time>.json`, and renames the file to
+`legacy-looks.env.done-<mode>-<time>`; an apply that deferred residents keeps the file so the next boot retries them.
+Remove environment options after the maintenance boot.
 
-The original-world operator exposes its already-open `{host, db, edge}`. From the same
-process, import `apps/server/src/edge/body/migrate-looks.ts` from the selected release and
-call `runLegacyLookMaintenance(host, db, edge, options)` with the same options above.
-The host clock must be running (or the operator must drive `host.drainInputs()`). No
-HTTP route or public authority is added by this migration.
+`plan` and `rollback-plan` make no migration writes (an ordinary boot still does its normal clock, bridge and boot
+writes). Residents that are not safely standing appear in `deferred`; retry later. Apply is idempotent; the clock drains
+the guarded assignments before the server listens.
 
-Palette selection must match what the existing viewer actually shows. Use `0` for
-ordinary/Simple worlds. Use `1` only for the audited social palette in authored Eden
-where `humanPresetsEnabled`, `edenExpansion`, authored-commons geometry and the original
-template source-provenance gate already apply. Do not turn it on merely because a Soul
-has a matching name/key: that could recolour a previously classic resident. The audited
-social palette retains recognizable colours with 8-bit colour quantization; classic
-presets retain the exact kit palette. The three default physical dimensions are exact.
+A process that already holds `{host, db, edge}` can call `runLegacyLookMaintenance(host, db, edge, options)` from
+`apps/server/src/edge/body/migrate-looks.ts` with the same options; the host clock must be running (or the caller drives
+`host.drainInputs()`). The migration adds no HTTP route.
 
-Each accepted assignment and its `legacy_looks_v1` receipt commit in one transaction.
-Receipts remain in the normal world database and its backups; no private export is
-needed. Rollback appends an ordinary compensating body assignment to `null`. It does
-not erase events or restore an old snapshot. It refuses a resident whose authority,
-safe-standing state or body has changed. A later owner assignment protects the body
-even if its bytes match the migration's body. The receipt and rollback marker survive
-restart. Retired/faded/busy residents are never revived, moved or interrupted.
+## Palette
 
-Focused proof:
+`LEGACY_LOOKS_SOCIAL_PRESETS` must match what the viewer shows. Use `0` for ordinary worlds. Use `1` only for the
+audited social palette in authored Eden, where `humanPresetsEnabled`, `edenExpansion`, authored-commons geometry and the
+template provenance gate already apply; never because a Soul has a matching name or key, which could recolour a
+classic resident. The social palette keeps recognizable colours with 8-bit quantization; classic presets keep the exact
+kit palette.
+
+## Receipts and rollback
+
+Each assignment and its `legacy_looks_v1` receipt commit in one transaction, in the world database and its backups.
+Rollback appends a compensating body assignment to `null`; it never erases events or restores a snapshot. It refuses a
+resident whose authority, standing state or body has changed, and a later owner assignment protects the body even if
+its bytes match. Retired, faded or busy residents are never revived, moved or interrupted.
+
+## Checks
 
 ```
 node --test apps/server/src/edge-body-migrate-looks.test.ts
 node tools/humanoid/migrate-looks.browser.mjs
 ```
 
-The browser proof uses only fresh data, fake minds, bodies ports 5940–5941 and real Chrome
-with the `bodies` lease. It records the same residents before/after at dpr 1 and 2, then
-checks rollback and a second boot. Scratch defaults to `team/scratch/bodies/migration`.
-It uses this branch's tracked `mars/viewer/public` assets, including the humanoid kit;
-the older shared preview overlay has no kit. A release must serve `/modular/humanoid/`
-from its matching assets before applying the migration. A missing kit is a visual hold.
+The browser check boots fresh data with fake minds on a local port (`BODIES_PROOF_PORT`, default 5940) and real Chrome,
+records the same residents before and after at dpr 1 and 2, then checks rollback and a second boot. Output goes to
+`BODIES_PROOF_OUT`. It uses the checkout's `mars/viewer/public` assets including the humanoid kit; a release must serve
+`/modular/humanoid/` from matching assets before applying the migration.

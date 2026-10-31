@@ -1,8 +1,6 @@
 # Runtime people
 
-`environment/animated-casual.glb`, `animated-punk.glb`, and
-`animated-woman.glb` are the existing Quaternius animated-person derivatives
-used by Mars. Upstream art: Quaternius, CC0. Copied read-only from the original
-modular deliverable on 2026-10-03; no rig/clip or mesh changes in this import.
-The original archive symlink is gone. Other campus derivatives stay in the
-existing public Worker/R2 delivery, accessed by the restricted proxy.
+`environment/animated-casual.glb`, `animated-punk.glb` and `animated-woman.glb` are the Quaternius animated-person
+derivatives used by Mars (upstream art: Quaternius, CC0), unchanged in rig, clips and mesh. Like other media they are
+not in git: fetch them with `node tools/assets/pull.mjs`. Credits for all media are in the root
+[ASSETS.md](../../../../ASSETS.md); delivery is described in [docs/operations/cdn.md](../../../../docs/operations/cdn.md).

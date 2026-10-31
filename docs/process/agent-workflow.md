@@ -1,0 +1,74 @@
+# Agent workflow
+
+Several coding agents (and people) work on Sim at once without a coordinator. They stay out of each other's way
+through a few repository conventions, and the merge train decides the order in which their work lands on `main`.
+[Agent lifecycle](agent-lifecycle.md) is the path one piece of work takes; this page is how many of them share the
+repository.
+
+## Working in parallel
+
+- **An issue is a lock.** Before starting, an agent assigns the issue to itself (or to the person running it) and adds
+  the `agent:claimed` label. Nobody else starts on a claimed issue; to take one over, ask in the issue. Pick from
+  issues labelled `agent:ready`. Unclaim (remove the label, unassign) when you stop without a PR.
+- **One branch per issue:** `agent/<issue>-<slug>`, for example `agent/412-reading-seat`, cut from the current
+  `origin/main`. One worktree per branch when several agents share a machine. Never commit to `main`, never
+  force-push a branch someone else is reviewing.
+- **Small PRs.** A PR does one thing and can be reviewed in one sitting. A large issue is split into issues that each
+  merge on their own; link them from a `type:epic` issue.
+- **Feature flags for unfinished work.** Work that is not ready for visitors merges behind a flag that defaults to off,
+  rather than living on a long branch. Remove the flag in a follow-up once the feature ships.
+- **Plans live in issues.** Briefs, status and findings go in the issue and its comments, never in files in the tree.
+
+## Conventions that avoid conflicts
+
+Two PRs that both append to one shared file conflict every time. So nothing a PR routinely adds goes in a shared file:
+
+| Instead of | Do |
+|---|---|
+| editing `CHANGELOG.md` | add one fragment, `changes/<pr-or-slug>.md` ([format](../../changes/README.md)); the `release` workflow compiles the fragments into `CHANGELOG.md` |
+| editing an existing conformance record | add a new supplement for your change in `packages/conformance/conformance/` ([conformance](../../packages/conformance/conformance/README.md)); older supplements are never edited |
+| committing generated output | let CI build it: the changelog, the web build and gate receipts are produced by workflows, not committed by PRs |
+| re-pinning a baseline inside a feature commit | regenerate the walk or bundle baseline (`--write`) in its own commit, with the reason in the message, after rebasing |
+
+## The merge train
+
+When a PR is ready, label it `merge:ready`. From there the train takes over, one PR at a time:
+
+1. **Rebase** the branch onto the current `main`.
+2. **Re-test**: the required `ci-ok` check (from the `ci` workflow), `security` and `changelog` run on the rebased
+   head. GitHub's merge queue re-runs them on the exact merge commit (`merge_group`), so `main` never gets a commit
+   that was tested only against an older base.
+3. **Merge**, by tier ([PROOF-POLICY.yml](PROOF-POLICY.yml), `node tools/proof/tier.mjs`):
+   - **T0–T2** merge automatically once every required check is green.
+   - **T3–T4** wait for the maintainer's approval, then merge.
+4. **On a conflict**, a Claude step tries to resolve it on the branch and re-runs the checks. If it can't produce a
+   clean, green rebase, it labels the PR `needs:rebase` and comments with what conflicted; the author rebases by hand
+   and relabels `merge:ready`.
+
+A PR that fails a check leaves the train with its result in the PR; fix it and relabel.
+
+## Review
+
+- **Claude reviews every PR.** The `claude-review` workflow reviews each non-draft PR against [AGENTS.md](../../AGENTS.md)
+  and [PROOF-POLICY.yml](PROOF-POLICY.yml), states the PR's proof tier, and keeps one review comment up to date on
+  later pushes. Answer each finding with a fix or a reason.
+- **`@claude` for follow-ups.** Mention `@claude` in an issue, PR comment or review (the `claude` workflow) to ask a
+  question, iterate on review feedback or have it push a fix to the PR branch. Only the owner, members and
+  collaborators can trigger it.
+- **Proof tiers.** The PR states its tier and links its proof: lint (T0); focused tests and typecheck (T1); an uncut,
+  real-speed clip of the changed journey (T2, the `proof` skill records it); a scenario playtest, a reviewer-agent
+  pass and maintainer sign-off (T3). T4 is the release head. What a reviewer checks: [review](review.md).
+
+## Who starts agents
+
+There are no scheduled agents. Nothing wakes up on a timer to pick issues, open PRs or ship releases. The maintainer
+starts agents, oversees them and gives the go-ahead for anything above T2 and for every release. The only automation
+that runs on its own is CI (`ci`, `security`, `changelog`, `claude-review`, label sync), which checks work and never
+starts it.
+
+## Repository skills and agents
+
+`.claude/skills/` holds the repo's skills as plain Markdown that any agent can read: `triage` (label and reproduce new
+issues), `finish` (turn a working change into a finished PR), `proof` (record the tier clip), `e2e` (browser
+scenarios) and `sim-director` (direct live Souls). `.claude/agents/` defines the `lane` implementer (one issue, end
+to end, to a draft PR) and the `reviewer`.

@@ -1,13 +1,7 @@
-# Score source provenance and use boundary
+# Score source and licence
 
-The exact source is Gene's supplied Sim Score repository at revision
-3b806f2084d5dcefcf9a2282828765657bd74220. Gene expressly commissioned its adoption
-into Sim in the PM chat on October 3/4, 2026. This artifact supports that local
-development work; it grants no general redistribution license for the source.
-No LICENSE/NOTICE or package-license declaration exists at this source pin.
-Do not label the original Score engine or pieces MIT or infer a license from Tone.
-Source comments and README/COMPOSING context are preserved unchanged.
+This folder is the web adapter for Sim Score, the generative soundtrack whose source is vendored in
+`vendor/sim-score/` (pinned revision in `vendor/sim-score/PROVENANCE.json`). Sim Score is © Gene Kogan and licensed
+under the MIT License, like the rest of this repository (see the root `LICENSE`).
 
-Third-party Tone and transitive package licenses are separate and will be retained
-from the frozen dependency closure. Publication/root wiring/consumer adaptation
-must be reviewed separately. No download, player, shared-radio or release claim.
+Tone.js and the other npm dependencies keep their own licences.

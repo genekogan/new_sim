@@ -1,45 +1,81 @@
-# Unified overnight journey fixtures
+# Unified journey batteries
 
-Each battery has four sequential owner requests, one Codex seat, fake native minds and deterministic review. Source scenarios remain guarded templates. `freeze.mjs` creates runnable files only after `fixtureStatus: verified`, checks every exact target exists, compares the old/new servers' actual physical entity poses and pins gpt-6-astra/high. Names, aliases and purpose prose never supply oracle truth.
+A/B batteries for the same physical world with and without authored meaning. Each world (`mars.json`, `eden.json`,
+`hamlet.json`) has four sequential owner requests, one Codex seat, fake native minds and deterministic review. The
+method is in [docs/testing/playtests.md](../../../../docs/testing/playtests.md).
 
-For each world, boot the same reviewed physical genesis on baseline and final source, save their public snapshots, then freeze:
+These source scenarios are guarded templates. `freeze.mjs` makes a runnable scenario only when `fixtureStatus` is
+`verified`: it checks every target exists, compares the physical entity poses of the baseline and final servers, pins
+the model and effort, and records the physical genesis hash. Names, aliases and purpose prose never supply oracle truth.
 
+## Run
+
+Boot the same reviewed physical genesis on the baseline and final source, save both public snapshots, then freeze and run:
+
+```sh
+node tools/playtest/scenarios/unified/freeze.mjs --world mars --genesis /abs/mars.json \
+  --snapshot /abs/final/snapshot.json --baseline-snapshot /abs/baseline/snapshot.json --out /abs/frozen/mars-control.json
+node tools/playtest/playtest.mjs run /abs/frozen/mars-control.json --server-root /abs/baseline-checkout --out /abs/control-mars-r1
 ```
-node tools/playtest/scenarios/unified/freeze.mjs --world mars --genesis /absolute/common/mars.json --snapshot /absolute/final/snapshot.json --baseline-snapshot /absolute/baseline/snapshot.json --out /absolute/frozen/mars-control.json
-node tools/playtest/playtest.mjs run /absolute/frozen/mars-control.json --server-root /absolute/baseline-worktree --out /absolute/control-mars-r1
+
+Treatment is a separately frozen scenario pointing at the enriched genesis, with identical physical hash, owner
+requests, predicates, setup, model and budgets. The comparison is old implementation/old meaning against final
+implementation/new meaning, two serial repeats per arm, three worlds; deterministic physics probes cover the
+intermediate condition. Do not change acceptance or budgets after baseline measurements.
+
+`overnight.mjs --baseline-root <dir> --treatment-root <dir> --fixtures <dir> --out <dir>` runs all twelve
+world/arm/repeat slots one at a time, with no automatic retries. `--plan <file>` takes a `unified-manual-plan/1` document
+listing which slots to run and which reviewed earlier runs to retain; together they must cover every slot exactly once.
+
+When two compiler versions settle the same genesis into different initial poses, record that as an engine diagnostic
+and freeze with `--seed-snapshot /abs/common/snapshot.json`: a complete physical snapshot, captured after normal
+startup, that must match both fresh boots. It seeds only compiler state before the isolated server starts and refuses
+existing databases, Soul bodies and private wallets. Treatment may change only `about` metadata.
+
+## What the runner and oracles check
+
+- Before provider preflight, `freeze.physicalSha256` must match the actual genesis (meaning blocks and batch labels are
+  excluded from the hash). Snapshot parity compares every physical entity by stable parent path, excluding Soul bodies;
+  any pose, parameter, def, shape, scale or rotation change breaks it. Physical state is checked again after startup,
+  before any Soul pairs.
+- Setup physically stands each body, walks it to a known start and faces the frozen heading, using the harness CLI in
+  both arms. No teleports or model calls; setup time is logged separately; a setup failure is infrastructure-invalid,
+  never a pass or a product miss. All requests become eligible at 5 s; each waits for the previous request.
+- `receipt.targetRefs` bind exact physical paths to fresh IDs. A seated completion needs the right sit receipt and the
+  matching held seat; each alternative venue carries its own region. Swimming needs observed swimming before a dry
+  return. Closed-room recovery also needs the server's structured refusal for that target, read from the run's isolated
+  SQLite refusal table.
+- Position, posture, activity, heading and seat come from one `here` observation. Completion, truthfulness and
+  efficiency are separate oracles; unknown never passes, and a later sample cannot prove an earlier done claim.
+- A request stays open until the agent turn ends and either it reports a terminal result or no action receipt is still
+  running, or until its budget expires. Native card autoresults count as server progress, not a completion claim.
+  Samples after the deadline are diagnostic only.
+- `firstDestinationChoiceSec` is the first accepted predicate action, or a walk bound by its receipt to the requested
+  frozen entity (or its listed room alternatives); a parent building or unbound name earns nothing. The 30-second,
+  three-discovery-call bar applies before that choice. `finalAffordanceChoiceSec` and `firstPredicateActionSec` (legacy
+  `firstAcceptedSec`) time the final verb. Completion still needs the final receipt, region, posture and held seat.
+
+Retain `fixture-setup.jsonl`, `infrastructure-invalid.jsonl`, the bound scenario, transcript, per-request evidence,
+oracles, journey metrics and the run's database (needed for refusal evidence).
+
+## Rescoring
+
+Oracle corrections never rewrite a run. Write a sidecar:
+
+```sh
+node tools/playtest/review/rescore-qualified.mjs --run /abs/prior-run --scenario /abs/frozen/world-control.json \
+  --out /abs/prior-run/rescoring
 ```
 
-Treatment uses a separately frozen scenario pointing to enriched genesis, with identical physical hash, owner instructions, numeric predicates, setup, model and budgets. Compare old implementation/old meaning against final implementation/new meaning; deterministic physics probes supply the intermediate new implementation/old meaning condition. Two serial repeats per arm, three worlds. Do not change acceptance or budgets after baseline measurements.
+It keeps the original reports and records each change, the scorer revision and file hashes, and source heads. Rescore
+both arms with the same correction. Token totals are per whole request; report pre-decision tool calls and latency
+without inventing token precision.
 
-All requests become eligible at five seconds; the sequential director waits for the prior request and model turn. Each setup physically stands, walks to a known start and faces the frozen heading. Setup uses the harness CLI transport in both arms, with the seat folder as cwd; the controlling agent still receives its own world's served CLI and skill. This avoids an old sole-JSON parser bug invalidating setup without hiding that bug from the measured agent. No teleport hooks or LLM setup calls. Setup wall time is logged separately and is not part of request latency. Setup failure is infrastructure-invalid and cannot count as a pass or product miss.
+## Fixtures
 
-The runner checks `freeze.physicalSha256` against the actual genesis before provider preflight. Physical hashing excludes only meaning blocks and batch labels. Snapshot parity compares every physical entity, including unnamed background geometry, using stable parent paths; temporary Soul bodies are excluded. Pose, parameters, def, shape, scale and rotation changes all invalidate parity.
-
-When compiler versions produce different initial poses from the same genesis, preserve that as an engine diagnostic and use a reviewed common compiler snapshot for the behavioral comparison. Capture it only after ordinary startup settlement. `freeze.mjs --seed-snapshot /absolute/common/snapshot.json` requires the complete physical snapshot to match both actual fresh boots. `world.snapshot` seeds only compiler state through `WorldModel.fromSnapshot` and `WorldStore.init/commit` before the isolated server starts; it refuses existing databases, Soul bodies and private layer wallets. No accounts or credentials are copied. The runner checks exact source bytes before launch and physical state again after native startup, before pairing any Soul. Treatment may change only about metadata; ground, definitions, entity poses and other physical state must hash identically. No postboot or per-task repair is permitted.
-
-`receipt.targetRefs` bind exact physical paths to fresh IDs. A seated completion requires the correct sit receipt and the matching held seat. Alternatives pair each legitimate venue/seat with its own region, preventing a receipt for one place from validating a body in another. Swimming requires observed swimming before dry return. A closed-room recovery also requires the server's structured refusal for that target before arrival at the fallback bench; review reads only timestamp, capability and code from this run's isolated SQLite refusal table.
-
-Body position, posture, activity, heading and seat come from one `here` observation. Completion, truthfulness and efficiency are separate oracles; unknown never passes. A later seated sample cannot retroactively prove an earlier done claim. Preserve `fixture-setup.jsonl`, `infrastructure-invalid.jsonl`, bound scenario, transcript, per-request evidence, oracles and journey metrics. Local DB is needed for recovery-refusal evidence; missing DB leaves that evidence unknown.
-
-Physical fixture notes:
-- Mars: patched campus, pond inserted before original entities, real podium seat and all four actual Mimos study chairs. All physiological paths verified locally. Before Mimos, setup walks out to the pond bank and back to the field: old-code walking directly to the containing field from Chiba can finish at the Chiba position. The identical physical reset passed from seated Chiba and the behind-task endpoint on both implementations, within the original 180-second setup allowance. The swim task avoids an artificial ten-second duration: the product's swim contract has a thirty-second minimum.
-- Eden: cumulative template plus supported west-pier bench. Music accepts bandstand, performance stage, music room, amphitheatre and both festival venues. The exact west-lake jetty→swim→dry-jetty route completed through the native CLI. Common snapshot equality must pass after the final physical patches.
-- Hamlet: common physical presentation hall, pond hall and closed reading room built through the god workflow before both arms. God authoring proof is separate from four Soul requests. The presenter seat and cottage bench use actual supported seat coordinates. All13 physical entities match between old/new boot snapshots.
-
-Journey evidence remains open until the requesting agent turn has finished and either an explicit agent terminal result exists or no action receipt is still running, or the frozen request budget expires. A deliberate held sit can still have a running receipt when the agent finishes; its terminal result closes observation, while the physical predicates independently judge whether it is seated correctly. Server-only progress retains the running-action guard, including a fresh terminal observation before closure. Native card autoresults are recorded as server progress; they do not close a multi-action request or count as an overall model completion claim. Evidence retains every changed card result with its source and timestamp, the latest result, and a terminal body sample. Explicit premature agent claims remain scoreable even if later corrected. A final sample collected after the deadline remains diagnostic only; its timestamp cannot extend the cutoff. Requests with no observed agent turn stay open to the original budget.
-
-Efficiency measures `firstDestinationChoiceSec`: the first accepted predicate action, or a walk/go bound by its receipt to the same frozen physical entity. A walk to a parent building or an unbound semantic name earns no credit. The unchanged 30-second/three-discovery-call bar applies before this destination choice. `firstPredicateActionSec` (also retained as legacy `firstAcceptedSec`) separately records the final verb, such as sit after an approach. Completion still requires the final verb receipt, physical region, posture and exact held seat; approach timing never substitutes for completion. Native `entity#slot` seat identities match their exact entity, with a frozen slot additionally enforced when supplied.
-
-Oracle correction v2 preserves v1 evidence and deadlines. Eden's dry-return alternatives include the existing pebble-shore surface, using its frozen `shore/1` outer and inner polygons, standing posture and a completed exact shore walk. A tree place overlapping that surface cannot change the geometry verdict; titles and place-path prose are not scoring inputs. Lake interior, another shore, an unfinished return or a return after the cutoff still fail. An explicitly failed overall card outcome can report a completed sub-action without becoming an overall completion claim. Earlier explicit done claims remain in claim history and still receive independent truthfulness checks. Corrected comparisons must rescore both arms and retain original reports.
-
-A coordinator may pass `--plan /absolute/qualification-plan.json` to `overnight.mjs`. The explicit `unified-manual-plan/1` document lists ordered `run` slots and reviewed `retain` control references; together they must account for all twelve world/arm/repeat slots exactly once. Retention requires the accepted baseline head, completed infrastructure/evidence, unchanged asks/setup/budgets/model/physical fixtures, and a sidecar rescore with the current oracle source hashes. The manifest records retained original and corrected evidence provenance alongside every new run's pinned source heads. This is manual selection, with no automatic retry or overwrite.
-
-Create correction sidecars with `node tools/playtest/review/rescore-qualified.mjs --run /absolute/prior-run --scenario /absolute/frozen-v2/world-control.json --out /absolute/prior-run/rescoring-v2`. This preserves original reports and records exact changes, scorer revision/file hashes and source heads. Whole-request Codex input/cache/output token totals are available separately from onboarding; pre-decision token usage is not available from whole-turn usage. Report pre-decision tool calls and latency without inventing token precision.
-
-The v3 shoreline correction adds one conjunctive alternative: the unchanged frozen dry shore ring, standing, a completed known West Lake bank walk, and `chosen.target` equal to the exact generated bank ID. It handles a deepest child-tree place without trusting prose place paths. The original run and earlier v2 sidecars remain immutable; late owner reports still fail.
-
-Treatment retention is restricted to reviewed Mars runs at `c887defd1c083e899057dc6df338adb166ffa7ce` across the far semantic-part WALK admission repair. An explicit `mars-far-part-walk-retention/1` scope proof pins the final head, full source diff and runtime hunk hashes, an exact changed-file inventory, independent reviews, native proof artifacts, original action/refusal evidence hashes and accepted qualified WALK bindings. Other runtime, content, CLI, skill, provider or fixture changes fail closed. Retained measurements keep their original source head and are labeled source-scoped retention; they are not described as new runs on the final head.
-
-Oracle correction v4 separates the first requested destination from the final affordance choice. For the request to go to the harbour and sit on the west pier, only the explicitly frozen west-pier entity/definition/geometry and its exact generated-place WALK capabilities receive additional first-destination credit. A broad harbour, another pier, an arbitrary parent, a refused receipt or conflicting chosen target cannot count. Legacy receipts without chosen metadata must still use the exact canonical frozen capability. Snapshot binding is verified before launch and offline rescoring. Final sitting/held-seat completion remains unchanged. `finalAffordanceChoiceSec` separately reports choosing the final action; existing `firstPredicateActionSec` remains available. Both retained Eden controls and prior treatments receive the same correction; raw reports stay immutable.
-
-Oracle correction v5 applies that distinction consistently to the explicitly requested Chiba auditorium, Mimos and Hamlet presentation hall. Their exact root/room WALK alternatives are fixed in the scenario; no arbitrary ancestor qualifies. Genesis worlds retain their original genesis hash and both reviewed materialization snapshots. A portable physical binding pins the definition hash and complete root physical fields while allowing regenerated entity IDs. Both materialization proofs are checked before provisioning, and the actual fresh public snapshot is checked in fixture binding before any model seat launches; the binding receipt records its actual entity ID. Final posture/seat predicates remain unchanged. The recovery task still scores the first correct **accepted fallback** action; its required closed-room refusal receives no efficiency credit.
+- Mars: the patched campus with a pond, the real podium seat and the four Mimos study chairs. Setup walks out to the
+  pond bank and back to the field before the Mimos request. The swim task respects the product's 30-second minimum.
+- Eden: the cumulative template plus the west-pier bench. Music accepts the bandstand, performance stage, music room,
+  amphitheatre and both festival venues; dry return accepts the pebble shore (`shore/1`) and the West Lake bank.
+- Hamlet: a presentation hall, pond hall and closed reading room built through god mode before both arms. Seats use
+  actual supported seat coordinates.
