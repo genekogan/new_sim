@@ -244,6 +244,9 @@ function step(host: Host) {
   for (const e of [...objects, ...ambient, ...people]) {
     if (playlist && e.spec.kind === 'music') continue;   // a world's own music things stay quiet under the playlist
     const d = e.follow ? 0 : distanceTo(e, x, y, z);
+    // Soul Actions: a switched sound (a fountain, a tap) follows the hand, not the 2 s emitter scan. Within earshot, its
+    // state is read live (one map lookup; the entity's specs share this state object).
+    if (e.source === 'object' && e.spec.when && d < e.spec.radius) { const live = model.entities.get(e.id.split('#')[0])?.state; if (live) Object.assign(e.state, live); }
     if (e.spec.mode === 'change') {
       const k = (e.spec.when ?? '').replace(/^!/, ''), v = e.state[k], prev = lastValue.get(e.id);
       lastValue.set(e.id, v);
