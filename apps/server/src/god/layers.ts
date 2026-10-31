@@ -55,6 +55,17 @@ const CAL_HORIZON = 24 * 60;
 // Reserved schedule-projection namespace plus its author marker: never prune steward/native calendar objects.
 const godCalendar = (o: { id: string; kind: string; state: unknown }) => o.kind === 'calendar-item' && /^cal-g[0-9a-f]{12}$/.test(o.id) && (o.state as { proposedBy?: string } | null)?.proposedBy === 'the god of this world';
 const calendarId = (entity: string, event: string, date: string) => `cal-g${hashOf([entity, event, date]).slice(0, 12)}`;
+const CAL_ID = /^cal-g[0-9a-f]{12}$/;
+/** Tick-thread budget for classifying calendar ids seen for the first time (a restart of a live world has 8,000+). */
+const CAL_LEARN_MS = 15;
+/** A god calendar item: the schedule source it projects ([entity, event] JSON), or the start tick of a pre-provenance item. */
+type CalEntry = { src: string } | { startsAtTick: number } | null;
+function calEntry(o: { id: string; kind: string; state: unknown }, params: Record<string, unknown> | undefined): CalEntry {
+  if (!godCalendar(o)) return null;
+  const source = params?.godSchedule as { entity?: string; event?: string; date?: string } | undefined;
+  if (source && typeof source.entity === 'string' && typeof source.event === 'string' && typeof source.date === 'string' && calendarId(source.entity, source.event, source.date) === o.id) return { src: JSON.stringify([source.entity, source.event]) };
+  return { startsAtTick: (o.state as { startsAtTick: number }).startsAtTick };
+}
 
 export type LayersHost = {
   model: WorldModel;
@@ -70,6 +81,8 @@ export type LayersHost = {
   building?: (id: string) => { id: string; title: string; step: string } | null;
   buildingActive?: () => boolean;
   closingSites?: () => ClosingSite[];
+  /** Tests: the per-step budget for classifying new calendar ids (default CAL_LEARN_MS; 0 = 32 ids a step). */
+  calendarLearnMs?: number;
   log(m: string): void;
 };
 
@@ -88,6 +101,7 @@ export class GodLayers {
   active(): boolean {
     if (this.h.buildingActive?.() || this.m.state.layers) return true;
     if (this.entitiesActive()) return true;
+    for (const k of this.calKnown.values()) if (k) return true; // remembered god calendar items still need their cleanup steps
     const objs = this.calendarObjects();
     return (objs?.ofKind ? objs.ofKind('calendar-item') : objs?.all())?.some(godCalendar) ?? false;
   }
@@ -147,19 +161,23 @@ export class GodLayers {
   private postCalendar(scheduled: Entity[], c: WorldClock): number {
     const objs = this.calendarObjects();
     if (!objs?.kindOf('calendar-item')) return 0;
-    // S1 V7d: only the calendar items are parsed (an Eden 2026 holds ~3,300 objects, 1.5 MB of JSON, every 2 s)
-    const all = objs.ofKind && objs.ids ? objs.ofKind('calendar-item') : objs.all(), keep = new Set<string>();
-    const have = new Set(objs.ofKind && objs.ids ? objs.ids() : all.map((o) => o.id));
+    // L4 item 0: incremental. A live Eden 2026 keeps every past occurrence (8,000+ god items, 5.6 MB of bodies); re-parsing
+    // them and reading each one's creation log every 2 s cost 140-560 ms a step on the tick thread. Now only the object ids
+    // are listed per step; an id seen for the first time is classified once (its body + creation provenance, a few per step
+    // under CAL_LEARN_MS) and remembered. A god id's provenance is fixed by its hash (calendarId), and bodies change only
+    // through remove + create, so the remembered classification stays exact while the id lives.
+    const ids = (objs.ids ? objs.ids() : objs.all().map((o) => o.id)).filter((id) => CAL_ID.test(id));
+    const have = new Set(ids), known = this.calKnown;
+    for (const id of known.keys()) if (!have.has(id)) known.delete(id);
+    const learned = this.learnCalendar(objs, ids);
     // Keep surviving sources, including their interest/reminder state. New entries carry private provenance
     // in the existing creation log, so changing the clock does not change their identity. Pre-fix entries
     // have only startsAtTick; retain the old deterministic date fallback for those records.
     const liveEvents = new Set(scheduled.flatMap(e => (e.schedule?.events ?? []).map(ev => JSON.stringify([e.id, ev.name]))));
-    const living = this.h.living()!, legacyDates = new Set<string>();
-    for (const o of all.filter(godCalendar)) {
-      const source = objs.creationParams(o.id)?.godSchedule as {entity?: string; event?: string; date?: string} | undefined;
-      if (source && typeof source.entity === 'string' && typeof source.event === 'string' && typeof source.date === 'string' && calendarId(source.entity, source.event, source.date) === o.id) {
-        if (liveEvents.has(JSON.stringify([source.entity, source.event]))) keep.add(o.id);
-      } else legacyDates.add(clockAt((o.state as { startsAtTick: number }).startsAtTick, living.origin, living.dayTicks).datetime.slice(0, 10));
+    const living = this.h.living()!, legacyDates = new Set<string>(), keep = new Set<string>();
+    for (const [id, k] of known) {
+      if (!k) continue;
+      if ('src' in k) { if (liveEvents.has(k.src)) keep.add(id); } else legacyDates.add(clockAt(k.startsAtTick, living.origin, living.dayTicks).datetime.slice(0, 10));
     }
     for (const e of scheduled) for (const ev of e.schedule?.events ?? []) for (const date of legacyDates) keep.add(calendarId(e.id, ev.name, date));
     let posted = 0, placeOf: LayersHost['placeOf'];
@@ -173,13 +191,36 @@ export class GodLayers {
         placeOf ??= this.h.calendarPlaces?.(scheduled) ?? this.h.placeOf?.bind(this.h);
         const place = placeOf?.(e), title = (ev.label ?? ev.name).slice(0, 80);
         try {
-          objs.create({ id, kind: 'calendar-item', name: title, placeId: place?.id ?? 'world', params: { godSchedule: { entity: e.id, event: ev.name, date }, title, description: `${title} at ${place?.name ?? this.m.pathOf(e.id)}, ${ev.at} for ${ev.minutes} minutes (the god's schedule)`, placeId: place?.id ?? '', placeName: place?.name ?? this.m.pathOf(e.id), proposedBy: 'the god of this world', startsAtTick: Math.round(c.tick + until * c.ticksPerMinute), durationTicks: Math.max(1, Math.round(ev.minutes * c.ticksPerMinute)) } });
-          posted++; have.add(id);
+          const params = { godSchedule: { entity: e.id, event: ev.name, date }, title, description: `${title} at ${place?.name ?? this.m.pathOf(e.id)}, ${ev.at} for ${ev.minutes} minutes (the god's schedule)`, placeId: place?.id ?? '', placeName: place?.name ?? this.m.pathOf(e.id), proposedBy: 'the god of this world', startsAtTick: Math.round(c.tick + until * c.ticksPerMinute), durationTicks: Math.max(1, Math.round(ev.minutes * c.ticksPerMinute)) };
+          const o = objs.create({ id, kind: 'calendar-item', name: title, placeId: place?.id ?? 'world', params });
+          posted++; have.add(id); ids.push(id); known.set(id, calEntry(o, params));
         } catch (err) { this.h.log(`calendar ${id}: ${(err as Error).message}`); }
       }
     }
-    for (const o of all) if (godCalendar(o) && !keep.has(o.id)) objs.remove(o.id);
+    // Until every listed id is classified, nothing is pruned (an unclassified id might be one to keep).
+    if (learned) for (const id of ids) if (known.get(id) && !keep.has(id)) { objs.remove(id); known.delete(id); }
     return posted;
+  }
+  /** Classified god calendar ids (see postCalendar); null = an id in the namespace that is not a god projection. */
+  private calKnown = new Map<string, CalEntry>();
+  /** Bodies read for ids still being classified (one kind read, dropped when all are known). */
+  private calBodies: Map<string, { id: string; kind: string; state: unknown }> | null = null;
+  /** Classify ids not seen before, within CAL_LEARN_MS; true when every id in `ids` is known. */
+  private learnCalendar(objs: NonNullable<ReturnType<GodLayers['calendarObjects']>>, ids: string[]): boolean {
+    const known = this.calKnown, t0 = performance.now();
+    const read = () => new Map((objs.ofKind ? objs.ofKind('calendar-item') : objs.all()).map((o) => [o.id, o] as const));
+    let n = 0, reread = false;
+    for (const id of ids) {
+      if (known.has(id)) continue;
+      if (n++ % 32 === 31 && performance.now() - t0 >= (this.h.calendarLearnMs ?? CAL_LEARN_MS)) return false;
+      this.calBodies ??= (reread = true, read());
+      let o = this.calBodies.get(id);
+      // an id created after the bodies were read (while a restart's backlog is classified over several steps)
+      if (!o && !reread) { this.calBodies = read(); reread = true; o = this.calBodies.get(id); }
+      known.set(id, o && godCalendar(o) ? calEntry(o, objs.creationParams(id)) : null);
+    }
+    this.calBodies = null;
+    return true;
   }
 
   /** EVENTS: "Saturday market is on here now (3 market stalls and a banner set up, until 13:00)" (places.ts leads with it). */
