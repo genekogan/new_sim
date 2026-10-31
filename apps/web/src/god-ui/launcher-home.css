@@ -60,3 +60,6 @@
 }
 .lh-desc { display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .lh-card .lh-world-slug{margin:4px 0 14px;font:600 13px/1.4 ui-monospace,monospace;color:var(--fg);overflow-wrap:anywhere}
+.lh-footer{margin-top:56px;padding-top:14px;border-top:1px solid var(--line);font-size:11.5px}
+.lh-footer a{color:var(--dim);text-decoration:none}
+.lh-footer a:hover{color:var(--fg);text-decoration:underline}
