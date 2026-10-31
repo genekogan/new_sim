@@ -9,7 +9,8 @@
 #             no approving review (T0-T2 merge on green), so this required check is the maintainer gate: without it,
 #             `gh pr merge --auto` would land a T3/T4 PR around the merge train. Reviews and labels re-run the check.
 #   drafts    skipped (the job shows as skipped, not failed); the check runs when the PR is marked ready for review.
-#             Check a draft locally with `node tools/proof/acceptance.mjs check`.
+#             Check a draft locally with `node tools/proof/acceptance.mjs check`. A skipped required check counts as
+#             passing, which is safe only because GitHub never merges a draft.
 # The tools run from the PR's base commit, so a PR cannot relax its own check; changes to the policy or the tools take
 # effect once merged. A maintainer can waive the check with the `proof:waived` label (it counts only when the
 # maintainer added it, and counts as their sign-off). Dependabot PRs pass the proof part (CI is their proof) but not the
@@ -23,7 +24,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: proof-check-${{ github.event.pull_request.number }}
+  # Drafts get their own group, so a skipped draft run never cancels a real one.
+  group: proof-check-${{ github.event.pull_request.number }}-${{ github.event.pull_request.draft }}
   cancel-in-progress: true
 jobs:
   proof-ok:
