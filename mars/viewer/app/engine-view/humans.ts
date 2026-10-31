@@ -1026,7 +1026,7 @@ export class HumanViews {
     if(water?.kind==='surface-swim')surfaceSwimBody(v,water);
     if(water?.floating)waterLegs(v,water);
     // arms
-    h.userData.wateringTilt=0;h.userData.wateringFlow=0;
+    h.userData.wateringTilt=0;h.userData.wateringFlow=0;h.userData.wateringYaw=0;
     const targets: (THREE.Vector3 | null)[] = v.arms.map(() => null);
     let source: Source = null;
     if (hasHands) {
@@ -1075,7 +1075,7 @@ export class HumanViews {
       // a handle-held item's reach blends that arm in from (and its release back out to) the clip's own pose
       const tw=v.transfer?transferWeight(v.transfer,(v.transferTime!==undefined?v.transferTime+(tSec-b.expressionT):tSec)-v.transfer.startTick*DT).weight:null;
       const armW=(i:number)=>wf?(armSide(v,i)==='left'?wf.left:1):tw!==null&&armSide(v,i)===v.transfer!.hand?tw:weight;
-      h.userData.wateringTilt=wf?.tilt??0;h.userData.wateringFlow=wf?.flow??0;
+      h.userData.wateringTilt=wf?.tilt??0;h.userData.wateringFlow=wf?.flow??0;h.userData.wateringYaw=wf?.yaw??0;
       const armBase=v.arms.some((_,i)=>armW(i)<1)?v.arms.flatMap((arm,i)=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand].map(o=>({o,w:armW(i)}))).map(({o,w})=>({o,w,q:o.quaternion.clone(),p:o.position.clone()})):[];
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
       v.arms.forEach((arm, i) => {

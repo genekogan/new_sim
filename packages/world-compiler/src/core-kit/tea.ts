@@ -1,0 +1,136 @@
+// Soul Actions entry 43: making tea. An electric kettle held by its handle (entry 34's handle-held vessel: filled under a
+// tap with the free hand on the valve, tilted to pour), a mug with a tea bag that holds tea, and a camp sink whose tap is
+// high enough to fill a kettle standing. Opt-in revisions: kettle@1 and cup@1 keep their bytes.
+//
+// The kettle's heat is a pure function of world time: switching it on records only the engine tick of the switch
+// contact (`heatTick`); cold / heating / boiling / hot follow from that tick and the tick now (`kettleHeat`). Nothing is
+// scheduled or committed at the boil, and no tick visits a kettle. Server perception and the viewer read the same function.
+import vocab from './vocab.json' with { type: 'json' };
+import type { DefInput } from '../schemas.ts';
+
+/** Kettle-local points (x forward along the spout, y up, z right of the spout; origin at the base centre). */
+export const KETTLE_GRIP: [number, number, number] = [-0.135, 0.15, 0];
+/** The lid opening the tap's water goes in, the spout tip the tea water leaves, the switch the thumb presses. */
+export const KETTLE_OPENING: [number, number, number] = [0.0, 0.232, 0];
+export const KETTLE_SPOUT: [number, number, number] = [0.268, 0.196, 0];
+/** The spout's own direction above the kettle's base line (rad): the stream leaves along it, tipped by the pour. */
+export const KETTLE_SPOUT_ANGLE = 38 * Math.PI / 180;
+export const KETTLE_SWITCH: [number, number, number] = [-0.118, 0.236, 0];
+/** Litres a full kettle holds; one cup takes CUP_LITRES of it. */
+export const KETTLE_LITRES = 1.2, CUP_LITRES = 0.25;
+/** The mug's rim (radius, height above its base) and the height the tea reaches in a full cup. */
+export const CUP_RIM = { r: 0.04, h: 0.1, full: 0.088 } as const;
+
+/** Heating clock (s): it heats for HEAT, boils for BOIL, then switches itself off and stays hot for HOT. */
+export const KETTLE_CLOCK = { heat: 24, boil: 5, hot: 300 } as const;
+export type KettlePhase = 'empty' | 'cold' | 'heating' | 'boiling' | 'hot';
+/** The kettle's heat at engine tick `tick` (dt s per tick): a pure function of its state and world time.
+ *  `temp` 0 (cold) .. 1 (boiling); `steam` 0..1 (the visible plume); `on` while the switch is down (heating, boiling). */
+export function kettleHeat(state: Record<string, unknown> | undefined, tick: number, dt = 0.05): { phase: KettlePhase; temp: number; steam: number; on: boolean; seconds: number; boilsIn: number } {
+  const level = typeof state?.level === 'number' ? state.level : 0, at = typeof state?.heatTick === 'number' ? state.heatTick : -1;
+  const s = at >= 0 && Number.isFinite(tick) ? Math.max(0, (tick - at) * dt) : -1, C = KETTLE_CLOCK;
+  if (level <= 0.02) return { phase: 'empty', temp: 0, steam: 0, on: false, seconds: s, boilsIn: Infinity };
+  if (s < 0) return { phase: 'cold', temp: 0, steam: 0, on: false, seconds: s, boilsIn: Infinity };
+  if (s < C.heat) { const k = s / C.heat; return { phase: 'heating', temp: k, steam: k < 0.35 ? 0 : 0.45 * ((k - 0.35) / 0.65) ** 1.6, on: true, seconds: s, boilsIn: C.heat - s }; }
+  if (s < C.heat + C.boil) return { phase: 'boiling', temp: 1, steam: Math.min(1, 0.45 + (s - C.heat) / 1.2), on: true, seconds: s, boilsIn: 0 };
+  const after = s - C.heat - C.boil;
+  if (after < C.hot) { const k = after / C.hot; return { phase: 'hot', temp: 1 - 0.3 * k, steam: 0.9 * Math.exp(-after / 6) + 0.08 * (1 - k), on: false, seconds: s, boilsIn: 0 }; }
+  return { phase: 'cold', temp: 0, steam: 0, on: false, seconds: s, boilsIn: Infinity };
+}
+/** A cup of tea steams for this long after it was poured (s). */
+export const CUP_STEAM_SECONDS = 240;
+/** The cup's visible steam at `tick` (0..1): strongest just poured, gone after CUP_STEAM_SECONDS. */
+export function cupSteam(state: Record<string, unknown> | undefined, tick: number, dt = 0.05): number {
+  const tea = typeof state?.tea === 'number' ? state.tea : 0, at = typeof state?.brewedTick === 'number' ? state.brewedTick : -1;
+  if (tea <= 0.05 || at < 0 || !Number.isFinite(tick)) return 0;
+  const s = (tick - at) * dt; return s < 0 || s > CUP_STEAM_SECONDS ? 0 : 0.6 * (1 - s / CUP_STEAM_SECONDS) ** 1.5;
+}
+/** Plain-word state of a kettle for nearby perception ("the kettle is boiling"). */
+export const kettleWord = (p: KettlePhase) => p;
+
+/** A vessel held by its handle and poured: where it is gripped, filled and poured from (def-local), and how it pours. */
+export type Vessel = { grip: [number, number, number]; opening: [number, number, number]; outlet: [number, number, number]; outletAngle: number; pour: 'rose' | 'spout' };
+export const isKettleDef = (def: { name?: string; version?: number; tags?: readonly string[]; slots?: readonly { kind: string }[] } | undefined) => !!def && !!def.tags?.includes('kettle') && !!def.slots?.some((s) => s.kind === 'carry');
+export const isTeaCupDef = (def: { tags?: readonly string[]; state?: Record<string, unknown> } | undefined) => !!def && !!def.tags?.includes('tea-cup') && !!def.state?.tea;
+
+const kettlePalette = { shell: '#e6dfcf', steel: '#b9bfc3', dark: '#2f2b29', switch: '#d0621f' };
+const kettle: DefInput = {
+  schema: 'def/1', name: 'core-kettle', version: 2,
+  description: `An electric kettle (${KETTLE_LITRES} L) with a lid, a spout and a handle with its switch on top. Filled at a tap and switched on, it heats, boils and switches itself off; tilted by the handle, it pours.`,
+  tags: ['kitchen', 'item', 'kettle', 'tea', 'object'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [
+    // the jug: a cream enamel body on a dark foot, narrowing to the lid
+    { kind: 'lathe', at: [0, 0, 0], profile: [[0, 0.012], [0.084, 0.012], [0.09, 0.03], [0.092, 0.07], [0.088, 0.16], [0.078, 0.21], [0.062, 0.226], [0, 0.229]], segments: 20, tint: 'shell' },
+    { kind: 'cyl', at: [0, 0.007, 0], r: 0.086, h: 0.014, segments: 20, tint: 'dark' },
+    // the lid and its knob
+    { kind: 'cyl', at: [0, 0.229, 0], r: 0.058, h: 0.006, segments: 16, tint: 'steel' },
+    { kind: 'sphere', at: [0, 0.242, 0], r: 0.014, segments: 8, tint: 'dark' },
+    // the spout from low on the front, up and out to its tip (38° above the base line)
+    { kind: 'sweep', at: [0, 0, 0], path: [[0.082, 0.11, 0], [0.14, 0.13, 0], [0.205, 0.158, 0], [0.262, 0.192, 0]], r: 0.016, segments: 7, tint: 'shell' },
+    { kind: 'cyl', at: [KETTLE_SPOUT[0], KETTLE_SPOUT[1], 0], r: 0.013, h: 0.006, segments: 8, tint: 'steel', roll: -(Math.PI / 2 - KETTLE_SPOUT_ANGLE) },
+    // the handle: a dark loop at the back, gripped in the middle of its upright
+    { kind: 'sweep', at: [0, 0, 0], path: [[-0.07, 0.212, 0], [-0.118, 0.222, 0], [-0.137, 0.19, 0], [-0.137, 0.11, 0], [-0.118, 0.07, 0], [-0.084, 0.06, 0]], r: 0.013, segments: 6, tint: 'dark' },
+    // the switch on top of the handle, under the thumb
+    { kind: 'box', at: [KETTLE_SWITCH[0], KETTLE_SWITCH[1], 0], size: [0.03, 0.012, 0.02], round: 0.004, tint: 'switch' }] } } as unknown as DefInput['make'],
+  params: { ...Object.fromEntries(Object.entries(kettlePalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])), litres: { type: 'number', min: 0.5, max: 3, default: KETTLE_LITRES, doc: 'litres it holds' } } as DefInput['params'], palette: kettlePalette,
+  // level: water in it (0..1); heatTick: the engine tick its switch was pressed (−1: not switched on since it was filled)
+  state: { level: { type: 'number', min: 0, max: 1, default: 0 }, heatTick: { type: 'number', min: -1, max: 1e12, default: -1 } } as DefInput['state'],
+  // the kettle's own voice (viewer): it rises while it heats, rolls at the boil and clicks off (sound.ts `kettle`); `heating`
+  // is derived from `heatTick` and the depicted tick by kettleHeat, never stored
+  components: { carryable: { mass: 1.1, grips: 1 }, container: { capacity: 1 }, sound: { kind: 'kettle', radius: 10, volume: 0.55, when: 'heating', mode: 'loop' } } as DefInput['components'],
+  slots: [{ id: 'handle', kind: 'carry', p: KETTLE_GRIP, yaw: 0 }] as DefInput['slots'],
+  size: { box: [0.56, 0.26, 0.2] },
+  actions: [
+    { name: 'fill-kettle', label: 'Fill the kettle', then: [{ op: 'set', field: 'level', value: 1 }] },
+    { name: 'boil', label: 'Put the kettle on', then: [{ op: 'set', field: 'heatTick', value: 0 }] },
+    { name: 'pour-tea', label: 'Pour the tea', then: [{ op: 'set', field: 'level', value: 0 }] },
+  ] as DefInput['actions'],
+} as unknown as DefInput;
+
+const cupPalette = { glaze: '#e8e2d6', inside: '#d9d1c2', tea: '#7a4b26', string: '#f2efe6', tag: '#c9a24a' };
+const cup: DefInput = {
+  schema: 'def/1', name: 'core-cup', version: 2,
+  description: 'A mug with a handle and a tea bag in it. Boiling water poured in makes a cup of tea that stays in it, carried or set down, until it is drunk.',
+  tags: ['kitchen', 'item', 'cup', 'mug', 'tea', 'container', 'tea-cup', 'recorded-item'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [
+    { kind: 'lathe', at: [0, 0, 0], profile: [[0, 0], [0.038, 0], [0.042, 0.006], [0.044, 0.1], [0.04, 0.1], [0.038, 0.014], [0, 0.014]], segments: 18, tint: 'glaze' },
+    { kind: 'torus', at: [0.05, 0.055, 0], r: 0.024, r2: 0.0065, segments: 10, tint: 'glaze' },
+    // tea rises in it as it is poured (three steps of a third); a full cup sits just under the rim
+    { kind: 'cyl', at: [0, 0.042, 0], r: 0.0385, h: 0.003, segments: 18, tint: 'tea', when: '@tea>0.05' },
+    { kind: 'cyl', at: [0, 0.066, 0], r: 0.039, h: 0.003, segments: 18, tint: 'tea', when: '@tea>0.4' },
+    { kind: 'cyl', at: [0, CUP_RIM.full, 0], r: 0.0395, h: 0.003, segments: 18, tint: 'tea', when: '@tea>0.75' },
+    // the tea bag's string over the rim and its paper tag outside
+    { kind: 'sweep', at: [0, 0, 0], path: [[0.008, 0.03, -0.012], [0.02, 0.085, -0.03], [0.012, 0.104, -0.044], [0.006, 0.09, -0.05]], r: 0.0012, segments: 4, tint: 'string' },
+    { kind: 'box', at: [0.006, 0.074, -0.051], size: [0.02, 0.026, 0.003], round: 0, tint: 'tag' }] } } as unknown as DefInput['make'],
+  params: Object.fromEntries(Object.entries(cupPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])) as DefInput['params'], palette: cupPalette,
+  // tea: how full it is (0..1 of a cup); brewedTick: the engine tick it was poured (its steam fades from there)
+  state: { tea: { type: 'number', min: 0, max: 1, default: 0 }, brewedTick: { type: 'number', min: -1, max: 1e12, default: -1 } } as DefInput['state'],
+  components: { carryable: { mass: 0.35, grips: 1 }, container: { capacity: 1 } } as DefInput['components'],
+  size: { box: [0.13, 0.1, 0.09] },
+  actions: [{ name: 'brew', label: 'Make a cup of tea', then: [{ op: 'set', field: 'tea', value: 1 }] }] as DefInput['actions'],
+} as unknown as DefInput;
+
+// A camp sink: a basin on a stand with a tall standpipe. Its spout is high enough to hold a kettle under it standing (a
+// garden tap's 0.8 m spout would put the kettle's lid at the knees). The valve is entry 28's 1.14 m.
+const sinkPalette = { metal: '#8d9499', valve: '#b8322a', nozzle: '#6f767b', wood: '#8a6a4a', basin: '#c9ccc8', water: '#bfe3f2' };
+const campSink: DefInput = {
+  schema: 'def/1', name: 'core-camp-sink', version: 1,
+  description: 'A camp sink: an enamel basin on a wooden stand with a standpipe and a tap. A Soul turns it on and off by hand; water runs into the basin, or into a kettle held under it.',
+  tags: ['water', 'kitchen', 'tap', 'sink', 'hand-operated', 'local-fixture'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
+    { kind: 'box', at: [0, 0.56, -0.02], size: [0.08, 1.12, 0.08], round: 0.01, tint: 'metal' },
+    { kind: 'cyl', at: [0, 1.0, 0.07], r: 0.02, h: 0.14, segments: 8, tint: 'metal', pitch: Math.PI / 2 },
+    { kind: 'cyl', at: [0, 1.14, 0.0], r: 0.045, h: 0.02, segments: 6, tint: 'valve' },
+    { kind: 'cyl', at: [0, 0.995, 0.15], r: 0.016, h: 0.02, segments: 6, tint: 'nozzle' },
+    // the stand and its basin, the stream falls 0.24 m into it
+    { kind: 'box', at: [0, 0.36, 0.22], size: [0.38, 0.72, 0.36], round: 0.01, tint: 'wood' },
+    { kind: 'cyl', at: [0, 0.73, 0.22], r: 0.175, h: 0.03, segments: 16, tint: 'basin' },
+    { kind: 'cyl', at: [0, 0.752, 0.22], r: 0.15, h: 0.006, segments: 16, tint: 'water', material: 'water', when: '@on' }] } } as unknown as DefInput['make'],
+  params: { ...Object.fromEntries(Object.entries(sinkPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])), basinHeight: { type: 'number', min: 0, max: 2, default: 0.755, doc: 'where the stream lands when nothing is under it' } } as DefInput['params'], palette: sinkPalette,
+  state: { on: { type: 'bool', default: false } } as DefInput['state'],
+  components: { sound: { kind: 'water', radius: 8, volume: 0.35, when: 'on', mode: 'loop' } } as DefInput['components'],
+  size: { box: [0.4, 1.16, 0.88] },
+  actions: (vocab.find((d) => d.name === 'core-desk-lamp')! as unknown as DefInput).actions!.map((a) => ({ ...structuredClone(a), label: a.name === 'switch-on' ? 'Turn on the sink tap' : 'Turn off the sink tap' })) as DefInput['actions'],
+} as unknown as DefInput;
+
+export const TEA_DEFS: DefInput[] = [kettle, cup, campSink];

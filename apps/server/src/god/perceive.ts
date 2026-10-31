@@ -97,6 +97,8 @@ export type PerceiveHost = {
   log(m: string): void;
   /** Entry 34 (watering.ts): "water <plant>" with a watering can from its hook. */
   watering?: { plan(soul: { entityId: string }, plant: string): { steps: { verb: string; params: Record<string, unknown> }[]; summary: string } | { code: string; reason: string } | null; expect(body: string): void };
+  /** Entry 43 (tea.ts): the kettle and cup acts. */
+  tea?: { plan(soul: { entityId: string }, id: string, action: string): { steps: { verb: string; params: Record<string, unknown> }[]; summary: string } | { code: string; reason: string } | null; expect(body: string): void };
   /** LAYERS (layers.ts): owner/price/hours in what Souls see; private things refuse other Souls' actuators. */
   layers?: { active(): boolean; tag(e: Entity): string; refusal(id: string, soul: { soulId: string; name: string }): { code: string; reason: string } | null; ownerWord(id: string, soul?: { soulId: string; name: string }): string | null; hoursOf(s: Entity['schedule']): string };
 };
@@ -153,6 +155,8 @@ export class GodPerceive {
       deferContacts: !!this.h.edge?.contactActuator,
       watering: (soul: EdgeSoul, id: string) => this.h.watering?.plan(soul, id) ?? null,
       wateringBegun: (soul: EdgeSoul) => this.h.watering?.expect(soul.entityId),
+      tea: (soul: EdgeSoul, id: string, action: string) => this.h.tea?.plan(soul, id, action) ?? null,
+      teaBegun: (soul: EdgeSoul) => this.h.tea?.expect(soul.entityId),
       contactPlan:(soul:EdgeSoul,id:string,action:string)=>this.h.edge?.contactActuator?.plan(soul,id,action)??null,
       bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },
       commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),

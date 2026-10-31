@@ -162,7 +162,8 @@ export function createWatering(h: WateringHost) {
   const planned = new Map<string, string>(), canOf = new Map<string, string>(), lastSupport = new Map<string, string>();
   function commitEvent(m: WateringMotion & { actor?: string }, actor: string, key: string, data: Record<string, unknown>) {
     const model = M(), target = model.entities.get(m.target), tdef = target && model.resolvedDef(target.def), can = model.entities.get(m.item);
-    if (!target || !tdef) return;
+    // entry 43: a kettle's fill and pour are tea.ts's moments, even for a body that watered a planter a minute ago
+    if (!target || !tdef || !isCanDef(can ? model.resolvedDef(can.def) : undefined)) return;
     const ops: Op[] = [], set = (id: string, state: Record<string, unknown>) => ops.push(opSchema.parse({ op: 'set', id, state }));
     const plantL = litresOf(tdef, (target.params ?? {}) as Record<string, unknown>), id = m.actionId ?? `${actor}:${m.startTick}`;
     const moisten = (fraction: number) => { const l = (m.litres ?? 0) * fraction; poured.set(id, (poured.get(id) ?? 0) + l); const now = model.entities.get(m.target)!.state?.moisture; set(m.target, { moisture: Math.min(1, Math.round((num(now, num((tdef.state as any).moisture?.default)) + l / plantL) * 1000) / 1000) }); };

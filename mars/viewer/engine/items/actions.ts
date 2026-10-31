@@ -367,7 +367,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
               subjects: [ex.actor, ex.item, dest.slot.id, occupied.id],
             } };
             // a hook (Soul Actions 34): what hangs keeps the yaw it was hung with (no turn at the release)
-            placeOnSlot(it, dest.slot, dest.slot.hang ? it.pose.yaw : owner.pose.yaw);
+            // entry 43: so does a handle-held item set down on a counter (a kettle keeps the yaw it was carried with)
+            placeOnSlot(it, dest.slot, dest.slot.hang || itemReachSeconds(it) !== undefined ? it.pose.yaw : owner.pose.yaw);
           }
           else placeOnGround(it, ex.dest!.ground, a.pose.yaw);
           ex.to = restHand(b, ex.hand);

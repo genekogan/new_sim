@@ -11,7 +11,7 @@ export const CONTACT_REACH = .8;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true };
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
-export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
+export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string)=>void;/** Entry 43: compact facts of things that are not contact actuators (a kettle, a cup of tea), or null. */moreFacts?:(id:string)=>Record<string,unknown>|null;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
  const binding=(id:string)=>{const m=d.model(),e=m.entities.get(id);return e?createHash('sha256').update(JSON.stringify([e,m.worldPose(e),m.resolvedDef(e.def)?.hash])).digest('hex'):null;};
  return {
   plan(soul:EdgeSoul,target:string,action:string){
@@ -53,6 +53,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // Entry 34: a growing planter says its stage in a word (and dry only when dry)
     const stage=st.growth?.type==='number'?stageWord(e.state?.growth??st.growth.default):null;
     return stage?{stage,...(dry?{dry:true}:{})}:dry?{dry:true}:null;}
+   if(e&&def&&!key)return d.moreFacts?.(target)??null;
    if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
