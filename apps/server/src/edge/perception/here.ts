@@ -25,6 +25,8 @@ export type Located = {kind: 'soul' | 'seat' | 'fire' | 'spot' | 'object' | 'ite
 
 /** One read of the world for one Soul (built per request). */
 export class Perception {
+  /** Kinds of the objects the last things() read (L3/audit #2: `here` asked the object table once per nearby object). */
+  readonly objectKinds = new Map<string, string>();
   readonly L: EdgeLedger; readonly soul: EdgeSoul; readonly w: NativeWorld; readonly tick: number;
   readonly pos: V2 | null; readonly heading: number; readonly enclosure: string | null; private solidsCache?: readonly Solid[];
   constructor(ledger: EdgeLedger, soul: EdgeSoul) {
@@ -101,6 +103,7 @@ export class Perception {
       // painting line, never the immutable definition description or private drawing recipe.
       const what = st?.def === 'core-easel@2' && typeof st.what === 'string' && st.what.startsWith('an easel with ')
         ? st.what.replace(/[\u0000-\u001f\u007f\u0085\u2028\u2029]+/g, ' ').slice(0, 230) : undefined;
+      this.objectKinds.set(o.id, o.kind);
       out.push({kind: 'object', id: o.id, name: (o as {name?: string}).name ?? o.kind, at: point, distance: d, ...(what ? {what} : {})});
     }
     for (const i of this.L.together.publicItems()) {
@@ -240,7 +243,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
       earshot: earshot(o.distance), facingMe: !!P.pos && facingPoint(o.at, facing, P.pos)};
   });
   // things: a few of each kind, nearest first (≤ 3 seats, ≤ 2 of any other kind); the rest are counted in `more`
-  const all = P.things(), kindOf = (t: Located) => t.kind === 'spot' ? (t.capability?.split(':')[0] ?? 'spot') : t.kind === 'object' ? (ledger.comms?.objects.all().find(o => o.id === t.id)?.kind ?? 'object') : t.kind;
+  const all = P.things(), kindOf = (t: Located) => t.kind === 'spot' ? (t.capability?.split(':')[0] ?? 'spot') : t.kind === 'object' ? (P.objectKinds.get(t.id) ?? 'object') : t.kind;
   const taken = new Map<string, number>(), picked: Located[] = [], more: Record<string, number> = {};
   for (const t of all) {const k = kindOf(t), n = taken.get(k) ?? 0; if (n < (k === 'seat' ? LIMITS.seats : 2) && picked.length < LIMITS.objects) {picked.push(t); taken.set(k, n + 1);} else more[k] = (more[k] ?? 0) + 1;}
   const objects = picked.map(t => ({
