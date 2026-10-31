@@ -699,7 +699,9 @@ export class HumanViews {
     const { walk, idle, mixer, extra } = v.rig;
     const wt = b.walkT >= a.walkT ? a.walkT + (b.walkT - a.walkT) * alpha : b.walkT;
     const opening=v.handActuator?.opening;
-    const backwards=opening&&opening.side*(opening.to-opening.from)<0;
+    const slide=v.handActuator?.slide;
+    // pulling a door toward you or a drawer out, the body steps backwards
+    const backwards=(opening&&opening.side*(opening.to-opening.from)<0)||(!!slide&&slide.to>slide.from);
     walk.time=backwards?(walk.getClip().duration-wt%walk.getClip().duration)%walk.getClip().duration:wt;
     idle.time = b.idleT;
     // Body activity layer (activity-poses.ts): free hands only (engine hand points / grips win), never on a frame or prone.
@@ -733,8 +735,9 @@ export class HumanViews {
     const libShare = lib.cur || lib.prev ? 1 - w : 0;
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
-    const idleFree = v.activity === 'idle' && b.sitW === 0 && !engineHands && freeBody && !lib.cur;
-    const idleHandoff=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1;
+    // Preserve and fade an existing idle gesture beneath a newly reaching hand.
+    const idleFree = (v.activity === 'idle' || !!v.handActuator) && b.sitW === 0 && (!engineHands || !!v.handActuator) && freeBody && !lib.cur;
+    const idleHandoff=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleWeight:1;
     const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
     const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff : 0;

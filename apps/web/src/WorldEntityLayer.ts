@@ -109,9 +109,17 @@ export class WorldEntityLayer {
     // M01: no per-frame array; leaf parts found once per drawn object; an unchanged angle (the release and
     // idle hand-off) leaves the leaf and its matrices alone. The angle is still the depicted tick's.
     for(const id in entities){
-      const m=entities[id].state.handActuator as HandActuatorMotion|undefined;if(!m?.opening)continue;
+      const m=entities[id].state.handActuator as HandActuatorMotion|undefined;if(!m?.opening&&!m?.slide)continue;
       const d=this.drawn.get(m.target);if(!d)continue;
-      const angle=handActuatorFrame(m,(tick-m.startTick)*dt).angle;
+      const f=handActuatorFrame(m,(tick-m.startTick)*dt);
+      if(m.slide){
+        // a drawer (entry 24) slides by the recorded travel, in its own units
+        const target=this.model?.entities.get(m.target),scale=target?this.model!.worldPose(target).s||1:1;
+        if(d.frozen)this.thaw(d);d.opening=undefined;
+        d.obj.traverse(o=>{if(o.userData.role==='drawer'&&typeof o.userData.restZ==='number')o.position.z=o.userData.restZ+f.pos/scale;});d.obj.updateMatrixWorld(true);
+        continue;
+      }
+      const angle=f.angle;
       let leaf=this.leaves.get(d.obj);
       if(leaf&&leaf.angle===angle&&!d.opening&&!d.motion)continue;
       if(!leaf){leaf={parts:[],angle};d.obj.traverse(o=>{if(o.userData.role==='door')leaf!.parts.push(o);});this.leaves.set(d.obj,leaf);}
