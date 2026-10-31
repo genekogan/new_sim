@@ -42,6 +42,15 @@ When a PR is ready, label it `merge:ready`. From there the train takes over, one
 3. **Merge**, by tier ([PROOF-POLICY.yml](PROOF-POLICY.yml), `node tools/proof/tier.mjs`):
    - **T0–T2** merge automatically once every required check is green.
    - **T3–T4** wait for the maintainer's approval, then merge.
+
+   The maintainer gate lives in the required `proof-ok` check, not only in the train: for a T3 or T4 PR, `proof-ok`
+   fails until the maintainer's latest decisive review is an approval or, on a PR the maintainer authored (GitHub
+   forbids self-approval), until they add `approved:maintainer` themselves (the label's actor is read from the PR's
+   events; a label someone else added does not count). Approvals and labels re-run the check. The `main` ruleset
+   requires no approving review, so that T0–T2 merge on green; without the gate in `proof-ok`, `gh pr merge --auto`
+   would land a T3/T4 PR around the train. The rule is `tools/proof/gate.mjs`; the train reads the same rule only to
+   leave unapproved PRs queued. The check trusts GitHub identity, so agents never approve a PR or add
+   `approved:maintainer` or `proof:waived`, and never act with the maintainer's account to do so.
 4. **On a conflict**, a Claude step tries to resolve it on the branch and re-runs the checks. If it can't produce a
    clean, green rebase, it labels the PR `needs:rebase` and comments with what conflicted; the author rebases by hand
    and relabels `merge:ready`.

@@ -58,6 +58,7 @@ jobs:
           .github/scripts/merge-train.test.mjs
           .github/scripts/install-hooks.test.mjs
           tools/proof/tier.test.mjs
+          tools/proof/gate.test.mjs
           tools/proof/acceptance.test.mjs
           tools/proof/upload.test.mjs
           tools/changelog/compile.test.mjs

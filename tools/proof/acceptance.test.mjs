@@ -192,3 +192,45 @@ test('prMode reads the PR, files, issue and proof.json through injected gh/fetch
   assert.equal(notMaintainer.result.ok, false);
   assert.ok(notMaintainer.result.warnings.some(w => /does not count/.test(w)));
 });
+
+test('prMode: a T3 PR needs the maintainer\'s sign-off in proof-ok; T0-T2 do not', async () => {
+  const pr = ({ labels = [], author = 'agent', body = '## Problem\nThe kernel drops a refusal reason for blocked moves. Closes #12' } = {}) => ({ body, labels: labels.map(name => ({ name })), user: { login: author }, head: { sha: 'head123' }, draft: false });
+  const api = ({ files = ['packages/kernel/src/a.ts'], reviews = [], events = [], ...o } = {}) => path => {
+    if (path.endsWith('/pulls/7')) return pr(o);
+    if (path.includes('/pulls/7/files')) return [files.map(filename => ({ filename }))];
+    if (path.includes('/pulls/7/reviews')) return [reviews];
+    if (path.includes('/issues/7/events')) return [events];
+    if (path.endsWith('/issues/12')) return { body: '' };
+    throw Error(`unexpected ${path}`);
+  };
+  const T0policy = { ...policy, prChecks: { ...policy.prChecks, T3: ['problem'] } }; // isolate the gate from the T3 journal checks
+  const run = o => prMode({ repo: 'o/r', pr: 7, gh: api(o), fetchImpl: async () => { throw Error('no fetch'); }, policy: T0policy, maintainer: 'o' });
+
+  const none = await run();
+  assert.equal(none.result.tier, 'T3');
+  assert.equal(none.result.ok, false);
+  assert.ok(none.result.problems.some(p => /^maintainer sign-off: no approval from @o/.test(p)));
+  assert.match(none.comment, /maintainer sign-off \| \*\*missing\*\*/);
+
+  const approved = await run({ reviews: [{ user: { login: 'o' }, state: 'APPROVED', commit_id: 'head123' }] });
+  assert.equal(approved.result.ok, true, approved.result.problems.join('\n'));
+  assert.match(approved.comment, /maintainer sign-off \| ok \| approved by @o/);
+
+  const agentLabel = await run({ labels: ['approved:maintainer'], events: [{ event: 'labeled', label: { name: 'approved:maintainer' }, actor: { login: 'agent' } }] });
+  assert.equal(agentLabel.result.ok, false);
+  const ownLabel = await run({ author: 'o', labels: ['approved:maintainer'], events: [{ event: 'labeled', label: { name: 'approved:maintainer' }, actor: { login: 'o' } }] });
+  assert.equal(ownLabel.result.ok, true);
+
+  const raised = await run({ files: ['docs/a.md'], labels: ['tier:T3'] });
+  assert.equal(raised.result.ok, false, 'a tier:T3 label puts the PR behind the gate');
+  const dependabot = await run({ author: 'dependabot[bot]' });
+  assert.equal(dependabot.result.ok, false, 'Dependabot is not exempt from the gate');
+  const waived = await run({ labels: ['proof:waived'], events: [{ event: 'labeled', label: { name: 'proof:waived' }, actor: { login: 'o' } }] });
+  assert.equal(waived.result.ok, true, 'the maintainer\'s waiver is their sign-off');
+
+  for (const files of [['docs/a.md'], ['apps/server/src/account-auth.ts'], ['apps/web/src/hud.ts']]) {
+    const r = await run({ files, body: '## Problem\nThe kernel drops a refusal reason for blocked moves. Closes #12' });
+    assert.ok(!r.result.rows.some(x => x.name === 'maintainer sign-off'), files[0]);
+    assert.ok(!r.result.problems.some(p => /maintainer sign-off/.test(p)), files[0]);
+  }
+});
