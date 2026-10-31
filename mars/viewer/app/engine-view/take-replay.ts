@@ -341,11 +341,12 @@ export class TakePeople {
   /** `id`'s walking-share steps on this take's tick axis, its adjacent takes included. */
   private gaitSteps(id: string): GaitSegments | null {
     if (this.gaits.has(id)) return this.gaits.get(id)!;
-    const own = this.take.tracks[id], parts: { track: PoseSample[]; offset: number }[] = [];
+    const own = this.take.tracks[id], parts: { track: PoseSample[]; offset: number; end: number }[] = [];
     const { prev, next } = this.neighbours;
-    if (prev?.tracks[id]) parts.push({ track: prev.tracks[id], offset: prev.startTick - this.take.startTick });
-    if (own) parts.push({ track: own, offset: 0 });
-    if (next?.tracks[id]) parts.push({ track: next.tracks[id], offset: next.startTick - this.take.startTick });
+    // each window's track holds its last pose to the window's end (`end`): a stop is standing, not unknown, after arrival
+    if (prev?.tracks[id]) parts.push({ track: prev.tracks[id], offset: prev.startTick - this.take.startTick, end: prev.ticks });
+    if (own) parts.push({ track: own, offset: 0, end: this.take.ticks });
+    if (next?.tracks[id]) parts.push({ track: next.tracks[id], offset: next.startTick - this.take.startTick, end: next.ticks });
     const g = own ? gaitSegments(parts, this.take.dt) : null;
     this.gaits.set(id, g);
     return g;
