@@ -285,7 +285,7 @@ export class EngineBridge {
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
     this.god.onBuild(e => this.buildNotice(e));
     this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, bodies: () => this.modelBodies(), levelAt: (x, z, y) => this.levelAt(x, z, y),
-      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
+      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), sliced: () => !!this.host.running, placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
     if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
     if (this.edge) {
       const edge = this.edge;
@@ -811,7 +811,7 @@ export class EngineBridge {
     this.flush(); this.projectedEdits = this.godEdits; if (S) t = S.add('flush', t);
     if (tick % 10 === 0 || this.writeBackPass) { this.writeBack(WRITE_BACK_SLICE_MS); if (S) t = S.add('writeBack', t); }
     this.perceiveStep(tick); if (S) t = S.add('perceive', t);
-    if (tick % 5 === 4) { this.spotsStep(); if (S) t = S.add('spots', t); }
+    if (tick % 5 === 4 || this.activitySpots.deriving()) { this.spotsStep(); if (S) t = S.add('spots', t); }
     if (tick % 40 === 7 || this.layerPlacesPending !== null) { this.layersStep(tick % 40 === 7); if (S) t = S.add('layers', t); }
     if (tick % 20 === 13) { this.flushMapNotices(); if (S) t = S.add('mapNotices', t); }
     if (!this.navWarm || this.navPending) { this.navStep(startedAtMs); if (S) t = S.add('nav', t); }
@@ -915,7 +915,8 @@ export class EngineBridge {
    *  Soul's listing (only when a listing has read them since the last such derive). */
   private spotsStep() {
     if (!this.edge || this.perceiveRunning || this.perceive.pending()) return;
-    try { if (this.activitySpots.warm()) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
+    // L4 item 6: a served world derives the spots in slices of the perception budget, one per tick until done
+    try { if (this.activitySpots.warm(this.perceiveDial?.sliceMs ?? PERCEIVE_SLICE_MS)) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
   }
   private navStep(tickStartedAtMs?: number) {
     try {
