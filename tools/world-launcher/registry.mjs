@@ -33,6 +33,17 @@ export function slugFor(name, taken = new Set()) {
   return slug;
 }
 
+/** World process heap (LOAD-CONTRACT §4, lane L1): a registry entry's own `worldHeapMb` wins; otherwise the launcher's
+ *  `--world-heap-mb` (a default only), else 1536 MB. Eden-2026-class worlds (its template, or > 3,000 entities last seen)
+ *  get at least 2048 MB: the 768 MB launcher-wide cap was what Eden 2026 hit on 10-31. */
+export const DEFAULT_WORLD_HEAP_MB = 1536, BIG_WORLD_HEAP_MB = 2048, BIG_WORLD_ENTITIES = 3000;
+export function worldHeapMb(w, fallback = 0) {
+  if (Number.isInteger(w?.worldHeapMb) && w.worldHeapMb >= 256) return w.worldHeapMb;
+  const base = Number.isInteger(fallback) && fallback >= 256 ? fallback : DEFAULT_WORLD_HEAP_MB;
+  const big = w?.template === 'eden-2026' || (Number(w?.entities) || 0) > BIG_WORLD_ENTITIES;
+  return big ? Math.max(base, BIG_WORLD_HEAP_MB) : base;
+}
+
 export class Registry {
   constructor(dataDir) {
     this.dataDir = resolve(dataDir);

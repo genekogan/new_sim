@@ -18,10 +18,12 @@ install -d -o root -g simworlds -m 750 /etc/sim-worlds
 # server idles at ~250-350 MB RSS. Production: 24 running worlds in a 6 GB cgroup (~250 MB each), 60
 # registered (sleeping worlds cost only disk), and no world boots while the host has under 2.5 GB free.
 # Staging: small, for the rehearsal party; stop it when production is live.
+# Heap: --world-heap-mb is only the default (1536 MB); a world's registry entry `worldHeapMb` wins (op.mjs set-heap) and
+# Eden-2026-class worlds get 2048 MB (registry.mjs worldHeapMb; LOAD-CONTRACT §4). The old launcher-wide cap was too small for Eden 2026 (10-31).
 if [ ! -f /etc/sim-worlds/staging.conf ]; then
   cat > /etc/sim-worlds/staging.conf <<'CONF'
 # sim-worlds@staging: localhost only, dev auth (staging check before the account provider is merged).
-SIM_WORLDS_ARGS=--base /worlds --port 4600 --range 4601-4619 --data /srv/sim-worlds-data/staging --dev-auth --max-worlds 20 --max-running 8 --min-free-mb 2500 --world-heap-mb 768 --create-limit 20 --mars-web /srv/sim-worlds/staging/mars-web --eager 2
+SIM_WORLDS_ARGS=--base /worlds --port 4600 --range 4601-4619 --data /srv/sim-worlds-data/staging --dev-auth --max-worlds 20 --max-running 8 --min-free-mb 2500 --world-heap-mb 1536 --create-limit 20 --mars-web /srv/sim-worlds/staging/mars-web --eager 2
 CONF
 fi
 if [ ! -f /etc/sim-worlds/production.conf ]; then
@@ -30,7 +32,7 @@ if [ ! -f /etc/sim-worlds/production.conf ]; then
 # /etc/sim-worlds/production-auth.env is a PLACEHOLDER path: Codex or Gene provisions it (CLERK_PUBLISHABLE_KEY,
 # CLERK_ISSUER_URL=https://clerk.eden.art, CLERK_AUTHORIZED_PARTIES=https://sim.eden.art; no secret key). Each world's node
 # loads it by path (--env-file); the launcher only reads the publishable key and issuer. Never copied from /opt/eden3.
-SIM_WORLDS_ARGS=--base /worlds --port 4620 --range 4621-4659 --data /srv/sim-worlds-data/production --public-origin https://sim.eden.art --auth-env /etc/sim-worlds/production-auth.env --max-worlds 60 --max-running 24 --min-free-mb 2500 --world-heap-mb 768 --create-limit 6 --mars-web /srv/sim-worlds/production/mars-web --eager 4
+SIM_WORLDS_ARGS=--base /worlds --port 4620 --range 4621-4659 --data /srv/sim-worlds-data/production --public-origin https://sim.eden.art --auth-env /etc/sim-worlds/production-auth.env --max-worlds 60 --max-running 24 --min-free-mb 2500 --world-heap-mb 1536 --create-limit 6 --mars-web /srv/sim-worlds/production/mars-web --eager 4
 CONF
 fi
 chown root:simworlds /etc/sim-worlds/*.conf && chmod 640 /etc/sim-worlds/*.conf

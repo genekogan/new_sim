@@ -32,7 +32,7 @@ export class ChildPool {
    *           command?: (w: object, port: number) => { cmd: string, args: string[], env?: object },
    *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void, pidFile?: string, idleMs?: number,
    *           maxRunning?: number, minFreeMb?: number, busy?: (slug: string) => boolean,
-   *           decorate?: (c: { cmd: string, args: string[], env?: object }) => { cmd: string, args: string[], env?: object },
+   *           decorate?: (c: { cmd: string, args: string[], env?: object }, world: object) => { cmd: string, args: string[], env?: object },
    *           soulCliFile?: string | null, soulControllerCliFile?: string | null, soulSkillFile?: string | null, soulInstructionsFile?: string | null }} o
    * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
@@ -311,7 +311,7 @@ export class ChildPool {
   /** Spawn one world process on `port` (its log appended to the world's log file); not yet the world's child. */
   launch(k, port, extraEnv = {}, { rotate = true } = {}) {
     const base = (this.o.command ?? defaultCommand)(k.world, port, this.o);
-    const { cmd, args, env } = this.o.decorate ? this.o.decorate(base) : base;
+    const { cmd, args, env } = this.o.decorate ? this.o.decorate(base, k.world) : base;
     const logFile = join(this.o.logDir, `${k.slug}.log`);
     if (rotate) rotateLog(logFile);
     const log = createWriteStream(logFile, { flags: 'a' });

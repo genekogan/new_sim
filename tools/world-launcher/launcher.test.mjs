@@ -273,7 +273,9 @@ test('production launcher under --base /worlds: one prefix for page, assets, API
     const a = await make('Mars'); assert.equal(a.status, 201); const ab = await a.json();
     assert.equal(ab.slug, 'my-mars'); assert.equal(ab.url, `${B}/w/my-mars/?dev=1&new=1`);
     const env = await (await fetch(`${base}${B}/w/my-mars/env`)).json();
-    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: 'http://sim-worlds.localhost:6204', ANTHROPIC_API_KEY: '', NODE_OPTIONS: '--max-old-space-size=512', FAKE_FROM_FILE: null, WORLD_PATH: `${B}/w/my-mars` });
+    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: 'http://sim-worlds.localhost:6204', ANTHROPIC_API_KEY: '', NODE_OPTIONS: null, FAKE_FROM_FILE: null, WORLD_PATH: `${B}/w/my-mars` });
+    // lane L1: the heap is the child's own node flag (--world-heap-mb is the default only), never NODE_OPTIONS
+    assert.deepEqual(await (await fetch(`${base}${B}/w/my-mars/argv`)).json(), { execArgv: ['--max-old-space-size=512'], heapMb: '512' });
     // behind the reverse proxy the visitor's x-forwarded-for reaches the world unchanged
     assert.equal((await fetch(`${base}${B}/w/my-mars/echo`, { method: 'POST', body: 'x', headers: { 'x-forwarded-for': '203.0.113.7' } })).headers.get('x-xff'), '203.0.113.7');
     const ws = await new Promise((yes, no) => { const s = connect(P, '127.0.0.1', () => s.write(`GET ${B}/w/my-mars/ws HTTP/1.1\r\nHost: x\r\nUpgrade: test\r\nConnection: Upgrade\r\n\r\n`)); s.once('data', (d) => { s.destroy(); yes(String(d)); }); s.on('error', no); });

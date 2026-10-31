@@ -10,6 +10,7 @@
 //   node tools/world-launcher/op.mjs set-claimable --port 4620 [--base /worlds] --slug <slug> --claimable false
 //        (a world with no god that nobody may claim: the homepage stops saying "open it to claim it")
 //   node tools/world-launcher/op.mjs set-unlisted --port 4620 [--base /worlds] --slug <slug> --unlisted true|false
+//   node tools/world-launcher/op.mjs set-heap --port 4620 [--base /worlds] --slug <slug> --mb 2048|default   (heap from its next boot)
 //        (left out of the public world list, still served at its URL; bench worlds and "… (scratch)" names default to true)
 //   node tools/world-launcher/op.mjs archive-world --port 4620 [--base /worlds] --slug <slug> [--reason <text>]
 //        (stops it, moves its data to <data>/archive/<id>/world, unregisters it; nothing is deleted)
@@ -44,6 +45,7 @@ const usage = () => {
     + '       op.mjs remove-fork --port <launcher port> [--base /worlds] --slug <slug>\n'
     + '       op.mjs set-claimable --port <launcher port> [--base /worlds] --slug <slug> --claimable true|false\n'
     + '       op.mjs set-unlisted --port <launcher port> [--base /worlds] --slug <slug> --unlisted true|false\n'
+    + '       op.mjs set-heap --port <launcher port> [--base /worlds] --slug <slug> --mb <256-8192|default>\n'
     + '       op.mjs archive-world --port <launcher port> [--base /worlds] --slug <slug> [--reason <text>]\n'
     + '       op.mjs restore-world --port <launcher port> [--base /worlds] --id <archive id>\n'
     + '       op.mjs list-archive --port <launcher port> [--base /worlds]\n'
@@ -74,6 +76,9 @@ if (cmd === 'create-world') {
 } else if (cmd === 'set-unlisted') {
   if (!flag('port') || !flag('slug') || !['true', 'false'].includes(flag('unlisted'))) usage();
   body = { slug: flag('slug'), unlisted: flag('unlisted') === 'true' };
+} else if (cmd === 'set-heap') {
+  if (!flag('port') || !flag('slug') || !flag('mb')) usage();
+  body = { slug: flag('slug'), worldHeapMb: flag('mb') === 'default' ? null : Number(flag('mb')) };
 } else if (cmd === 'archive-world') {
   if (!flag('port') || !flag('slug')) usage();
   body = { slug: flag('slug'), ...(flag('reason') ? { reason: flag('reason') } : {}) };
