@@ -16,7 +16,7 @@ import { chromeLease } from '../god-skill/lib/chrome-lease.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2), mode = args[0];
 const opt = (name, fallback) => { const i = args.indexOf('--' + name); return i < 0 ? fallback : args[i + 1]; };
-const out = resolve(opt('out', '<team>/scratch/cdn/browser-root'));
+const out = resolve(opt('out', resolve(root, '.local/cdn/browser-root')));
 const prefix = opt('prefix', '');
 assert.ok(['', '/worlds'].includes(prefix));
 const index = JSON.parse(readFileSync(resolve(root, 'worlds/core-assets/index.json'), 'utf8'));
@@ -41,8 +41,8 @@ const origin = 'http://127.0.0.1:5812';
 mkdirSync(out, { recursive: true });
 
 if (mode === 'serve') {
-  const webDir = resolve(opt('web-dir', '<team>/scratch/cdn/web-on'));
-  const manifest = JSON.parse(readFileSync(resolve(opt('manifest', '<team>/scratch/cdn/cdn-manifest.json')), 'utf8'));
+  const webDir = resolve(opt('web-dir', resolve(root, '.local/cdn/web-on')));
+  const manifest = JSON.parse(readFileSync(resolve(opt('manifest', resolve(root, '.local/cdn/cdn-manifest.json'))), 'utf8'));
   // CDN3: the cow is a precompressed (q11 br) object in the current manifest; an identity key is accepted too.
   const cowEntry = manifest.assets[`${prefix}/assets/${sha}.glb`];
   assert.deepEqual({ ...cowEntry, key: undefined }, { key: undefined, sha256: sha, bytes: bytes.length, licence: 'CC0-1.0' }, 'proof must use the actual inventory publication alias');

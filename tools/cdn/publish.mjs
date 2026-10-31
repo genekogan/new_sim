@@ -8,8 +8,25 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ALLOWED_LICENCES, BR_EXTENSIONS, CACHE, DEFAULT_BR_CACHE, DEFAULT_SOURCES, ROOT, TYPES, encodedCopy, inventory, isBrKey, licenceEvidence, parseCsv, readReviewed, readServedAll, shaFile, validKey } from './inventory.mjs';
 import { withNewReceipt } from './receipt.mjs';
+import { deployEnv } from '../world-launcher/deploy/deploy-env.mjs';
 
-export const ENDPOINT = 'https://<cf-account-id>.r2.cloudflarestorage.com';
+// The R2 S3 endpoint of the Cloudflare account that owns the bucket: CF_ACCOUNT_ID in the environment or deploy.env.
+// Unset, ENDPOINT is a stand-in (tests and dry runs need no account) and a real --apply stops before any request.
+const ACCOUNT = /^[0-9a-f]{32}$/.test(deployEnv('CF_ACCOUNT_ID') ?? '') ? deployEnv('CF_ACCOUNT_ID') : null;
+export const ENDPOINT = `https://${ACCOUNT ?? 'cf-account-id-unset'}.r2.cloudflarestorage.com`;
+export function requireAccount() {
+  if (!ACCOUNT) throw Error('Set CF_ACCOUNT_ID (the 32-hex Cloudflare account id) in the environment or deploy.env (template: deploy.env.example)');
+}
+// Repo media (tools/assets): pull-only objects for files that left git. Their evidence is the committed asset manifest
+// (path, sha256, bytes, url), never the plan; they never enter the client cdn-manifest.json.
+export const REPO_MEDIA = 'repo-media';
+export const ASSET_MANIFEST = resolve(ROOT, 'tools/assets/manifest.json');
+const REPO_MEDIA_TYPES = { ...TYPES, '.mp3': 'audio/mpeg', '.gz': 'application/gzip' };
+async function readAssetManifest(file = ASSET_MANIFEST) {
+  const m = JSON.parse(await readFile(file, 'utf8')), byKey = new Map();
+  for (const f of m.files) if (f.url) byKey.set(new URL(f.url).pathname.slice(1), f);
+  return byKey;
+}
 export const BUCKET = 'eden-assets';
 export const SCOPED_KEY = /^assets(?:\/worlds)?\/w\/[a-z][a-z0-9-]{0,31}\/[0-9a-f]{64}\.[a-z0-9]+$/;
 const sha = value => createHash('sha256').update(value).digest('hex');
@@ -77,28 +94,37 @@ async function storedBody(object, brCache) {
 }
 
 /** `only`: publish just these keys of the reviewed plan (the release owner's one-object live test). */
-export async function publish(plan, { sources = DEFAULT_SOURCES, credentials, fetcher = fetch, now, onProgress = () => {}, brCache, only } = {}) {
+export async function publish(plan, { sources = DEFAULT_SOURCES, credentials, fetcher = fetch, now, onProgress = () => {}, brCache, only, assetManifest = ASSET_MANIFEST } = {}) {
   if (plan.version !== 1 || plan.bucket !== BUCKET || !Array.isArray(plan.objects) || !plan.objects.length) throw Error('No approved immutable objects in this plan');
   // A plan is untrusted input. Only direct function callers (tests) can override the trusted licence source.
-  const sourceBytes = await readFile(sources), sourcesSha256 = sha(sourceBytes);
-  const rows = parseCsv(sourceBytes.toString('utf8')), reviewed = await readReviewed(), served = await readServedAll(), results = [], seen = new Set();
+  // A repo-media-only plan needs no SOURCES.csv: its evidence is the committed asset manifest.
+  const needsSources = plan.objects.some(o => o.licence !== REPO_MEDIA);
+  const sourceBytes = needsSources ? await readFile(sources) : Buffer.alloc(0), sourcesSha256 = sha(sourceBytes);
+  const rows = needsSources ? parseCsv(sourceBytes.toString('utf8')) : [], reviewed = await readReviewed(), served = await readServedAll(), results = [], seen = new Set();
+  const assets = plan.objects.some(o => o.licence === REPO_MEDIA) ? await readAssetManifest(assetManifest) : null;
   // Validate every object before making the first network request.
   // The dry run's brotli cache: its entries are only used after they decode to the plan's sha256 and match its encoded sha.
   brCache ??= typeof plan.brotli?.cache === 'string' && isAbsolute(plan.brotli.cache) ? plan.brotli.cache : DEFAULT_BR_CACHE;
   const objects = only ? plan.objects.filter(o => only.includes(o.key)) : plan.objects;
   if (only && objects.length !== new Set(only).size) throw Error('--only names a key that is not in the plan');
   for (const object of objects) {
-    const ext = '.' + object.key.split('.').at(-1), br = isBr(object);
-    if (!validKey(object.key, object.sha256) || seen.has(object.key) || object.contentType !== TYPES[ext] || object.cacheControl !== CACHE || !ALLOWED_LICENCES.has(object.licence)) throw Error('Invalid or duplicate immutable object in plan');
+    const ext = '.' + object.key.split('.').at(-1), br = isBr(object), repo = object.licence === REPO_MEDIA;
+    if (!validKey(object.key, object.sha256) || seen.has(object.key) || object.contentType !== (repo ? REPO_MEDIA_TYPES : TYPES)[ext] || object.cacheControl !== CACHE || !(repo || ALLOWED_LICENCES.has(object.licence))) throw Error('Invalid or duplicate immutable object in plan');
     if (object.encoding !== undefined && !br) throw Error('Unknown object encoding in plan');
     if (br !== isBrKey(object.key) || (br && (!BR_EXTENSIONS.has(ext) || !Number.isSafeInteger(object.encodedBytes) || object.encodedBytes < 1 || object.encodedBytes >= object.bytes || !/^[0-9a-f]{64}$/.test(object.encodedSha256 ?? '')))) throw Error('Invalid precompressed object in plan');
     seen.add(object.key);
-    const evidence = licenceEvidence(rows, object.sha256, object.bytes, reviewed, served);
-    if (evidence.reason || evidence.licence !== object.licence) throw Error('Object no longer has exact allowlisted SOURCES.csv, reviewed or served-public evidence');
+    if (repo) {
+      const entry = assets.get(object.key);
+      if (!entry || entry.sha256 !== object.sha256 || entry.bytes !== object.bytes) throw Error(`Repo-media object is not in tools/assets/manifest.json with this sha256/bytes: ${object.key}`);
+    } else {
+      const evidence = licenceEvidence(rows, object.sha256, object.bytes, reviewed, served);
+      if (evidence.reason || evidence.licence !== object.licence) throw Error('Object no longer has exact allowlisted SOURCES.csv, reviewed or served-public evidence');
+    }
     const digest = await shaFile(object.file);
     if (digest.sha256 !== object.sha256 || digest.bytes !== object.bytes) throw Error('Local asset changed since dry-run');
     if (br) await storedBody(object, brCache);   // the exact br bytes exist (or rebuild identically) before any request
   }
+  if (fetcher === fetch) requireAccount();
   if (!credentials) credentials = await loadCredentials();
   const request = async (method, object, body, headers = {}, unsigned = {}) => {
     const signed = signRequest({ method, key: object.key, credentials, body, headers, now });
@@ -132,9 +158,36 @@ export async function publish(plan, { sources = DEFAULT_SOURCES, credentials, fe
   return { version: 1, at: new Date().toISOString(), bucket: BUCKET, sources: resolve(sources), sourcesSha256, ok: true, results };
 }
 
+/** Dry run for repo media: the listed paths (first TSV column, header `path`) of a tree that still has the files
+ *  (a checkout from before the media left git). Each must match its tools/assets/manifest.json entry; the key is the
+ *  entry's url, precompressed (q11 brotli, stored with Content-Encoding br) when that key is under assets/br/. */
+export async function repoMediaPlan({ list, root, assetManifest = ASSET_MANIFEST, brCache = DEFAULT_BR_CACHE }) {
+  const m = JSON.parse(await readFile(assetManifest, 'utf8')), byPath = new Map(m.files.map(f => [f.path, f]));
+  const paths = (await readFile(list, 'utf8')).split(/\r?\n/).slice(1).map(l => l.split('\t')[0]).filter(Boolean);
+  const objects = [], seen = new Set();
+  for (const path of paths) {
+    const f = byPath.get(path);
+    if (!f?.url) throw Error(`${path}: not a file entry of ${assetManifest}`);
+    const key = new URL(f.url).pathname.slice(1), file = resolve(root, path);
+    if (seen.has(key)) continue;
+    const digest = await shaFile(file);
+    if (digest.sha256 !== f.sha256 || digest.bytes !== f.bytes) throw Error(`${path}: ${file} is not the manifest's bytes`);
+    const ext = '.' + key.split('.').at(-1), object = { key, file, sha256: f.sha256, bytes: f.bytes, contentType: REPO_MEDIA_TYPES[ext], cacheControl: CACHE, licence: REPO_MEDIA, path };
+    if (!object.contentType || !validKey(key, f.sha256)) throw Error(`${path}: no content type or invalid key ${key}`);
+    if (isBrKey(key)) {
+      const { encodedBytes, encodedSha256 } = await encodedCopy(file, f.sha256, f.bytes, brCache);
+      if (encodedBytes >= f.bytes) throw Error(`${path}: brotli does not shrink it; give it an identity key in the manifest`);
+      Object.assign(object, { encoding: 'br', encodedBytes, encodedSha256 });
+    }
+    seen.add(key); objects.push(object);
+  }
+  if (!objects.length) throw Error(`no paths listed in ${list}`);
+  return { version: 1, bucket: BUCKET, repoMedia: true, brotli: { cache: brCache }, objects, totals: { objects: objects.length, bytes: objects.reduce((s, o) => s + o.bytes, 0) } };
+}
+
 async function main() {
   const args = process.argv.slice(2), value = (key, fallback) => { const i = args.indexOf(key); if (i < 0) return fallback; if (!args[i + 1] || args[i + 1].startsWith('--')) throw Error(`Missing value for ${key}`); return args[i + 1]; };
-  const allowed = new Set(['--apply', '--dry-run', '--out', '--manifest', '--root', '--sources', '--plan', '--receipt', '--only', '--identity', '--base']);
+  const allowed = new Set(['--apply', '--dry-run', '--out', '--manifest', '--root', '--sources', '--plan', '--receipt', '--only', '--identity', '--base', '--repo-media']);
   for (const arg of args.filter(a => a.startsWith('--'))) if (!allowed.has(arg)) throw Error(`Unknown option ${arg}`);
   if (args.includes('--apply') && args.includes('--dry-run')) throw Error('Choose --dry-run or --apply');
   if (args.includes('--apply')) {
@@ -144,6 +197,12 @@ async function main() {
     const only = value('--only') ? value('--only').split(',') : undefined;
     const result = await withNewReceipt(receipt, async () => publish(JSON.parse(await readFile(file, 'utf8')), { only, onProgress: result => console.log(JSON.stringify(result)) }));
     console.log(JSON.stringify({ ok: true, objects: result.results.length, receipt }));
+  } else if (args.includes('--repo-media')) {
+    // node tools/cdn/publish.mjs --dry-run --repo-media <list.tsv> --root <tree with the files> --out <plan.json>
+    const root = value('--root'); if (!root) throw Error('--repo-media needs --root <tree that still has the files>');
+    const plan = await repoMediaPlan({ list: value('--repo-media'), root: resolve(root) }), out = resolve(value('--out', 'cdn-repo-media-plan.json'));
+    await writeFile(out, JSON.stringify(plan, null, 2) + '\n');
+    console.log(JSON.stringify({ dryRun: true, repoMedia: true, ...plan.totals, out }));
   } else {
     const root = resolve(value('--root', ROOT)), sources = resolve(value('--sources', DEFAULT_SOURCES));
     // --identity: CDN1/CDN2-style plan without precompressed objects.

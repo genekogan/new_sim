@@ -21,14 +21,14 @@ import { mergeManifest, plan, publishScoped, readRecords } from './world-scoped.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2), mode = args[0];
 const opt = (name, fallback) => { const i = args.indexOf('--' + name); return i < 0 ? fallback : args[i + 1]; };
-const out = resolve(opt('out', '<team>/scratch/cdn2/proof'));
+const out = resolve(opt('out', resolve(root, '.local/cdn/world-scoped-proof')));
 const WORLD = '/w/mars', CAMPUS = '/browser/campus.glb?v=20260922b';
 const ORIGIN = 'http://127.0.0.1:6140', CDN = 'http://127.0.0.1:6141', CONTROL = 'http://127.0.0.1:6142';
 mkdirSync(out, { recursive: true });
 
 if (mode === 'serve') {
   assert.equal(globalThis.__portRemap, 6107, 'run serve with the port-remap preload and PORT_REMAP_BASE=6107 (4963 -> 6140)');
-  const webDir = resolve(opt('web-dir', '<team>/scratch/cdn2/web-on'));
+  const webDir = resolve(opt('web-dir', resolve(root, '.local/cdn/web-on')));
   const bucket = resolve(out, 'bucket'), dataDir = resolve(out, 'world-data');
   rmSync(dataDir, { recursive: true, force: true }); rmSync(bucket, { recursive: true, force: true }); // this proof's own scratch only
   const records = await readRecords();
@@ -101,7 +101,7 @@ if (mode === 'serve') {
     console.log(JSON.stringify({ ready: true, ...ready }));
   } catch (error) { await stop(); throw error; }
 } else if (mode === 'check') {
-  const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+  const { chromeLease } = await import(process.env.SIM_CHROME_LEASE || '../god-skill/lib/chrome-lease.mjs');
   const { findPlaywright } = await import('../god-skill/lib/look.mjs');
   const ready = JSON.parse(readFileSync(resolve(out, 'ready.json'), 'utf8'));
   const shots = resolve(opt('shots', out)); mkdirSync(shots, { recursive: true });

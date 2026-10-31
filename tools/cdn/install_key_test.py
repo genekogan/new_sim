@@ -9,11 +9,14 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('cdn_install_key', Path(__file__).with_name('install-key.py'))
 installer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(installer)
+# Under the repo's git-ignored .local/, not the shared temp dir.
+SCRATCH = Path(__file__).resolve().parents[2] / '.local' / 'cdn'
+SCRATCH.mkdir(parents=True, exist_ok=True)
 
 
 class InstallKeyTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='installer-test-', dir='<team>/scratch/cdn')
+        self.temp = tempfile.TemporaryDirectory(prefix='installer-test-', dir=SCRATCH)
         self.addCleanup(self.temp.cleanup)
         self.target = Path(self.temp.name) / 'synthetic-only.txt'
 
