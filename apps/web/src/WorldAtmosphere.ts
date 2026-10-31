@@ -108,10 +108,10 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  // Sky bodies (sun, moon and phase, star rotation) from the world clock, recomputed about once a second.
  let bodies:SkyBodies|null=null,bodiesAt=-Infinity,bodiesClock='';
  const lightList:HaloSource[]=[],lv=new THREE.Vector3();
- const lightPublishers:{node:THREE.Object3D;list:unknown}[]=[];
+ const lightPublishers:{node:THREE.Object3D;list:unknown;offset:number;moveVersion:unknown}[]=[];
  let lightCollects=0,lightRefreshes=0;
  /** Published night lights (lamps, lanterns, fires) in world space, for the glow sprites. */
- function publish(o:THREE.Object3D,list:unknown[]){lightPublishers.push({node:o,list});o.updateWorldMatrix(true,false);
+ function publish(o:THREE.Object3D,list:unknown[]){lightPublishers.push({node:o,list,offset:lightList.length,moveVersion:o.userData.edenLightMoveVersion});o.updateWorldMatrix(true,false);
    for(const a of list){if(!Array.isArray(a)||a.length<3)continue;lv.set(+a[0],+a[1],+a[2]).applyMatrix4(o.matrixWorld);lightList.push([lv.x,lv.y,lv.z,String(a[3]??'lamp'),a[4]===undefined?1:+a[4],a[5],a[6],a[7]]);}}
  function finishLights(){
   // The commons campfire (native fixture) and the garden fire circle publish no anchors of their own.
@@ -123,6 +123,11 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   *  without walking the whole scene. New publishers are still found by the periodic scan's collectLights. */
  function refreshLights(){const known=lightPublishers.map(p=>p.node);lightList.length=0;lightPublishers.length=0;scene.updateWorldMatrix(true,false);lightRefreshes++;
   for(const o of known){const list=o.userData?.edenLightSources;if(Array.isArray(list))publish(o,list);}finishLights();}
+ /** Cached publishers supply only changed portable anchors; no scene traversal
+  * or static light-list reconstruction for a lantern moving in one hand. */
+ function moveLights(){for(const p of lightPublishers){const v=p.node.userData.edenLightMoveVersion;if(v===p.moveVersion)continue;p.moveVersion=v;
+  for(const move of (p.node.userData.edenLightMoves??[]) as {index:number;at:HaloSource}[]){const a=move.at;lv.set(a[0],a[1],a[2]).applyMatrix4(p.node.matrixWorld);halos.moveSource(p.offset+move.index,lv.x,lv.y,lv.z);}
+ }}
  function scan(seconds:number){
   wind.scan(scene,scans,scans===0?0:1,own);motion.scan(scene,own);
   const f=findAnchors(scene,own,!fauna.ducksPlaced);covers=f.covers;
@@ -284,6 +289,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    // unchanged frames compare a few publisher references, not every world entity.
    else if(lightPublishers.some(p=>p.node!==scene&&!p.node.parent))collectLights();
    else if(lightPublishers.some(p=>p.node.userData.edenLightSources!==p.list))refreshLights();
+   moveLights();
    // Any world can opt in using its admitted sky palette; no Mars identity special case.
    // Explicit owner weather wins over auto, unless a dust review override was requested.
    dustScheduled=!photoFrame&&desert&&!!(dustOverride||(!override&&!setWeather));

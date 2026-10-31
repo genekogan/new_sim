@@ -22,6 +22,7 @@ import {wateringDiffAhead} from './watering-diff-clock.ts';
 import {defLights} from './WorldNightLights.ts';
 import {pourJets, waterJets} from './fx/water-jets.ts';
 import {isGrowingDef, plantGroup, plantLookOf, posePlants, type PlantGroup, type PlantLook} from './fx/plant-growth.ts';
+import {itemDiffAhead} from './item-diff-clock.ts';
 import {beginOpeningMotion,stepOpeningMotion,type OpeningMotion} from './opening-motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
@@ -348,7 +349,7 @@ export class WorldEntityLayer {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
       if (m.kind !== 'world-diff' || typeof m.seq !== 'number' || m.seq <= this.seq) continue;
-      if (lightDiffAhead(this.model,m,depictedTick)||wateringDiffAhead(this.model,m,depictedTick)) return;
+      if (lightDiffAhead(this.model,m,depictedTick)||wateringDiffAhead(this.model,m,depictedTick)||itemDiffAhead(this.model,m,depictedTick)) return;
       this.stats.edgeSeen++;
       if (m.seq > this.seq + 1) { void this.resync(); return; }  // a gap: something was missed; take the whole picture again
       try { this.applyDiff(m as unknown as DiffMsg); this.stats.applied++; } catch (e) { this.stats.lastError = String(e); this.seq = m.seq; }
@@ -393,6 +394,40 @@ export class WorldEntityLayer {
   private overrides = new Map<string, THREE.Vector3>();
   /** BALLOON-BODY: the native twin's yaw (Core convention: rotation.y = -yaw), so the drawn cabin's door is Core's door. */
   private overrideYaw = new Map<string, number>();
+  private recordedItems = new Set<string>();
+  private missingItemAt = new Map<string,number>();
+  private lightMoves = new Set<string>();
+  /** Only active/settling portable emitters, never a per-frame search of the world. */
+  *movingLights() {
+    for (const id of this.lightMoves) {
+      const d=this.drawn.get(id);
+      if(!d) { this.lightMoves.delete(id); continue; }
+      if(d.settled&&!this.held.has(id)&&!this.recordedItems.has(id))this.lightMoves.delete(id);
+      yield id; // one last final-position update when settling finishes
+    }
+  }
+  lightObject(id:string) { return this.drawn.get(id)?.obj; }
+  /** Authoritative small-item poses share the figure's take clock, including
+   * approach/grasp/release. Live world diffs may arrive ahead of that clock. */
+  itemPoses(entities:Record<string,{p:readonly number[];yaw:number}>) {
+    const seen=new Set<string>();
+    for(const [id,pose]of Object.entries(entities)) {
+      const e=this.model?.entities.get(id);
+      if(!e||!this.model?.resolvedDef(e.def)?.tags.includes('recorded-item'))continue;
+      seen.add(id);this.recordedItems.add(id);
+      this.missingItemAt.delete(id);
+      const p=this.overrides.get(id)??new THREE.Vector3();p.set(pose.p[0],pose.p[1],pose.p[2]);this.overrides.set(id,p);this.overrideYaw.set(id,pose.yaw);
+      if(this.model.resolvedDef(e.def)?.components.light||this.model.resolvedDef(e.def)?.components.lights)this.lightMoves.add(id);
+    }
+    for(const id of this.recordedItems)if(!seen.has(id)) {
+      const d=this.drawn.get(id),last=this.overrides.get(id);
+      if(d&&last&&d.to.p.distanceToSquared(last)>.0001){
+        const since=this.missingItemAt.get(id)??this.now;this.missingItemAt.set(id,since);
+        if(this.now-since<1000)continue; // short write-back grace; a later owner move must never freeze the old pose forever
+      }
+      this.recordedItems.delete(id);this.missingItemAt.delete(id);this.overrides.delete(id);this.overrideYaw.delete(id);if(d)d.settled=false;
+    }
+  }
   /** Names of world-level god things with a native ride twin: the god's balloons (def carrier + tag balloon). */
   rideNames(): string[] {
     if (!this.model) return [];
@@ -475,7 +510,7 @@ export class WorldEntityLayer {
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
       const shown = this.interiorVisible(id, d);
-      const inHand = !d.removing && this.held.has(id) && (d.obj.userData.handleGrip ? this.handleHeld(id, d) : this.handPoint(this.held.get(id)!, d.obj.position));
+      const inHand = !ride && !d.removing && this.held.has(id) && (d.obj.userData.handleGrip ? this.handleHeld(id, d) : this.handPoint(this.held.get(id)!, d.obj.position));
       if (!inHand && this.pours.has(id)) this.pours.get(id)!.visible = false;
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
@@ -708,6 +743,7 @@ export class WorldEntityLayer {
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);
     this.drawn.clear();
+    this.recordedItems.clear();this.missingItemAt.clear();this.lightMoves.clear();
     for (const m of this.materials.values()) m.dispose();
     this.materials.clear();
     this.waterGroup.clear(); this.terrainGroup.clear(); this.thingsGroup.clear();
@@ -868,6 +904,7 @@ export class WorldEntityLayer {
   private draw(e: Entity, ease: boolean, force = false) {
     const m = this.model!; const def = m.resolvedDef(e.def);
     if (!def) return;
+    if(def.components.carryable&&(def.components.light||def.components.lights))this.lightMoves.add(e.id);
     if (def.tags.includes('horizon')) this.horizonBy.add(e.id); else this.horizonBy.delete(e.id);
     const parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     if (parent && m.resolvedDef(parent.def)?.components.body) this.held.set(e.id, parent.id); else this.held.delete(e.id);

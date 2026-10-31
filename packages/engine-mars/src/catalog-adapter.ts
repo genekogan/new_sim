@@ -150,6 +150,7 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   else if (c.surface) out.surfaceSlots = surfaceLattice('top', w, dd, c.surface.height ?? h);
   if (hangs.length) out.surfaceSlots = [...(out.surfaceSlots ?? []), ...hangs];
   const caps: NonNullable<AssetDef['capabilities']> = {};
+  if (c.carryable && d.tags.includes('recorded-item')) caps.recordedItemPoseV1 = true;
   if (c.readable) caps.readable = { pages: Math.max(1, Math.round(c.readable.pages ?? 4)), maxSeatDistance: 0.65 };
   if (c.display) caps.display = { accepts: 'text', maxChars: 280 };
   if (c.boardGame?.game === 'chess') caps.boardGame = 'chess';
