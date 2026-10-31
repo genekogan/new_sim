@@ -58,6 +58,9 @@ import type { DepictionBeat } from './station-depiction.ts';
 import { sleepGoal, sleepHands, sleepHeadPitch, sleepRestWeight, sleepHeadRestLift } from './sleep.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
 import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
+import { handGameActive, handGameSuppress, poseHandGames, type HandGameDiag } from './hand-games.ts';
+import type { HandHoldState } from '../../engine/social/hand-hold.ts';
+import type { RpsState } from '../../engine/social/rps.ts';
 import {recordedGame,type RecordedGame} from './recorded-games.ts';
 import {runningGaitAt} from './running-gait.ts';
 import {PLAY_MOTION, playSeatAt, rideSeat} from './play-motion.ts';
@@ -149,6 +152,13 @@ type View = {
   restAgeAtWalk?: number;
   partner?: string;
   partnerP?: THREE.Vector3;
+  /** entry 35 (hand-games.ts): holding hands / an offered hand, and a rock-paper-scissors count; the tick drawn and the
+   *  hand partner's drawn root. */
+  handHold?: HandHoldState;
+  rps?: RpsState;
+  hgTick?: number;
+  hgDt?: number;
+  holdP?: THREE.Vector3;
   dist: number;
   speaking?: boolean;
   /** Library actions playing at the last render (stopped when no longer wanted). */
@@ -174,6 +184,8 @@ export type Diag = {
   /** Prone layer (prone.ts): rise coordinate, torso pitch and body turn (rad), rendered yaw, layer weight; what the
    *  engine published at the latest tick (its body turn angleDelta(pose.yaw, proneYaw), phaseK; null: not published). */
   prone: (ProneState & { engTurn: number | null; phaseK: number | null }) | null;
+  /** entry 35: the hand-game layer drawn this frame (hold / offer / rps), its weight, the shaped hand's finger curls. */
+  handGame?: HandGameDiag;
 };
 /** Where an arm's target came from: engine hand points, a grip slot, or private frame/balance/ground-sleep contacts. */
 type Source = 'hands' | 'grip' | 'frame' | 'sleep' | 'expression' | 'water' | null;
@@ -222,6 +234,11 @@ export type SampledHuman = {
   speed?: number;
   /** together/1: the other body of a paired gesture (hug, handshake, high-five, give/take, dance together). */
   partner?: string;
+  /** entry 35: take fields handHold / rps, and the absolute take tick (fractional) and tick length they are read at. */
+  handHold?: HandHoldState;
+  rps?: RpsState;
+  handGameTick?: number;
+  handGameDt?: number;
   /** Seconds since `activity` began in this take, and the activity / base before it (library clip crossfades and
    *  one-shots); absent when the activity began before the take. */
   activityAge?: number;
@@ -491,6 +508,7 @@ export class HumanViews {
       v.shoreTime = undefined;
       v.waterTransition = undefined;
       v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;
+      v.handHold=e.human?.handHold;v.rps=e.human?.rps;v.hgTick=world.tick;v.hgDt=DT;{const q=v.handHold?world.entities[v.handHold.with]:undefined;v.holdP=q?new THREE.Vector3(...q.pose.p):undefined;}
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
@@ -706,6 +724,7 @@ export class HumanViews {
       v.prevBase = f.prevActivity === undefined ? undefined : baseOf(f.prevActivity, f.prevBaseActivity);
       v.partner = f.partner;
       v.partnerP = undefined;
+      v.handHold = f.handHold; v.rps = f.rps; v.hgTick = f.handGameTick; v.hgDt = f.handGameDt; v.holdP = undefined;
       v.dist = f.walkDist;
       const water=!!waterMotionAt(f.id,act,f.shoreTime??t,f.shore)&&!f.hands?.left&&!f.hands?.right&&!f.grip&&!f.on;
       const transition=f.waterTransition,targetWeight=transition?.weight??1,priorWater=transition?.origins.reduce((sum,x)=>sum+(x.pose?x.weight:0),0)??0;
@@ -740,6 +759,8 @@ export class HumanViews {
         this.views.delete(id);
       }
     for (const f of frame) { const v = this.views.get(f.id); if (v?.partner) { const q = frame.find((g) => g.id === v.partner); v.partnerP = q ? new THREE.Vector3(...q.p) : undefined; } }
+    // entry 35: the hand partner's drawn root (both bodies draw their joined hands to one point between them)
+    for (const f of frame) { const v = this.views.get(f.id); if (v?.handHold) { const q = frame.find((g) => g.id === v.handHold!.with); v.holdP = q ? new THREE.Vector3(...q.p) : undefined; } }
     this.parts.clear(); // random access: no tick history, so prev = cur
     this.trackParts((id) => parts[id]);
   }
@@ -818,15 +839,18 @@ export class HumanViews {
     // Over GESTURE_FADE, not the 0.65 s reach: folded arms opening in 0.65 s still swung the free hand 0.13 m per 50 ms (0.084 over 1.2 s).
     const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE) : 0;
     // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
-    const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
+    // entry 35: a hand game holds idle gestures off, fading them out from its start and back in after it (no pop at a
+    // join, a count's start or a release); rps keeps the variety layer for that fade
+    const hgOff = handGameSuppress(v);
+    const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0) || (v.activity === 'rps' && hgOff < 1)) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
     const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : 1;
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
     const restOnset = v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset : 0;
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset * (1 - hgOff) : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
-    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset : 0;
+    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset * (1 - hgOff) : 0;
     v.variety = neutralW + variantW;
     // A walk starting out of an idle gesture: the legs take the walk's own ease (WALK_EASE, 0.55 s), but folded arms opening
     // that fast swung a hand 0.28 m per 50 ms. On the arms alone (arms-only copies of the gesture clips) the gesture fades
@@ -838,7 +862,7 @@ export class HumanViews {
       const g = 1 - smooth(v.walkAge / GESTURE_FADE), on = v.restAgeAtWalk === undefined ? 1 : smooth(Math.min(1, v.restAgeAtWalk / IDLE_VARIETY_ONSET));
       const n0 = extra.idleNeutral ? neutralWeight(h.name, tSec) * on : 0, v0 = gv && libAction(v.rig, gv.clip) ? (1 - n0) * gv.w * on : 0;
       const want = (n0 + v0) * g, have = neutralW + variantW;
-      if (want > have + 1e-4) { const k = Math.min(20, (want - have) / Math.max(1e-3, 1 - want)) / (n0 + v0); armsN = n0 * k; armsV = v0 * k; }
+      if (want > have + 1e-4 && hgOff < 1e-4) { const k = Math.min(20, (want - have) / Math.max(1e-3, 1 - want)) / (n0 + v0); armsN = n0 * k; armsV = v0 * k; }
     }
     const libOn = new Set<THREE.AnimationAction>();
     const libAt = (act: THREE.AnimationAction | null, weight: number, time: number) => {
@@ -896,7 +920,8 @@ export class HumanViews {
     const wantProp = !hasHands && !gripping && proneW === 0 ? propFor(act || clipBody || lib.cur ? v.activity : '', v.propWanted,v.instrument) : null;
     if (v.prop && v.prop.kind !== wantProp) v.prop.obj.visible = false;
     const footFit = !water && !waterFrom && !lib.water && sitW <= 0 && !gait && !fp?.feet && !posed && !runFallback && !gripping && !hasHands && ['idle', 'walk', 'run', 'jog'].includes(v.activity);
-    if (!(footFit || runFallback || waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp)) return;
+    const handGame = handGameActive(v) && freeBody && sitW === 0 && !hasHands && !gripping;
+    if (!(footFit || runFallback || waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp || handGame)) return;
     for (const s of v.saved) { s.p.copy(s.o.position); s.q.copy(s.o.quaternion); }
     v.layered = true;
     _fwd.set(Math.cos(yaw), 0, Math.sin(yaw)); // engine yaw 0 faces +x; holder.rotation.y = -yaw
@@ -1111,6 +1136,8 @@ export class HumanViews {
       });
       reachTo(v,targets,false);closeHands(v,targets.map(()=>0));
     } else dangle(v, pz.bend, []);
+    // entry 35: hand games over whatever the arms do now (holding hands, an offered hand, a rock-paper-scissors count)
+    const hgDiag = handGame ? poseHandGames(v, v.arms, (i) => armSide(v, i), h, _fwd, _right, h.position.y, v.spine?.head) : null;
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
     if (v.sleepPose && pr && v.spine?.head && !lib.sleep) {
       turn(v.spine.head, _right, sleepHeadPitch(pr));
@@ -1173,6 +1200,7 @@ export class HumanViews {
     v.diag = diagOf(v, gait?.g ?? null, gait?.f.id ?? '', pz, targets, source, fp, proneW > 0 ? pr : null);
     if(expression)v.diag.expression=expression;
     if(water)v.diag.water=water;
+    if(hgDiag)v.diag.handGame=hgDiag;
   }
 
   /**

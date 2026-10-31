@@ -19,6 +19,7 @@ import { HUMAN_RADIUS } from '../world/catalog.ts';
 import { seatFitProblem } from '../bodies/humanoid.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
+import { RPS, RPS_SHAPES, type RpsShape } from './rps.ts';
 
 /** Overlay activities (upper body; drawn on top of baseActivity). */
 export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'operate',
@@ -40,6 +41,8 @@ export const POSE_POSTURES = ['sit-ground', 'lie', 'nap', 'pushups', 'situps', '
 export const POSE_MOVES = ['dance', 'jump', 'stretch', 'jumping-jacks',
   // paired touch gestures (core-next4): both bodies face each other at `gap` and share one start and end
   'hug', 'high-five', 'handshake',
+  // entry 35: rock-paper-scissors face to face (social/rps.ts; paired, ready-v1)
+  'rps',
   // CN5: outdoor gym bars; choreographed games (grouped: the world keeps the turns, see `game`)
   'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball'] as const;
 export const POSE_ACTIVITIES: readonly string[] = [...POSE_OVERLAYS, ...POSE_POSTURES, ...POSE_MOVES];
@@ -74,7 +77,9 @@ type Params = { actor: string; activity: string; seconds: number; prop?: string;
   /** CN5: the instrument played (play-music) and a choreographed game (grouped). */
   instrument?: string; game?: { kind: GameKind; jack?: Vec2; net?: [number, number, number, number] };
   /** CN5: keep the scenery seat height when the pose is done together (grouped). */
-  seatTogether?: boolean };
+  seatTogether?: boolean;
+  /** entry 35: this body's rock-paper-scissors choice (published only from the shoot beat). */
+  throw?: RpsShape };
 type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw: number | null;
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
   phase?: 'waiting' | 'active'; readyAt?: number; waited?: number; until?: number; mobile?: boolean; close?: boolean;
@@ -114,7 +119,7 @@ const nudged = (rt: Runtime, actor: string) => rt.holder('actor:' + actor).some(
 const restore = (rt: Runtime, ex: Exec) => {
   const h = rt.world.entities[ex.p.actor]?.human; if (!h) return;
   if (h.activity === ex.p.activity || (ex.phase && h.activity === 'walk')) h.activity = ex.base === 'sit' && !held(rt, ex.p.actor) ? 'idle' : ex.base;
-  delete h.baseActivity; delete h.seatHeight; delete h.partner; delete h.together; delete h.instrument; delete h.game; if (ex.phase) delete h.speed;
+  delete h.baseActivity; delete h.seatHeight; delete h.partner; delete h.together; delete h.instrument; delete h.game; delete h.rps; if (ex.phase) delete h.speed;
   // together/1: a carried item stays in the hand between activities
   if (h.holding) h.prop = h.holding; else delete h.prop;
 };
@@ -136,10 +141,11 @@ export const poseV1: ActionDef<Params, true, Exec> = {
   schema: z.object({ actor: z.string().min(1).max(80), activity: z.enum(POSE_ACTIVITIES as [string, ...string[]]), seconds: z.number().min(0.5).max(3600), prop: z.enum(POSE_PROPS).optional(), base: z.enum(['sit', 'idle']).optional(), seatHeight: z.number().min(0.2).max(1.2).optional(), face: z.tuple([z.number(), z.number()]).optional(),
     group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), pairedPolicy: z.literal('ready-v1').optional(), windowPolicy: z.literal('once-v1').optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
     gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional(),
-    instrument: z.enum(POSE_INSTRUMENTS).optional(), seatTogether: z.boolean().optional(),
+    instrument: z.enum(POSE_INSTRUMENTS).optional(), seatTogether: z.boolean().optional(), throw: z.enum(RPS_SHAPES).optional(),
     game: z.object({ kind: z.enum(Object.keys(GAMES) as [GameKind, ...GameKind[]]), jack: z.tuple([z.number(), z.number()]).optional(), net: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional() }).strict().optional() }).strict()
-    .refine(p => !p.pairedPolicy || (!!p.group && p.gap !== undefined && ['hug','high-five','handshake','dance'].includes(p.activity) && !p.game && !p.hold && !p.release), {message:'ready-v1 requires a paired limb gesture with group and gap'})
+    .refine(p => !p.pairedPolicy || (!!p.group && p.gap !== undefined && ['hug','high-five','handshake','dance','rps'].includes(p.activity) && !p.game && !p.hold && !p.release), {message:'ready-v1 requires a paired limb gesture with group and gap'})
     .refine((p) => !p.game || (!!p.group && p.activity === 'play-' + p.game.kind), { message: 'a game needs a group and its own play-<game> activity' })
+    .refine((p) => (p.activity === 'rps') === (p.throw !== undefined) && (p.activity !== 'rps' || p.pairedPolicy === 'ready-v1'), { message: 'rps needs a throw and the ready-v1 paired policy (and only rps has a throw)' })
     .refine((p) => !p.windowPolicy || (!!p.group && !p.pairedPolicy && !p.game), { message: 'once-v1 is a group activity window (not a paired gesture or a game)' }),
   reservations: (_w, p) => [{ resource: 'hand:' + p.actor + ':left', mode: 'exclusive' }, { resource: 'hand:' + p.actor + ':right', mode: 'exclusive' }, { resource: 'pose:' + p.actor, mode: 'exclusive' }],
   plan(rt, p) { const d = admission(rt, p); return d ? { ok: false, diagnostic: d } : { ok: true, program: true }; },
@@ -286,6 +292,8 @@ function pairedReadyV1(rt:Runtime,ex:Exec,a:NonNullable<Runtime['world']['entiti
  if(nudged(rt,partner.id)){h.activity=ex.base;return tick>=ex.until!?finish(rt,ex):{status:'running' as const,phase:'settling-with-partner'};}
  if(!held(rt,ex.p.actor)&&hypot(partner.pose.p[0]-a.pose.p[0],partner.pose.p[2]-a.pose.p[2])>.05)a.pose.yaw=heading([partner.pose.p[0]-a.pose.p[0],partner.pose.p[2]-a.pose.p[2]]);
  h.partner=partner.id;h.activity=ex.p.activity;delete h.speed;
+ // entry 35: one count for both (the shared start), the shape shown from the shoot beat only
+ if(ex.p.activity==='rps'&&ex.p.throw){const start=ex.until!-ticks(ex.p.seconds),shoot=start+ticks(RPS.SHOOT);h.rps={start,shoot,...(tick>=shoot?{shape:ex.p.throw}:{})};}
  if(ex.p.prop)h.prop=ex.p.prop;else if(h.holding)h.prop=h.holding;
  if(tick>=ex.until!)return finish(rt,ex);
  return {status:'running' as const,phase:'together'};

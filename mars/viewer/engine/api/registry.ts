@@ -23,6 +23,7 @@ import { hashOf } from '../core/hash.ts';
 import { sceneForWorld, worldBaseId } from '../spatial/edits.ts';
 import type { ActionDef } from '../actions/types.ts';
 import {handActuator} from '../social/hand-actuator.ts';
+import { handHold } from '../social/hand-hold.ts';
 import { walkTo } from '../locomotion/walk.ts';
 import { carry } from '../carry/actions.ts';
 import { FIXTURE_ACTIONS } from '../carry/fixture.ts';
@@ -53,7 +54,7 @@ import type { WorldState } from '../world/types.ts';
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
 export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/31+bodies/1+hand-actuator/1`;
 
-export const ENGINE_ACTIONS: ActionDef[] = [walkTo, handActuator, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...PREPARATION_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS, ...SLEEP_ACTIONS, gardenCare, ...MUSIC_GATHERING_ACTIONS, ...LIVING_INTENTION_ACTIONS, ...OPEN_JAM_ACTIONS, ...DRAWING_ACTIONS, ...GROUP_WARMUP_ACTIONS, ...ART_SHARING_ACTIONS, ...TABLE_CLEANUP_ACTIONS, ...GALLERY_TOUR_ACTIONS, ...READING_CIRCLE_ACTIONS, ...SEED_PLANTING_ACTIONS, ...ROOM_PREPARATION_ACTIONS, ...COMMUNAL_SUPPER_ACTIONS, ...GARDEN_CIRCUIT_ACTIONS, ...COMPUTER_WORKSHOP_ACTIONS, ...LIBRARY_READING_ACTIONS];
+export const ENGINE_ACTIONS: ActionDef[] = [walkTo, handActuator, handHold as ActionDef, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...PREPARATION_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS, ...SLEEP_ACTIONS, gardenCare, ...MUSIC_GATHERING_ACTIONS, ...LIVING_INTENTION_ACTIONS, ...OPEN_JAM_ACTIONS, ...DRAWING_ACTIONS, ...GROUP_WARMUP_ACTIONS, ...ART_SHARING_ACTIONS, ...TABLE_CLEANUP_ACTIONS, ...GALLERY_TOUR_ACTIONS, ...READING_CIRCLE_ACTIONS, ...SEED_PLANTING_ACTIONS, ...ROOM_PREPARATION_ACTIONS, ...COMMUNAL_SUPPER_ACTIONS, ...GARDEN_CIRCUIT_ACTIONS, ...COMPUTER_WORKSHOP_ACTIONS, ...LIBRARY_READING_ACTIONS];
 export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS, ...FRAMING_INVARIANTS];
 
 export function createRegistry(extra: ActionDef[] = []): Map<string, ActionDef> {
