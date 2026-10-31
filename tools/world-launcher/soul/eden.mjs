@@ -11,7 +11,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.6.0";
+const VERSION = "2.7.0";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
