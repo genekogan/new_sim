@@ -142,6 +142,8 @@ export class WorldHost {
   clockRate = 1;
   paused = false;
   listeners: HostListener[] = [];
+  /** Stage B (split/delta.ts, SIM_READ_WORKER=1 only): the WorldDelta tap, given each completed tick's own paths/changes. */
+  splitTap?: (tick: number, out: { paths: PathCommit[]; changes: ChangeEvent[] }) => void;
   ring: Batch[] = [];
   lastSnapshotTick = 0;
   /** Adaptive snapshot cadence (lane L5): a periodic snapshot is also due once the ticks since the last one cost
@@ -547,6 +549,7 @@ export class WorldHost {
     if (this.snapshotDue(now)) this.schedulePeriodicSnapshot();
     this.tickMs.push(performance.now() - t0);
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
+    if (this.splitTap) this.splitTap(now, out); // never throws (DeltaTap.onTick); reads only
     for (const l of this.listeners) { try { l.afterTickComplete?.(now); } catch { /* observers cannot undo a completed tick */ } }
   }
 

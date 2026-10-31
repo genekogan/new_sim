@@ -11,20 +11,18 @@ import {WorldHost} from '../world.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {hereFrame, Perception} from '../edge/perception/here.ts';
 import {DeltaTap} from './delta.ts';
+import {worldInit} from './world-init.ts';
 
 const CONTROL = Number(process.env.SPLIT_CONTROL_PORT ?? 5202), WPORT = Number(process.env.SPLIT_WORKER_PORT ?? 5203);
 const cpuMs = () => {const u = threadCpuUsage(); return (u.user + u.system) / 1000;};
 let host: WorldHost | undefined, L: EdgeLedger | undefined, tap: DeltaTap | undefined, worker: Worker | undefined;
-const changed = new Set<string>(), tickCost = {n: 0, cpuMs: 0, max: 0};
+const tickCost = {n: 0, cpuMs: 0, max: 0};
 const log = (m: string) => console.log(`[split] ${m}`);
 
 if (!isMainThread) throw Error('split/preload.ts: main thread only');
 const boot = WorldHost.prototype.boot;
 WorldHost.prototype.boot = function (this: WorldHost, ...a: unknown[]) {
   const out = (boot as (...x: unknown[]) => unknown).apply(this, a); host = this;
-  const eng = this.engine as unknown as {step: () => {paths: {entity: string}[]; changes: [number, string, string, unknown][]}};
-  const step = eng.step.bind(eng);
-  eng.step = () => {const o = step(); for (const p of o.paths) changed.add(p.entity); for (const c of o.changes) changed.add(c[1]); return o;};
   const tickOnce = this.tickOnce.bind(this);
   this.tickOnce = () => {const c = cpuMs(); tickOnce(); const ms = cpuMs() - c; tickCost.n++; tickCost.cpuMs += ms; tickCost.max = Math.max(tickCost.max, ms);};
   maybeStart(); return out as ReturnType<WorldHost['boot']>;
@@ -34,15 +32,16 @@ EdgeLedger.prototype.attachComms = function (this: EdgeLedger, c) {attach.call(t
 
 function maybeStart() {
   if (!host || !L || tap) return;
-  tap = new DeltaTap(host, L);
-  const c = cpuMs(), init = tap.init(), initCpu = cpuMs() - c, initBytes = JSON.stringify(init).length;
+  tap = new DeltaTap(host, L); tap.measureBytes = true; const t = tap;
+  host.splitTap = (tick, out) => t.onTick(tick, out);
+  const c = cpuMs(), init = worldInit(host, L, tap), initCpu = cpuMs() - c, initBytes = JSON.stringify(init).length;
   worker = new Worker(new URL('./read-worker.ts', import.meta.url), {workerData: {port: WPORT}, execArgv: []});
   worker.on('message', m => {if (m.t === 'ready') log(`worker ready at tick ${m.tick} ${JSON.stringify(m.stats)} init ${m.initCpuMs.toFixed(1)} ms`); else pending.get(m.id)?.(m.v);});
   worker.on('error', e => log(`worker error ${e.stack}`));
   worker.postMessage({t: 'init', w: init});
-  initInfo = {tick: init.tick, mainCpuMs: +initCpu.toFixed(1), bytes: initBytes, staticBytes: JSON.stringify(init.static).length, entities: init.bodies.length};
+  initInfo = {tick: init.tick, mainCpuMs: +initCpu.toFixed(1), bytes: initBytes, staticBytes: JSON.stringify(init.static).length, entities: Object.keys(init.entities).length};
   log(`init ${JSON.stringify(initInfo)}`);
-  host.listeners.push({afterTickComplete: () => {const d = tap!.delta(changed); changed.clear(); worker!.postMessage({t: 'delta', d});}});
+  tap.subscribe(m => {if ('t' in m) worker!.postMessage({t: 'init', w: worldInit(host!, L!, tap!)}); else worker!.postMessage({t: 'delta', d: m});});
 }
 let initInfo: unknown = null;
 const pct = (a: number[], p: number) => {const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : 0;};
@@ -92,7 +91,7 @@ createServer(async (req, res) => {
   try {
     if (!tap) {res.end(JSON.stringify({ready: false})); return;}
     let v: unknown;
-    if (u.pathname === '/status') v = {steady: summary(tap.steady), tick: host!.engine.world.tick, init: initInfo, delta: tap.cost, tickCost, walkers, souls: souls().map(s => ({id: s.soulId, name: s.name, body: !!host!.engine.world.entities[s.entityId], faded: L!.faded.has(s.soulId), open: L!.openReceipts(s.soulId).length})), worker: await ask('stats', '')};
+    if (u.pathname === '/status') v = {steady: summary(tap.samples), tick: host!.engine.world.tick, init: initInfo, delta: tap.cost, tickCost, walkers, souls: souls().map(s => ({id: s.soulId, name: s.name, body: !!host!.engine.world.entities[s.entityId], faded: L!.faded.has(s.soulId), open: L!.openReceipts(s.soulId).length})), worker: await ask('stats', '')};
     else if (u.pathname === '/walkers') {const n = Number(u.searchParams.get('n') ?? 6); walkers = souls().filter(s => host!.engine.world.entities[s.entityId] && !L!.faded.has(s.soulId)).slice(0, n).map(s => s.soulId); await walk(); v = {walkers};}
     else if (u.pathname === '/converge') {   // every walker walks to the same place, so near/wave/face are exercised
       const ws = souls().filter(s => walkers.includes(s.soulId)), sets = ws.map(s => new Set(L!.capabilities(s as never).filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place').map(c => c.target!.id)));
@@ -100,7 +99,7 @@ createServer(async (req, res) => {
       const res: unknown[] = []; for (const s of ws) {const c = L!.capabilities(s as never).find(c => c.verb === 'walk' && c.target?.id === to); try {res.push(c ? await L!.act(s as never, {capability: c.id} as never).then(r => !!(r as {accepted?: boolean}).accepted) : 'no-offer');} catch (e) {res.push((e as Error).message);}}
       walkers = []; v = {to, common: common.length, res};}
     else if (u.pathname === '/walk') {await walk(); v = {ok: true};}
-    else if (u.pathname === '/reset') {for (const key of Object.keys(tap.cost)) (tap.cost as Record<string, number>)[key] = 0; tap.steady.length = 0; tickCost.n = tickCost.cpuMs = tickCost.max = 0; v = {ok: true};}
+    else if (u.pathname === '/reset') {for (const key of Object.keys(tap.cost)) (tap.cost as Record<string, number>)[key] = 0; tap.samples.length = 0; tickCost.n = tickCost.cpuMs = tickCost.max = 0; v = {ok: true};}
     else if (u.pathname === '/oracle') v = await oracle();
     else if (u.pathname === '/busy') {const ms = Number(u.searchParams.get('ms') ?? 2000), t0 = host!.engine.world.tick; setTimeout(() => {const end = performance.now() + ms; while (performance.now() < end) { /* the tick thread is deliberately busy */ }}, 50); v = {busyFromTick: t0, ms};}
     else {res.statusCode = 404; v = {error: 'unknown'};}
