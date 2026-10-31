@@ -37,7 +37,7 @@ import {installBirthLooks} from './god/birth-look.ts';
 import { setKitViewerContract } from '@sim/generators';
 import { rehearseRestore, standby } from './standby.ts';
 import { coreLibrary } from '@sim/world-compiler';
-import { startWatchdog } from './load/watchdog.ts';
+import { startWatchdog, writeLiveNow } from './load/watchdog.ts';
 import { bootPhase } from './load/boot-progress.ts';
 import { LoadMonitor } from './load/monitor.ts';
 import { Admission } from './load/admission.ts';
@@ -172,9 +172,10 @@ if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entit
 // srv-load: the load sensor (load/monitor.ts) and in-world admission (load/admission.ts; SIM_ADMISSION=0 turns it off).
 // Black for 60 s → planned restart: snapshot, exit 75 (the launcher restarts at once, no backoff penalty).
 const admission = process.env.SIM_ADMISSION === '0' ? undefined : new Admission();
-const monitor = new LoadMonitor({ host, queue: () => admission?.queueStats() ?? { depth: 0, oldestMs: 0 }, shed: () => ({ reads: admission?.shed.reads ?? 0, acts: admission?.shed.acts ?? 0 }),
+const drill = process.env.SIM_LOAD_DRILL_LEVEL as 'amber' | 'red' | 'black' | undefined;   // drill: hold a level (L1 tests 'planned' restarts with black)
+const monitor = new LoadMonitor({ host, drill: drill && ['amber', 'red', 'black'].includes(drill) ? drill : undefined, blackLimitMs: Number(process.env.SIM_LOAD_BLACK_MS) || 60_000, queue: () => admission?.queueStats() ?? { depth: 0, oldestMs: 0 }, shed: () => ({ reads: admission?.shed.reads ?? 0, acts: admission?.shed.acts ?? 0 }),
   souls: () => { let awake = 0, connected = 0; for (const id of host.minds.keys()) { const st = host.publicBodyOf?.(id)?.state; if (st === 'awake') awake++; if (st && st !== 'asleep') connected++; } return { awake, waiting: 0, connected }; },
-  onBlackTooLong: () => { console.log('[load] black for 60 s: planned restart (snapshot, exit 75)'); void shutdown('load:black', 75).catch(() => process.exit(75)); } });
+  onBlackTooLong: () => { console.log(`[load] black for ${Math.round((Number(process.env.SIM_LOAD_BLACK_MS) || 60_000) / 1000)} s: planned restart (snapshot, exit 75)`); void shutdown('load:black', 75).catch(() => process.exit(75)); } });
 if (admission) monitor.register('admission', (l) => admission.setLoadLevel(l));
 monitor.register('hub', (l) => hub.setLoadLevel(l));
 const app = buildApp({ load: { admission, monitor }, cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
@@ -269,7 +270,7 @@ server.listen(config.port, config.host, () => {
 });
 
 const shutdown = async (sig: string, exitCode = 0) => {
-  if (closing) return; closing = true; bootPhase('stopping', host.engine.world.tick);
+  if (closing) return; closing = true; bootPhase('stopping', host.engine.world.tick); writeLiveNow(config.dataDir);
   if (writesInFlight.size) {
     const n = writesInFlight.size, t = performance.now();
     await Promise.race([Promise.all(writesInFlight), new Promise((r) => setTimeout(r, WRITE_DRAIN_MS))]);

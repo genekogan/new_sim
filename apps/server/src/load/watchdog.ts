@@ -1,7 +1,14 @@
 // Starts the watchdog thread (watchdog-worker.ts) first thing in main.ts. Unref'd: it never keeps the process alive.
+import {renameSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {Worker} from 'node:worker_threads';
-import {sharedLoad} from './shared.ts';
+import {liveOf, sharedLoad} from './shared.ts';
+
+/** live.json from this thread, now (the stop path: the process may exit before the watchdog's next write). */
+export function writeLiveNow(dataDir: string, a: Float64Array = sharedLoad) {
+  const file = join(dataDir, 'live.json');
+  try { writeFileSync(file + '.main.tmp', JSON.stringify(liveOf(a, process.pid, Date.now())) + '\n'); renameSync(file + '.main.tmp', file); } catch { /* best effort */ }
+}
 
 export function startWatchdog(opts: {dataDir: string; port?: number; everyMs?: number; shared?: Float64Array; onListening?: (port: number) => void}) {
   const worker = new Worker(new URL('./watchdog-worker.ts', import.meta.url), {

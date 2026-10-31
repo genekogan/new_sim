@@ -52,6 +52,8 @@ export type MonitorOpts = {
   /** Black for this long → planned restart (main.ts: snapshot, exit 75). */
   onBlackTooLong?: () => void; blackLimitMs?: number;
   shared?: Float64Array; now?: () => number; sampleMs?: number;
+  /** Drill only (SIM_LOAD_DRILL_LEVEL): hold this level whatever the signals say, to exercise dials and the restart path. */
+  drill?: Level;
 };
 
 const TICK_MS = 50;
@@ -115,7 +117,7 @@ export class LoadMonitor {
     const sorted = ms.length ? [...ms].sort((x, y) => x - y) : [];
     this.tickStats = {avg: ms.length ? Math.round(10 * sum / ms.length) / 10 : 0, max: Math.round(10 * max) / 10, n: ms.length, p99: sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(0.99 * sorted.length))] : 0};
     if (this.o.souls && now - this.soulsAt >= 2000) { this.soulsAt = now; try { this.souls = this.o.souls(); } catch { /* presence is best effort */ } }
-    const from = this.level, to = this.state.update(this.signals, now);
+    const from = this.level, to = this.o.drill ? (this.state.level = this.o.drill) : this.state.update(this.signals, now);
     if (to !== from) this.changed(from, to);
     if (to === 'black') {
       this.blackSince ??= now;
