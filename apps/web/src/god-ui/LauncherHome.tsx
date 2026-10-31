@@ -61,6 +61,8 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
           </a>
         ))}
       </div>
+      {/* #388: the public changelog, a static page the launcher serves beside this list (apps/web/changelog.html) */}
+      <footer className="lh-footer"><a href={`${BASE}/changelog`} data-changelog-link="1">Changelog</a></footer>
       {dialog && <NewWorldDialog templates={list.templates} onClose={() => { setDialog(false); const q = new URLSearchParams(location.search); if (q.has('new')) history.replaceState(null, '', location.pathname); }} />}
     </main>
   );

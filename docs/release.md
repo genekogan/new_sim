@@ -47,6 +47,10 @@ a `version` (for the changelog and tag) and optional `label`, `baseline` (defaul
 4. **publish**: compiles `changes/` into [`CHANGELOG.md`](../CHANGELOG.md), tags `v<version>` on the shipped commit
    and creates the GitHub Release.
 
+The site's public changelog page (`<base>/changelog`, `https://sim.eden.art/worlds/changelog`) is `CHANGELOG.md`
+rendered into the web build (`apps/web/changelog.html`, `apps/web/src/changelog-page.ts`). Because publish runs after
+ship, a release's own notes appear on the page from the next release's build on.
+
 Configuration lives in GitHub, never in the repository; preflight names whatever is missing:
 
 | Name | Kind | Purpose |

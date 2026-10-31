@@ -4,6 +4,7 @@ import { entryPrefetchScript } from './src/snapshot-prefetch.ts';
 import { rewritePhasedHtml } from './src/phased-entry.ts';
 import { anonymousHello } from '../../packages/client/src/hello.ts';
 import { PWA_MANIFEST, pwaHeadTags, pwaManifest, type PwaIcons } from './src/pwa-manifest.ts';
+import { changelogHtml } from './src/changelog-page.ts';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -87,6 +88,23 @@ function pwa(): Plugin {
       if (!/(^|\/)index\.html$/.test(ctx.path)) return;
       if (!html.includes('</title>')) throw Error('index.html: no </title> to place the app manifest after');
       return html.replace('</title>', `</title>\n    ${pwaHeadTags(base, names)}`);
+    },
+  };
+}
+
+// Issue #388: the public changelog page (changelog.html, served at <base>/changelog by the world launcher) is the repo's
+// CHANGELOG.md rendered at build time (src/changelog-page.ts): static HTML, no script, nothing fetched at runtime. A
+// CHANGELOG.md with no release headings fails the build. Dev server too, so `vite` shows the same page.
+function changelogPage(): Plugin {
+  let base = '/';
+  const file = fileURLToPath(new URL('../../CHANGELOG.md', import.meta.url));
+  return {
+    name: 'sim-changelog-page',
+    configResolved(c) { base = c.base; },
+    configureServer(server) { server.watcher.add(file); },
+    transformIndexHtml(html, ctx) {
+      if (!/(^|\/)changelog\.html$/.test(ctx.path)) return;
+      return changelogHtml(html, readFileSync(file, 'utf8'), base);
     },
   };
 }
@@ -181,7 +199,7 @@ function vendorGroups() {
 }
 
 export default defineConfig({
-  plugins: [snapshotPrefetch(), cdnPreconnect(), pwa(), phasedEntry(), checkChunks(), react()],
+  plugins: [snapshotPrefetch(), cdnPreconnect(), pwa(), phasedEntry(), checkChunks(), changelogPage(), react()],
   define: { __BUILD__: JSON.stringify(process.env.BUILD_ID ?? 'dev'), __SIM_ARRIVAL_ENABLED__: process.env.SIM_ARRIVAL_UI_ENABLED==='1', __SIM_GOATCOUNTER__: JSON.stringify(process.env.SIM_GOATCOUNTER ?? 'simeden'),
     __SIM_ASSETS_CDN_ENABLED__: process.env.SIM_ASSETS_CDN_ENABLED==='1',
     // CDN4: god uploads via the pull-through Worker on assets.eden.art/w/* (default on; needs the CDN switch above)
@@ -192,6 +210,6 @@ export default defineConfig({
   // chunkSizeWarningLimit (kB, lane BUDGET 2026-10-22): just above the largest legitimate chunk, core-kit (1,491 kB raw /
   // 221 kB gzip on 3.62: the shared three.js + catalogue kit every world loads), so any chunk past it warns at build time.
   // The hard limit is the release gate's V3-bundle step (tools/test-harness/bundle-budget): +10% per chunk or total fails.
-  build: { manifest: true, chunkSizeWarningLimit: 1600, rollupOptions: { input: { main: 'index.html', workbench: 'workbench.html', contextView: 'context-view.html', early: 'src/early-entry.ts' },
+  build: { manifest: true, chunkSizeWarningLimit: 1600, rollupOptions: { input: { main: 'index.html', workbench: 'workbench.html', contextView: 'context-view.html', changelog: 'changelog.html', early: 'src/early-entry.ts' },
     output: { codeSplitting: { groups: vendorGroups() } } } },
 });
