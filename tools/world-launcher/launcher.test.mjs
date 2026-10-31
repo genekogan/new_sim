@@ -14,7 +14,7 @@ import { productionSettings, decorateCommand, shadowsExisting } from './producti
 import { backoffMs } from './children.mjs';
 
 const BASE = Number(process.env.LAUNCHER_TEST_PORT_BASE ?? 6200);
-if (!Number.isInteger(BASE) || BASE < 1024 || BASE > 65535 - 24) throw Error(`LAUNCHER_TEST_PORT_BASE must be a port from 1024 (got ${process.env.LAUNCHER_TEST_PORT_BASE})`);
+if (!Number.isInteger(BASE) || BASE < 1024 || BASE > 65535 - 24) throw Error(`LAUNCHER_TEST_PORT_BASE must be 1024–65511 (got ${process.env.LAUNCHER_TEST_PORT_BASE})`);
 const at = (offset) => BASE + offset;
 const PORT = at(19), RANGE = [at(11), at(18)];
 const dir = mkdtempSync(join(tmpdir(), 'launcher-test-'));

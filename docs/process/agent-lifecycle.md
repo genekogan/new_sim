@@ -69,8 +69,9 @@ CI runs the checks for the PR's paths. The `main` ruleset requires `ci-ok`, the 
 its jobs from the changed paths with the release gate's `--scope auto` map (`.github/scripts/ci-scope.mjs`): server
 and package tests, typecheck and the web build, the `apps/web` unit suite (`V4-web`), the `tools/world-launcher` unit
 tests (`V3-launcher-unit`) and the `tools/edge-skill` / `tools/client-eval` tests (`V3-client-cli`). The browser
-walks and the full gate stay with the release. To run the launcher tests beside other local processes, set
-`LAUNCHER_TEST_PORT_BASE=<port>` (launcher.test.mjs uses 25 ports from it). The `proof-check` bot keeps one comment
+walks and the full gate stay with the release. `launcher.test.mjs` takes its 25 ports from
+`LAUNCHER_TEST_PORT_BASE=<port>` so it can run beside other local processes; other launcher test files still use their
+own fixed ports (`op.test.mjs` takes `OP_TEST_PORT`). The `proof-check` bot keeps one comment
 up to date with the tier, the proof that tier needs, and which acceptance boxes have evidence. The `claude-review`
 workflow reviews every push, including whether the evidence supports each acceptance claim. `@claude` answers
 follow-ups, and the author answers each comment with a fix or a reason. The maintainer reviews T3 and above and
