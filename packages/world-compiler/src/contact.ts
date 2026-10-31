@@ -6,5 +6,7 @@ export function contactStateKey(def:{tags?:readonly string[];components?:{light?
   if(def.components?.sign&&def.tags?.includes('hand-writable')&&(!action||['write','erase','pin','unpin'].includes(action)))return 'text';
   // Opted-in hand switches without a light (a tap, a shower valve): the same on/off contact.
   if(!def.components?.opening&&def.tags?.includes('hand-operated')&&(!action||['switch-on','switch-off'].includes(action)))return 'on';
+  // Opted-in fire (a candle, a campfire): "light" / "put out" are the same on/off contact, under their own words.
+  if(def.tags?.includes('hand-operated')&&action!==undefined&&['light','put-out'].includes(action))return 'on';
   return null;
 }
