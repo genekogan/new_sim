@@ -175,6 +175,7 @@ if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entit
 const admission = process.env.SIM_ADMISSION === '0' ? undefined : new Admission();
 const drill = process.env.SIM_LOAD_DRILL_LEVEL as 'amber' | 'red' | 'black' | undefined;   // drill: hold a level (L1 tests 'planned' restarts with black)
 const monitor = new LoadMonitor({ host, drill: drill && ['amber', 'red', 'black'].includes(drill) ? drill : undefined, blackLimitMs: Number(process.env.SIM_LOAD_BLACK_MS) || 60_000, queue: () => admission?.queueStats() ?? { depth: 0, oldestMs: 0 }, shed: () => ({ reads: admission?.shed.reads ?? 0, acts: admission?.shed.acts ?? 0 }),
+  requestMs: () => admission?.spentMs ?? 0, baselineMs: process.env.SIM_LOAD_BASELINE_MS !== undefined && process.env.SIM_LOAD_BASELINE_MS !== '' ? Number(process.env.SIM_LOAD_BASELINE_MS) : undefined,
   souls: () => { let awake = 0, connected = 0; for (const id of host.minds.keys()) { const st = host.publicBodyOf?.(id)?.state; if (st === 'awake') awake++; if (st && st !== 'asleep') connected++; } return { awake, waiting: waking?.waiting() ?? 0, connected }; },
   onBlackTooLong: () => { console.log(`[load] black for ${Math.round((Number(process.env.SIM_LOAD_BLACK_MS) || 60_000) / 1000)} s: planned restart (snapshot, exit 75)`); void shutdown('load:black', 75).catch(() => process.exit(75)); } });
 if (admission) monitor.register('admission', (l) => admission.setLoadLevel(l));

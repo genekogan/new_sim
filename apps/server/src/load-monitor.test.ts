@@ -1,7 +1,7 @@
 // srv-load: load levels with hysteresis (LOAD-CONTRACT §1), live.json from the shared numbers (§4).
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {LevelState, LoadMonitor, STEP_DOWN_MS, type Signals} from './load/monitor.ts';
+import {BASELINE_CAP_MS, LevelState, LoadMonitor, QuietBaseline, STEP_DOWN_MS, type Signals} from './load/monitor.ts';
 import {liveOf, newSharedLoad, S} from './load/shared.ts';
 import {attachBootSlots, bootPhase, bootSlots, bootTick} from './load/boot-progress.ts';
 
@@ -40,6 +40,60 @@ test('levels: leave one step at a time after 30 s below the lower band; a signal
   l.update(calm, t += 1000); l.update(at({loopP99Ms: 120}), t += 20_000); l.update(calm, t += 1000);
   l.update(calm, t += STEP_DOWN_MS - 2000); assert.equal(l.level, 'amber', 'a sample above the band restarts the 30 s');
   l.update(calm, t += 2000); assert.equal(l.level, 'green');
+});
+
+test('levels: loop bands are relative to the quiet baseline (a 170 ms-quiet world returns to green)', () => {
+  const l = new LevelState(); l.baselineMs = 170; let t = 0;
+  assert.equal(l.update(at({loopP99Ms: 190}), t), 'green', 'its own quiet ticks are not load (amber enters at 2 × 170)');
+  assert.equal(l.update(at({loopP99Ms: 330}), t += 250), 'green');
+  assert.equal(l.update(at({loopP99Ms: 350}), t += 250), 'amber', 'above 2 × baseline');
+  l.update(at({loopP99Ms: 180}), t += 1000); l.update(at({loopP99Ms: 180}), t += STEP_DOWN_MS);
+  assert.equal(l.level, 'green', 'leaves below 1.2 × baseline (204 ms), where the fixed 100 ms band never would');
+  const fixed = new LevelState(); fixed.update(at({loopP99Ms: 350}), 0); fixed.update(at({loopP99Ms: 180}), 1000); fixed.update(at({loopP99Ms: 180}), 1000 + STEP_DOWN_MS);
+  assert.equal(fixed.level, 'amber', 'the absolute bands (no baseline) hold it at amber: the defect');
+  const small = new LevelState(); small.baselineMs = 20;
+  assert.equal(small.update(at({loopP99Ms: 210}), 0), 'amber', 'a small world keeps the absolute floor');
+  const red = new LevelState(); red.baselineMs = BASELINE_CAP_MS;
+  assert.equal(red.update(at({loopP99Ms: 900}), 0), 'amber', 'a capped baseline keeps amber below red');
+  assert.equal(red.update(at({loopP99Ms: 1100}), 1), 'red');
+});
+
+test('quiet baseline: boot median over 60 s, only quiet windows, slow rise, faster fall, cap, registry pin', () => {
+  const b = new QuietBaseline(); let t = 5000;
+  b.window(900, true, t);   // a JIT-warm first window
+  for (const x of [170, 165, 175, 168]) b.window(x, true, t += 5000);
+  b.window(2000, false, t += 5000);   // loaded: ignored
+  assert.equal(b.value, 170, 'median of the quiet boot windows, the warm-up and loaded windows do not move it');
+  t = 65_000; for (let i = 0; i < 12; i++) b.window(400, true, t += 5000);   // sustained heavier ticks for a minute
+  assert.ok(b.value > 170 && b.value < 240, `rises slowly: ${b.value}`);
+  for (let i = 0; i < 12; i++) b.window(400, false, t += 5000);
+  const before = b.value; assert.equal(b.window(5000, false, t += 5000), before, 'load never teaches it');
+  for (let i = 0; i < 20; i++) b.window(60, true, t += 5000);
+  assert.ok(b.value < 80, `falls back within ~100 s: ${b.value}`);
+  const late = new QuietBaseline(); late.window(300, false, 5000); late.window(500, false, 70_000);
+  assert.equal(late.value, 0); late.window(150, true, 75_000); assert.equal(late.value, 150, 'no quiet boot: the first quiet window seeds it');
+  const capped = new QuietBaseline(); capped.window(3000, true, 5000); assert.equal(capped.value, BASELINE_CAP_MS);
+  const pin = new QuietBaseline(120); pin.window(10, true, 5000); assert.equal(pin.value, 120, 'pinned: never learned');
+  assert.equal(new QuietBaseline(Number.NaN).pinned, undefined, 'a bad pin is ignored');
+});
+
+test('monitor: a synthetic 170 ms quiet tick (real event-loop histogram) is learned as the baseline; load is not', async () => {
+  const host = {engine: {world: {tick: 0}}, tickMs: [] as number[], paused: false, pace: 1, baseRate: 1, running: false, clockAvailable: true};
+  let reqMs = 0, depth = 0;
+  const m = new LoadMonitor({host, shared: newSharedLoad(), sampleMs: 50, windowMs: 600, requestMs: () => reqMs, queue: () => ({depth, oldestMs: 0})});
+  const block = (ms: number) => { const end = performance.now() + ms; while (performance.now() < end) { /* a 170 ms tick */ } };
+  const ticker = setInterval(() => block(170), 300);
+  try {
+    m.start();
+    await new Promise(r => setTimeout(r, 3200));   // ~5 quiet windows
+    const learned = m.state.baselineMs;
+    assert.ok(learned >= 150 && learned <= 260, `quiet loop p99 ~170 ms learned: ${learned}`);
+    assert.equal(m.level, 'green', 'its own quiet ticks keep it green (the fixed 200 ms band would be close to the edge)');
+    depth = 3; reqMs += 10_000;   // loaded windows
+    await new Promise(r => setTimeout(r, 1400));
+    assert.ok(Math.abs(m.state.baselineMs - learned) < 1e-9, 'loaded windows do not move it');
+    assert.equal(m.health().loopBaselineMs, Math.round(learned));
+  } finally { clearInterval(ticker); m.stop(); }
 });
 
 test('monitor: tick service counts dilation and slow frames as missed, a paused or stopped clock as served', () => {

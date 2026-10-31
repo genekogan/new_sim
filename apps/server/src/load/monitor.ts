@@ -10,33 +10,73 @@ export type Signals = {service: number; loopP99Ms: number; heapFrac: number; gcF
 const RANK: Record<Level, number> = {green: 0, amber: 1, red: 2, black: 3};
 export const STEP_DOWN_MS = 30_000, BLACK_SERVICE_MS = 30_000;
 
+/** Loop-delay bands are relative to the world's own quiet baseline (LOAD-CONTRACT §1): a large world whose quiet ticks
+ *  take 170 ms has a quiet loop p99 near 170 ms, so fixed 200/100 ms amber bands would hold it at amber forever.
+ *  A loop band enters at max(absolute, 2 × baseline) and leaves below max(absolute, 1.2 × baseline). */
+export const BASELINE_ENTER_X = 2, BASELINE_LEAVE_X = 1.2, BASELINE_CAP_MS = 400;
+const loopEnter = (abs: number, b: number) => Math.max(abs, BASELINE_ENTER_X * b);
+const loopLeave = (abs: number, b: number) => Math.max(abs, BASELINE_LEAVE_X * b);
+
 /** Enter on any condition; step down one level after 30 s with every signal below the current level's lower band. */
 export class LevelState {
   level: Level = 'green';
+  /** The world's quiet loop-delay p99 (ms), from QuietBaseline or a registry pin; 0 = absolute bands only. */
+  baselineMs = 0;
   private calmSince: number | null = null;
   private starvedSince: number | null = null;   // tick service < 0.2 since
   enterOf(s: Signals, now: number): Level {
+    const b = this.baselineMs;
     if (s.service < 0.2) this.starvedSince ??= now; else this.starvedSince = null;
     if ((s.heapFrac > 0.92 && s.gcFrac > 0.40) || (this.starvedSince !== null && now - this.starvedSince >= BLACK_SERVICE_MS)) return 'black';
-    if (s.service < 0.5 || s.loopP99Ms > 1000 || s.heapFrac > 0.85 || s.oldestMs > 6000) return 'red';
-    if (s.service < 0.8 || s.loopP99Ms > 200 || s.heapFrac > 0.70 || s.oldestMs > 2000) return 'amber';
+    if (s.service < 0.5 || s.loopP99Ms > loopEnter(1000, b) || s.heapFrac > 0.85 || s.oldestMs > 6000) return 'red';
+    if (s.service < 0.8 || s.loopP99Ms > loopEnter(200, b) || s.heapFrac > 0.70 || s.oldestMs > 2000) return 'amber';
     return 'green';
   }
-  static below(level: Level, s: Signals): boolean {
+  below(level: Level, s: Signals): boolean {
+    const b = this.baselineMs;
     switch (level) {
       case 'black': return s.service >= 0.4 && s.heapFrac < 0.85;
-      case 'red': return s.service >= 0.7 && s.loopP99Ms < 400 && s.heapFrac < 0.75 && s.oldestMs < 3000;
-      case 'amber': return s.service >= 0.9 && s.loopP99Ms < 100 && s.heapFrac < 0.60 && s.oldestMs < 1000;
+      case 'red': return s.service >= 0.7 && s.loopP99Ms < loopLeave(400, b) && s.heapFrac < 0.75 && s.oldestMs < 3000;
+      case 'amber': return s.service >= 0.9 && s.loopP99Ms < loopLeave(100, b) && s.heapFrac < 0.60 && s.oldestMs < 1000;
       default: return true;
     }
   }
   update(s: Signals, now: number): Level {
     const enter = this.enterOf(s, now);
     if (RANK[enter] > RANK[this.level]) { this.level = enter; this.calmSince = null; return this.level; }
-    if (this.level === 'green' || !LevelState.below(this.level, s)) { this.calmSince = null; return this.level; }
+    if (this.level === 'green' || !this.below(this.level, s)) { this.calmSince = null; return this.level; }
     this.calmSince ??= now;
     if (now - this.calmSince >= STEP_DOWN_MS) { this.level = LEVELS[RANK[this.level] - 1]; this.calmSince = null; }
     return this.level;
+  }
+}
+
+/** The quiet baseline: one value per completed 5 s loop-delay window that was quiet (nothing queued, request time
+ *  under 5 % of the window). Boot: the median of the quiet windows in the first 60 s; after that a slow EWMA that
+ *  rises slowly (~4 min) and falls faster (~50 s), so sustained load is not learned as normal and a recovered world
+ *  regains its tight bands. Capped at 400 ms (amber enter ≤ 800 ms stays below red's 1 s). */
+export const BOOT_BASELINE_MS = 60_000, QUIET_REQUEST_FRAC = 0.05;
+export class QuietBaseline {
+  value = 0;
+  private boot: number[] = [];
+  private bootEnd: number | null = null;
+  readonly pinned: number | undefined;
+  private bootMs: number; private windowMs: number;
+  constructor(pinned?: number, bootMs = BOOT_BASELINE_MS, windowMs = 5000) {
+    this.bootMs = bootMs; this.windowMs = windowMs;
+    this.pinned = pinned !== undefined && Number.isFinite(pinned) ? Math.min(BASELINE_CAP_MS, Math.max(0, pinned)) : undefined;
+    this.value = this.pinned ?? 0;
+  }
+  /** A completed window's loop p99 (ms) and whether it was quiet. Returns the baseline. */
+  window(loopP99Ms: number, quiet: boolean, now: number): number {
+    if (this.pinned !== undefined) return this.value;
+    this.bootEnd ??= now - this.windowMs + this.bootMs;   // the first window closes 5 s after the monitor starts (at serving)
+    if (!quiet || !Number.isFinite(loopP99Ms) || loopP99Ms < 0) return this.value;
+    const x = Math.min(BASELINE_CAP_MS, loopP99Ms);
+    if (now <= this.bootEnd) { this.boot.push(x); const v = [...this.boot].sort((p, q) => p - q); this.value = v[Math.floor((v.length - 1) / 2)]; }
+    else if (!this.boot.length) { this.boot.push(x); this.value = x; }   // no quiet window during boot: the first one seeds it
+    else this.value += (x > this.value ? 0.02 : 0.1) * (x - this.value);
+    return this.value;
   }
 }
 
@@ -47,11 +87,17 @@ export type MonitorOpts = {
   host: HostLike;
   queue?: () => {depth: number; oldestMs: number};
   shed?: () => {reads: number; acts: number};
+  /** Monotonic request handler ms (Admission.spentMs): a loop window is quiet only if requests took < 5 % of it. */
+  requestMs?: () => number;
+  /** Registry pin for the quiet loop baseline (SIM_LOAD_BASELINE_MS): fixed, never learned; 0 = absolute bands. */
+  baselineMs?: number;
   souls?: () => {awake: number; waiting: number; connected: number};
   onLevel?: (from: Level, to: Level, s: Signals) => void;
   /** Black for this long → planned restart (main.ts: snapshot, exit 75). */
   onBlackTooLong?: () => void; blackLimitMs?: number;
   shared?: Float64Array; now?: () => number; sampleMs?: number;
+  /** Loop-delay window (default 5 s; tests shorten it). The boot baseline spans 12 windows (60 s). */
+  windowMs?: number;
   /** Drill only (SIM_LOAD_DRILL_LEVEL): hold this level whatever the signals say, to exercise dials and the restart path. */
   drill?: Level;
 };
@@ -59,6 +105,9 @@ export type MonitorOpts = {
 const TICK_MS = 50;
 export class LoadMonitor {
   readonly state = new LevelState();
+  readonly baseline: QuietBaseline;
+  private windowMs: number;
+  private quiet = {depth: 0, reqMs: 0};   // the current loop window: max queue depth, request ms at its start
   get level(): Level { return this.state.level; }
   signals: Signals = {service: 1, loopP99Ms: 0, heapFrac: 0, gcFrac: 0, oldestMs: 0};
   tickStats = {avg: 0, max: 0, n: 0, p99: 0};
@@ -76,13 +125,13 @@ export class LoadMonitor {
   private a: Float64Array;
   private now: () => number;
   private o: MonitorOpts;
-  constructor(o: MonitorOpts) { this.o = o; this.a = o.shared ?? sharedLoad; this.now = o.now ?? Date.now; }
+  constructor(o: MonitorOpts) { this.o = o; this.a = o.shared ?? sharedLoad; this.now = o.now ?? Date.now; this.windowMs = o.windowMs ?? 5000; this.baseline = new QuietBaseline(o.baselineMs, 12 * this.windowMs, this.windowMs); this.state.baselineMs = this.baseline.value; }
 
   /** The dial registry (LOAD-CONTRACT §1). A dial is told the current level at once and on every change. */
   register(name: string, dial: Dial) { this.dials.set(name, dial); try { dial(this.level); } catch (e) { console.error(`[load] dial ${name} failed`, e); } }
   start() {
     if (this.timer) return;
-    this.hist = monitorEventLoopDelay({resolution: 10}); this.hist.enable(); this.histAt = this.now();
+    this.hist = monitorEventLoopDelay({resolution: 10}); this.hist.enable(); this.histAt = this.now(); this.quiet = {depth: 0, reqMs: this.o.requestMs?.() ?? 0};
     try { this.obs = new PerformanceObserver(list => { for (const e of list.getEntries()) this.gc.push({at: this.now(), ms: e.duration}); }); this.obs.observe({entryTypes: ['gc']}); } catch { this.obs = null; }
     this.timer = setInterval(() => this.sample(), this.o.sampleMs ?? 250); this.timer.unref();
     this.sample();
@@ -102,15 +151,20 @@ export class LoadMonitor {
     const ran = this.ticks.at(-1)!.tick - this.ticks[0].tick;
     const service = owed >= 2 ? Math.min(1, ran / owed) : 1;
     // event-loop delay p99 over the last ~5 s (two rotating windows)
+    const q = this.o.queue?.() ?? {depth: 0, oldestMs: 0};
+    this.quiet.depth = Math.max(this.quiet.depth, q.depth);
     let loopP99 = this.prevLoopP99;
     if (this.hist) {
       if (this.hist.count > 0) loopP99 = Math.max(loopP99, this.hist.percentile(99) / 1e6);
-      if (now - this.histAt >= 5000) { this.prevLoopP99 = this.hist.count > 0 ? this.hist.percentile(99) / 1e6 : 0; this.hist.reset(); this.histAt = now; }
+      if (now - this.histAt >= this.windowMs) {
+        this.prevLoopP99 = this.hist.count > 0 ? this.hist.percentile(99) / 1e6 : 0;
+        this.windowDone(this.prevLoopP99, now);
+        this.hist.reset(); this.histAt = now;
+      }
     }
     const hs = v8.getHeapStatistics(), heapFrac = hs.heap_size_limit ? hs.used_heap_size / hs.heap_size_limit : 0;
     while (this.gc.length && now - this.gc[0].at > 10_000) this.gc.shift();
     let gcMs = 0; for (const g of this.gc) gcMs += g.ms;
-    const q = this.o.queue?.() ?? {depth: 0, oldestMs: 0};
     this.signals = {service, loopP99Ms: loopP99, heapFrac, gcFrac: gcMs / 10_000, oldestMs: q.oldestMs};
     // tick times (the last ~20 s, as /healthz has always reported them)
     const ms = h.tickMs; let sum = 0, max = 0; for (const x of ms) { sum += x; if (x > max) max = x; }
@@ -131,11 +185,18 @@ export class LoadMonitor {
     a[S.shedReads] = shed.reads; a[S.shedActs] = shed.acts; a[S.sampledAt] = now;
     return to;
   }
+  /** A loop window closed: feed the quiet baseline (nothing queued, requests under 5 % of the window). Public for tests. */
+  windowDone(loopP99Ms: number, now: number) {
+    const reqMs = this.o.requestMs?.() ?? 0, spanMs = Math.max(1, now - this.histAt);
+    const quiet = this.quiet.depth === 0 && reqMs - this.quiet.reqMs < QUIET_REQUEST_FRAC * spanMs;
+    this.state.baselineMs = this.baseline.window(loopP99Ms, quiet, now);
+    this.quiet = {depth: 0, reqMs};
+  }
   /** Mark a main-thread turn without a full sample (after a tick). */
   turn() { this.a[S.lastTurnAt] = this.now(); }
   private changed(from: Level, to: Level) {
     const s = this.signals;
-    console.log(`[load] ${from}→${to}: service ${s.service.toFixed(2)}, loop p99 ${Math.round(s.loopP99Ms)} ms, heap ${Math.round(100 * s.heapFrac)}%, gc ${Math.round(100 * s.gcFrac)}%, queue ${(s.oldestMs / 1000).toFixed(1)} s`);
+    console.log(`[load] ${from}→${to}: service ${s.service.toFixed(2)}, loop p99 ${Math.round(s.loopP99Ms)} ms (quiet ${Math.round(this.state.baselineMs)}), heap ${Math.round(100 * s.heapFrac)}%, gc ${Math.round(100 * s.gcFrac)}%, queue ${(s.oldestMs / 1000).toFixed(1)} s`);
     this.o.onLevel?.(from, to, s);
     for (const [name, dial] of this.dials) { try { dial(to); } catch (e) { console.error(`[load] dial ${name} failed`, e); } }
   }
@@ -143,6 +204,6 @@ export class LoadMonitor {
   health() {
     const s = this.signals;
     return {level: this.level, service5s: Math.round(100 * s.service) / 100, loopP99Ms: Math.round(s.loopP99Ms), heapPct: Math.round(100 * s.heapFrac), gcPct10s: Math.round(100 * s.gcFrac),
-      tickP99Ms: Math.round(10 * this.tickStats.p99) / 10, queue: this.o.queue?.() ?? {depth: 0, oldestMs: 0}, souls: this.souls};
+      tickP99Ms: Math.round(10 * this.tickStats.p99) / 10, loopBaselineMs: Math.round(this.state.baselineMs), queue: this.o.queue?.() ?? {depth: 0, oldestMs: 0}, souls: this.souls};
   }
 }

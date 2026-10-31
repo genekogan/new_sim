@@ -57,6 +57,8 @@ export class Admission {
   readonly queue: Job[] = [];
   readonly outstanding = new Set<string>();
   readonly shed = {reads: 0, acts: 0, busy: 0, slow: 0, dropped: 0, cooled: 0};
+  /** Monotonic measured request ms (the monitor's quiet-window test). */
+  spentMs = 0;
   private buckets = new Map<string, Bucket>();
   private est = new Map<string, number>();
   /** World-total request time (LOAD-CONTRACT §2b): credit accrues at budget/50 ms per ms, capped at one frame's
@@ -134,7 +136,7 @@ export class Admission {
   private creditNow(now: number) { const budget = FRAME_BUDGET_MS[this.level]; this.credit = Math.min(budget, this.credit + (now - this.creditAt) * budget / FRAME_MS); this.creditAt = now; return this.credit; }
   /** Debit a job's measured time: the world credit, the god/Souls shares, the principal's bucket, the route estimate. */
   private charge(key: string, god: boolean, id: string, ms: number, startedAt: number) {
-    this.creditNow(startedAt); this.credit -= ms;
+    this.creditNow(startedAt); this.credit -= ms; this.spentMs += ms;
     this.share.god = this.share.god * 0.95 + (god ? ms : 0); this.share.souls = this.share.souls * 0.95 + (god ? 0 : ms);
     const b = this.bucket(key, god, startedAt + ms); b.tokens -= ms;
     const e = this.est.get(id); this.est.set(id, e === undefined ? ms : e * 0.8 + ms * 0.2);
