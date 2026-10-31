@@ -1139,10 +1139,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if(!project(soul,asked,caps,plans))return null;
       // Evaluate known providers rather than trust a stale namespace promise.
       // Drift to any non-object offer disables projection before admission.
-      for(const provider of this.providers)if(provider(soul).some(c=>c.verb!=='object'||!c.id.startsWith('object:')))return null;
+      // (asked for the objects this walk's focus names, as bindOne's tail: none, so no object table read or offer build)
+      const focus=focusFor(asked),only=focusObjects(focus);
+      for(const provider of this.providers)if(provider(soul,only).some(c=>c.verb!=='object'||!c.id.startsWith('object:')))return null;
       // the whole menu's end: its core's ride refusals, then the tail (bindsTail) as a focused build of this one offer
       this.rideBlocks(soul,caps);
-      const out=this.bindsTail(soul,{caps,plans},focusFor(asked)),cap=out.caps.find(c=>c.id===asked);
+      const out=this.bindsTail(soul,{caps,plans},focus),cap=out.caps.find(c=>c.id===asked);
       // Refusals need the original complete diagnostics/alternatives too.
       return cap?.available&&out.plans.has(asked)?{caps:out.caps,plans:out.plans,tick}:null;
     }catch{return null;}

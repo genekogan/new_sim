@@ -192,3 +192,19 @@ test('unlisted room, water/shore and area-shaped landform retain full legacy res
   edge.coreA.binds(w.soul);assert.equal((edge as any).exactWalkBindings(w.soul,{capability:'walk:'+ref}),null,'full-cache miss must not broaden '+ref);
  }
 });
+test('exact walk asks the object provider for no unrelated objects (no object table read, no offer build)',async t=>{
+ const w=await setup(t),{edge,comms,soul,bridge}=w,objects=comms.objects as any;
+ assert.ok(objects.capabilities(soul).some((c:any)=>c.id.startsWith('object:projection-object:')),'a visible object offer exists');
+ const asked:(ReadonlySet<string>|undefined)[]=[];let tableReads=0;
+ const caps=objects.capabilities.bind(objects);objects.capabilities=(s:EdgeSoul,only?:ReadonlySet<string>,places?:Map<string,string>)=>{asked.push(only);return caps(s,only,places);};
+ const fresh=objects.fresh.bind(objects);objects.fresh=(...args:any[])=>{tableReads++;return fresh(...args);};
+ const roomRef=bridge.nav.things().find(x=>x.ref.startsWith('eden-library-1/')&&x.kind==='room')!.ref;
+ for(const capability of ['walk:eden-library-1','walk:place-field','walk:field','walk:flag-marker','walk:'+roomRef]){
+  asked.length=0;tableReads=0;
+  const projected=w.sparse(capability);assert.ok(projected,capability);assert.ok(projected.caps.find((c:any)=>c.id===capability)?.available,capability);
+  assert.ok(asked.length>0,`${capability}: the provider drift check still runs`);
+  assert.ok(asked.every(only=>only!==undefined&&only.size===0),`${capability}: asked for no objects (${JSON.stringify(asked.map(o=>o&&[...o]))})`);
+  assert.equal(tableReads,0,`${capability}: the whole object table is not read`);
+  assert.ok(!projected.caps.some((c:any)=>c.verb==='object'),`${capability}: no object offers built`);
+ }
+});
