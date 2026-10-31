@@ -72,6 +72,11 @@ export class LifecycleRunner {
   /** A detached probe already ran in this macrotask (cleared at the next check phase, after I/O such as /healthz
    * has been served). pump plans no further birth while it is set; the host's guard itself always runs. */
   private probed=false;
+  /** A birth was held back by `probed` or by the onApplied hook (`planBirths:false`) while none is in flight: one
+   * later pump is owed, run from a check-phase setImmediate (lane srv-r5fix-births). Without it the queue only moved
+   * on the next tick or request, so a world driven by drainInputs alone (the commit's own pump lands in the probed
+   * macrotask) left every later birth pending. The owed pump never owes another, so a deferred guard cannot spin. */
+  private owed=false;private owing=false;
   private recoveryAfter:{requestedAt:number;requestId:string}|undefined;
   private authority:(op:LifecycleOperation)=>boolean;
   constructor(host:WorldHost,journal:LifecycleJournal,authority:(op:LifecycleOperation)=>boolean){
@@ -83,7 +88,16 @@ export class LifecycleRunner {
   }
   private current(op:LifecycleOperation){const current=this.journal.get(op.scope,op.requestId);if(!current||current.state!==op.state)throw new LifecycleDeferred('Lifecycle state changed');return current;}
   private spendProbe(){
-    if(this.probed)return;this.probed=true;setImmediate(()=>{this.probed=false;}).unref?.();
+    if(this.probed)return;this.probed=true;setImmediate(()=>{this.probed=false;this.settleOwed();}).unref?.();
+  }
+  private owe(){
+    if(this.owed||this.owing)return;this.owed=true;
+    if(!this.probed)setImmediate(()=>this.settleOwed()).unref?.();
+  }
+  private settleOwed(){
+    if(!this.owed)return;this.owed=false;this.owing=true;
+    // Opportunistic: a host stopped or a db closed before this check phase is not a lifecycle fault.
+    try{this.pump();}catch{}finally{this.owing=false;}
   }
   private queue(op:LifecycleOperation,promise:Promise<unknown>,birth=false){
     this.inflight.add(op.requestId);if(birth)this.births.add(op.requestId);
@@ -109,7 +123,10 @@ export class LifecycleRunner {
       // At most one lifecycle birth in flight, and none planned in a macrotask that already probed: later births stay
       // pending in request order and are planned by a later pump (next tick, request or commit), so no single tick or
       // handler runs more than one detached probe. The create's HTTP wait still answers lifecycle-pending at 2 s.
-      if(op.operation==='create'&&op.state!=='recorded'&&(!planBirths||this.births.size>0||this.probed))continue;
+      if(op.operation==='create'&&op.state!=='recorded'&&(!planBirths||this.births.size>0||this.probed)){
+        // With a birth in flight its commit pumps again; otherwise one check-phase pump is owed.
+        if(this.births.size===0)this.owe();continue;
+      }
       try{this.advance(op);}catch(error){if(!(error instanceof LifecycleDeferred))this.faults.set(op.requestId,error);}
     }
   }
