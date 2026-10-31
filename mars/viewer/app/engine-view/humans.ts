@@ -624,9 +624,11 @@ export class HumanViews {
     }
     // Entry 43: a handle-held vessel's fill or pour leans toward its one fixed hold point (under the tap, over the cup),
     // eased with the hand on the stage's own clock ('hips', as 34's per-frame solve: 'lean' squatted 0.16 m under a
-    // 1.33 m hold close to the chest). Solved per frame against the moving hand it hopped between grid minima:
+    // 1.33 m hold close to the chest). A hold well above the hips (a kettle over a cup) is a standing hold: at most a small
+    // lean ('walk': ≤ 25°, ≤ 8 cm); 'hips' squatted a taller body 12 cm to keep the kettle hand off its chest (take 5).
+    // Solved per frame against the moving hand it hopped between grid minima:
     // a 0.26 m one-frame dip as the kettle hand passed 1.2 m on its way up to a pour.
-    if(v.watering&&!v.handActuator&&!walking){const m=v.watering,k=wateringFrame(m,(v.wateringTime??0)-m.startTick*DT).right,q=solvePosture(d,[toBody(m.hold[0],m.hold[1],m.hold[2],1)],'hips');return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
+    if(v.watering&&!v.handActuator&&!walking){const m=v.watering,k=wateringFrame(m,(v.wateringTime??0)-m.startTick*DT).right,t=toBody(m.hold[0],m.hold[1],m.hold[2],1),q=solvePosture(d,[t],t.up>d.hipH+0.15?'walk':'hips');return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
     // entry 43: taking or putting a handle-held thing (a kettle) leans like the vessel stages: 'hips' flickered its hips 4 cm
     const pz = solvePosture(d, ts, v.transfer && v.transfer.endTick === undefined && v.activity === 'reach' && !walking ? 'lean' : styleFor(v.activity, walking));
     // A low latch may need a small bend as well as a hand reach. Ease the whole
