@@ -10,6 +10,7 @@ import {Replica, type Ent, type WorldDelta, type WorldInit} from './read-model.t
 import {SpatialReplica, type FixtureRow, type ReplicaBody} from './spatial-replica.ts';
 import {ReplicaMenuWorld, VerdictTable, type ActionRow, type Aboard, type ClaimRow, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow} from './menu-world.ts';
 import {CATALOG} from '../../../../mars/viewer/engine/world/catalog.ts';
+import {registerAssets} from '../../../../packages/engine-mars/src/catalog-adapter.ts';
 import {placeLevelOf} from '../../../../packages/engine-mars/src/upper-floors.ts';
 import {inShoreDomain} from '../../../../mars/viewer/engine/locomotion/connected-shore.ts';
 import {inDeepWater, destinationInDeepWater} from '../../../../mars/viewer/engine/locomotion/swim.ts';
@@ -140,6 +141,7 @@ export class ReplicaWorld {
   private applyMenu(m: MenuDelta | MenuInit | undefined, whole: boolean) {
     if (!m) return;
     this.pumped = true;
+    if (m.assets) registerAssets(m.assets);   // main's runtime catalogue entries (a worker's CATALOG has only the built-in ones)
     if (whole) {this.actions.clear(); this.records.clear(); this.verdicts.clear();}
     for (const a of m.actions ?? []) this.actions.set(a.actor, a);
     for (const id of (m as MenuDelta).actionsGone ?? []) this.actions.delete(id);

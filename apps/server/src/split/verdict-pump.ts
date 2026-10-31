@@ -9,6 +9,7 @@
 // one delta). Shipped verdicts are re-asked when their actor's action changes (route keys) or any action changes
 // (scope-'' keys, e.g. a seat taken), under a CPU budget per tick, so a verdict is never older than its inputs for long.
 import type {Program, RuntimeView} from '@sim/engine-contract';
+import {CATALOG} from '../../../../mars/viewer/engine/world/catalog.ts';
 import {LiveFeasibility, planKey, type ActionRow, type ClaimRow, type LedgerEnv, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow, type VerdictRow, type MenuWorld} from './menu-world.ts';
 
 /** The record verbs the read code reads from `runtime.records` (held seats, berths, slots). */
@@ -118,7 +119,21 @@ export class VerdictPump {
   init(): MenuInit {
     const actions = this.actionRows(), records = this.recordRows(), statics = this.statics();
     const tick = this.mw.world.tick, verdicts = [...this.shipped].map(([key, s]) => ({soulId: this.soulOf(s.actor), actor: s.actor, key, verdict: JSON.parse(s.v), tick}));
-    return {actions, records, verdicts, statics, claims: this.claimRows(), env: this.ledgerEnv(true)};
+    const assets = this.runtimeAssets(true);
+    return {actions, records, verdicts, statics, claims: this.claimRows(), env: this.ledgerEnv(true), ...(assets ? {assets} : {})};
+  }
+  /** The CATALOG entries main's engine registered at runtime (`ew:` ids: registerAssets from the world's entity physics;
+   *  never replaced: an id names its content): all of them (an init), or those not shipped yet (a delta, when the
+   *  catalogue grew). */
+  private assetsShipped = new Set<string>();
+  private assetsCount = -1;
+  private runtimeAssets(all: boolean): Record<string, unknown> | undefined {
+    const keys = Object.keys(CATALOG);
+    if (!all && keys.length === this.assetsCount) return undefined;
+    if (!all) this.assetsCount = keys.length;
+    let out: Record<string, unknown> | undefined;
+    for (const id of keys) if (id.startsWith('ew:') && (all || !this.assetsShipped.has(id))) {(out ??= {})[id] = CATALOG[id]; if (!all) this.assetsShipped.add(id);}
+    return out;
   }
   /** After each tick (from the tap): the changed rows, or undefined when nothing in the menu section moved. */
   delta(staticMoved: boolean): MenuDelta | undefined {
@@ -132,6 +147,7 @@ export class VerdictPump {
     for (const id of this.recordKeys.keys()) if (!rseen.has(id)) {this.recordKeys.delete(id); (d.recordsGone ??= []).push(id);}
     {const c = this.claimRows(), k = JSON.stringify(c); if (k !== this.claimsKey) {this.claimsKey = k; d.claims = c;}}
     {const e = this.ledgerEnv(false); if (e) d.env = e;}
+    {const a = this.runtimeAssets(false); if (a) d.assets = a;}
     // statics: by reference (the engine replaces regions/navV1 on a static change) and on the tap's static epoch
     const refs = this.refs();
     if (staticMoved || refs.some((x, i) => x !== this.staticsRef[i]) || tick % 200 === 0) {

@@ -165,8 +165,10 @@ export type ClaimRow = [slot: string, actor: string];
 /** The ledger's god-fed reads (main-only providers): weatherNow(), the recent lightning strikes, the god's activity spots.
  *  A key present = its new value (null = none); resent when it changed. */
 export type LedgerEnv = {weather?: unknown; strikes?: unknown; spots?: unknown; /** the god bridge's physics facts (engine-bridge readPhysicsV1), when its hash moved */ physics?: unknown; /** the ground swim offers' recipe and deep-middle answers (ground-host GroundEnvV1) */ ground?: unknown; /** main ledger's ride boarding checks {carrier: {tick, route, issue}} */ boarding?: unknown};
-export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics; claims?: ClaimRow[]; env?: LedgerEnv};
-export type MenuDelta = {actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel' | 'names'>; kernel?: unknown; names?: unknown; claims?: ClaimRow[]; env?: LedgerEnv};
+/** `assets`: the CATALOG entries main's engine registered at runtime (entity-world defs, `ew:` ids, from its entity physics):
+ *  a worker's CATALOG has only the built-in ones (the read code looks seats, fires, beds and labels up there). */
+export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics; claims?: ClaimRow[]; env?: LedgerEnv; assets?: Record<string, unknown>};
+export type MenuDelta = {assets?: Record<string, unknown>; actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel' | 'names'>; kernel?: unknown; names?: unknown; claims?: ClaimRow[]; env?: LedgerEnv};
 export type VerdictRow = {soulId: string; actor: string; key: string; verdict: Diag | null; tick: number};
 /** The verdicts main computed for the programs a replica's reads ask about. A miss answers "feasible" (the planner's
  *  refusal then comes at act time, as `deferRouteChecks` offers do today) and is queued for main (`misses`). */

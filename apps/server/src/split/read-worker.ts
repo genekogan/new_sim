@@ -120,7 +120,7 @@ function here2(soulId: string, query: string): {body: object; cpuMs: number} | n
   try {
     const {hereFrame} = here2.mod!;
     R2!.readBridgeSync(RH, RL);   // the god layer's reads (split/read-bridge.ts), current to main's last god commit
-    const body = {tick: RW.mw.world.tick, here: hereFrame(RL, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {})};
+    const body = {tick: RW.mw.world.tick, here: hereFrame(RL, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {}), ...(here2.debug ? {_debug: here2.debug.fireFacts(RL, soul)} : {})};
     const ms = cpuMs() - c; c2.served++; c2.cpuMs += ms; c2.maxCpuMs = Math.max(c2.maxCpuMs, ms);
     // the slowest reads (diagnosis): which Soul, its how-many-th read here, the tick
     const nth = (servedBy.get(soulId) ?? 0) + 1; servedBy.set(soulId, nth);
@@ -135,6 +135,8 @@ function here2(soulId: string, query: string): {body: object; cpuMs: number} | n
 }
 here2.mod = null as null | typeof import('../edge/perception/here.ts');
 if (R2) here2.mod = await import('../edge/perception/here.ts');
+here2.debug = null as null | typeof import('./read-debug.ts');
+if (R2 && process.env.SIM_READ_DEBUG === '1') here2.debug = await import('./read-debug.ts');
 
 parentPort!.on('message', (m: ToWorker) => {
   if (m.t === 'init') {

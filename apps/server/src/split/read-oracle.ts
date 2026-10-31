@@ -107,6 +107,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     return {live: a.length, replica: b.length, onlyLive: a.filter(x => !B.has(x)).slice(0, 12), onlyReplica: b.filter(x => !A.has(x)).slice(0, 12)};
   };
   let next = 0;
+  const DEBUG = process.env.SIM_READ_DEBUG === '1' ? await import('./read-debug.ts') : null, debugged = new Set<string>();
   const round = () => {
     if (RW.R.pos.tick !== host.engine.world.tick) {skip('tick'); return;}
     if (RW.R.pos.logSeq !== host.seq) {skip('logSeq'); return;}
@@ -117,6 +118,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     if (!(L as unknown as {bodyPlacesReady(): boolean}).bodyPlacesReady()) {skip('main-places'); return;}
     const all = souls(); if (!all.length) {skip('no-souls'); return;}
     const s = all[next++ % all.length]; S.rounds++;
+    if (DEBUG && !debugged.has(s.soulId)) {debugged.add(s.soulId); try {(o.log ?? console.log)('[read-debug] ' + JSON.stringify({soul: s.soulId.slice(-6), tick: RW.R.pos.tick, main: DEBUG.fireFacts(L, s), replica: DEBUG.fireFacts(RL, s)}));} catch (e) {console.error('[read-debug]', e);}}
     {const c = cpu(); readBridgeSync(H, RL); S.syncCpuMs += cpu() - c;}   // as a worker does before each read (its CPU apart)
     for (const name of READS) {
       const T = S.reads[name];
