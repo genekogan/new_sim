@@ -58,7 +58,7 @@ if (RW_MODES.some((m) => m !== 'on' && m !== 'off')) throw new Error('--read-wor
 if (CPUS && !sh0('taskset', ['-V'])) throw new Error('--cpus needs Linux taskset');
 const MODES = RW_MODES.length ? RW_MODES : [null];
 const PH = SHORT ? { warm: 10, idle: 10, active: 20, calib: 5 } : { warm: 60, idle: 30, active: 120, calib: 20 };
-const TICK_HZ = 20, BUSY = /\b(world\.busy|world\.crowded|world\.starting|soul\.busy|soul\.slow-down|rate-limited)\b/;
+const TICK_HZ = 20, BUSY = /\b(world\.busy|world\.crowded|world\.starting|soul\.busy|soul\.slow-down|rate-limited|client\.rate|account\.rate)\b/;
 const TARGETS = ['the bandstand', 'the commons', 'the pond', 'the classroom', 'the orchard', 'the kitchen', 'the garden', 'the plaza'];
 const SEARCH = ['bench', 'seat', 'door', 'book', 'table'];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -243,11 +243,18 @@ async function join_(run, i) {
   writeFileSync(join(dir, 'eden.mjs'), Buffer.from(await (await fetch(`${BASE}/eden.mjs`)).arrayBuffer()));
   const soul = { i, dir };
   const a = await runCli(soul, ['register', BASE], 60_000);
-  // v2: a create the proxy answered 502/503 (a slow world under N concurrent creates) is tried again, up to 3 times
-  // (a fresh name per try: a create whose answer was lost may have made the Soul, and the same name then answers 409
-  // name-taken with exit 0 and no token)
-  let b; for (let k = 0; k < (LOAD === 'stageb' ? 3 : 1); k++) { b = await runCli(soul, ['create', k ? `Bench${i}t${k}` : `Bench${i}`], 120_000); if (existsSync(join(dir, '.eden-agent.json')) && JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) break; run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(5000); }
-  if (!JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
+  // v3 (srv-cli-lifecycle): the SAME name on every try, until the folder holds a token or 120 s pass. Soul CLI 2.5.3
+  // waits itself (up to 120 s) for a create the world is still finishing (503 lifecycle-pending) and a re-run of the same
+  // create resumes that Soul, also after a lost answer (409 name-taken by this folder's own create). v2's fresh name per
+  // try left a half-made Soul behind on every late create and added load (eden2 B-soak r3: every N=50/100 arm).
+  const token = () => { try { return JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token ?? null; } catch { return null; } };
+  const t0 = now(); let b;
+  for (let k = 0; ; k++) {
+    b = await runCli(soul, ['create', `Bench${i}`], 150_000);
+    if (token() || now() - t0 >= 120_000) break;
+    run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(2000);
+  }
+  if (!token()) throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
   soul.token = JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token;
   return soul;
 }
