@@ -61,10 +61,10 @@ export class ChildPool {
   // ---------- handover between launcher generations (keeper.mjs; lane C4 downtime)
   /** A world still run by the previous launcher (its child, its port): proxied to as is until takeOver(). Never booted,
    *  stopped, put to sleep or restarted by this pool while adopted, so its database has exactly one writer. */
-  adopt(world, { port, pid, script, healthPort }) {
+  adopt(world, { port, pid, script, healthPort, readPorts }) {
     // its watchdog port (lane L1) stays held here too: the next process keeps it (the old one is gone before the new
     // one's watchdog listens), and no other world of this launcher may take it meanwhile
-    this.kids.set(world.slug, { slug: world.slug, world, restarts: 0, crashes: 0, status: 'running', port, ...(Number.isInteger(healthPort) ? { healthPort } : {}), child: null, adopted: { pid, script }, upSince: Date.now(), lastExit: null, ready: null, stopped: false, lastUsed: Date.now() });
+    this.kids.set(world.slug, { slug: world.slug, world, restarts: 0, crashes: 0, status: 'running', port, ...(Number.isInteger(healthPort) ? { healthPort } : {}), ...(Array.isArray(readPorts) && readPorts.length ? { readPorts: readPorts.filter(Number.isInteger) } : {}), child: null, adopted: { pid, script }, upSince: Date.now(), lastExit: null, ready: null, stopped: false, lastUsed: Date.now() });
     this.savePids();
   }
   /** Take an adopted world over: `release(slug)` makes the previous launcher stop it (snapshot saved, process gone);
@@ -115,6 +115,7 @@ export class ChildPool {
     // an adopted world keeps its watchdog port: the standby process opens it only after its go, when the previous
     // process is gone (takeOver awaits gone()); a world that had none gets one if the range has room
     if (!k.healthPort) k.healthPort = await this.pickHealthPort(k, k.port);
+    if (!k.readPorts?.length) await this.pickReadPorts(k, k.port);
     const t0 = Date.now(), run = this.launch(k, k.port, { SIM_STANDBY: '1' }, { rotate: false });
     await new Promise((yes, no) => {
       let buf = '';
@@ -163,7 +164,7 @@ export class ChildPool {
   /** The next launcher's canary failed (keeper.mjs): this pool runs its worlds again. */
   unfence() { this.fenced = false; }
   /** The running children, for the next launcher to adopt. */
-  handoverList() { for (const k of this.kids.values()) this.thaw(k); return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}) })); }
+  handoverList() { for (const k of this.kids.values()) this.thaw(k); return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}), ...(k.readPorts?.length ? { readPorts: k.readPorts } : {}) })); }
 
   /** Children a previous launcher left running (it was killed hard): stop them before anyone opens their databases again. */
   async reapOrphans() {
@@ -186,7 +187,7 @@ export class ChildPool {
   savePids() {
     if (!this.o.pidFile) return;
     const rec = {};
-    for (const k of this.kids.values()) if (k.child?.pid) rec[k.slug] = { pid: k.child.pid, port: k.port, script: k.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}) }; else if (k.adopted?.pid) rec[k.slug] = { pid: k.adopted.pid, port: k.port, script: k.adopted.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}) };
+    for (const k of this.kids.values()) if (k.child?.pid) rec[k.slug] = { pid: k.child.pid, port: k.port, script: k.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}), ...(k.readPorts?.length ? { readPorts: k.readPorts } : {}) }; else if (k.adopted?.pid) rec[k.slug] = { pid: k.adopted.pid, port: k.port, script: k.adopted.script, ...(k.healthPort ? { healthPort: k.healthPort } : {}), ...(k.readPorts?.length ? { readPorts: k.readPorts } : {}) };
     const tmp = `${this.o.pidFile}.${process.pid}.tmp`;
     try { writeFileSync(tmp, JSON.stringify(rec, null, 2) + '\n'); renameSync(tmp, this.o.pidFile); } catch { /* best effort */ }
   }
@@ -249,12 +250,12 @@ export class ChildPool {
     const k = this.kids.get(slug);
     if (!k) return { status: 'stopped' };
     return { status: k.frozen || (k.asleep && k.status === 'stopped') ? 'asleep' : k.status, ...(k.frozen ? { frozen: true } : {}), port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit,
-      ...(k.restartsBy ? { restartsByReason: { ...k.restartsBy } } : {}), ...(k.lastBootMs != null ? { lastBootMs: k.lastBootMs } : {}), ...(k.healthPort ? { healthPort: k.healthPort } : k.noHealthPort ? { watchdog: 'none: live.json + main /healthz' } : {}), ...(k.held ? { held: { ...k.held } } : {}), ...(k.wedging ? { wedging: { ...k.wedging } } : {}),
+      ...(k.restartsBy ? { restartsByReason: { ...k.restartsBy } } : {}), ...(k.lastBootMs != null ? { lastBootMs: k.lastBootMs } : {}), ...(k.readPorts?.length ? { readPorts: [...k.readPorts] } : {}), ...(k.healthPort ? { healthPort: k.healthPort } : k.noHealthPort ? { watchdog: 'none: live.json + main /healthz' } : {}), ...(k.held ? { held: { ...k.held } } : {}), ...(k.wedging ? { wedging: { ...k.wedging } } : {}),
       ...(k.boot && (k.status === 'starting' || k.status === 'handover') ? { boot: { ...k.boot } } : {}), ...(k.nextTryAt && k.status === 'restarting' ? { nextTryAt: k.nextTryAt } : {}),
       ...(k.live ? { level: k.live.level ?? null } : {}), ...(k.rampFrom && k.status === 'running' ? { rampFrom: k.rampFrom } : {}) };
   }
   /** Ports held by live or (re)starting children; a sleeping world's old port is free for anyone. */
-  usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).flatMap((k) => [k.port, k.healthPort]).filter(Boolean)); }
+  usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).flatMap((k) => [k.port, k.healthPort, ...(k.readPorts ?? [])]).filter(Boolean)); }
   /** The world's watchdog port (SIM_HEALTH_PORT, LOAD-CONTRACT §4; healthPorts option): a second port from the range,
    *  searched from its top so it does not take the port a world prefers; none free: the world runs without one. */
   async pickHealthPort(k, mainPort) {
@@ -264,6 +265,26 @@ export class ChildPool {
     for (const p of [...prefer, ...Array.from({ length: hi - lo + 1 }, (_, i) => hi - i)]) if (p !== mainPort && !used.has(p) && await portFree(p)) { k.noHealthPort = false; return p; }
     if (!k.noHealthPort) this.log(`world ${k.slug}: no free watchdog port in ${lo}-${hi}; liveness from live.json and the main /healthz only`);
     k.noHealthPort = true; return null;
+  }
+  /** Stage B (lane B-port): the world's read-worker ports (SIM_READ_PORTS), one per worker, when its read workers are on
+   *  (readWorkers option: SIM_READ_WORKER=1 or the registry's `readWorkers`); searched from the range's top past the
+   *  watchdog port, as pickHealthPort. Fewer free than workers: the rest listen where the OS puts them (live.json says). */
+  async pickReadPorts(k, mainPort) {
+    const n = this.o.readWorkers?.(k.world) ?? 0;
+    if (!n) { k.readPorts = null; return null; }
+    const [lo, hi] = this.o.range, used = this.usedPorts(k.slug), out = [];
+    const prefer = (k.readPorts ?? []).filter((p) => p >= lo && p <= hi);
+    for (const p of [...prefer, ...Array.from({ length: hi - lo + 1 }, (_, i) => hi - i)]) {
+      if (out.length >= n) break;
+      if (p !== mainPort && p !== k.healthPort && !used.has(p) && !out.includes(p) && await portFree(p)) out.push(p);
+    }
+    if (out.length < n) this.log(`world ${k.slug}: ${out.length} of ${n} read-worker ports free in ${lo}-${hi}; the rest on ports the OS picks`);
+    k.readPorts = out; return out;
+  }
+  /** The read-worker env of a world's next process (nothing at all while its read workers are off: flag off = as before). */
+  readEnv(k) {
+    const n = this.o.readWorkers?.(k.world) ?? 0;
+    return n ? { SIM_READ_WORKER: '1', SIM_READ_WORKERS: String(n), ...(k.readPorts?.length ? { SIM_READ_PORTS: k.readPorts.join(',') } : {}) } : {};
   }
   async pickPort(prefer, self) {
     const [lo, hi] = this.o.range, used = this.usedPorts(self);
@@ -347,7 +368,7 @@ export class ChildPool {
       if (!(await this.evictIdle(k.slug))) throw e;
       for (let i = 0; ; i++) { try { port = await this.pickPort(k.port ?? k.world.port, k.slug); break; } catch (again) { if (i >= 50) throw again; await sleep(100); } }  // the sleeper's socket takes a moment to close
     }
-    k.port = port; k.asleep = false; k.healthPort = await this.pickHealthPort(k, port);
+    k.port = port; k.asleep = false; k.healthPort = await this.pickHealthPort(k, port); await this.pickReadPorts(k, port);
     if (k.abandoned) { k.status = 'failed'; this.o.onChange?.(k.slug); throw new Error(`world ${k.slug}: boot abandoned for a handover`); }
     const run = this.launch(k, port);
     this.attach(k, run);
@@ -361,7 +382,7 @@ export class ChildPool {
     if (rotate) rotateLog(logFile);
     const log = createWriteStream(logFile, { flags: 'a' });
     log.write(`\n--- ${new Date().toISOString()} start ${k.slug} on :${port} (restart ${k.restarts})${extraEnv.SIM_STANDBY ? ' standby' : ''}\n`);
-    const child = spawn(cmd, args, { cwd: this.o.root, env: { ...env, ...(k.healthPort ? { SIM_HEALTH_PORT: String(k.healthPort) } : {}), ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(cmd, args, { cwd: this.o.root, env: { ...env, ...(k.healthPort ? { SIM_HEALTH_PORT: String(k.healthPort) } : {}), ...this.readEnv(k), ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
     const run = { child, port, script: args.find((a) => !a.startsWith('-')) ?? args[0], exited: false };
     child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
     // a boot's progress, when the world writes no live.json: its output (healthy())
