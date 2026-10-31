@@ -27,7 +27,7 @@ import { GAIT_ACTS, GESTURE_FADE, HumanViews, REST_ACTS, type Hands, type Sample
 import { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 import type { Template } from './people.ts';
 import { walkCum } from './take-walk.ts';
-import { WALK_EASE, gaitSegments, lastFullStride, walkWeightAt, type GaitSegments } from './walk-ease.ts';
+import { WALK_EASE, easedOut, gaitSegments, lastFullStride, walkWeightAt, type GaitSegments } from './walk-ease.ts';
 import type { DepictionBeat } from './station-depiction.ts';
 import {shoreDepiction} from './recorded-shore.ts';
 import {matchedStairFlights,type SupplementalStair} from './stair-frame.ts';
@@ -292,25 +292,28 @@ export class TakePeople {
   /**
    * Idle-variety onset clock: seconds since the body last walked at a full stride or did something other than stand
    * (absent: unknown). A walk that has not reached a full stride (its start, a short nudge) does not restart it, so a
-   * gesture fades out with the walk's own ease instead of being cut on the first walking frame; after a stop it restarts
-   * from the last full stride, which lies inside the stop's ease.
+   * gesture fades out with the walk's own ease instead of being cut on the first walking frame. After a stop it starts
+   * when the stride's ease has finished (walk-ease.ts easedOut): started at the last full stride, inside the ease, the
+   * folded arms came in at the ease's rate on top of the arm swing settling (entry 39, take 3: 0.094 m per 50 ms).
    */
   private restAge(id: string, a: { t: number[]; v: string[] } | undefined, k: number, tick: number, act: string): Pick<SampledHuman, 'restAge'> {
     const cur = a && k >= 0 ? a.v[k] : act, dt = this.take.dt;
     if (!REST_ACTS.has(cur) && !GAIT_ACTS.has(cur)) return {};
     const seg = this.gaitSteps(id), age = (from: number) => ({ restAge: Math.max(0, tick - from) * dt });
+    // from a full stride: the clock starts once the stride has eased out (now, while it is still easing)
+    const settled = (key: string, f: number) => { const e = this.strides.get(key) ?? easedOut(seg!, f, tick, dt); if (e !== null && e !== undefined) this.strides.set(key, e); return age(e ?? tick); };
     for (let j = k; a && j >= 0; j--) {
       const v = a.v[j];
       if (GAIT_ACTS.has(v)) {
         const f = !seg ? null : j === k ? lastFullStride(seg, a.t[j], tick, dt) : this.stride(`${id}#${j}`, () => lastFullStride(seg, a.t[j], a.t[j + 1], dt));
-        if (f !== null) return age(f);
+        if (f !== null) return settled(`${id}#${j}@${f}`, f);
         continue;
       }
       if (!REST_ACTS.has(v)) return age(j === k ? tick : a.t[j + 1]);
     }
     // before the first change this take records (or none at all): a full stride on the track still restarts it
     const t1 = a && k >= 0 ? a.t[0] : tick, f = seg && seg.t.length ? (a && k >= 0 ? this.stride(`${id}#pre`, () => lastFullStride(seg, seg.t[0], t1, dt, 60, false)) : lastFullStride(seg, seg.t[0], t1, dt, 60, false)) : null;
-    return f !== null ? age(f) : {};
+    return f !== null ? settled(`${id}#pre@${f}`, f) : {};
   }
   private runAt(a: { t: number[] } | undefined, tick: number) {
     if (a) for (let i = a.t.length - 1; i >= 0; i--) if (a.t[i] <= tick) return i;

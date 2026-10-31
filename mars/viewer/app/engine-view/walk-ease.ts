@@ -78,3 +78,13 @@ export function lastFullStride(s: GaitSegments, t0: number, t1: number, dt: numb
   if (s.peak >= WALK_FULL) for (let k = end; k >= stop; k--) if (walkWeightAt(s, k, dt) >= WALK_FULL) return k;
   return longMoves && t1 - t0 > maxBack ? t1 - maxBack : null;
 }
+
+/** The first whole tick in [from, to] at which the Walk weight has eased out (≤ 0.02), or null while it is still easing.
+ *  The idle-variety onset clock starts there: started at the last full stride (inside the stop's ease) the folded arms
+ *  came in at the walk ease's rate, multiplied by (1 − walk weight), and swung a hand 0.094 m per 50 ms at the stop
+ *  (entry 39, take 3). */
+export function easedOut(s: GaitSegments, from: number, to: number, dt: number): number | null {
+  for (let k = Math.ceil(from); k <= to; k++) if (walkWeightAt(s, k, dt) <= 0.02) return k;
+  return null;
+}
+
