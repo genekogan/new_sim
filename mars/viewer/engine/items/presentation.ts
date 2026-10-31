@@ -29,10 +29,10 @@ export function itemPostureK(transfer:ItemTransferV1,tick:number,dt:number){
 }
 /** Entry 43: the presentation for a body's view, with when its transfer began and whether it is a pick-up (a let-go
  *  just before a pick-up means the pick-up fades no gesture of its own). itemPresentation itself is unchanged. */
-export type ItemPoseView=ItemPresentation&{start?:number;take?:true};
+export type ItemPoseView=ItemPresentation&{start?:number;take?:true;/** a put: seconds since the release */releasedFor?:number};
 export function itemPoseOf(transfer:ItemTransferV1|undefined,held:{left?:string;right?:string}|undefined,tick:number,dt:number):ItemPoseView|undefined{
  const r=itemPresentation(transfer,held,tick,dt);
- return r&&transfer?{...r,start:transfer.startTick,...(transfer.mode==='take'?{take:true as const}:{})}:r;
+ return r&&transfer?{...r,start:transfer.startTick,...(transfer.mode==='take'?{take:true as const}:{}),...(transfer.mode==='put'&&transfer.releaseTick!==undefined?{releasedFor:(tick-transfer.releaseTick)*dt}:{})}:r;
 }
 export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:string;right?:string}|undefined,tick:number,dt:number):ItemPresentation|undefined {
  const holding=!!(held?.left||held?.right);

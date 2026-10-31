@@ -1,5 +1,5 @@
 import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
-import {itemPoseOf,type ItemPoseView} from '../../engine/items/presentation.ts';
+import {itemPoseOf,ITEM_RECOVERY_SECONDS,type ItemPoseView} from '../../engine/items/presentation.ts';
 import {wateringFrame,transferWeight,TRANSFER_HANDOFF,type HandTransfer,type WateringMotion} from '../../engine/items/watering.ts';
 import type {LetGoV1} from '../../engine/items/let-go.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
@@ -79,6 +79,8 @@ type View = {
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
   itemPose?:ItemPoseView;
+  /** entry 43: render time an opted-in put let go of its item (gestures come back only after the arm has). */
+  itemReleasedAt?:number;
   /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
   watering?:WateringMotion;
   wateringTime?:number;
@@ -878,7 +880,13 @@ export class HumanViews {
     const letGoing = !!lg && lg.startTick >= driverStart, letGone = !!lg && !letGoing && (driverStart - lg.startTick) * DT <= lg.seconds + 1;
     const letIdle = !letGoing ? 1 : lgS < lg!.seconds ? 1 - smooth(lgS / lg!.seconds) : smooth((lgS - lg!.seconds - 1) / TRANSFER_HANDOFF);
     const fadeOut = letGone ? 0 : v.transfer?.mode === 'put' && transferS >= 0 && !handoff ? 0 : reachFade;
-    const idleHandoff = letGoing ? letIdle : v.itemPose ? (letGone && v.itemPose.take ? 0 : v.itemPose.idleBlend) : (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, fadeOut)) : v.transfer?.endTick !== undefined ? smooth(((v.transferTime ?? tSec) - v.transfer.endTick * DT) / TRANSFER_HANDOFF) : v.transfer && transferS >= 0 ? fadeOut : 1);
+    // entry 43 (entry 41's M04 finding): after an opted-in put the arm goes back over the recovery first, then idle
+    // gestures fade in over TRANSFER_HANDOFF (29 blended both over the same 1.2 s: folded arms swept in as the arm fell)
+    if (v.itemPose?.releasedFor !== undefined) v.itemReleasedAt = tSec - v.itemPose.releasedFor;
+    const relS = v.itemReleasedAt === undefined ? Infinity : tSec - v.itemReleasedAt;
+    const putReturn = relS < ITEM_RECOVERY_SECONDS + TRANSFER_HANDOFF ? smooth((relS - ITEM_RECOVERY_SECONDS) / TRANSFER_HANDOFF) : 1;
+    if (relS >= ITEM_RECOVERY_SECONDS + TRANSFER_HANDOFF) v.itemReleasedAt = undefined;
+    const idleHandoff = Math.min(putReturn, letGoing ? letIdle : v.itemPose ? (letGone && v.itemPose.take ? 0 : v.itemPose.idleBlend) : (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, fadeOut)) : v.transfer?.endTick !== undefined ? smooth(((v.transferTime ?? tSec) - v.transfer.endTick * DT) / TRANSFER_HANDOFF) : v.transfer && transferS >= 0 ? fadeOut : 1));
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).

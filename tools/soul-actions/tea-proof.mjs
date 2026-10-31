@@ -10,7 +10,7 @@ const run=promisify(execFile);
 const snap=await(await fetch(base+'/v1/world/snapshot')).json(),id=n=>snap.entities.find(e=>e.name===n).id,ids={kettle:id('kettle'),cup:id('cup'),cup2:id('cup-two'),sink:id('sink'),counter:id('counter'),table:id('table')};
 const camera=async(eye,at)=>{await page.evaluate(({eye,at})=>{const a=window.__simEntity;a.controls.target.set(...at);a.camera.position.set(...eye);a.camera.lookAt(a.controls.target);a.controls.update();},{eye,at});};
 // views: the counter from the side (her arms, the kettle, the cups); the sink from behind her right; the table
-const VIEW={counter:[[1.55,1.5,1.75],[-0.05,0.98,2.95]],kettle:[[-0.75,1.62,4.15],[0.05,1.0,2.85]],pour:[[-0.75,1.62,4.15],[0.05,1.0,2.85]],sink:[[-1.05,1.55,1.95],[-2.15,0.95,3.0]],table:[[1.25,1.55,0.45],[2.55,0.85,1.55]],wide:[[0.6,2.3,-0.6],[0.2,0.8,2.4]]};
+const VIEW={counter:[[1.55,1.5,1.75],[-0.05,0.98,2.95]],kettle:[[-0.75,1.62,4.15],[0.05,1.0,2.85]],pour:[[-0.75,1.62,4.15],[0.05,1.0,2.85]],sink:[[-1.05,1.55,1.95],[-2.15,0.95,3.0]],table:[[3.55,1.6,0.35],[2.1,0.9,1.75]],wide:[[0.6,2.3,-0.6],[0.2,0.8,2.4]]};
 const STATIONS={counter:[0,2.55],sink:[-2.75,2.95],table:[2.6,1.0]};
 // what the viewer draws, every 50 ms: the body (bones, hands), the drawn kettle (grip, palm, tilt, turn, the pour stream),
 // the cups (drawn, palm, tea), steam, the world state and the kettle's voice
@@ -57,7 +57,7 @@ try{
  const world=JSON.parse(readFileSync(scene+'/world.json'));marks.push({restart:'stop',at:Date.now(),tick:samples.at(-1)?.tick,pid:world.pid});process.kill(world.pid);
  for(let i=0;i<100;i++){try{await fetch(base+'/healthz');await new Promise(r=>setTimeout(r,200));}catch{break;}}
  await run(process.execPath,['tools/soul-actions/start-tea.mjs'],{cwd:new URL('../..',import.meta.url).pathname,env:{...process.env,SOUL_TEA_SCENE:scene},timeout:300000});marks.push({restart:'started',at:Date.now()});
- await page.goto(base+'/?eye=1.25,1.55,0.45&at=2.55,0.85,1.55');await ready();await startAudio('audio-2').catch(e=>marks.push({audio2:String(e)}));phase='after-restart';sampling();await camera(...VIEW.table);marks.push({tick:samples.at(-1)?.tick,view:'table',after:'restart'});
+ await page.goto(base+'/?eye=3.55,1.6,0.35&at=2.1,0.9,1.75');await ready();await startAudio('audio-2').catch(e=>marks.push({audio2:String(e)}));phase='after-restart';sampling();await camera(...VIEW.table);marks.push({tick:samples.at(-1)?.tick,view:'table',after:'restart'});
  await page.waitForTimeout(5000);await here('after restart');
  phase='brew';follow=true;lastView='table';await act('make a cup of tea');await page.waitForTimeout(3000);follow=false;await here('second cup');
  assert.deepEqual(errors,[]);pass=true;
