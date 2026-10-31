@@ -51,6 +51,23 @@ test('paged: a snapshot taken mid far-walk restores and continues identically', 
   assert.equal(b.stateHash(), a.stateHash());
 });
 
+// A restore rebuilds the paged windows and re-bases the planner; neither may move the navigation epoch the snapshot
+// recorded, or every walker in flight re-verifies its corridor, re-keys its narrows and re-smooths at once — a live world
+// that kept running never does (Eden 2026 copy, 2026-10-31: a Soul restored mid-walk ended 0.2 m off the live one).
+test('paged: a mid-walk restore keeps the navigation epoch, so the walk goes on exactly as live', () => {
+  const a = wide('epoch-snap', ['h_ana']);
+  const p0 = a.world.entities.h_ana.pose.p;
+  a.perform({ actor: 'h_ana', label: 'far', steps: [{ verb: 'walk_to', params: { to: [p0[0] + 300, p0[2] + 60] } }] });
+  for (let i = 0; i < 200; i++) a.step();
+  const b = factory.restore(a.snapshot()) as never as Eng;
+  const epoch = (e: Eng) => (e as never as { rt: { services: { spatial: { epoch: number } } } }).rt.services.spatial.epoch;
+  assert.equal(epoch(b), epoch(a));
+  for (let i = 0; i < 40; i++) { a.step(); b.step(); }
+  // everything but the event-log cursor (a restored runtime starts its own log): the walk's epoch, narrows and smoothing too
+  const body = (e: Eng) => { const s = e.snapshot() as { mars: { eventCursor?: number } }; delete s.mars.eventCursor; return s; };
+  assert.deepEqual(body(b), body(a));
+});
+
 // A god world on the empty plain (the launcher's "Empty plain"): no bodies and no obstacle fixtures, so nothing but the
 // world-edit changes. A new floor height re-bases the planner (refreshForWorld); the windows it already faced must be
 // rebuilt with the new level and the new walls, not kept from before (release 1.1: every upper floor of a lighthouse and
