@@ -23,6 +23,7 @@ import type {EdgeCapability, EdgeReceipt, EdgeSoul, NearbyBody} from '../contrac
 import {centroid, type PlaceIndex} from './places.ts';
 import {tokens} from './vocabulary.ts';
 import type {SpotsData} from './activities.ts';
+import {menuStats, cpuNow} from './menu-stats.ts';
 
 type V2 = [number, number];
 type Steps = Program['steps'];
@@ -238,7 +239,8 @@ export class Together {
   /** Deterministic item sources: shelves (books), writing desks (letters) and walkable places by kind (gardens → flowers…). */
   sources() {
     const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = Object.keys(this.w.regions).length + ':' + this.p.places.byId.size + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
-    if (this.sourceCache?.key === key) return this.sourceCache.list;
+    if (this.sourceCache?.key === key) {menuStats.src.hit++; return this.sourceCache.list;}
+    menuStats.src.miss++; const c0 = cpuNow();
     const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
     for (const s of this.p.spots().shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
@@ -252,7 +254,7 @@ export class Together {
       const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24) ?? null; if (!at) continue;
       for (const kind of [...new Set(kinds)]) out.push({id: 'place:' + place.id, kind, label: place.name, at, place: place.id});
     }
-    this.sourceCache = {key, list: out}; return out;
+    this.sourceCache = {key, list: out}; menuStats.src.cpuUs += cpuNow() - c0; return out;
   }
 
   /** GEST-LIVE: the other sources of an item kind within reach, nearest first (the nearest one may have no walkable route). */

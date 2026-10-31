@@ -55,6 +55,7 @@ import {EDEN_LIBRARY_CATALOGUE} from '../content/eden-library-catalogue.ts';
 import {isVerificationProbe, PROBE_OWNER} from '../../verification-probe.ts';
 import {tx,afterCommit} from '../comms/store.ts';
 import {PlaceKnowledge} from '../perception/knowledge.ts';
+import {menuStats, countClear, cpuNow} from './menu-stats.ts';
 import {BodyRule, BODY_PATH_SAMPLE_M, type BodyKnobs, type BodySoul, type Posture} from './body-rule.ts';
 
 type Resolved = {from: string; to: string; note: string};
@@ -149,7 +150,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       else if (e.change === 'reclaimed' && this.faded.delete(e.soulId)) {
         const m = this.host.minds.get(e.soulId);
         try { if (m) void this.host.enqueue('edge-relocate', `edge:${e.soulId}`, {soulId: e.soulId, entityId: m.entityId, to: this.startingPoint(e.soulId), why: 'reclaimed after fading'}).catch(() => {/* best effort */}); } catch { /* clock not ready */ }
-        this.capCache.delete(e.soulId);
+        this.dropMenu('reclaimed', e.soulId);
       }
     });
     // `faded` is memory: after a restart re-learn the durable fade roster, or absent Souls look alive
@@ -239,7 +240,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const to = keep ? p! : this.startingPoint(id);
       lines.push(`${id} ${JSON.stringify(m.name)} ${keep ? 'stays' : 'to the arrival point'} at ${to.map(v => Math.round(v * 10) / 10).join(',')}`);
       if (dry) continue;
-      this.faded.delete(id); this.capCache.delete(id);
+      this.faded.delete(id); this.dropMenu('soul-gone', id);
       if (!keep && m) try {void this.host.enqueue('edge-relocate', `edge:${id}`, {soulId: id, entityId: m.entityId, to, why: 'back as a sleeping body (LINK)'}).catch(() => {/* best effort */});} catch {/* clock not ready */}
       this.bodyRule?.restoreAsleep({soulId: id, entityId: m.entityId, name: m.name, owner: m.owner});
     }
@@ -323,7 +324,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       spectate: m => {try {(this.comms as unknown as {core?: {spectate(m: object): void}} | undefined)?.core?.spectate({tick: this.host.engine.world.tick, ...m});} catch {/* spectators never break the ledger */}},
       touch: id => this.comms?.fading.touch?.(id),
       decide: (soul, receipt, capability, label, steps) => this.decide(soul, receipt, capability, label, steps)});
-    this.receiptListeners.push(r => {if(!OPEN.includes(r.phase))this.capCache.clear();});
+    this.receiptListeners.push(r => {if(!OPEN.includes(r.phase))this.dropMenus('receipt-closed');});
     // D1: the card's doing line names an edge act's approach ("walking to Kitchen chair") from this ledger's plans
     host.approachV1 = m => {const program = host.engine.programOf(m.entityId), r = program ? this.rows("soul_id=? AND phase='started' AND program_id=?", m.soulId, program)[0] : undefined; return r ? this.approachFor(m, r.receipt_id) : null;};
     // Open receipts from a previous process: a started one whose programme the snapshot carries is still followed;
@@ -440,7 +441,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       this.pending.delete(soulId);
       for (const r of this.openReceipts(soulId)) this.update(r.id, {phase: 'failed', code: 'engine.fault-recovered', reason: 'That would have pushed bodies into each other, so the world set it aside and carried on; choose again.'});
     }
-    this.capCache.clear();
+    this.dropMenus('engine-recovery');
   }
   private onProgram(ev: {id: string; kind: string; code?: string; message?: string}) {
     if (ev.kind === 'step') return;
@@ -610,8 +611,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   // ---------------------------------------------------------------- capabilities
   private binds(soul: EdgeSoul): {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>} {
-    const tick = this.host.engine.world.tick, hit = this.capCache.get(soul.soulId);
-    if (hit && hit.tick === tick) return hit.value;
+    const tick = this.host.engine.world.tick, hit = this.capCache.get(soul.soulId), c0 = cpuNow();
+    if (hit && hit.tick === tick) {menuStats.cap.hit++; return hit.value;}
+    menuStats.cap.miss++; if (hit) menuStats.cap.missTick++; else menuStats.cap.missAbsent++;
     const m = this.mind(soul), read = readHumanCapabilitiesV1(this.host, m, {registeredActivitiesV1: true, deferRouteChecks: true, skipRegisteredCards: true});
     const caps: EdgeCapability[] = [], plans = new Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>();
     const secondsParam = {seconds: {type: 'integer', min: 1, max: 600, default: 60}};
@@ -751,9 +753,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
     shapeRigidCapabilities(me,caps,plans as never,secondsParam);
     // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
     if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {if (this.secretOffer(soul,caps[i]!)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
-    const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
+    const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); menuStats.cap.cpuUs += cpuNow() - c0; return value;
   }
-  invalidateBodies(){this.capCache.clear();}
+  invalidateBodies(){this.dropMenus('invalidateBodies');}
+  /** Every Soul's menu rebuilds on its next read (`site` names the cause, for menu-stats). */
+  private dropMenus(site: string) {countClear(site); this.capCache.clear();}
+  /** One Soul's menu rebuilds on its next read. */
+  private dropMenu(site: string, soulId: string) {countClear(site, true); this.capCache.delete(soulId);}
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
   bodyVerbProblem(soul:EdgeSoul,verb:string){return bodyVerbProblem(this.body(soul.entityId),verb);}
   /** Walks and ride boardings advertise `with` (quality cases 21/27: the invitation was there but undiscoverable). */
@@ -836,7 +842,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown; verb?: unknown; target?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
     // intents/1 (Core-A): {verb, target} is resolved now and acted on as the concrete choice it reports
-    if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.capCache.clear(); return out;}
+    if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.dropMenus('act-intent'); return out;}
     if(typeof input.capability==='string'){
       if(input.capability.length>=1&&input.capability.length<=200&&typeof input.clientRef==='string'&&input.clientRef.length<=100){const old=this.coreA.byClientRef(soul.soulId,input.clientRef);if(old)return {accepted:true,receipt:old};}
       // BODY refusals precede place/alias diagnostics, as in the original actOnce path.
@@ -852,12 +858,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const receipt=this.coreA.setDetail(out.receipt.id,{chosen:{...place.chosen,...(out.receipt.chosen as Record<string,unknown>??{})}})??out.receipt;return {...out,receipt};
       }
     }
-    if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.capCache.clear();return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}
+    if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.dropMenus('act-walk-words');return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}
       // quality case 27: an ambiguous destination ("the library") falls back to the walk its plain words resolve to, still inviting
-      const alt=walkWithFallback(this,soul,walk);if(alt){const again=await this.actOnce(soul,{capability:alt.cap.id,params:{...(input.params&&typeof input.params==='object'?input.params as Record<string,unknown>:{}),with:walk.with},clientRef:input.clientRef});if(again.accepted){this.capCache.clear();return {...again,resolved:{from:input.capability,to:alt.cap.id,note:`Walk to ${alt.cap.label}; ${(walk.with as string[]).join(', ')} receive an invitation and choose whether to join.`}};}}
+      const alt=walkWithFallback(this,soul,walk);if(alt){const again=await this.actOnce(soul,{capability:alt.cap.id,params:{...(input.params&&typeof input.params==='object'?input.params as Record<string,unknown>:{}),with:walk.with},clientRef:input.clientRef});if(again.accepted){this.dropMenus('act-walk-fallback');return {...again,resolved:{from:input.capability,to:alt.cap.id,note:`Walk to ${alt.cap.label}; ${(walk.with as string[]).join(', ')} receive an invitation and choose whether to join.`}};}}
       return out;}}
     const out = await this.actOnce(soul, input);
-    if (out.accepted) this.capCache.clear();     // invitations, items and follows change what others can do this tick
+    if (out.accepted) this.dropMenus('act-accepted');     // invitations, items and follows change what others can do this tick
     return out;
   }
   private async actOnce(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
@@ -872,7 +878,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // Reclaim: fall onto feet at a starting place, identity and history intact (C9).
       this.faded.delete(soul.soulId);
       await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to: this.startingPoint(soul.soulId), why: 'reclaimed after fading'});
-      this.capCache.delete(soul.soulId);
+      this.dropMenu('act-retry', soul.soulId);
     }
     let {caps, plans} = this.binds(soul);
     let params = (input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? {...input.params as Record<string, unknown>} : {}) as Record<string, unknown>;
@@ -1689,7 +1695,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   /** G1: an accepted god edit interrupts the resident's current use and any queued retry. */
   godInterrupted(soulId: string, reason: string) {
-    this.pending.delete(soulId); this.capCache.delete(soulId);
+    this.pending.delete(soulId); this.dropMenu('god-interrupted', soulId);
     for (const receipt of this.openReceipts(soulId)) this.update(receipt.id, {phase: 'failed', code: 'god.walkout', reason});
   }
   observe(soul: EdgeSoul, include: Set<string>) {
@@ -1893,14 +1899,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if (self.aboard(s.entityId)?.phase === 'aloft') return {accepted: false as const, code: 'ride.aboard', reason: 'You are aloft; it lands by itself and you step out then.', capability};
         const stepOut = self.stepOutRefusal(s.entityId); if (stepOut) return {accepted: false as const, ...stepOut, capability};
         const refuse = (code: string, reason: string) => {self.recordRefusal(s.soulId, 'intent', capability, code, reason); return {accepted: false as const, code, reason, capability};};
-        const out = await self.launch(s, capability, label, steps, clientRef, {}, refuse,undefined,contentParams); if (out.accepted) self.capCache.clear(); return out;
+        const out = await self.launch(s, capability, label, steps, clientRef, {}, refuse,undefined,contentParams); if (out.accepted) self.dropMenus('coreA-launch'); return out;
       },
       /** A faded Soul's next act lands it at a starting place first (C9), as act() does. */
       reclaim: async (s: EdgeSoul) => {
         if (!self.faded.has(s.soulId)) return;
         self.faded.delete(s.soulId);
         await self.host.enqueue('edge-relocate', `edge:${s.soulId}`, {soulId: s.soulId, entityId: s.entityId, to: self.startingPoint(s.soulId), why: 'reclaimed after fading'});
-        self.capCache.delete(s.soulId);
+        self.dropMenu('coreA-retry', s.soulId);
       },
       /** Open conversations (ids and member Soul ids only; never turns). */
       conversations: (): {id: string; members: string[]}[] => {
