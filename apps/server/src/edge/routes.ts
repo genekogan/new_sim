@@ -22,6 +22,7 @@ import {livePlatforms} from './eyes/platforms.ts';
 import {OwnerLoop, type OwnerLoopInbox} from './owner-loop.ts';
 import type {WorldHost} from '../world.ts';
 import type {Souls} from '../souls.ts';
+import {loadOf, worldBlock} from '../load/admission.ts';
 
 export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Context) => string | undefined) {
   return (c: Context): EdgeSoul => {
@@ -45,7 +46,8 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   mountIdempotency(app, deps);
   const wrap = (fn: (c: Context) => unknown | Promise<unknown>) => async (c: Context) => {
     c.header('Cache-Control', 'no-store');
-    try {return c.json(edgeBody(await fn(c) as object));}
+    // LOAD-CONTRACT §3: at amber and above a frame says so in world words (admission sets the level it was admitted at)
+    try {const out = edgeBody(await fn(c) as object), lv = loadOf(c); return c.json(lv && lv !== 'green' && !('world' in out) ? {...out, world: worldBlock(lv)} : out);}
     catch (error) {
       if (error instanceof EdgeError) return c.json({contract: EDGE_CONTRACT, error: edgeErrorOf(error)}, error.status as 400);
       console.error('[edge] ledger fault', c.req.method, c.req.path, error instanceof Error ? (error.stack ?? error.message).split('\n').slice(0, 4).join(' | ') : String(error));

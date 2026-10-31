@@ -67,6 +67,7 @@ export function publicTakes<T>(value: T, full = false): T {
   const v = value as { chunks?: unknown[] };
   return !full && Array.isArray(v?.chunks) ? { ...v, chunks: v.chunks.map((k) => viewerChunk(k)) } as T : value;
 }
+const SWEEP_MS = 15_000;
 export class Hub {
   wss: WebSocketServer;
   /** Other WebSocket endpoints on this server (EVENTS-v1 /v1/edge/events/ws); each returns true when it took the upgrade. */
@@ -138,10 +139,11 @@ export class Hub {
       onKernel: (view) => this.broadcast({ t: 'kernel', view }),
       onPlay: (p) => this.broadcast({ t: 'plays', plays: [p] }),
     });
-    setInterval(() => this.sweep(), 15_000).unref();
+    setInterval(() => this.sweep(), SWEEP_MS).unref();
     setInterval(() => { const full = this.stats(); this.broadcast({ t: 'stats', stats: full }, (c) => c.me?.role === 'admin'); this.broadcast({ t: 'stats', stats: publicStats(full) }, (c) => c.me?.role !== 'admin'); }, 2_000).unref();
     // a socket that never introduces itself is not a viewer
-    setInterval(() => { const now = Date.now(); for (const c of this.clients) if (!c.ready && now - c.joinedAt > 15_000) { c.ws.close(1008, 'no hello'); this.clients.delete(c); } }, 5_000).unref();
+    // judged after the poll phase (setImmediate), so a hello that arrived during a stall is read first
+    setInterval(() => setImmediate(() => { const now = Date.now(); for (const c of this.clients) if (!c.ready && now - c.joinedAt > 15_000 + this.stallMs) { c.ws.close(1008, 'no hello'); this.clients.delete(c); } }), 5_000).unref();
   }
 
   private onConnect(ws: WebSocket, req: IncomingMessage) {
@@ -396,8 +398,25 @@ export class Hub {
     });
   }
 
+  /** Lag-aware heartbeat (srv-load, audit #5): a stall of the main thread delays both this timer and the reading of
+   *  the pongs that arrived meanwhile (timers run before the poll phase). So the verdict waits for the poll phase
+   *  (setImmediate), and a sweep that itself ran late by more than 5 s judges nobody: a slow world never cuts its
+   *  viewers, which would then all reconnect (and re-download the world) at once. */
+  private sweepAt = Date.now();
+  /** How late the last sweep ran (ms): also stretches the hello deadline. */
+  stallMs = 0;
   private sweep() {
-    for (const c of this.clients) { if (!c.alive) { c.ws.terminate(); this.clients.delete(c); continue; } c.alive = false; try { c.ws.ping(); } catch { /* closed */ } }
+    const now = Date.now(); this.stallMs = Math.max(0, now - this.sweepAt - SWEEP_MS); this.sweepAt = now;
+    const judge = this.stallMs <= 5_000 && this.loadLevel !== 'black';
+    setImmediate(() => {
+      for (const c of this.clients) { if (!c.alive && judge) { c.ws.terminate(); this.clients.delete(c); continue; } c.alive = false; try { c.ws.ping(); } catch { /* closed */ } }
+    });
+  }
+  /** Load dial (LOAD-CONTRACT §1, §3): viewers hear the level ({t:'load'}); at black new joins wait (see hello). */
+  loadLevel: 'green' | 'amber' | 'red' | 'black' = 'green';
+  setLoadLevel(level: 'green' | 'amber' | 'red' | 'black') {
+    if (level === this.loadLevel) return;
+    this.loadLevel = level; this.broadcast({t: 'load', level} as unknown as ServerMsg);
   }
 
   stats(): ServerStats {

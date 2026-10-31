@@ -37,6 +37,10 @@ import {installBirthLooks} from './god/birth-look.ts';
 import { setKitViewerContract } from '@sim/generators';
 import { rehearseRestore, standby } from './standby.ts';
 import { coreLibrary } from '@sim/world-compiler';
+import { startWatchdog } from './load/watchdog.ts';
+import { bootPhase } from './load/boot-progress.ts';
+import { LoadMonitor } from './load/monitor.ts';
+import { Admission } from './load/admission.ts';
 
 // Lane P5: when the boot's phases end (ms since the process started; the first is this release's code load)
 const bootAt: Record<string, number> = { code: performance.now() };
@@ -51,6 +55,10 @@ await standby(async () => {
   if (!edenCoreRequested(config, process.env)) { warmFactory = await plainFactory(); rehearseRestore(join(config.dataDir, 'sim.db'), config.worldId, warmFactory as never, (ro) => { if (config.worldEngine && ro.prepare("SELECT 1 FROM sqlite_master WHERE name='world_ground_recipes_v1'").get()) registerGroundRecipes(ro, config.worldId); }); }
 });
 bootAt.go = performance.now();
+// srv-load (LOAD-CONTRACT §4): the watchdog thread first, before the database opens, so <DATA_DIR>/live.json reports the
+// whole boot. Not during a standby wait (the serving process still owns the file then). SIM_HEALTH_PORT: its own /healthz.
+if (process.env.SIM_WATCHDOG !== '0') startWatchdog({ dataDir: config.dataDir, port: Number(process.env.SIM_HEALTH_PORT) || undefined });
+bootPhase('boot:restore');
 
 // K1 / NT5: new kit fields are admitted only with the viewer that can draw them.
 try { setKitViewerContract(JSON.parse(readFileSync(join(config.webDir, 'kit-contract.json'), 'utf8'))); }
@@ -161,7 +169,15 @@ if (god) installWorldEnv(host, god, edge);  // R4-LIVE: Souls perceive the god's
 if (god) installLightning(god, edge, () => host.engine.world.tick);  // GOD-ENV: Souls see the bolts and hear the thunder
 if (god) installGovernance(god, { host, edge });  // GOVERN: versioned constitution, amendments, prayer states (god/governance.ts)
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} own defs + library ${god.model.library ? `${god.model.library.id}@${god.model.library.version} (${god.model.library.all().length})` : 'none'}, owner ${god.owner ?? '(unclaimed)'}`);
-const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
+// srv-load: the load sensor (load/monitor.ts) and in-world admission (load/admission.ts; SIM_ADMISSION=0 turns it off).
+// Black for 60 s → planned restart: snapshot, exit 75 (the launcher restarts at once, no backoff penalty).
+const admission = process.env.SIM_ADMISSION === '0' ? undefined : new Admission();
+const monitor = new LoadMonitor({ host, queue: () => admission?.queueStats() ?? { depth: 0, oldestMs: 0 }, shed: () => ({ reads: admission?.shed.reads ?? 0, acts: admission?.shed.acts ?? 0 }),
+  souls: () => { let awake = 0, connected = 0; for (const id of host.minds.keys()) { const st = host.publicBodyOf?.(id)?.state; if (st === 'awake') awake++; if (st && st !== 'asleep') connected++; } return { awake, waiting: 0, connected }; },
+  onBlackTooLong: () => { console.log('[load] black for 60 s: planned restart (snapshot, exit 75)'); void shutdown('load:black', 75).catch(() => process.exit(75)); } });
+if (admission) monitor.register('admission', (l) => admission.setLoadLevel(l));
+monitor.register('hub', (l) => hub.setLoadLevel(l));
+const app = buildApp({ load: { admission, monitor }, cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
 if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
 const listener = getRequestListener(app.fetch);
 // G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)
@@ -245,14 +261,15 @@ if (engineBridge) {
   }
 }
 server.listen(config.port, config.host, () => {
+  bootPhase('serving', host.engine.world.tick); monitor.start();
   console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`);
   const s = (ms: number) => (ms / 1000).toFixed(2);
   console.log(`[boot] listening ${s(performance.now())} s after start: code ${s(bootAt.code)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
   if (process.env.SIM_STANDBY === '1') console.log(`[boot] listening ${s(performance.now() - bootAt.go)} s after the standby go: database ${s(bootAt.db - bootAt.go)}, factory ${s(bootAt.open - bootAt.db)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
 });
 
-const shutdown = async (sig: string) => {
-  if (closing) return; closing = true;
+const shutdown = async (sig: string, exitCode = 0) => {
+  if (closing) return; closing = true; bootPhase('stopping', host.engine.world.tick);
   if (writesInFlight.size) {
     const n = writesInFlight.size, t = performance.now();
     await Promise.race([Promise.all(writesInFlight), new Promise((r) => setTimeout(r, WRITE_DRAIN_MS))]);
@@ -276,8 +293,10 @@ const shutdown = async (sig: string) => {
   console.log(`[world] ${sig}: snapshot saved in ${Math.round(performance.now() - saveAt)} ms (capture ${Math.round(host.snapshotMs.capture)}, write ${Math.round(host.snapshotMs.persist)})`);
   server.close(); void hub.closeClients('server restarting');
   await closeContextViews();
-  auth.close();db.close(); process.exit(0);
+  auth.close();db.close(); process.exit(exitCode);
 };
+// The launcher's wedge path sends SIGUSR2 before SIGTERM (LOAD-CONTRACT §4): a diagnostic report, if this thread can still run.
+process.on('SIGUSR2', () => { try { console.log(`[load] SIGUSR2: diagnostic report ${process.report?.writeReport(join(config.dataDir, `report-${Date.now()}.json`))}`); } catch (e) { console.error('[load] report failed', e); } });
 process.on('SIGTERM', () => void shutdown('SIGTERM').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));
 process.on('SIGINT', () => void shutdown('SIGINT').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));
 
