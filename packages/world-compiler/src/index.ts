@@ -9,6 +9,7 @@ export { hashOf, sha256Hex, stableStringify } from './hash.ts';
 export { CORE_KIT, coreRef } from './core-kit.ts';
 export { PIN_NOTES_MAX, PIN_TEXT_MAX, PIN_PER_SOUL, pinSlot } from './core-kit/writable-boards.ts'; // Soul Actions entry 19
 export { SIGNUP_MAX, POLL_OPTIONS_MAX, signupSlot, pollSlot, pollOptions } from './core-kit/writable-boards.ts'; // Soul Actions entry 25
+export { CAN_GRIP, CAN_LITRES, CAN_OPENING, CAN_ROSE, GROWTH_STAGES, HOOK_PEG, POUR_LITRES } from './core-kit/watering-can.ts';
 export { stormStrikes, strikesBetween, STRIKE_CELL, STRIKE_FRESH, SOUND_MPS, type Strike } from './lightning.ts';
 export { WEATHER_RULES, isWetSetting, showerMinutes, showerUntil, setWeatherInForce } from './weather-rules.ts';
 export * as vocab from './vocab/index.ts';

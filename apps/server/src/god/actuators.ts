@@ -79,6 +79,10 @@ export type ActuatorHost = {
   approach?(id: string, soul: EdgeSoul, front: Vec2 | null, radius?: number): { p: Vec2; level: number } | null;
   /** W5 water (water.ts): the things involved in moving water, and an atomic commit of several state changes. */
   water?: WaterHost;
+  /** Entry 34 (watering.ts): "water <plant>" with a watering can from its hook, as one act of native steps; null = W5. */
+  watering?(soul: EdgeSoul, plant: string, action: string): { steps: { verb: string; params: Record<string, unknown> }[]; summary: string } | Refusal | null;
+  /** The act was accepted: watch this Soul's body for its watering moments. */
+  wateringBegun?(soul: EdgeSoul): void;
 };
 export type Thing = { id: string; name: string; def: StoredDef; state: Record<string, unknown>; params: Record<string, unknown> };
 export type WaterHost = {
@@ -255,6 +259,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
       if(host.deferContacts&&def.tags.includes('wall-window')&&s.key&&!host.contactPlan?.(ctx.soul,s.key,a.name))return {code:'contact.out-of-reach',reason:'This window handle is outside standing hand reach from your floor.'};
       const policy = s.key ? host.policy?.(s.key, ctx.soul, a.name) : null; if (policy) return policy;
+      const can = s.key && a.name === 'water' ? host.watering?.(ctx.soul, s.key, a.name) : null; if (can) return 'code' in can ? can : null;
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
       const state = (s.key && host.stateOf?.(s.key)) || s.state || {};
       return whenRefusal(a, state, nameOf(s)) ?? (isListAction(def, a) ? listProblem(def, a, state, ctx.soul) : isGameAction(def, a) ? gameProblem(a, state, ctx.soul) : null);
@@ -264,6 +269,8 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       available: (s: BuiltLike, ctx: any) => check(s, ctx),
       validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (isListAction(def, a) ? listProblem(def, a, (s.key && host.stateOf?.(s.key)) || s.state || {}, ctx.soul, p ?? {}) : null) ?? (isGameAction(def, a) && a.name === 'mark' ? gameProblem(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, ctx.soul, p?.square ?? '') : null) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
+        const can = s.key && a.name === 'water' ? host.watering?.(ctx.soul, s.key, a.name) : null;
+        if (can && !('code' in can)) return { state: s, result: { action: a.name, summary: can.summary }, bodies: [{ label: a.label, steps: can.steps }] };
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
         if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
@@ -296,6 +303,8 @@ export function wrapAct(objects: { act(id: string, soul: EdgeSoul, input: Record
     const t = find(id), a = t ? actionsOf(t.def).find((x) => x.name === input.action) : undefined;
     if (!t || !a) return out;
     if (host.deferContacts && isContactActuator(t.def, a)) return out;
+    // Entry 34: the watering-can act changes the world at its own native moments (watering.ts), never here
+    if (a.name === 'water' && host.watering?.(soul, id, a.name)) { host.wateringBegun?.(soul); return out; }
     // W5: water moves between two things (tank → can, can → planter) in one commit, planned again at commit time
     const water = waterPlan(a, id, soul, host);
     if (water) {

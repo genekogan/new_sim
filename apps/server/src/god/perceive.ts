@@ -97,6 +97,8 @@ export type PerceiveHost = {
   /** VOCAB-MECH: commit a Soul's actuator action on a god thing (engine edit). Without it, things offer no actions. */
   commit?(ops: unknown[], note: string): { accepted: boolean };
   log(m: string): void;
+  /** Entry 34 (watering.ts): "water <plant>" with a watering can from its hook. */
+  watering?: { plan(soul: { entityId: string }, plant: string): { steps: { verb: string; params: Record<string, unknown> }[]; summary: string } | { code: string; reason: string } | null; expect(body: string): void };
   /** LAYERS (layers.ts): owner/price/hours in what Souls see; private things refuse other Souls' actuators. */
   layers?: { active(): boolean; tag(e: Entity): string; refusal(id: string, soul: { soulId: string; name: string }): { code: string; reason: string } | null; ownerWord(id: string, soul?: { soulId: string; name: string }): string | null; hoursOf(s: Entity['schedule']): string };
 };
@@ -151,6 +153,8 @@ export class GodPerceive {
   private actHost() {
     return {
       deferContacts: !!this.h.edge?.contactActuator,
+      watering: (soul: EdgeSoul, id: string) => this.h.watering?.plan(soul, id) ?? null,
+      wateringBegun: (soul: EdgeSoul) => this.h.watering?.expect(soul.entityId),
       contactPlan:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>this.h.edge?.contactActuator?.plan(soul,id,action,params)??null,
       policy:(id:string,soul:EdgeSoul,action:string)=>this.h.edge?.contactActuator?.policy(soul,id,action)??null,
       bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },

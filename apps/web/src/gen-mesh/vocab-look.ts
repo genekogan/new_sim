@@ -147,7 +147,8 @@ export function applyLook(obj: THREE.Object3D | null, ctx: MeshCtx): THREE.Objec
   const apply = (root: THREE.Object3D) => { warpSubtree(root, look, h); paintSubtree(root, look, ctx); stateRoles(root, look); };
   apply(obj);
   // imported meshes arrive after build (mesh.mesh.ts adds the GLB later): give them the same look when they land
-  obj.addEventListener('childadded', (e: { child?: THREE.Object3D }) => { if (e.child) queueMicrotask(() => apply(e.child!)); });
+  // the event object is reused (its child is null again by the microtask): keep the child itself (entry 34 found it)
+  obj.addEventListener('childadded', (e: { child?: THREE.Object3D }) => { const child = e.child; if (child) queueMicrotask(() => apply(child)); });
   if (look.condition === 'damaged') { obj.rotation.z = (hashSeed(ctx.entity.id) - 0.5) * 0.06; obj.rotation.x = (hashSeed(ctx.entity.id + 'x') - 0.5) * 0.05; }
   const stretched = look.sx !== 1 || look.sy !== 1 || look.sz !== 1;
   if (!stretched && look.condition !== 'construction') return obj;

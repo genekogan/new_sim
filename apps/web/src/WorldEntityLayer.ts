@@ -10,7 +10,7 @@ import { godFeature, isFlagDef } from './god-ui/features.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
-import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { WorldModel, CAN_OPENING, CAN_ROSE, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
@@ -18,8 +18,10 @@ import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion, syncLightGlow } from './gen-mesh/motion.ts';
 import { hasFlames } from './fx/flames.ts';
 import {lightDiffAhead} from './light-diff-clock.ts';
+import {wateringDiffAhead} from './watering-diff-clock.ts';
 import {defLights} from './WorldNightLights.ts';
-import {waterJets} from './fx/water-jets.ts';
+import {pourJets, waterJets} from './fx/water-jets.ts';
+import {isGrowingDef, plantGroup, plantLookOf, posePlants, type PlantGroup, type PlantLook} from './fx/plant-growth.ts';
 import {beginOpeningMotion,stepOpeningMotion,type OpeningMotion} from './opening-motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
@@ -177,6 +179,13 @@ export class WorldEntityLayer {
   private hiddenBase = new WeakSet<THREE.Object3D>();
   /** Viewer B7: things a body carries (entity parent = a body entity) by body id; they ride that figure's animated hand. */
   private held = new Map<string, string>();
+  /** Entry 34: taps whose stream is drawn (a can held under one catches it short); growing planters, the look each was
+   *  last drawn with and the eases in progress; the rose shower of each can being poured. */
+  private tapJets = new Map<string, THREE.Points>();
+  private growing = new Set<string>();
+  private plantShown = new Map<string, PlantLook>();
+  private plantTweens = new Map<string, { from: PlantLook; to: PlantLook; t0: number; dur: number }>();
+  private pours = new Map<string, THREE.Points>();
   private figures = new Map<string, Figure>();
   private now = 0;
   private readonly api: (p: string) => string;
@@ -328,7 +337,7 @@ export class WorldEntityLayer {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
       if (m.kind !== 'world-diff' || typeof m.seq !== 'number' || m.seq <= this.seq) continue;
-      if (lightDiffAhead(this.model,m,depictedTick)) return;
+      if (lightDiffAhead(this.model,m,depictedTick)||wateringDiffAhead(this.model,m,depictedTick)) return;
       this.stats.edgeSeen++;
       if (m.seq > this.seq + 1) { void this.resync(); return; }  // a gap: something was missed; take the whole picture again
       try { this.applyDiff(m as unknown as DiffMsg); this.stats.applied++; } catch (e) { this.stats.lastError = String(e); this.seq = m.seq; }
@@ -422,6 +431,16 @@ export class WorldEntityLayer {
     const frame = ++this.frame;
     // P1 phones: frozen things skip the matrix walk on the promise that what they hang from does not move; if it ever does, thaw all
     if (this.freezeSettled && !this.thingsGroup.matrixWorld.equals(this.frozenUnder)) { this.frozenUnder.copy(this.thingsGroup.matrixWorld); for (const d of this.drawn.values()) if (d.frozen) this.thaw(d); }
+    // Entry 34: taps run to their basin unless a held can catches the stream this frame (below); growth and wilt ease
+    for (const jets of this.tapJets.values()) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = jets.userData.dropDefault;
+    for (const [id, tw] of this.plantTweens) {
+      const d = this.drawn.get(id), grp = d?.obj.getObjectByName('plant growth') as PlantGroup | undefined;
+      if (!d || !grp) { this.plantTweens.delete(id); continue; }
+      if (d.frozen) this.thaw(d);
+      const k = easeInOut((nowMs - tw.t0) / tw.dur), look = { g: tw.from.g + (tw.to.g - tw.from.g) * k, w: tw.from.w + (tw.to.w - tw.from.w) * k, m: tw.from.m + (tw.to.m - tw.from.m) * k };
+      posePlants(grp, look); setPatch(d.obj, look.m); d.obj.updateMatrixWorld(true); this.plantShown.set(id, look);
+      if (k >= 1) this.plantTweens.delete(id);
+    }
     let k = 0;
     for (const [id, d] of this.drawn) {
       if (d.opening && !stepOpeningMotion(d.opening,nowMs)) d.opening=undefined;
@@ -445,7 +464,8 @@ export class WorldEntityLayer {
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
       const shown = this.interiorVisible(id, d);
-      const inHand = !d.removing && this.held.has(id) && this.handPoint(this.held.get(id)!, d.obj.position);
+      const inHand = !d.removing && this.held.has(id) && (d.obj.userData.handleGrip ? this.handleHeld(id, d) : this.handPoint(this.held.get(id)!, d.obj.position));
+      if (!inHand && this.pours.has(id)) this.pours.get(id)!.visible = false;
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
         if (inHand || ride || !d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
@@ -468,6 +488,47 @@ export class WorldEntityLayer {
    *  The figure is the native people view's rig, found in the scene by its name (= the body's engine id). False when the
    *  body has no figure here (no takes yet, or a stand-in): then the thing stays at the body entity's carry slot. */
   private handPoint(body: string, out: THREE.Vector3): boolean {
+    const f = this.figureOf(body); if (!f) return false;
+    f.holder.updateWorldMatrix(true, true);
+    const palm = (k: 0 | 1, v: THREE.Vector3) => { f.wrists[k].getWorldPosition(v); const kn = f.knuckles[k]; if (kn) v.lerp(kn.getWorldPosition(_v3), 0.5); return v; };
+    palm(0, _pl); palm(1, _pr);
+    if (Math.abs(_pl.y - _pr.y) < 0.06) out.copy(_pl).lerp(_pr, 0.5); else out.copy(_pl.y > _pr.y ? _pl : _pr);
+    return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
+  }
+  /** Entry 34: a thing held by its handle (a watering can) hangs from the right palm by its grip, turned with the body and
+   *  tipped by the recorded pour (the figure's `wateringTilt`); its rose showers while the figure says the water flows. */
+  private handleHeld(id: string, d: Drawn): boolean {
+    const f = this.figureOf(this.held.get(id)!); if (!f) return false;
+    f.holder.updateWorldMatrix(true, true);
+    const s = d.obj.scale.x, grip = d.obj.userData.handleGrip as number[], tilt = Number(f.holder.userData.wateringTilt ?? 0), flow = Number(f.holder.userData.wateringFlow ?? 0);
+    f.wrists[1].getWorldPosition(_pr); const kn = f.knuckles[1]; if (kn) _pr.lerp(kn.getWorldPosition(_v3), 0.5);
+    f.holder.getWorldQuaternion(_qh); _qh.multiply(_qt.setFromAxisAngle(_zAxis, -tilt));
+    d.obj.quaternion.copy(_qh);
+    d.obj.position.copy(_pr).sub(_v3.set(grip[0], grip[1], grip[2]).multiplyScalar(s).applyQuaternion(_qh));
+    // a tap's stream ends in the can's filler opening when the opening is under the nozzle
+    const opening = _vo.set(CAN_OPENING[0], CAN_OPENING[1] + 0.008, CAN_OPENING[2]).multiplyScalar(s).applyQuaternion(_qh).add(d.obj.position);
+    for (const jets of this.tapJets.values()) {
+      const n = jets.getWorldPosition(_vn);
+      if (Math.hypot(opening.x - n.x, opening.z - n.z) < 0.16 && opening.y < n.y - 0.02) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = (n.y - opening.y) / Math.max(0.01, jets.parent?.getWorldScale(_v3).y ?? 1);
+    }
+    let pour = this.pours.get(id);
+    if (flow > 0.003) {
+      if (!pour) { pour = pourJets(); this.thingsGroup.add(pour); this.pours.set(id, pour); }
+      const rose = _vr.set(CAN_ROSE[0], CAN_ROSE[1], CAN_ROSE[2]).multiplyScalar(s).applyQuaternion(_qh).add(d.obj.position);
+      const u = (pour.material as THREE.ShaderMaterial).uniforms, yaw = _eu.setFromQuaternion(f.holder.getWorldQuaternion(_qy), 'YXZ').y;
+      // the spout leaves the can 43° above its base line; tipped by `tilt`; the shower falls to the soil under the rose
+      pour.position.copy(this.thingsGroup.worldToLocal(rose.clone())); pour.rotation.set(0, yaw, 0); pour.visible = true;
+      u.uFlow.value = flow; u.uDir.value = 0.75 - tilt; u.uDrop.value = Math.max(0.05, rose.y - this.soilUnder(rose));
+    } else if (pour) pour.visible = false;
+    return true;
+  }
+  /** The top of the soil under a point: a growing planter's within reach, else the ground under the drawn body. */
+  private soilUnder(p: THREE.Vector3): number {
+    let best = Infinity, y = p.y - 0.6;
+    for (const id of this.growing) { const d = this.drawn.get(id); if (!d) continue; const q = d.obj.position, r = Math.hypot(q.x - p.x, q.z - p.z); if (r < 0.75 && r < best) { best = r; y = q.y + 0.372 * d.obj.scale.x; } }
+    return y;
+  }
+  private figureOf(body: string): { holder: THREE.Object3D; wrists: [THREE.Object3D, THREE.Object3D]; knuckles: (THREE.Object3D | null)[] } | null {
     let f = this.figures.get(body);
     if (f && 'holder' in f && !attached(f.holder)) f = undefined;
     if (!f || ('missingAt' in f && this.now - f.missingAt > 1000)) {
@@ -481,12 +542,7 @@ export class WorldEntityLayer {
       });
       this.figures.set(body, found); f = found;
     }
-    if (!('holder' in f)) return false;
-    f.holder.updateWorldMatrix(true, true);
-    const palm = (k: 0 | 1, v: THREE.Vector3) => { f.wrists[k].getWorldPosition(v); const kn = f.knuckles[k]; if (kn) v.lerp(kn.getWorldPosition(_v3), 0.5); return v; };
-    palm(0, _pl); palm(1, _pr);
-    if (Math.abs(_pl.y - _pr.y) < 0.06) out.copy(_pl).lerp(_pr, 0.5); else out.copy(_pl.y > _pr.y ? _pl : _pr);
-    return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
+    return 'holder' in f ? f as never : null;
   }
 
   private frame = 0;
@@ -825,7 +881,17 @@ export class WorldEntityLayer {
     let built = this.build(e, def);
     if (!built) { if (existing) this.undraw(e.id); return; }
     // Soul Actions: moving water (sprinkler fan, tap stream, shower) while the thing is on; GPU points, never instanced
-    { const jets = waterJets(def as never, e.state, e.params ?? {}); if (jets) { built.add(jets); delete built.userData.instanceKey; } }
+    { const jets = waterJets(def as never, e.state, e.params ?? {}); if (jets) { built.add(jets); delete built.userData.instanceKey; }
+      if (jets?.userData.waterJet === 'stream') this.tapJets.set(e.id, jets as THREE.Points); else this.tapJets.delete(e.id); }
+    // Entry 34: a growing planter's plants, eased from how they were last drawn to what the state now asks for; a can
+    // carried by its handle (a `carry` slot) is posed from the hand every frame, so never instanced
+    if (isGrowingDef(def as never)) {
+      const look = plantLookOf(e.state, def as never), shown = this.plantShown.get(e.id) ?? look;
+      built.add(plantGroup(seedOf(e.id), shown)); delete built.userData.instanceKey; setPatch(built, shown.m); this.growing.add(e.id);
+      if (!sameLook(shown, look)) this.plantTweens.set(e.id, { from: shown, to: look, t0: this.now, dur: lookSeconds(shown, look) * 1000 }); else this.plantTweens.delete(e.id);
+      this.plantShown.set(e.id, shown);
+    }
+    { const grip = (def as unknown as { slots?: { kind: string; p: number[] }[] }).slots?.find((x) => x.kind === 'carry'); if (grip) { built.userData.handleGrip = [...grip.p]; delete built.userData.instanceKey; } }
     // State is visible on this frame, including during the generic edit easing.
     // Waiting for animate()'s settled transform left an OFF bulb glowing for 2.5 s.
     if (def.components.light || def.components.lights) syncLightGlow(built,e,def,m,this.now/1000);
@@ -848,6 +914,8 @@ export class WorldEntityLayer {
   }
   private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id);
+    this.tapJets.delete(id); this.growing.delete(id); this.plantShown.delete(id); this.plantTweens.delete(id);
+    { const pour = this.pours.get(id); if (pour) { pour.removeFromParent(); (pour.material as THREE.Material).dispose(); this.pours.delete(id); } }
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now + delaySeconds * 1000; d.dur = EASE_OUT_S;
   }
@@ -993,6 +1061,18 @@ function nextTask(priority: 'background' | 'user-visible' = 'background'): Promi
 /** A cached snapshot (the server's snapshot cache or an edge copy, lanes W1/O2) says how old it is: its `now` is moved on by that. */
 function ageNow(snap: { now?: number }, r: Response) { const age = Number(r.headers.get('age')) || 0; if (age > 0 && typeof snap.now === 'number') snap.now += age * 1000; }
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
+// Entry 34 scratch: held-by-handle pose, tap catch, rose shower
+const _qh = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _qy = new THREE.Quaternion(), _zAxis = new THREE.Vector3(0, 0, 1), _vo = new THREE.Vector3(), _vn = new THREE.Vector3(), _vr = new THREE.Vector3(), _eu = new THREE.Euler();
+const easeInOut = (k: number) => { const x = Math.max(0, Math.min(1, k)); return x * x * (3 - 2 * x); };
+/** A planter's seed for its plants' layout (stable per entity). */
+const seedOf = (id: string) => { let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619); return h; };
+const sameLook = (a: PlantLook, b: PlantLook) => Math.abs(a.g - b.g) < 1e-3 && Math.abs(a.w - b.w) < 1e-3 && Math.abs(a.m - b.m) < 1e-3;
+/** A stage or a wilt change eases over 2.4 s; the soil darkening while water is poured over 0.9 s. */
+const lookSeconds = (a: PlantLook, b: PlantLook) => (Math.abs(a.g - b.g) > 1e-3 || Math.abs(a.w - b.w) > 1e-3 ? 2.4 : 0.9);
+/** The damp patch (role fill) of a planter spread for moisture `m`. */
+function setPatch(root: THREE.Object3D, m: number) {
+  root.traverse((o) => { if (o.userData.role === 'fill') { const k = Math.max(0.001, Math.min(1, m)); o.scale.set(k, 1, k); o.visible = m > 0.02; } });
+}
 /** Still in a scene graph (a re-created figure leaves its old holder detached). */
 function attached(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; for (let i = 0; p && i < 64; i++) { if (p.type === 'Scene') return true; p = p.parent; } return false; }
 /** Lane PERF2: two grounds differ only in landforms, waters or extent (what a world diff's tile list covers), so baked

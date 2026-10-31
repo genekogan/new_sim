@@ -2,7 +2,7 @@
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
 import {actuatorPoint,opPoint,slidePoint,strokePoint,strokeRoot,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
-import { isDry } from './garden.ts';
+import { isDry, stageWord } from './garden.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
 import { opSchema, contactStateKey, DRAWER_TRAVEL, pinSlot, signupSlot, pollSlot, gameSquare, gameSquareOf, gameStatus, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
@@ -114,7 +114,11 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   facts(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),key=def&&contactStateKey(def);
    // Entry 18: a thirsty planter says so (only when dry; a watered garden adds nothing)
-   if(e&&def&&!key&&(def.state as Record<string,{type?:string}>).moisture?.type==='number')return isDry(e.state?.moisture??(def.state as Record<string,{default?:unknown}>).moisture?.default)?{dry:true}:null;
+   if(e&&def&&!key&&(def.state as Record<string,{type?:string}>).moisture?.type==='number'){
+    const st=def.state as Record<string,{type?:string;default?:unknown}>,dry=isDry(e.state?.moisture??st.moisture?.default);
+    // Entry 34: a growing planter says its stage in a word (and dry only when dry)
+    const stage=st.growth?.type==='number'?stageWord(e.state?.growth??st.growth.default):null;
+    return stage?{stage,...(dry?{dry:true}:{})}:dry?{dry:true}:null;}
    if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
