@@ -7,7 +7,7 @@ const d=process.env.SOUL_TEA_MEDIA,ff='/opt/homebrew/bin/ffmpeg',x=JSON.parse(re
 const S=x.samples.filter(Boolean),F=clock.frames;
 // the restart: the longest gap between stamped frames splits the take into two segments
 let gapAt=0,gap=0;for(let i=1;i<F.length;i++)if(F[i].seconds-F[i-1].seconds>gap){gap=F[i].seconds-F[i-1].seconds;gapAt=i;}
-const segs=gap>5?[F.slice(0,gapAt),F.slice(gapAt)]:[F];
+const segs=gap>2?[F.slice(0,gapAt),F.slice(gapAt)]:[F];
 const vt=(tick,seg)=>{const fs=seg??(tick<=segs[0].at(-1).tick?segs[0]:segs.at(-1));const f=fs.find(f=>f.tick>=tick)??fs.at(-1);return f.seconds;};
 const wallOf=tick=>{let i=S.findIndex(s=>s.tick>=tick);if(i<0)i=S.length-1;if(i===0)i=1;const p=S[i-1],q=S[Math.min(i,S.length-1)];return p.at+(q.at-p.at)*((tick-p.tick)/Math.max(1e-6,q.tick-p.tick));};
 const tickOfWall=w=>{let best=S[0];for(const s of S)if(Math.abs(s.at-w)<Math.abs(best.at-w))best=s;return best.tick;};
