@@ -16,7 +16,7 @@ test('a directed walk waits out a make-way nudge on the same body, then walks fr
   const nudge=rt.submit('walk_to',{actor:'b',x:-4,z:-4.4},{id:'b:make-way:7'});assert.equal(nudge.status,'executing');
   const walk=rt.submit('walk_to',{actor:'b',x:-1,z:-6});
   assert.equal(walk.status,'requested','waits instead of failing');assert.equal(walk.phase,'make-way');
-  let started=-1;for(let i=0;i<400&&!['completed','failed'].includes(walk.status);i++){rt.step();if(started<0&&walk.status==='executing')started=rt.tick;}
+  let started=-1;for(let i=0;i<400&&!['completed','failed'].includes(walk.status as string);i++){rt.step();if(started<0&&(walk.status as string)==='executing')started=rt.tick;}
   assert.equal(rt.records.get('b:make-way:7')!.status,'completed','the nudge finished first');
   assert.ok(started>0,'the walk started after the nudge');assert.equal(walk.status,'completed',JSON.stringify(walk.diagnostic));
   const p=world.entities.b.pose.p;assert.ok(Math.hypot(p[0]+1,p[2]+6)<0.4,'arrived');
