@@ -30,6 +30,11 @@ test('an open pavilion: inside and a few metres outside hear and perceive each o
     { op: 'place', def: coreRef('pavilion'), name: 'bandstand', p: [20, -20] },
     { op: 'place', def: 'bare-pavilion@1', name: 'shelter', p: [-20, -20] },
     { op: 'place', def: coreRef('roundhouse'), name: 'moss-cottage', p: [-16, 14] },
+    // a walled cafe whose place component leaves `enclosed` out (the def schema defaults it to false): still enclosed
+    { op: 'define', def: { schema: 'def/1', name: 'walled-cafe', make: { kind: 'gen', gen: 'building/1', args: { style: 'cottage' } }, size: { box: [8, 4, 6] }, components: { place: { kind: 'cafe' } } } },
+    { op: 'place', def: 'walled-cafe@1', name: 'cafe', p: [24, 16] },
+    // a core pavilion given an explicit walled plan is no longer a roof on posts
+    { op: 'place', def: coreRef('pavilion'), name: 'walled-stand', p: [-30, 30], params: { plan: { floors: [{ rooms: [{ id: 'hall', rect: [0, 0, 6, 6] }], exterior: [{ room: 'hall', wall: 's', kind: 'door' }] }] } } },
   ] }, 'a bandstand, a shelter and a cottage');
   assert.equal(r.accepted, true, JSON.stringify(r));
   const fr: any = god.act({ ops: (runQuery(god.model, { furnish: { ref: 'moss-cottage' } } as any) as any).furnish.ops }, 'furnish');
@@ -42,6 +47,9 @@ test('an open pavilion: inside and a few metres outside hear and perceive each o
   assert.equal(room('g-bandstand.pavilion').enclosed, false, 'core-pavilion says enclosed:false');
   assert.equal(room('g-shelter.pavilion').enclosed, false, 'a building/1 pavilion has no walls');
   assert.equal(room('g-moss-cottage.living').enclosed, true, 'an ordinary room stays enclosed');
+  const cafeRooms = [...map.values()].filter((p: any) => String(p.id).startsWith('g-cafe.'));
+  assert.ok(cafeRooms.length >= 1, 'the cafe has rooms'); for (const p of cafeRooms as any[]) assert.equal(p.enclosed, true, `${p.id}: a walled room stays enclosed whatever place.enclosed defaults to`);
+  assert.equal(room('g-walled-stand.hall').enclosed, true, 'a pavilion with an explicit walled plan is enclosed');
   assert.match(room('g-bandstand.pavilion').description, /; open-sided, about /); assert.match(room('g-moss-cottage.living').description, /; indoors, about /);
   const occ = buildOccluders(edge.enclosurePlaces(), edge.spots);
   assert.equal(occ.buildings.some((b) => b.id === 'g-bandstand.pavilion' || b.id === 'g-shelter.pavilion'), false, 'an open pavilion blocks no sight');
@@ -89,5 +97,13 @@ test('an open pavilion: inside and a few metres outside hear and perceive each o
   const inRoom = await say(ana, 'Just me in here.');
   assert.equal(inRoom.channel.kind, 'enclosure'); assert.equal(inRoom.heardBy, 0, 'nobody outside hears the room');
   assert.equal((await say(ben, 'Anyone home?')).heardBy, 0, 'the room does not hear the yard');
+
+  // the walled cafe (place component without `enclosed`): inside and ~6 m outside neither hear nor perceive each other
+  const cafe = (cafeRooms[0] as any).center as [number, number];
+  await put([cafe, [cafe[0], cafe[1] + 8]]);
+  assert.equal(edge.enclosureOf(ana.soulId), (cafeRooms[0] as any).id, 'Ana is inside the cafe');
+  assert.deepEqual(near(ana), []); assert.deepEqual(near(ben), []);
+  const inCafe = await say(ana, 'Quiet in here.');
+  assert.equal(inCafe.channel.kind, 'enclosure'); assert.equal(inCafe.heardBy, 0, 'nobody outside hears the cafe');
   assert.deepEqual(E.runtime.violations, []);
 });

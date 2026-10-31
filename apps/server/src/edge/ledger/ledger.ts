@@ -750,7 +750,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // todo (leisure): ride a dock bicycle to a place and back (the ordinary walk's route, at the cycling gait)
       for (const c of [...caps]) {
         if (c.verb !== 'walk' || !c.target || c.target.kind !== 'place') continue;
-        const place = this.places.byId.get(c.target.id); if (!place || place.kind === 'water' || place.enclosed) continue;
+        const place = this.places.byId.get(c.target.id); if (!place || place.kind === 'water' || place.enclosed || (this.placeWalkable && place.kind === 'room')) continue;
         const legs = (plans.get(c.id)?.steps ?? []).filter(s => s.verb === 'walk_to').map(s => ({...s, params: {...s.params, gait: 'cycle'}})); if (!legs.length) continue;
         this.bikeRide(soul, me, caps, plans, `cycle:${place.id}`, 'cycle', place.id, `Ride a bicycle to ${place.name} and back`, legs, bikesOut);
       }

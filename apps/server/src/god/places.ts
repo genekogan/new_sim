@@ -57,12 +57,12 @@ function hull(pts: Vec2[]): Vec2[] {
 }
 /** The kind a def's `place` component gives (plaza, pitch, garden …). */
 function placeKind(m: WorldModel, id: string): string | undefined { const e = m.entities.get(id), k = e ? (m.resolvedDef(e.def)?.components as Record<string, any> | undefined)?.place?.kind : undefined; return typeof k === 'string' && k ? k : undefined; }
-/** Whether a building's rooms are enclosed (privacy, earshot, sight as Eden's rooms). Its def's `place.enclosed` decides
- *  when it says (core-pavilion: `false`); a building/1 pavilion with no place component is open too, as its plan has
- *  posts and no walls (building-plan.ts pavilionPlan, unless an explicit `plan` replaces it); every other room is. */
+/** Whether a building's rooms are enclosed (privacy, earshot, sight as Eden's rooms). Decided by geometry, not by the
+ *  def's `place.enclosed` (the def schema defaults a missing value to false, so a walled cafe would read open): only a
+ *  building/1 pavilion is open, as its plan is a roof on posts with no walls (building-plan.ts pavilionPlan), and only
+ *  while no explicit `plan` param replaces that layout. Every other room is enclosed. */
 function roomsEnclosed(m: WorldModel, id: string): boolean {
   const e = m.entities.get(id), def = e ? m.resolvedDef(e.def) : undefined; if (!e || !def) return true;
-  const said = (def.components as Record<string, any> | undefined)?.place?.enclosed; if (typeof said === 'boolean') return said;
   const make = def.make as { kind?: string; gen?: string; args?: Record<string, unknown> } | undefined;
   if (make?.kind !== 'gen' || make.gen !== 'building/1') return true;
   const params = { ...Object.fromEntries(Object.entries((def.params ?? {}) as Record<string, { default?: unknown }>).map(([k, p]) => [k, p?.default])), ...(e.params ?? {}) } as Record<string, unknown>;
