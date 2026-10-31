@@ -6,7 +6,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {openJournal} from './journal.mjs';
-import {runSupervisor,attentionPriority} from './supervisor.mjs';
+import {runSupervisor,attentionPriority,presenceCooldown,PRESENCE_COOLDOWN_MS,PRESENCE_COOLDOWN_SUBJECTS} from './supervisor.mjs';
 import {abortableSleep} from './receiver.mjs';
 import {parseDecision,retainDecision,applyPendingDecision} from './decision.mjs';
 const waitDecision={plan:'Resume the reading appointment after interruption',call:{type:'wait',command:'',arguments:'{}'},wakeAt:null};
@@ -183,6 +183,16 @@ test('immediate replan reads latest owner authority before the dispatcher hint c
 test('listening matches exact native ambient speaker identities without inferring relevance from text',()=>{
  const event=ambient('c_1'),fact={source:'world',event};assert.equal(attentionPriority(fact,['s_presenter']),1);assert.equal(attentionPriority(fact,[]),0);assert.equal(attentionPriority(fact,['s_other']),0);assert.equal(attentionPriority(fact,'nearby'),1);
  assert.equal(attentionPriority({source:'world',event:{...event,raw:'receipt'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{...event,data:{from:{soulId:'s_other'},text:'s_presenter'}}},['s_presenter']),0);assert.equal(attentionPriority({source:'world',event:{...event,kind:'world.narration'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{id:'direct',salience:3}},[]),3);assert.equal(attentionPriority({source:'owner',event:{id:'m1',salience:0}},[]),4);
+});
+test('presence cooldown is per subject, uses receipt time, and its in-memory map stays bounded',()=>{
+ const fact=(soulId,receivedAt,kind='arrive.here')=>({source:'world',receivedAt,event:{id:soulId+receivedAt,kind,raw:kind==='arrive.here'?'arrival':'departure',salience:1,about:{soulId,name:'Observed'},data:{soul:{soulId,name:'Observed'}}}});
+ assert.equal(PRESENCE_COOLDOWN_MS,300000);assert.ok(PRESENCE_COOLDOWN_SUBJECTS>=16);
+ const c=presenceCooldown({limit:2});assert.equal(c.priority(fact('s_a',0),'nearby'),1);c.delivered([fact('s_a',0)],'nearby',1000);
+ assert.equal(c.priority(fact('s_a',1000+PRESENCE_COOLDOWN_MS-1,'leave.here'),'nearby'),0);assert.equal(c.priority(fact('s_a',1000+PRESENCE_COOLDOWN_MS),'nearby'),1);assert.equal(c.priority(fact('s_b',2000),'nearby'),1);
+ c.delivered([fact('s_a',5000)],'nearby',6000);assert.equal(c.priority(fact('s_a',1000+PRESENCE_COOLDOWN_MS),'nearby'),1,'a cooled delivery does not extend the cooldown');
+ assert.equal(c.priority(fact('s_a',2000),[]),0,'unattended presence stays priority 0');assert.equal(c.priority({source:'owner',event:{id:'m'}},[]),4);
+ c.delivered([fact('s_b',2000),fact('s_c',2000)],'nearby',3000);assert.equal(c.size,2);assert.equal(c.priority(fact('s_a',4000),'nearby'),1,'the least recently delivered subject is evicted first');assert.equal(c.priority(fact('s_c',4000),'nearby'),0);
+ const big=presenceCooldown();for(let i=0;i<PRESENCE_COOLDOWN_SUBJECTS*3;i++)big.delivered([fact('s_'+i,i)],'nearby',i);assert.equal(big.size,PRESENCE_COOLDOWN_SUBJECTS);
 });
 test('native arrival/departure of an attended Soul is ambient priority; unattended presence and closures stay quiet',()=>{
  const presence=(kind,soulId='s_presenter')=>({id:'p_1',kind,raw:kind==='arrive.here'?'arrival':'departure',salience:1,about:{soulId,name:'Observed participant'},data:{placeId:'p_place',soul:{soulId,name:'Observed participant'},untrusted:true},text:'Observed participant moved'});

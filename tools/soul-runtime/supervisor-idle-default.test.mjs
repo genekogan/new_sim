@@ -5,7 +5,7 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {openJournal} from './journal.mjs';
-import {runSupervisor,AMBIENT_WAKE_MS,AMBIENT_SETTLE_MS} from './supervisor.mjs';
+import {runSupervisor,AMBIENT_WAKE_MS,AMBIENT_SETTLE_MS,PRESENCE_COOLDOWN_MS} from './supervisor.mjs';
 import {abortableSleep} from './receiver.mjs';
 
 const origin=Date.parse('2026-10-30T12:00:00.000Z');
@@ -28,7 +28,7 @@ function fixture(t,{legacy}={}){
  if(legacy!==undefined){const fence=journal.control.claim('existing');journal.control.save(fence,0,legacy);journal.control.release(fence);}
  const initial=journal.control.checkpoint();
  const world={read:async command=>{commands.push(['read',command]);return {here:'native current place'};},write:async command=>{commands.push(['write',command]);return {accepted:true};}};
- for(const method of ['ownerPage','worldPage'])world[method]=async({after,signal})=>{await abortableSleep(60000,signal);return {cursor:after,events:[]};};
+ for(const method of ['ownerPage','worldPage'])world[method]=async({after,signal})=>{await abortableSleep(24*3600000,signal);return {cursor:after,events:[]};};
  const start=()=>{const task=runSupervisor({journal,host,world,signal:stop.signal,onState:s=>states.push(s)});task.catch(()=>{});return task;};
  let running=start();
  const ingest=event=>journal.ingest({source:'world',after:journal.cursor('world'),cursor:event.id,events:[event]});
@@ -125,5 +125,24 @@ test('attended presence never steers or interrupts an active turn and is deliver
  try{
   await flush();f.ingest(presence('during-active','arrive.here','s_peer'));t.mock.timers.tick(AMBIENT_WAKE_MS*2);await flush();assert.equal(f.host.calls.length,1);assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);
   f.host.finish({...wait(),wakeAt:far});await flush();t.mock.timers.tick(AMBIENT_SETTLE_MS+100);await flush();t.mock.timers.tick(100);await flush();assert.equal(f.host.calls.length,2);assert.ok(f.host.calls[1].pending.some(x=>x.event.id==='during-active'));assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);
+ }finally{await f.cleanup();}
+});
+test('presence of one subject shuffling across a boundary wakes at most once per cooldown; suppressed facts arrive with the next wake',async t=>{
+ const f=fixture(t),advance=async ms=>{for(let left=Math.max(0,ms);left>0;left-=1000){t.mock.timers.tick(Math.min(1000,left));await flush();}for(let i=0;i<2;i++){t.mock.timers.tick(100);await flush();}};// small steps keep the controller lease renewed
+ try{
+  await flush();f.host.finish({...wait(),wakeAt:far});await flush();f.ingest(presence('x0','arrive.here','s_peer'));await advance(AMBIENT_SETTLE_MS);assert.equal(f.host.calls.length,2);
+  const delivered=f.journal.control.checkpoint().value.lastAmbientDeliveryAt;f.host.finish({...wait(),wakeAt:far});await flush();
+  const shuffled=[];for(let i=1;i<=14;i++){await advance(delivered+20000*i-Date.now());const id='x'+i;shuffled.push(id);f.ingest(presence(id,i%2?'leave.here':'arrive.here','s_peer'));await advance(AMBIENT_SETTLE_MS);}
+  assert.equal(f.host.calls.length,2,'repeat presence of the same subject inside the cooldown does not wake');
+  await advance(delivered+PRESENCE_COOLDOWN_MS-Date.now());f.ingest(presence('x15','leave.here','s_peer'));await advance(AMBIENT_SETTLE_MS);
+  assert.equal(f.host.calls.length,3,'the first presence after the cooldown is prompt again');assert.deepEqual(f.host.calls[2].pending.filter(x=>x.event.kind==='leave.here'||x.event.kind==='arrive.here').map(x=>x.event.id).sort(),[...shuffled,'x15'].sort());assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);
+ }finally{await f.cleanup();}
+});
+test('presence of different subjects each wakes inside one subject cooldown',async t=>{
+ const f=fixture(t),advance=async ms=>{for(let left=Math.max(0,ms);left>0;left-=1000){t.mock.timers.tick(Math.min(1000,left));await flush();}for(let i=0;i<2;i++){t.mock.timers.tick(100);await flush();}};// small steps keep the controller lease renewed
+ try{
+  await flush();f.host.finish({...wait(),wakeAt:far});await flush();
+  for(const [i,subject] of ['s_peer','s_second','s_third'].entries()){f.ingest(presence('p'+i,'arrive.here',subject));await advance(AMBIENT_SETTLE_MS);assert.equal(f.host.calls.length,2+i,subject);assert.ok(f.host.calls.at(-1).pending.some(x=>x.event.id==='p'+i));f.host.finish({...wait(),wakeAt:far});await flush();await advance(AMBIENT_WAKE_MS);}
+  f.ingest(presence('again','leave.here','s_second'));await advance(AMBIENT_WAKE_MS);assert.equal(f.host.calls.length,4,'a repeat subject inside its cooldown stays quiet');
  }finally{await f.cleanup();}
 });
