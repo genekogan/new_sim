@@ -1,0 +1,88 @@
+# How much proof a change needs. Agents, the PR review workflow and CI all read this one file.
+#
+# A change's tier is the highest tier any changed path maps to (`paths`, first match per file wins). A `tier:Tn`
+# label on the PR can raise it, never lower it. T4 is the release head only (release.yml), not a path tier.
+# The path map follows the release gate's `--scope auto` map (SCOPE_RULES in tools/test-harness/release-gate.mjs):
+# every prefix there has a rule here; tools/proof/tier.test.mjs keeps the two in step.
+#
+#   node tools/proof/tier.mjs                      tier of the working tree's diff against origin/main
+#   node tools/proof/tier.mjs --base <ref> [--label tier:T3] [--json]
+#
+# Changing a knob or a mapping is a reviewed one-line PR, not a new brief.
+version: 1
+
+tiers:
+  T0:
+    typical: docs, tools-only, process and CI configuration
+    required: [lint]
+    not_required: [tests, video]
+  T1:
+    typical: server or package logic with no visible change
+    required: [focused node --test of touched files, typecheck of touched packages]
+    not_required: [browser, video]
+  T2:
+    typical: visible UI or behaviour
+    required: [T1, one uncut real-speed clip of the changed journey on a fake-mind world (desktop; phone too when layout changed)]
+    not_required: [playtest]
+  T3:
+    typical: Soul behaviour, navigation or engine, shared or brittle code
+    required: [T2, scenario playtest with repeats_per_arm repeats per arm, reviewer agent pass, maintainer sign-off]
+    not_required: [Modal gate]
+  T4:
+    typical: release head
+    required: [Modal full gate against the cached baseline, live walks, cdn-walk, changelog]
+    not_required: [re-running checks that already passed on the same tree]
+
+# First match wins for each file. `prefix` matches the start of a repo-relative path; `glob` supports * (within a
+# path segment) and ** (across segments).
+paths:
+  # T3: Soul behaviour, navigation, engines and the shared protocol
+  - { glob: "apps/server/src/{edge,intent,soul,brain,body,purpose,lifecycle,nav}*", tier: T3 }
+  - { prefix: "packages/brain/", tier: T3 }
+  - { prefix: "packages/kernel/", tier: T3 }
+  - { prefix: "packages/protocol/", tier: T3 }
+  - { glob: "packages/engine-*/**", tier: T3 }
+  # T2: anything a visitor sees
+  - { prefix: "apps/web/", tier: T2 }
+  - { prefix: "mars/", tier: T2 }
+  - { prefix: "worlds/", tier: T2 }
+  - { prefix: "packages/client/", tier: T2 }
+  # T1: logic with no visible change
+  - { prefix: "apps/server/", tier: T1 }
+  - { prefix: "packages/", tier: T1 }
+  - { prefix: "tools/edge-skill/", tier: T1 }
+  - { prefix: "tools/client-eval/", tier: T1 }
+  - { prefix: "tools/world-launcher/", tier: T1 }
+  - { prefix: "tools/god-skill/", tier: T1 }
+  - { prefix: "vendor/", tier: T1 }
+  - { prefix: "infra/", tier: T1 }
+  - { prefix: "e2e/", tier: T1 }
+  - { glob: "package.json", tier: T1 }
+  - { glob: "pnpm-lock.yaml", tier: T1 }
+  - { glob: "pnpm-workspace.yaml", tier: T1 }
+  - { glob: "tsconfig*.json", tier: T1 }
+  # T0: docs, tools, process
+  - { prefix: "docs/", tier: T0 }
+  - { prefix: "tools/", tier: T0 }
+  - { prefix: "changes/", tier: T0 }
+  - { prefix: ".github/", tier: T0 }
+  - { prefix: ".claude/", tier: T0 }
+  - { prefix: "scripts/", tier: T0 }
+  - { glob: "*.md", tier: T0 }
+  - { glob: "LICENSE", tier: T0 }
+  - { glob: ".gitleaks.toml", tier: T0 }
+  - { glob: ".gitignore", tier: T0 }
+
+# Paths no rule names.
+default_tier: T1
+
+knobs:
+  repeats_per_arm: 2            # T3 playtests: repeats of each arm (baseline / candidate)
+  attempt_cap: 3                # fix attempts before stopping; an independent diagnosis comes before the third
+  rerun_on_pass: false          # never re-run a check that passed on the same tree
+  video:
+    max_seconds: 90             # one uncut, real-speed clip; longer journeys are split into separate clips
+    phone_when_layout: true     # add a phone-viewport clip when layout or CSS changed
+  modal_gates_per_day: 3        # full release gates, across all releases
+  playtest_budget_minutes: 30   # wall-clock budget for one PR's T3 playtests
+  review_after_milestones: 2    # a reviewer-agent pass after every N milestones of a long lane
