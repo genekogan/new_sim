@@ -3,7 +3,6 @@
 import { mkdirSync, existsSync, readFileSync, writeFileSync, copyFileSync, cpSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { homedir } from 'node:os';
 import { assertFrozenGenesis } from './lib/physical-fixture.mjs';
 import { bindJourneyFixtures } from './arena/fixture-bindings.mjs';
 import { providerPolicy, requireProviders, assertMeasurementReady } from './lib/provider-policy.mjs';
@@ -12,10 +11,11 @@ import { writeJson, readJson, appendJsonl } from './lib/jsonl.mjs';
 import { quota, quotaAllows } from './lib/quota.mjs';
 import { sha256, rng } from './lib/hash.mjs';
 import { freeMemGb, resolvePlaywright } from './lib/platform.mjs';
+import { REPO_ROOT, scratchDir } from '../lib/paths.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_SERVER_ROOT = '<worktrees>/soul3-integration';
-const RUNS_ROOT = join(homedir(), 'Eden/team/playtest/runs');
+const DEFAULT_SERVER_ROOT = process.env.PLAYTEST_SERVER_ROOT ?? REPO_ROOT;
+const RUNS_ROOT = process.env.PLAYTEST_RUNS_ROOT ?? scratchDir('playtest/runs');
 const FROZEN_BUNDLE = join(here, 'frozen/frozen.json');
 const STEPS = ['preflight', 'provision', 'seats', 'play', 'close', 'review', 'develop', 'report'];
 

@@ -68,7 +68,7 @@ test('playwright candidates: override, globals, server root, laptop; resolution 
   const c = playwrightCandidates({ serverRoot: '/srv', env: { PLAYTEST_PLAYWRIGHT_PKG: '/p/package.json', NODE_PATH: '/np' }, globalRoot: '/g' });
   assert.equal(c[0].from, 'PLAYTEST_PLAYWRIGHT_PKG');
   assert.deepEqual(c.filter((x) => x.kind === 'global').slice(0, 2).map((x) => x.dir), ['/np', '/g']);
-  assert.ok(c.findIndex((x) => x.from === 'server root mars/viewer') < c.findIndex((x) => x.from === 'laptop viewer'));
+  assert.ok(c.findIndex((x) => x.from === 'server root mars/viewer') < c.findIndex((x) => x.from === 'checkout viewer'));
   assert.ok(c.findIndex((x) => x.kind === 'global') < c.findIndex((x) => x.from === 'server root mars/viewer'));
   const pw = resolvePlaywright();
   if (pw) assert.equal(typeof pw.chromium.launch, 'function');
@@ -80,12 +80,11 @@ test('quota: skipped with a note when usage.py is absent, and allowed', async ()
   assert.equal(quotaAllows(q).allowed, true); assert.match(quotaAllows(q).note, /skipped/);
 });
 
-test('mars web overlay: env, laptop, ../mars-web beside the server root, then .lane', () => {
+test('mars web overlay: env, ../mars-web beside the server root, then .lane', () => {
   const d = mkdtempSync(join(tmpdir(), 'pt-ov-'));
   const kit = (dir) => { mkdirSync(join(dir, 'modular/humanoid'), { recursive: true }); writeFileSync(join(dir, 'modular/humanoid/kit.json'), '{}'); };
   mkdirSync(join(d, 'server')); const home = join(d, 'home');
   assert.equal(marsWebDir(join(d, 'server'), { env: {}, home }), join(d, 'server/.lane/mars-web'));
   kit(join(d, 'mars-web')); assert.equal(marsWebDir(join(d, 'server'), { env: {}, home }), join(d, 'mars-web'));
-  kit(join(home, 'Eden/team/playtest/mars-web')); assert.equal(marsWebDir(join(d, 'server'), { env: {}, home }), join(home, 'Eden/team/playtest/mars-web'));
   kit(join(d, 'env')); assert.equal(marsWebDir(join(d, 'server'), { env: { PLAYTEST_MARS_WEB: join(d, 'env') }, home }), join(d, 'env'));
 });

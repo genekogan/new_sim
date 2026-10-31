@@ -7,7 +7,8 @@ import { reviewRun } from '../reviewer.mjs';
 import { buildStory, renderStoryHtml, storyLines, writeStory } from '../story.mjs';
 import { copyRuns, fakeReviewer, FIX, MAIN } from './helpers.mjs';
 
-const REAL = '<team>/playtest/runs/20261025-104004-newcomer-opus-1-4119';
+// A retained real run (not in the repo), e.g. …/playtest/runs/20261025-104004-newcomer-opus-1-4119.
+const REAL = process.env.PLAYTEST_REAL_RUN ?? '';
 const all = (s) => Object.values(s.seats).flatMap((x) => x.moments);
 const says = (run) => Object.entries(run.personas).flatMap(([seat, p]) => p.turns.filter((t) => t.decision?.say?.text).map((t) => ({ seat, text: t.decision.say.text })));
 

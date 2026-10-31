@@ -10,12 +10,12 @@ import { DEFAULT_RUNS_ROOT, esc as esc0, chip, md2html, listRuns, loadBundle } f
 import { computeMetrics } from './metrics.mjs';
 import { similar } from './reviewer.mjs';
 
-export const DEFAULT_NIGHT_LOG = '<team>/playtest/NIGHT-20261025.md';
+export const DEFAULT_NIGHT_LOG = process.env.PLAYTEST_NIGHT_LOG ?? null; // an optional coordinator night log (markdown)
 const PHYS = new Set(['inside-solid', 'no-progress', 'stuck-receipt']);
 const CLASSES = ['O1', 'O2', 'O3', 'O4', 'O5'];
 
 // Absolute home paths never reach the page text (only Developer-draft links may carry a path).
-const scrub = (s) => String(s ?? '').replace(/\/Users\/[^/\s]+\/Eden\/team\/playtest\/runs\//g, 'runs/').replace(/\/Users\/[^/\s]+\//g, '~/');
+const scrub = (s) => String(s ?? '').replace(/(?:\/[^/\s]+)+\/playtest\/runs\//g, 'runs/').replace(/\/(?:Users|home)\/[^/\s]+\//g, '~/');
 const esc = (s) => esc0(scrub(s));
 const rel = (from, to) => relative(from, to).split(sep).join('/');
 const pct = (v) => (typeof v === 'number' ? `${Math.round(v * 100)}%` : '—');

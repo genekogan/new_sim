@@ -15,7 +15,7 @@ async function summary() {
   const r = copyRuns(); await reviewRun({ runDir: r.main, call: fakeReviewer(), log: () => {} }); reportRun(r.main);
   mkdirSync(join(r.main, 'specs'), { recursive: true });
   writeFileSync(join(r.main, 'specs', 'I-1.md'), '# Draft\n\n**Issue**\n\nCard says Pip arrived at the library while she stands still\n');
-  writeFileSync(join(r.main, 'COORDINATOR-NOTES.md'), 'Harness caveat: the shots under <team>/playtest/runs/x/shots were late. Second sentence.\n');
+  writeFileSync(join(r.main, 'COORDINATOR-NOTES.md'), 'Harness caveat: the shots under /home/someone/sim/.local/playtest/runs/x/shots were late. Second sentence.\n');
   const night = join(dirname(r.runs), 'NIGHT.md');
   writeFileSync(night, '# Playtest night log — 2026-10-24/25\n\n## 06:30 memory, not CPU\n\nThe laptop is memory-bound: 46 of 48 GB used. Speed measures in every report tonight are "under load" and relative.\n\n## Open harness items\n\nWake latency under load; god oracles minimal.\n\n## 09:20 last entry\n\nQuiet machine now.\n');
   const out = join(dirname(r.runs), 'site', 'index.html'); const assets = join(dirname(r.runs), 'site', 'assets');

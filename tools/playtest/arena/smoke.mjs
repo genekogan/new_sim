@@ -5,19 +5,19 @@
 // ("sit down") as the owner, lets the wake loop deliver it, waits for the card result (or 120 s), prints a JSON summary
 // and tears everything down.
 import { join, resolve } from 'node:path';
-import { homedir } from 'node:os';
 import { provision, stopWorld, healthz } from './provision.mjs';
 import { createSeat } from './seat.mjs';
 import { sendCard, cardView, cardSummary, publicSoul } from './owner.mjs';
 import { writeJson, readJsonl } from '../lib/jsonl.mjs';
 import { setAnchor, now, sleep, until } from '../lib/clock.mjs';
+import { REPO_ROOT, scratchDir } from '../../lib/paths.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (k, d) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d; };
 const has = (k) => argv.includes(`--${k}`);
-const serverRoot = resolve(flag('server-root', `${homedir()}/Eden/sim-wt/soul3-integration`));
+const serverRoot = resolve(flag('server-root', process.env.PLAYTEST_SERVER_ROOT ?? REPO_ROOT));
 const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-const runDir = resolve(flag('out', `${homedir()}/Eden/team/playtest/runs/${stamp}-arena-smoke`));
+const runDir = resolve(flag('out', join(process.env.PLAYTEST_RUNS_ROOT ?? scratchDir('playtest/runs'), `${stamp}-arena-smoke`)));
 const adapter = flag('adapter', 'claude-headless');
 if (!['claude-headless', 'codex-headless'].includes(adapter)) throw new Error('unknown adapter; no substitution allowed');
 const port = Number(flag('port', 4995)), model = flag('model', adapter === 'codex-headless' ? '' : 'haiku'), resultSec = Number(flag('result-sec', 120));

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Pull one cloud replay arm from the `playtest-results` branch into a local folder and (optionally) rescore it against
-# a local baseline arm:  bash tools/playtest/cloud/pull-results.sh <arm> [dest-root=<team>/playtest/replays/cloud] [baseline-arm]
+# a local baseline arm:  bash tools/playtest/cloud/pull-results.sh <arm> [dest-root=.local/playtest/replays/cloud] [baseline-arm]
 # The arm lands at <dest-root>/<arm>; with a baseline arm, SCORECARD-vs-<baseline>.md is written beside its SCORECARD.md.
 set -euo pipefail
 ARM="${1:?usage: pull-results.sh <arm> [dest-root] [baseline-arm]}"
-ROOT="${2:-<team>/playtest/replays/cloud}"
+ROOT="${2:-.local/playtest/replays/cloud}"   # relative to the repo root (cd below)
 BASE="${3:-}"
 PT="$(git rev-parse --show-toplevel)"; cd "$PT"
 git fetch -q --no-tags origin "+refs/heads/playtest-results:refs/remotes/origin/playtest-results"

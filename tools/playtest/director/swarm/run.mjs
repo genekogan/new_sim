@@ -3,7 +3,6 @@
 // + one wide) → planner → orchestrator with the live console (stdin) or a headless script → close → verdict + metrics,
 // journal and story.html. Review and developer stay off: `playtest.mjs review <run>` refers the session later.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { now, setAnchor } from '../../lib/clock.mjs';
@@ -16,9 +15,10 @@ import { createSwarm } from './orchestrator.mjs';
 import { parseScript, stdinConsole } from './console.mjs';
 import { worldTruth } from './truth.mjs';
 import { verifyRun } from './verify.mjs';
+import { REPO_ROOT, scratchDir } from '../../../lib/paths.mjs';
 
-const DEFAULT_SERVER_ROOT = '<worktrees>/soul3-integration';
-const RUNS_ROOT = join(homedir(), 'Eden/team/playtest/runs');
+const DEFAULT_SERVER_ROOT = process.env.PLAYTEST_SERVER_ROOT ?? REPO_ROOT;
+const RUNS_ROOT = process.env.PLAYTEST_RUNS_ROOT ?? scratchDir('playtest/runs');
 const receipt = (runDir, n, step, data) => writeJson(join(runDir, 'receipts', `${n}-${step}.json`), { step, ...now(), ...data });
 const infoOf = (s) => (typeof s?.info === 'function' ? s.info() : s?.info ?? {});
 

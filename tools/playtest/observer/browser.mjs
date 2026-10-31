@@ -30,12 +30,12 @@ import { now, sleep } from '../lib/clock.mjs';
 import { appendJsonl } from '../lib/jsonl.mjs';
 
 /** openBrowser({headless, gpu, serverRoot}) → {browser, gpu, playwright, openCamera(opts), close()}.
- *  Playwright: global `playwright` first (cloud), then <serverRoot>/mars/viewer, then the laptop viewer (lib/platform.mjs).
+ *  Playwright: global `playwright` first (cloud), then <serverRoot>/mars/viewer, then this checkout's viewer (lib/platform.mjs).
  *  On Linux the launch is SwiftShader headless with --no-sandbox whatever `gpu` says; `gpu` returned is what was used. */
 export async function openBrowser({ headless = true, gpu: wantGpu = 'metal', serverRoot = null } = {}) {
   browsersPath();
   const pw = resolvePlaywright({ serverRoot });
-  if (!pw) throw new Error('Playwright not found (global playwright, <server-root>/mars/viewer or the laptop viewer)');
+  if (!pw) throw new Error('Playwright not found (global playwright, <server-root>/mars/viewer or this checkout's viewer)');
   const { args, gpu } = launchArgs({ gpu: wantGpu });
   const browser = await pw.chromium.launch({ headless, args });
   const cams = [];
