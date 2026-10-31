@@ -125,7 +125,11 @@ tick's own `paths`/`changes`/`programs` (the arrays the viewer Batch accumulates
 reads. Installed by `installDeltaStream(host, ledger)` when `SIM_READ_WORKER=1`; otherwise nothing runs.
 
 **Measured** (live-copy fixture eden-2026, 4,543 entities, 11,584 objects, 7 Souls of which 6 walk, laptop, CPU =
-`threadCpuUsage` of the tick thread): see the B-delta status file for the soak receipt. NUMBERS
+`threadCpuUsage` of the tick thread; 10-min soak `team/scratch/srv/b-delta/run13`, with every write path driven and a
+forced resnapshot mid-run): oracle **879/879** checks equal (replica vs a fresh read of every table), 0 diffs, 0 refused.
+Tap per tick (11,728 ticks): CPU **p50 0.060 ms, p99 0.143 ms, mean 0.090 ms**; JSON size **p50 662 B, p99 1,562 B**.
+The static layer (1.1 MB) is resent only when the static epoch moves (24 times in 10 min with 15 god commits).
+postMessage of a delta to a worker: p50 0.015 ms. WorldInit: 19.5–22.5 ms to build, 8.7 MB as JSON.
 
 ## 7. What this contract does not do
 No server-side Soul mind (queue, delay, refuse — never choose or retry an act for a Soul). No travel or overflow instances. The waking limit (`world.crowded`) ships dark behind `SIM_WAKING_LIMIT=1` until Gene turns it on. Carryables stay opt-in. The god is never starved.
