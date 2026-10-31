@@ -111,7 +111,7 @@ const wallTorch: DefInput = {
     ...torchHead(1.52, 0.02)] } } as unknown as DefInput['make'],
   params: torchLook as DefInput['params'], palette: torchPalette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
-  components: { light: { color: '#ff7f30', range: 3.6, on: true, at: [0, 1.68, 0.2] }, sound: torchSound } as DefInput['components'],
+  components: { light: { color: '#ff7f30', range: 3.6, on: true, at: [0, 1.68, 0.02] }, sound: torchSound } as DefInput['components'],   // the light at the flame, so its glow sits on it
   size: { box: [0.2, 1.86, 0.28] },
   actions: fireActions('Light the wall torch', 'Put out the wall torch') as DefInput['actions'],
 } as DefInput;
