@@ -1,0 +1,20 @@
+Sim
+Copyright (c) 2026 Gene Kogan
+
+The code in this repository, including Sim Score (vendor/sim-score, apps/web/src/score), is licensed under the
+MIT License (see LICENSE).
+
+Media (3D models, textures, audio, video, photos) is not included in this repository and is not covered by the
+MIT License. It is served from https://assets.eden.art; see ASSETS.md for sources, licences and credits.
+
+Little Martians characters, names, descriptions and lore are (c) Vanessa Rosa (Little Martians). Mars College
+campus models and campus geometry data are (c) Mars College. Both are used with permission and are not licensed
+for reuse.
+
+mars/ is a hard fork of the Mars College campus world engine (tag mars-world-v1-alpha, commit
+75d022308e944128335b9c0c1ef84e2c1e51e54c, with later engine work imported from commit
+fa0c9b6ea10151e2b0c5f76977fe6030351ab7c9). Its history was filtered on import; changes made here are not sent
+back upstream.
+
+This product includes generated type declarations (c) Cloudflare, Inc. and (c) Microsoft Corporation, licensed
+under the Apache License, Version 2.0 (mars/viewer/simulation/env.d.ts).
