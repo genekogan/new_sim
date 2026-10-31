@@ -7,7 +7,7 @@
 // can wait for a gesture on the depicted clock; it never drives the renderer.
 import {createRequire} from 'node:module';import {mkdirSync,writeFileSync} from 'node:fs';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import assert from 'node:assert/strict';import {installFrameStamp} from './frame-stamp.mjs';
 const scene=process.env.SOUL_M04_SCENE??'<team>/soul-actions/day-39/scene',out=process.env.SOUL_M04_OUT??'<team>/soul-actions/day-39/visual-01',port=Number(process.env.SOUL_M04_PORT??7873),base=`http://127.0.0.1:${port}/w/soul-m04`;mkdirSync(out,{recursive:true});
-const require=createRequire(new URL('../../mars/viewer/package.json',import.meta.url)),{chromium}=require('@playwright/test'),browser=await chromium.launch({channel:'chrome',headless:true}),ctx=await browser.newContext({viewport:{width:1440,height:1080},recordVideo:{dir:out+'/raw',size:{width:1440,height:1080}}}),page=await ctx.newPage();const errors=[],samples=[],commands=[],marks=[];page.on('pageerror',e=>errors.push(String(e)));let timer,busy=false,pass=false;
+const require=createRequire(new URL('../../mars/viewer/package.json',import.meta.url)),{chromium}=require('@playwright/test'),browser=await chromium.launch({channel:'chrome',headless:true}),ctx=await browser.newContext({viewport:{width:1440,height:1080},recordVideo:{dir:out+'/raw',size:{width:1440,height:1080}}}),page=await ctx.newPage();const errors=[],samples=[],commands=[],marks=[];page.on('pageerror',e=>errors.push(String(e)));let timer,busy=false,pass=false,viewport=null;
 const token=(await(await fetch(base+'/v1/god/mint',{method:'POST',headers:{authorization:'Bearer dev:admin','content-type':'application/json'},body:JSON.stringify({label:'m04-proof'})})).json()).token;
 const post=async(path,data)=>{const j=await(await fetch(base+path,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(data)})).json();assert.equal(j.accepted,true,JSON.stringify(j));};
 const hashId=id=>{let h=0;for(const c of id)h=(h*31+c.charCodeAt(0))>>>0;return h;};
@@ -27,6 +27,7 @@ try{
  await page.goto(base+(process.env.SOUL_M04_EYE??'/?eye=-1.6,2.1,-0.6&at=2.2,0.85,5.4'));await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1,null,{timeout:180000});
  await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(2500);await installFrameStamp(page);
  writeFileSync(out+'/initial.yml',await page.locator('body').ariaSnapshot());
+ viewport=await page.evaluate(()=>({w:innerWidth,h:innerHeight,dpr:devicePixelRatio}));
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}finally{busy=false;}},50);
  // the first walk starts out of a gesture too, when one is playing within 25 s
  await waitGesture('walk-start-1',3000,40000);
@@ -37,4 +38,4 @@ try{
  await act('ada',process.env.SOUL_M04_WALK??'walk to the garden deck');
  await page.waitForTimeout(6000);
  assert.deepEqual(errors,[]);pass=true;
-}finally{clearInterval(timer);writeFileSync(out+'/proof.json',JSON.stringify({pass,commands,marks,samples,errors,method:'Real full client, one ordinary paired Soul CLI seat, plain words; camera fixed; samples of the drawn rig every ~50 ms.'}));try{const v=page.video();await ctx.close();await v.saveAs(out+'/continuous.webm');}finally{await browser.close();}console.log(JSON.stringify({pass,out,commands:commands.length,samples:samples.length,marks,errors}));}
+}finally{clearInterval(timer);writeFileSync(out+'/proof.json',JSON.stringify({pass,commands,marks,samples,errors,viewport,method:'Real full client, one ordinary paired Soul CLI seat, plain words; camera fixed; samples of the drawn rig every ~50 ms.'}));try{const v=page.video();await ctx.close();await v.saveAs(out+'/continuous.webm');}finally{await browser.close();}console.log(JSON.stringify({pass,out,commands:commands.length,samples:samples.length,marks,errors}));}
