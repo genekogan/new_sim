@@ -64,7 +64,7 @@ test('paged: a mid-walk restore keeps the navigation epoch, so the walk goes on 
   assert.equal(epoch(b), epoch(a));
   for (let i = 0; i < 40; i++) { a.step(); b.step(); }
   // everything but the event-log cursor (a restored runtime starts its own log): the walk's epoch, narrows and smoothing too
-  const body = (e: Eng) => { const s = e.snapshot() as { mars: { eventCursor?: number } }; delete s.mars.eventCursor; return s; };
+  const body = (e: Eng) => { const s = e.snapshot() as never as { mars: { eventCursor?: number } }; delete s.mars.eventCursor; return s; };
   assert.deepEqual(body(b), body(a));
 });
 
