@@ -94,16 +94,16 @@ test('making tea: a real cup of tea from a kettle filled, boiled and poured by h
 
   // ---- refusals before anything ----
   refused(`object:${id('kettle')}:boil`, 'tea.kettle-empty');
-  refused(`object:${id('kettle')}:pour-tea`, 'tea.kettle-empty');
+  refused(`object:${id('kettle')}:pour`, 'tea.kettle-empty');
 
   // ---- fill the kettle ----
-  const fill = await done(`object:${id('kettle')}:fill-kettle`);
+  const fill = await done(`object:${id('kettle')}:fill`);
   assert.equal(state('kettle').level, 1, 'filled'); assert.equal(state('sink').on, false, 'the tap is off again');
   assert.ok(report.timeline.some((s) => s.sink && s.motion === 'fill'), 'the tap ran while she held the kettle under it');
   assert.equal(ent('kettle').support.kind, 'resting-on'); assert.equal(byName('kettle').in.parent, id('counter'), 'back on the counter');
   assert.equal(state('kettle').heatTick, -1, 'fresh water is cold');
   report.checks.push('fill: tap on/off at the valve contacts, kettle level 1, back on the counter: ' + (fill.summary ?? fill.phase));
-  refused(`object:${id('kettle')}:pour-tea`, 'tea.kettle-cold');
+  refused(`object:${id('kettle')}:pour`, 'tea.kettle-cold');
   assert.deepEqual(objOf(await here(), 'kettle')?.state, {kettle: 'cold'}, 'a nearby cold kettle');
 
   // ---- put the kettle on: heatTick is the switch contact's tick ----
@@ -114,7 +114,7 @@ test('making tea: a real cup of tea from a kettle filled, boiled and poured by h
   const dt = f.host.engine.dt ?? 0.05;
   assert.equal(kettleHeat(state('kettle'), f.host.engine.world.tick, dt).phase, 'heating');
   refused(`object:${id('kettle')}:boil`, 'tea.kettle-on');
-  refused(`object:${id('kettle')}:pour-tea`, 'tea.not-boiled');
+  refused(`object:${id('kettle')}:pour`, 'tea.not-boiled');
   const heating = await here(); assert.deepEqual(objOf(heating, 'kettle')?.state, {kettle: 'heating'});
   // wait for the boil: nothing is committed while it heats (the heat is a function of the tick)
   const editsBefore = god.model.editSeq ?? null;
@@ -128,7 +128,7 @@ test('making tea: a real cup of tea from a kettle filled, boiled and poured by h
   report.contextBytes.kettleRow = JSON.stringify(kRow).length; report.contextBytes.kettleFact = JSON.stringify({state: kRow.state}).length - 2;
 
   // ---- pour the tea ----
-  const pour = await done(`object:${id('kettle')}:pour-tea`);
+  const pour = await done(`object:${id('kettle')}:pour`);
   assert.equal(state('cup').tea, 1, 'a full cup of tea'); assert.ok(state('cup').brewedTick > ht, 'brewed after the boil');
   assert.ok(report.timeline.some((s) => s.motion === 'pour' && s.tea > 0 && s.tea < 1), 'the tea rose in steps while the stream ran');
   assert.equal(r3(state('kettle').level), r3(1 - 0.25 / 1.2), 'one cup out of the kettle');

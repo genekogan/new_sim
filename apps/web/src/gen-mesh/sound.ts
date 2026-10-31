@@ -19,7 +19,7 @@
 // longer restarts sounds: a source that drops out of hearing keeps its voice, silent, for LINGER_MS and picks up where it
 // was if it is heard again, a source that follows the listener (the sea) is heard wherever the camera is, and a voice's
 // event clock never fires a backlog of notes when it comes back.
-import type { WorldModel } from '@sim/world-compiler';
+import { kettleHeat, type WorldModel } from '@sim/world-compiler';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
 import { sharedCoverProbe, type CoverProbe } from '../world-env.ts';
@@ -160,6 +160,18 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
       const base = variant ? 240 : 205;
       for (const d of [0, 7, -11]) { const o = c.createOscillator(), g = c.createGain(), bp = filt(c, 'bandpass', 450, 1.5); o.type = 'sawtooth'; o.frequency.value = base + d; g.gain.value = 0; o.connect(bp).connect(g).connect(out); o.start(); nodes.push(o, lfo(c, 3 + r() * 4, 6, o.frequency), lfo(c, 0.15 + r() * 0.3, 0.16, g.gain)); }
       break; }
+    case 'kettle': {
+      // Entry 43: an electric kettle. A low rumble and a rising hiss as the element heats (both follow the water's
+      // temperature, `kettleTemp`, derived from the switch tick and the depicted tick), then a rolling boil: the rumble
+      // swells and bubbles burst at the surface. The click on and off is the one-shot below.
+      const rumble = bed('lowpass', 260, 0.9, 0), hiss = bed('bandpass', 2300, 0.9, 0), roll = bed('bandpass', 700, 0.7, 0);
+      let bubble = c.currentTime;
+      tick = (t, e) => { const temp = Math.max(0, Math.min(1, Number(e.state.kettleTemp) || 0)), boil = e.state.kettlePhase === 'boiling';
+        rumble.g.gain.setTargetAtTime(0.15 + 0.55 * temp + (boil ? 0.4 : 0), t, 0.4); hiss.g.gain.setTargetAtTime(0.04 + 0.32 * temp ** 2 + (boil ? 0.12 : 0), t, 0.5);
+        hiss.b.frequency.setTargetAtTime(1600 + 1700 * temp, t, 0.8); roll.g.gain.setTargetAtTime(boil ? 0.45 : temp > 0.75 ? (temp - 0.75) * 1.2 : 0, t, 0.3);
+        if (bubble < t - 0.25) bubble = t;
+        let guard = 0; while ((boil || temp > 0.7) && bubble < t + 0.3 && guard++ < 24) { burst(c, out, bubble, 0.012 + r() * 0.02, (boil ? 0.35 : 0.12) * (0.5 + r()), 500 + r() * 900, 'bandpass'); bubble += boil ? 0.025 + r() * 0.06 : 0.12 + r() * 0.3; } };
+      break; }
     case 'footsteps': every((at, e) => { const sp = Math.max(0.5, Math.min(5, Number(e.state.speed) || 1.3));
       // soft earth thud, or gravel crunch; cadence follows the walker's speed
       if (variant === 1) { burst(c, out, at, 0.07, 0.5, 2400); burst(c, out, at + 0.015, 0.05, 0.3, 4200); } else { burst(c, out, at, 0.09, 0.9, 260, 'lowpass'); tone(c, out, at, 90, 60, 0.07, 0.25); }
@@ -175,6 +187,7 @@ function oneShot(c: AudioContext, kind: SoundKind, gain: number) {
   else if (kind === 'water' || kind === 'stream' || kind === 'waves') for (let i = 0; i < 6; i++) tone(c, out, t + i * 0.05, 500 + Math.random() * 600, 900 + Math.random() * 700, 0.07, 0.15);
   else if (kind === 'fire') for (let i = 0; i < 8; i++) burst(c, out, t + i * 0.05, 0.04, 0.4, 1500);
   else if (kind === 'footsteps') burst(c, out, t, 0.09, 0.9, 260, 'lowpass');
+  else if (kind === 'kettle') { burst(c, out, t, 0.008, 0.9, 3200); burst(c, out, t + 0.012, 0.02, 0.4, 900, 'bandpass'); }   // the switch: a plastic click
   else tone(c, out, t, 660, 880, 0.3, 0.3);
   setTimeout(() => out.disconnect(), 3000);
 }
@@ -249,6 +262,8 @@ function step(host: Host) {
     // Soul Actions: a switched sound (a fountain, a tap) follows the hand, not the 2 s emitter scan. Within earshot, its
     // state is read live (one map lookup; the entity's specs share this state object).
     if (e.source === 'object' && e.spec.when && d < e.spec.radius) { const live = model.entities.get(e.id.split('#')[0])?.state; if (live) Object.assign(e.state, live); }
+    // Entry 43: a kettle's sound follows its heat, a pure function of the switch tick and the depicted tick
+    if (e.spec.kind === 'kettle' && d < e.spec.radius) { const k = kettleHeat(e.state, (window as unknown as { __simEntity?: { depictedTick?: number } }).__simEntity?.depictedTick ?? NaN); e.state.heating = k.on; e.state.kettleTemp = k.temp; e.state.kettlePhase = k.phase; e.state.kettleSwitch = k.on ? 1 : typeof e.state.heatTick === 'number' && e.state.heatTick >= 0 && k.phase !== 'cold' ? 2 : 0; }
     if (e.spec.mode === 'change') {
       const k = (e.spec.when ?? '').replace(/^!/, ''), v = e.state[k], prev = lastValue.get(e.id);
       lastValue.set(e.id, v);

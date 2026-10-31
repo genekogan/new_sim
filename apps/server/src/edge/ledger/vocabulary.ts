@@ -377,6 +377,17 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   const acts = ctx.caps.filter(c => c.verb === 'object' && c.action && /^e_/.test(c.object ?? ''));
   for (const c of acts) verbs.add(c.action!);
   for (const [k, v] of Object.entries(ACT_ALIASES)) if (verbs.has(v) && !verbs.has(k)) verbs.add(k);
+  // Entry 43: a kettle's and a cup's everyday words, only where such an action is offered: "put the kettle on" (or switch /
+  // turn it on, boil it) is the kettle's `boil`; "make a cup of tea" is the nearest offered cup's `brew` (an available one first)
+  if (colon < 0) {
+    const want = /^(?:please\s+)?(?:(?:put|switch|turn)\s+(?:the\s+|my\s+)?kettle\s+on|(?:switch|turn)\s+on\s+(?:the\s+)?kettle|boil\s+(?:the\s+)?(?:kettle|water))[.!]?$/.test(text) ? 'boil'
+      : /^(?:please\s+)?(?:make|brew)\s+(?:me\s+|us\s+)?(?:a\s+|some\s+|another\s+)?(?:(?:cup|mug)\s+of\s+)?tea[.!]?$/.test(text) ? 'brew' : null;
+    const pool = want ? acts.filter(c => c.action === want).sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id)) : [];
+    if (pool.length) return {kind: 'alias', cap: pool[0], note: `${input} is ${pool[0].id} (${pool[0].label}).`};
+    // "put the cup on the table", "set it down on the counter": while something is held, that is put-on <the surface>
+    const put = /^(?:please\s+)?(?:put|set|place|stand)\s+(?:(?:the|my|this|that|your)\s+)?(?:it|[a-z][a-z-]*(?:\s+of\s+tea)?)\s+(?:down\s+|back\s+)?(?:on|onto)\s+(?:to\s+)?(.+?)[.!]?$/.exec(text);
+    if (put && ctx.caps.some(c => c.verb === 'put-on')) return resolveCapability(`put-on ${put[1]}`, ctx);
+  }
   let {verb, rest} = parseCapability(input, verbs);
   const nearestRequested = /\b(?:nearest|closest|nearby|anywhere|somewhere)\b|^(?:find|look for|search for)\b|\b(?:a|an)\s/.test(input.toLowerCase());
   const nearestBuilding=verb==='walk'&&/\b(?:nearest|closest)\b/i.test(rest)&&norm(rest.replace(/\bbehind(?:\s+(?:you|me|us))?\b/ig,' ').replace(/\b(?:nearest|closest)\b/ig,' '))==='building';

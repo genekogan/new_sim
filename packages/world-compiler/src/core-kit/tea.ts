@@ -37,6 +37,11 @@ export function kettleHeat(state: Record<string, unknown> | undefined, tick: num
   if (after < C.hot) { const k = after / C.hot; return { phase: 'hot', temp: 1 - 0.3 * k, steam: 0.9 * Math.exp(-after / 6) + 0.08 * (1 - k), on: false, seconds: s, boilsIn: 0 }; }
   return { phase: 'cold', temp: 0, steam: 0, on: false, seconds: s, boilsIn: Infinity };
 }
+/** A kettle's stream leaves the spout tip along the spout at this speed (m/s): the server plans the pour with it and the
+ *  viewer draws the stream with it, so the planned and the drawn landing agree. */
+export const SPOUT_SPEED = 0.55;
+/** Where a spout stream leaving at elevation `el` (rad, above the horizontal) lands `drop` m lower: its horizontal run (m). */
+export function spoutRun(el: number, drop: number) { const v = SPOUT_SPEED, vy = v * Math.sin(el), t = (vy + Math.sqrt(vy * vy + 2 * 9.8 * Math.max(0, drop))) / 9.8; return v * Math.cos(el) * t; }
 /** A cup of tea steams for this long after it was poured (s). */
 export const CUP_STEAM_SECONDS = 240;
 /** The cup's visible steam at `tick` (0..1): strongest just poured, gone after CUP_STEAM_SECONDS. */
@@ -77,13 +82,13 @@ const kettle: DefInput = {
   state: { level: { type: 'number', min: 0, max: 1, default: 0 }, heatTick: { type: 'number', min: -1, max: 1e12, default: -1 } } as DefInput['state'],
   // the kettle's own voice (viewer): it rises while it heats, rolls at the boil and clicks off (sound.ts `kettle`); `heating`
   // is derived from `heatTick` and the depicted tick by kettleHeat, never stored
-  components: { carryable: { mass: 1.1, grips: 1 }, container: { capacity: 1 }, sound: { kind: 'kettle', radius: 10, volume: 0.55, when: 'heating', mode: 'loop' } } as DefInput['components'],
+  components: { carryable: { mass: 1.1, grips: 1 }, container: { capacity: 1 }, sound: { kind: 'kettle', radius: 10, volume: 0.55, when: 'heating', mode: 'loop', also: [{ kind: 'kettle', radius: 9, volume: 0.6, when: 'kettleSwitch', mode: 'change' }] } } as DefInput['components'],
   slots: [{ id: 'handle', kind: 'carry', p: KETTLE_GRIP, yaw: 0 }] as DefInput['slots'],
   size: { box: [0.56, 0.26, 0.2] },
   actions: [
-    { name: 'fill-kettle', label: 'Fill the kettle', then: [{ op: 'set', field: 'level', value: 1 }] },
+    { name: 'fill', label: 'Fill the kettle', then: [{ op: 'set', field: 'level', value: 1 }] },
     { name: 'boil', label: 'Put the kettle on', then: [{ op: 'set', field: 'heatTick', value: 0 }] },
-    { name: 'pour-tea', label: 'Pour the tea', then: [{ op: 'set', field: 'level', value: 0 }] },
+    { name: 'pour', label: 'Pour the tea', then: [{ op: 'set', field: 'level', value: 0 }] },
   ] as DefInput['actions'],
 } as unknown as DefInput;
 

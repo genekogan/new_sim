@@ -7,7 +7,7 @@
 // the tap at the valve contacts, the kettle's water at the second contact, `heatTick` at the switch contact, the cup's
 // tea in thirds while the stream runs, the kettle's level when the pour ends. The heat itself is never committed: it is
 // kettleHeat(state, tick), a pure function of world time.
-import { opSchema, cupSteam, kettleHeat, KETTLE_CLOCK, isKettleDef, isTeaCupDef, CUP_LITRES, CUP_RIM, KETTLE_GRIP, KETTLE_LITRES, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, type Op, type StoredDef, type WorldModel } from '@sim/world-compiler';
+import { opSchema, cupSteam, kettleHeat, spoutRun, KETTLE_CLOCK, isKettleDef, isTeaCupDef, CUP_LITRES, CUP_RIM, KETTLE_GRIP, KETTLE_LITRES, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, type Op, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { canPoint, wateringEvents, type WateringMotion } from '../../../../mars/viewer/engine/items/watering.ts';
 import { handActuatorFrame, HAND_REACH_SECONDS, HAND_RELEASE_SECONDS, HAND_IDLE_HANDOFF_SECONDS, type HandActuatorMotion } from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
@@ -19,7 +19,7 @@ type Vec2 = [number, number]; type Vec3 = [number, number, number];
 type Step = { verb: string; params: Record<string, unknown> };
 type Refusal = { code: string; reason: string };
 export type TeaPlan = { steps: Step[]; summary: string };
-export const TEA_ACTIONS = new Set(['fill-kettle', 'boil', 'pour-tea', 'brew']);
+export const TEA_ACTIONS = new Set(['fill', 'boil', 'pour', 'brew']);
 /** How far (m) a kettle may be from the cup it pours into, and a tap from the kettle. */
 const NEAR_CUP = 2.5, TAP_REACH = 20, GRACE_TICKS = 1200;
 /** Seconds the tap runs into the kettle; seconds of stream for one cup. */
@@ -28,7 +28,7 @@ export const KETTLE_FILL_SECONDS = 3.0, CUP_POUR_SECONDS = 2.6;
 const EDGE_GAP = HUMAN_RADIUS + 0.04;
 /** The kettle's tilt while pouring: 46°, rising 4° as the cup fills; the stream leaves the spout at this speed (m/s). The
  *  viewer's spout stream (fx/water-jets.ts `spout`) uses the same speed, so the planned and drawn landing agree. */
-export const KETTLE_TILT = 46 * Math.PI / 180, KETTLE_TILT_MORE = 4 * Math.PI / 180, SPOUT_SPEED = 0.55;
+export const KETTLE_TILT = 46 * Math.PI / 180, KETTLE_TILT_MORE = 4 * Math.PI / 180;
 /** Pour: the tea's surface is this far under the spout tip (m); the kettle hand is this far right of the body axis. */
 const SPOUT_DROP = 0.07, POUR_HAND_RIGHT = 0.17;
 /** The kettle's opening sits this far under the tap's nozzle while it fills (m). */
@@ -36,8 +36,6 @@ const CATCH_BELOW = 0.05;
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const shapesOf = (def: StoredDef) => (def.make.kind === 'gen' ? (def.make.args as { shapes?: { tint?: string; at?: number[] }[] })?.shapes ?? [] : []);
-/** Where a spout stream leaving at elevation `el` (rad) and SPOUT_SPEED lands, `drop` m lower: horizontal run (m). */
-export function spoutRun(el: number, drop: number) { const v = SPOUT_SPEED, vy = v * Math.sin(el), t = (vy + Math.sqrt(vy * vy + 2 * 9.8 * Math.max(0, drop))) / 9.8; return v * Math.cos(el) * t; }
 /** Seconds from a switch press's start to the end of its release (the hand actuator's own timeline, no opening). */
 const SWITCH_DONE = HAND_REACH_SECONDS + HAND_RELEASE_SECONDS + HAND_IDLE_HANDOFF_SECONDS;
 
@@ -169,7 +167,7 @@ export function createTea(h: TeaHost) {
     const k = heat(kettle), level = num(stateOf(kettle).level), litres = litresOf(defOf(kettle)!, (m.entities.get(kettle)?.params ?? {}) as Record<string, unknown>) || KETTLE_LITRES, cupL = CUP_LITRES / litres;
     const kname = m.pathOf(kettle);
     const ok = (steps: Step[] | Refusal, summary: string): TeaPlan | Refusal => ('code' in steps ? steps : (planned.set(soul.entityId, kettle), { steps, summary }));
-    if (action === 'fill-kettle') {
+    if (action === 'fill') {
       if (level >= 0.98) return { code: 'tea.kettle-full', reason: `${kname} is already full.` };
       return ok(fillSteps(kettle, me), `Filled ${kname} at the tap and put it back on the counter.`);
     }
@@ -179,11 +177,11 @@ export function createTea(h: TeaHost) {
       if (k.phase === 'hot') return { code: 'tea.kettle-hot', reason: `${kname} has just boiled; the water is hot.` };
       return ok(boilSteps(kettle, me), `Switched ${kname} on; it boils in about ${KETTLE_CLOCK.heat} s.`);
     }
-    // pour-tea (a kettle) or brew (a cup): a cup on the counter, and boiled water (brew makes it so first)
+    // pour (a kettle) or brew (a cup): a cup on the counter, and boiled water (brew makes it so first)
     const cup = isTeaCupDef(def as never) ? id : cupNear(kettle);
     if (!cup) return { code: 'tea.no-cup', reason: `There is no empty cup on the counter by ${kname}.` };
     if (num(stateOf(cup).tea) > 0.05) return { code: 'tea.cup-full', reason: `${m.pathOf(cup)} already has tea in it.` };
-    if (action === 'pour-tea') {
+    if (action === 'pour') {
       if (k.phase === 'empty' || level < cupL * 0.9) return { code: 'tea.kettle-empty', reason: `${kname} has not enough water for a cup; fill it first.` };
       if (k.phase === 'cold') return { code: 'tea.kettle-cold', reason: `${kname} is cold; put it on first.` };
       if (k.phase === 'heating') return { code: 'tea.not-boiled', reason: `${kname} has not boiled yet; it boils in about ${Math.ceil(k.boilsIn)} s.` };

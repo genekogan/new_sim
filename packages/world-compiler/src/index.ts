@@ -7,7 +7,7 @@ export { GENERATORS, registerGenerator, scatterPoints, type Generator, type Bake
 export { hashOf, sha256Hex, stableStringify } from './hash.ts';
 export { CORE_KIT, coreRef } from './core-kit.ts';
 export { CAN_GRIP, CAN_LITRES, CAN_OPENING, CAN_ROSE, GROWTH_STAGES, HOOK_PEG, POUR_LITRES } from './core-kit/watering-can.ts';
-export { KETTLE_GRIP, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, KETTLE_LITRES, KETTLE_CLOCK, CUP_LITRES, CUP_RIM, CUP_STEAM_SECONDS, kettleHeat, cupSteam, isKettleDef, isTeaCupDef, type KettlePhase, type Vessel } from './core-kit/tea.ts';
+export { KETTLE_GRIP, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, KETTLE_LITRES, KETTLE_CLOCK, CUP_LITRES, CUP_RIM, CUP_STEAM_SECONDS, kettleHeat, cupSteam, spoutRun, SPOUT_SPEED, isKettleDef, isTeaCupDef, type KettlePhase, type Vessel } from './core-kit/tea.ts';
 export { stormStrikes, strikesBetween, STRIKE_CELL, STRIKE_FRESH, SOUND_MPS, type Strike } from './lightning.ts';
 export { WEATHER_RULES, isWetSetting, showerMinutes, showerUntil, setWeatherInForce } from './weather-rules.ts';
 export * as vocab from './vocab/index.ts';

@@ -10,7 +10,10 @@ export function wateringDiffAhead(model: WorldModel, message: unknown, depictedT
     const before = model.entities.get(e.id), def = model.resolvedDef(e.def) as {slots?: {kind: string}[]; state?: Record<string, {type?: string}>} | undefined;
     if (!before || !def) return false;
     const can = !!def.slots?.some((s) => s.kind === 'carry'), growing = def.state?.growth?.type === 'number';
-    if (can) return before.in.parent !== e.in.parent || before.state?.level !== e.state?.level;
+    // entry 43: a kettle's switch contact (heatTick) and a cup's tea wait the same way (the steam and the tea never show
+    // ahead of the hand that pressed or poured)
+    if (can) return before.in.parent !== e.in.parent || before.state?.level !== e.state?.level || before.state?.heatTick !== e.state?.heatTick;
+    if ((def.state as Record<string, unknown> | undefined)?.tea) return before.state?.tea !== e.state?.tea || before.state?.brewedTick !== e.state?.brewedTick;
     return growing && JSON.stringify(before.state ?? {}) !== JSON.stringify(e.state ?? {});
   });
 }

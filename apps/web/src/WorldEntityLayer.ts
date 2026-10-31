@@ -9,7 +9,7 @@ import { godFeature, isFlagDef } from './god-ui/features.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
-import { WorldModel, CAN_OPENING, CAN_ROSE, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { WorldModel, CAN_OPENING, CAN_ROSE, CUP_RIM, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, SPOUT_SPEED, cupSteam, isKettleDef, isTeaCupDef, kettleHeat, spoutRun, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
@@ -19,7 +19,8 @@ import {lightDiffAhead} from './light-diff-clock.ts';
 import {itemDiffAhead} from './item-diff-clock.ts';
 import {wateringDiffAhead} from './watering-diff-clock.ts';
 import {defLights} from './WorldNightLights.ts';
-import {pourJets, waterJets} from './fx/water-jets.ts';
+import {pourJets, spoutJets, waterJets} from './fx/water-jets.ts';
+import {setSteam, steam} from './fx/steam.ts';
 import {isGrowingDef, plantGroup, plantLookOf, posePlants, type PlantGroup, type PlantLook} from './fx/plant-growth.ts';
 import {beginOpeningMotion,stepOpeningMotion,type OpeningMotion} from './opening-motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
@@ -145,6 +146,9 @@ export class WorldEntityLayer {
   private plantShown = new Map<string, PlantLook>();
   private plantTweens = new Map<string, { from: PlantLook; to: PlantLook; t0: number; dur: number }>();
   private pours = new Map<string, THREE.Points>();
+  /** Entry 43: steam over kettles and cups of tea (world space, placed each frame); the depicted tick their heat is read at. */
+  private steamers = new Map<string, { pts: THREE.Points; kind: 'kettle' | 'cup'; lamp?: THREE.Mesh }>();
+  private depictedTick = Infinity;
   private figures = new Map<string, Figure>();
   private now = 0;
   private readonly api: (p: string) => string;
@@ -290,6 +294,7 @@ export class WorldEntityLayer {
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, leafWrites: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[], depictedTick=Infinity) {
+    this.depictedTick = depictedTick;
     if (this.immutable || !this.model || this.building || this.filling) return;
     for(const m of msgs)if(m.kind==='world-diff'&&typeof m.seq==='number')this.bufferedSeq=Math.max(this.bufferedSeq,m.seq);
     for (const m of msgs) {
@@ -426,6 +431,7 @@ export class WorldEntityLayer {
     if (this.freezeSettled && !this.thingsGroup.matrixWorld.equals(this.frozenUnder)) { this.frozenUnder.copy(this.thingsGroup.matrixWorld); for (const d of this.drawn.values()) if (d.frozen) this.thaw(d); }
     // Entry 34: taps run to their basin unless a held can catches the stream this frame (below); growth and wilt ease
     for (const jets of this.tapJets.values()) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = jets.userData.dropDefault;
+    this.stepSteam();
     for (const [id, tw] of this.plantTweens) {
       const d = this.drawn.get(id), grp = d?.obj.getObjectByName('plant growth') as PlantGroup | undefined;
       if (!d || !grp) { this.plantTweens.delete(id); continue; }
@@ -495,16 +501,19 @@ export class WorldEntityLayer {
     f.holder.updateWorldMatrix(true, true);
     const s = d.obj.scale.x, grip = d.obj.userData.handleGrip as number[], tilt = Number(f.holder.userData.wateringTilt ?? 0), flow = Number(f.holder.userData.wateringFlow ?? 0);
     f.wrists[1].getWorldPosition(_pr); const kn = f.knuckles[1]; if (kn) _pr.lerp(kn.getWorldPosition(_v3), 0.5);
-    f.holder.getWorldQuaternion(_qh); _qh.multiply(_qt.setFromAxisAngle(_zAxis, -tilt));
+    // entry 43: a kettle also turns about the grip toward the cup it pours into (engine yaw: + is to the body's right)
+    const turn = Number(f.holder.userData.wateringYaw ?? 0), vessel = d.obj.userData.vessel as { opening: number[]; outlet: number[]; angle: number; pour: 'spout' } | undefined;
+    f.holder.getWorldQuaternion(_qh); if (turn) _qh.multiply(_qy.setFromAxisAngle(_yAxis, -turn)); _qh.multiply(_qt.setFromAxisAngle(_zAxis, -tilt));
     d.obj.quaternion.copy(_qh);
     d.obj.position.copy(_pr).sub(_v3.set(grip[0], grip[1], grip[2]).multiplyScalar(s).applyQuaternion(_qh));
     // a tap's stream ends in the can's filler opening when the opening is under the nozzle
-    const opening = _vo.set(CAN_OPENING[0], CAN_OPENING[1] + 0.008, CAN_OPENING[2]).multiplyScalar(s).applyQuaternion(_qh).add(d.obj.position);
+    const op = vessel?.opening ?? CAN_OPENING, opening = _vo.set(op[0], op[1] + 0.008, op[2]).multiplyScalar(s).applyQuaternion(_qh).add(d.obj.position);
     for (const jets of this.tapJets.values()) {
       const n = jets.getWorldPosition(_vn);
       if (Math.hypot(opening.x - n.x, opening.z - n.z) < 0.16 && opening.y < n.y - 0.02) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = (n.y - opening.y) / Math.max(0.01, jets.parent?.getWorldScale(_v3).y ?? 1);
     }
     let pour = this.pours.get(id);
+    if (vessel) { this.spoutPour(id, d, vessel, flow, tilt, s); return true; }
     if (flow > 0.003) {
       if (!pour) { pour = pourJets(); this.thingsGroup.add(pour); this.pours.set(id, pour); }
       const rose = _vr.set(CAN_ROSE[0], CAN_ROSE[1], CAN_ROSE[2]).multiplyScalar(s).applyQuaternion(_qh).add(d.obj.position);
@@ -514,6 +523,49 @@ export class WorldEntityLayer {
       u.uFlow.value = flow; u.uDir.value = 0.75 - tilt; u.uDrop.value = Math.max(0.05, rose.y - this.soilUnder(rose));
     } else if (pour) pour.visible = false;
     return true;
+  }
+  /** Entry 43: a kettle's pour. The stream leaves the drawn spout tip along the spout (tipped by the recorded tilt) at
+   *  SPOUT_SPEED and falls to the tea's surface in the cup under it (rising as the cup fills); what the stream does is
+   *  published on the kettle (`pourDebug`) for proofs: tip, landing, the cup and its rim distance. */
+  private spoutPour(id: string, d: Drawn, vessel: { outlet: number[]; angle: number }, flow: number, tilt: number, s: number) {
+    const q = d.obj.quaternion, o = vessel.outlet, tip = _vr.set(o[0], o[1], o[2]).multiplyScalar(s).applyQuaternion(q).add(d.obj.position);
+    const fwd = _vn.set(1, 0, 0).applyQuaternion(q); fwd.y = 0; if (fwd.lengthSq() < 1e-9) fwd.set(1, 0, 0); fwd.normalize();
+    const el = vessel.angle - tilt;
+    // the cup under the stream: the nearest drawn cup of tea within 0.15 m of where a 7 cm fall would land
+    const guess = spoutRun(el, 0.07);
+    let cup: string | null = null, best = 0.15, surface = tip.y - 0.5;
+    for (const [cid, st] of this.steamers) { if (st.kind !== 'cup') continue; const c = this.drawn.get(cid); if (!c) continue; const p = c.obj.position, r = Math.hypot(p.x - (tip.x + fwd.x * guess), p.z - (tip.z + fwd.z * guess)); if (r < best && p.y < tip.y) { best = r; cup = cid; const tea = Number(this.model?.entities.get(cid)?.state?.tea ?? 0); surface = p.y + (0.014 + (CUP_RIM.full - 0.014) * Math.max(0, Math.min(1, tea))) * c.obj.scale.x; } }
+    const drop = Math.max(0.02, tip.y - surface), run = spoutRun(el, drop), land = [tip.x + fwd.x * run, surface, tip.z + fwd.z * run];
+    const c = cup ? this.drawn.get(cup)!.obj.position : null;
+    d.obj.userData.pourDebug = { flow: +flow.toFixed(3), tilt: +tilt.toFixed(4), tip: tip.toArray().map((v) => +v.toFixed(4)), land: land.map((v) => +v.toFixed(4)), cup, rim: c ? +Math.hypot(land[0] - c.x, land[2] - c.z).toFixed(4) : null, drop: +drop.toFixed(3) };
+    let pour = this.pours.get(id);
+    if (flow > 0.003) {
+      if (!pour) { pour = spoutJets(SPOUT_SPEED); this.thingsGroup.add(pour); this.pours.set(id, pour); }
+      const u = (pour.material as THREE.ShaderMaterial).uniforms;
+      pour.position.copy(tip); pour.rotation.set(0, Math.atan2(-fwd.z, fwd.x), 0); pour.visible = true;
+      u.uFlow.value = flow; u.uDir.value = el; u.uDrop.value = drop;
+    } else if (pour) pour.visible = false;
+  }
+  /** Entry 43: each kettle's and cup's steam from its state at the depicted tick (one uniform each); hidden when cold. */
+  private stepSteam() {
+    if (!this.steamers.size || !this.model) return;
+    for (const [id, st] of this.steamers) {
+      const d = this.drawn.get(id), e = this.model.entities.get(id);
+      if (!d || !e || d.removing || !d.obj.visible) { setSteam(st.pts, 0); if (st.lamp) st.lamp.visible = false; continue; }
+      const s = d.obj.scale.x, q = d.obj.quaternion;
+      if (st.kind === 'kettle') {
+        const k = kettleHeat(e.state, this.depictedTick), o = KETTLE_SPOUT;
+        st.pts.position.set(o[0], o[1], o[2]).multiplyScalar(s).applyQuaternion(q).add(d.obj.position);
+        const jet = _vs.set(Math.cos(KETTLE_SPOUT_ANGLE), Math.sin(KETTLE_SPOUT_ANGLE), 0).applyQuaternion(q).multiplyScalar(0.3 + 0.5 * k.steam);
+        setSteam(st.pts, k.steam, jet);
+        if (st.lamp) { st.lamp.visible = k.on; if (k.on) st.lamp.position.set(KETTLE_SWITCH[0] - 0.01, KETTLE_SWITCH[1] + 0.008, KETTLE_SWITCH[2]).multiplyScalar(s).applyQuaternion(q).add(d.obj.position); }
+        d.obj.userData.kettleHeat = { phase: k.phase, steam: +k.steam.toFixed(3), tick: this.depictedTick };
+      } else {
+        const v = cupSteam(e.state, this.depictedTick);
+        st.pts.position.set(0, CUP_RIM.h * s, 0).add(d.obj.position);
+        setSteam(st.pts, v, _vs.set(0, 0.02, 0));
+      }
+    }
   }
   /** The top of the soil under a point: a growing planter's within reach, else the ground under the drawn body. */
   private soilUnder(p: THREE.Vector3): number {
@@ -883,6 +935,15 @@ export class WorldEntityLayer {
       this.plantShown.set(e.id, shown);
     }
     { const grip = (def as unknown as { slots?: { kind: string; p: number[] }[] }).slots?.find((x) => x.kind === 'carry'); if (grip) { built.userData.handleGrip = [...grip.p]; delete built.userData.instanceKey; } }
+    // Entry 43: a kettle is filled through its lid and pours from its spout (a can: its filler and its rose); kettles and
+    // cups of tea steam (a plume placed each frame from their state and the depicted tick)
+    if (isKettleDef(def as never)) built.userData.vessel = { opening: KETTLE_OPENING, outlet: KETTLE_SPOUT, angle: KETTLE_SPOUT_ANGLE, pour: 'spout' };
+    if (isKettleDef(def as never) || isTeaCupDef(def as never)) {
+      delete built.userData.instanceKey;
+      if (!this.steamers.has(e.id)) { const kind = isKettleDef(def as never) ? 'kettle' : 'cup', pts = steam(kind); this.thingsGroup.add(pts);
+        let lamp: THREE.Mesh | undefined; if (kind === 'kettle') { lamp = new THREE.Mesh(new THREE.SphereGeometry(0.0055, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff7a2a })); lamp.name = 'kettle switch lamp'; lamp.visible = false; this.thingsGroup.add(lamp); }
+        this.steamers.set(e.id, { pts, kind, lamp }); }
+    }
     // State is visible on this frame, including during the generic edit easing.
     // Waiting for animate()'s settled transform left an OFF bulb glowing for 2.5 s.
     if (def.components.light || def.components.lights) syncLightGlow(built,e,def,m,this.now/1000);
@@ -907,6 +968,7 @@ export class WorldEntityLayer {
     this.held.delete(id); this.horizonBy.delete(id);
     this.tapJets.delete(id); this.growing.delete(id); this.plantShown.delete(id); this.plantTweens.delete(id);
     { const pour = this.pours.get(id); if (pour) { pour.removeFromParent(); (pour.material as THREE.Material).dispose(); this.pours.delete(id); } }
+    { const st = this.steamers.get(id); if (st) { st.pts.removeFromParent(); (st.pts.material as THREE.Material).dispose(); st.lamp?.removeFromParent(); this.steamers.delete(id); } }
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now + delaySeconds * 1000; d.dur = EASE_OUT_S;
   }
@@ -1053,7 +1115,7 @@ function nextTask(priority: 'background' | 'user-visible' = 'background'): Promi
 function ageNow(snap: { now?: number }, r: Response) { const age = Number(r.headers.get('age')) || 0; if (age > 0 && typeof snap.now === 'number') snap.now += age * 1000; }
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
 // Entry 34 scratch: held-by-handle pose, tap catch, rose shower
-const _qh = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _qy = new THREE.Quaternion(), _zAxis = new THREE.Vector3(0, 0, 1), _vo = new THREE.Vector3(), _vn = new THREE.Vector3(), _vr = new THREE.Vector3(), _eu = new THREE.Euler();
+const _qh = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _qy = new THREE.Quaternion(), _zAxis = new THREE.Vector3(0, 0, 1), _yAxis = new THREE.Vector3(0, 1, 0), _vs = new THREE.Vector3(), _vo = new THREE.Vector3(), _vn = new THREE.Vector3(), _vr = new THREE.Vector3(), _eu = new THREE.Euler();
 const easeInOut = (k: number) => { const x = Math.max(0, Math.min(1, k)); return x * x * (3 - 2 * x); };
 /** A planter's seed for its plants' layout (stable per entity). */
 const seedOf = (id: string) => { let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619); return h; };
