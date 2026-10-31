@@ -1,194 +1,266 @@
-# /worlds releases without visible downtime
+# Releasing Sim
 
-`release.sh <stage>` uploads a release, then runs `activate.sh` on the box. The unit `sim-worlds@<stage>` runs the
-**keeper** (`tools/world-launcher/keeper.mjs`). The keeper holds the port and runs the launcher from the release that
-`/srv/sim-worlds/<stage>` points at.
+A release puts one exact commit on the production host. The site has two launcher **stages**, each a
+`sim-worlds@<stage>` systemd unit running the world launcher under its keeper (`tools/world-launcher/keeper.mjs`):
 
-## Shipping a release: ship.sh
-`deploy/ship.sh --label <n>` runs a whole release in the proven order. Run it from the release worktree, clean, at
-the gated head, with `node_modules` and `.lane/mars-web` in place. `<n>` is the release number without dots (353 for
-3.53). The steps:
+| Stage | Serves | Build id | Release directory on the host |
+|---|---|---|---|
+| `production` | `https://sim.eden.art/worlds/` (every world people create) | `we-<sha12>` | `/srv/sim-worlds/releases/we-<sha12>` |
+| `legacy` | `https://sim.eden.art/` and `/w/<key>` (the original worlds) | `we-<sha12>-root` | `/srv/sim-old/releases/we-<sha12>-root` |
 
-| step | what it does | its bar |
+Both stages ship from the same commit in the same release. A `staging` stage (loopback only, dev auth) also exists
+in `release.sh`; ship.sh does not use it. See [operations](operations.md) for the services themselves and
+[the runbook](operations/runbook.md) for day-to-day commands.
+
+## Release order
+
+1. **Gate receipt.** The candidate commit has a clean full-scope receipt from the
+   [remote gate](testing/remote-gate.md) (`tools/test-harness/release-gate.sh`), combined with the V7 browser walk
+   into a ship receipt (`tools/test-harness/ship-receipt.mjs`). Clean means no new failures, no blockers and no
+   unexpected skips. A scoped candidate gate (`--scope auto`) is useful during development but never makes a ship
+   receipt.
+2. **Build exactly HEAD of a clean tree.** `release.sh` refuses uncommitted tracked changes and ships `git archive
+   HEAD`, so the build id names exactly what runs.
+3. **CDN first.** Any new immutable asset the web build's CDN manifest references is uploaded to `assets.eden.art`
+   and verified before the release ([CDN](operations/cdn.md)). The client falls back to the origin on a CDN miss,
+   but a release must not depend on that.
+4. **Staged ship.** `tools/world-launcher/deploy/ship.sh` runs backups, the legacy upload, the live probe, the
+   production release and the legacy activation in that order (below).
+5. **healthz.** Each activation checks the stage's `/__sim/healthz` reports the new build and every registered world
+   answers; afterwards `https://sim.eden.art/worlds/__sim/healthz` shows `build`, `worlds`/`running` and `hostOk`.
+6. **Walks.** Real-Chrome arrivals on desktop and phone, the poster and stall checks.
+7. **cdn-walk.** `tools/cdn/cdn-walk.mjs` proves the live pages load mapped assets from the CDN.
+8. **Rollback on failure.** A failed handover or health check rolls back on its own; any later failure stops the run
+   and prints the exact rollback commands. Code is rolled back; data never is.
+
+## The release workflow
+
+Releases run from [`.github/workflows/release.yml`](../.github/workflows/release.yml), started by manual dispatch with
+a `version` (for the changelog and tag) and optional `label`, `baseline` (default: the newest `v*` tag) and
+`no_probe`. A `release` concurrency group lets only one run at a time. Its jobs:
+
+1. **preflight**: the required secrets and variables exist (it names any that are missing), the head is `main`, and
+   the inputs are sane.
+2. **gate**: the full remote gate against the baseline release.
+3. **ship**: waits for the protected `production` environment's required reviewer, then runs `ship.sh` over SSH
+   and checks healthz.
+4. **publish**: compiles `changes/` into [`CHANGELOG.md`](../CHANGELOG.md), tags `v<version>` on the shipped commit
+   and creates the GitHub Release.
+
+The production host, SSH user and key, known-hosts entry and the Modal token come from repository and environment
+secrets and variables (the workflow header lists them); none are in the repository.
+
+Outside the workflow, the scripts read the same variables from the environment or from an untracked `deploy.env` at
+the repository root (copy [`deploy.env.example`](../deploy.env.example); the environment wins). Loaders:
+`tools/world-launcher/deploy/deploy-env.{sh,mjs}`.
+
+The same scripts run from any clean checkout with SSH access to the host; the workflow is the normal path.
+
+## ship.sh
+
+```sh
+tools/world-launcher/deploy/ship.sh --label <n> [--dry-run] [--from <step>] [--no-probe] [--exclude-world <slug>] [--out <dir>]
+```
+
+| Option | Meaning |
+|---|---|
+| `--label <n>` | Release label: letters, digits, `-` and `_`. Names the backups (`pre-r<n>-<stage>-<time>`) and the output folder. |
+| `--dry-run` | Prints every step with its exact commands. Nothing runs and the host is not contacted. Exits 1 when preflight would stop a real run. |
+| `--from <step>` | Resumes at `<step>` after a fix, with the same label and outputs; earlier steps are skipped. |
+| `--no-probe` | Skips the three live-probe steps. |
+| `--exclude-world <slug>` | Leaves one `/worlds/w/<slug>/` world out of the arrival walks (repeatable). Unknown slugs fail. Backups, probe and activation are unchanged. |
+| `--out <dir>` | Output folder (default `$SHIP_OUT_ROOT/<label>`). |
+
+Environment:
+
+| Variable | Default | Used for |
 |---|---|---|
-| preflight | local checks: clean tree, tools, Mars web assets, required dedicated release-probe god folder; prints the deploy lease | nothing missing |
-| backup | `ship/compact-backup.sh` uses the row-verified compact-copy helper with `--keep-takes` for every production + legacy db, then `PRAGMA quick_check` | every copied row matches its source read transaction; every db `ok` |
-| legacy-upload | `release.sh legacy` builds and uploads `we-<sha12>-root` without activating it | exit 0 |
-| probe-start | `release-probe.mjs` in the background (desktop + phone, CLI edits, `--expect-build`); waits for `probe/ready` | ready within 10 min |
+| `SIM_DEPLOY_HOST` | none; required | SSH target of the production host (an SSH config alias works); `SIM_DEPLOY_USER` (default `root`) is prepended. Also read by `release.sh` |
+| `SHIP_ORIGIN` | `https://sim.eden.art` | Public origin the probe and walks load |
+| `SHIP_PROBE_CLI` | `.local/release-probe` | God folder of the release-probe world (below) |
+| `SHIP_LEGACY_RELEASE_FILE` | `.local/ship/LEGACY-RELEASE` | File that records the active legacy build after activation |
+| `SHIP_OUT_ROOT` | `.local/ship` | Parent of the output folder |
+| `SHIP_PROBE_READY_S` | `600` | How long to wait for the probe to be ready |
+| `MARS_WEB_SRC` | `.lane/mars-web` | Mars web asset overlay (see `release.sh`) |
+
+Steps, each checked by `ship/checks.mjs`:
+
+| Step | What it does | Pass when |
+|---|---|---|
+| preflight | Local only: clean tree, `node_modules`, Mars web assets, every ship tool present, the probe god folder, an unused output folder | nothing is missing |
+| backup | Copies `ship/compact-backup.sh`, `old-worlds/compact-copy.py` and `ship/quick-check.mjs` to the host; makes a row-verified compact copy of every production and legacy database (`/srv/sim-worlds-data/release-backups/pre-r<n>-<stage>-<time>`); runs `PRAGMA quick_check` on each | every copied row matches its source; every database `ok` |
+| legacy-upload | `release.sh legacy`: builds and uploads `we-<sha12>-root` without activating it | exit 0 |
+| probe-start | Starts `release-probe.mjs` in the background (desktop and phone pages, god CLI edits in the probe world, `--expect-build we-<sha12>`); waits for `<out>/probe/ready` | ready in time |
 | release | `release.sh production --reload` | exit 0 |
-| legacy-activate | `sha256sum -c FILES.sha256`, `activate.sh legacy … --reload`, then the laptop's `LEGACY-RELEASE` | exit 0 |
-| released / probe-check | touch `probe/released`; the probe watches 60 s more | exit 0 (1 = visitor bar missed, 3 = rolled back) |
-| walks | `ship/walk.mjs`: 7 worlds at desktop dpr 1+2, 3 worlds on a phone | 17 arrivals, 0 errors, 0 resync, picks ok |
-| poster | `ship/poster.mjs` x3 on Eden 2026 (phone) + `poster-count.py` | a world frame every run, never blank after it |
-| stall | `ship/stall.mjs` x4 on Eden 2026 (phone) | no frame gap over 1 s |
-| cdn-walk | `tools/cdn/cdn-walk.mjs` on Eden 2026, /w/mars, /w/eden | PASS |
+| legacy-activate | `sha256sum -c FILES.sha256` in the legacy release, `activate.sh legacy <release> --reload`, then writes the build to `SHIP_LEGACY_RELEASE_FILE` | exit 0 |
+| released | Touches `<out>/probe/released`; the probe watches 60 s more | — |
+| probe-check | Reads the probe's exit | 0 = pass; 1 = visitor bar missed (the release is live); 3 = the release rolled back |
+| walks | `ship/walk.mjs`: a fixed set of worlds on desktop at dpr 1 and 2, a smaller set on a phone | every arrival, 0 errors, 0 resyncs, picks ok |
+| poster | `ship/poster.mjs` three times on a phone, then `ship/poster-count.py` | a world frame every run, never blank after it |
+| stall | `ship/stall.mjs` four times on a phone | no frame gap over 1 s |
+| cdn-walk | `tools/cdn/cdn-walk.mjs` on three live pages, desktop and phone | PASS |
 
-`ship/checks.mjs` gives each step's verdict. Outputs go to `team/scratch/ship/<n>/`: `STEPS.txt` (one line per step),
-`ship.log`, `ROLLBACK.txt`, and each step's logs and shots. Any failure stops the run. ship.sh then prints what is live
-at that moment, the rollback commands (the previous production and legacy releases, read before the first change), and
-the `--from <step>` that resumes it. It never rolls back on its own: `activate.sh` already does that for a failed
-handover, and the probe's exit 3 says it happened.
+Before the first change on the host, ship.sh reads the current and previous stage links and writes the rollback
+commands to `<out>/ROLLBACK.txt`. The output folder also holds `STEPS.txt` (one line per step), `ship.log`, and each
+step's logs, JSON and screenshots. Any failure stops the run: ship.sh prints what is live at that moment, the
+rollback commands and the `--from` that resumes. It never rolls back by itself; `activate.sh` already does that for a
+failed handover, and probe exit 3 reports it.
 
-- `--dry-run` prints every step with its exact commands. Nothing runs, and eden2 is not contacted. It exits 1 when
-  preflight would stop a real run.
-- `--exclude-world <slug>` omits that registered world from desktop and phone arrival walks when the user has explicitly excluded it. It prints the exclusion and recalculates the arrival count; unknown/duplicate slugs fail. Record the reduced coverage in SHIP-LOG. Other release steps remain mandatory.
-- `--from <step>` resumes after a fix (same `--label`, same outputs). `--no-probe` skips the three probe steps.
-- The legacy handover itself is `activate.sh`'s job. ship.sh only calls it, so changes to the handover (keeper,
-  `children.mjs`) reach ship.sh without touching it.
-- The release owner still does the lane-specific live checks, the fast-forward of main and the push, the SHIP-LOG entry and RESUME.
-- Tests: `node --test tools/world-launcher/ship.test.mjs` stubs every command (`SHIP_TEST=1`, `SHIP_SSH`, `SHIP_SCP`,
-  `SHIP_NODE`, `SHIP_PYTHON`, `SHIP_RELEASE_SH`).
+Tests stub every external command: `node --test tools/world-launcher/ship.test.mjs` (`SHIP_TEST=1` with `SHIP_SSH`,
+`SHIP_SCP`, `SHIP_NODE`, `SHIP_PYTHON`, `SHIP_RELEASE_SH` and `SHIP_BUILD`).
 
-`release.sh` never prunes remote or local releases. Rebuilding a local artifact moves its previous copy to a unique
-directory under `~/.Trash`. Destructive retention on eden2 remains a separate operation requiring Gene's approval.
-A same-build remote upload is reused only when `RELEASE-MANIFEST.json` matches the new assembly and every artifact,
-symlink and file mode still matches that manifest (installed `node_modules` are excluded). Missing manifests,
-partial uploads and changed/extra artifacts are retained and refused; use a new commit/build instead of deleting or
-overwriting them. Focused checks: `node --test tools/test-harness/release-no-delete.test.mjs`.
+## release.sh
 
-To use builds produced on Modal, set `SIM_PREBUILT_WEB_ROOT` to a directory containing `<build>/dist` and
-`<build>/WEB-BUILD.json` for both `we-<sha12>` and `we-<sha12>-root`. The receipt is sealed by `prebuilt-web.mjs`
-after building and precompressing on Modal. Installation requires the exact full source SHA, build ID, base path,
-CDN flags/origin and Eden world pin; every artifact hash is checked before and after copying. The normal prefix,
-CDN and world-pin release checks still run. Without the variable the existing build path is unchanged.
+```sh
+tools/world-launcher/deploy/release.sh [staging|production|legacy] [--no-activate] [--restart|--reload]
+tools/world-launcher/deploy/release.sh [staging|production|legacy] --local <absolute dir>   # assemble only
+```
 
-## Release-probe world (one-time setup, then every release)
-The probe's CLI edits go to its own world, **release-probe**: an unlisted scratch world, flagged test, with no Soul a person
-owns. Releases never write to bench-hamlet again (it holds Kwyjibo). ship.sh's god folder is
-`<team>/runtime/t4-bench/release-probe` (`SHIP_PROBE_CLI` overrides it). If that folder is missing,
-preflight stops before any remote command. There is no fallback to another world.
+It runs from a clean checkout (`git status --porcelain --untracked-files=no` empty) and:
 
-R does the setup once, on eden2, after a release that carries `op.mjs god-approve` (lane OPS2) is live:
-1. `node tools/world-launcher/op.mjs create-world --port 4620 --base /worlds --name "Release probe (scratch)" --template hello-hamlet --owner-of bench-hamlet --slug release-probe --unlisted`
-   (`--unlisted` and `set-unlisted` come from lane QA2. If the live op.mjs does not have them yet, leave `--unlisted` off,
-   and once QA2 is live run `op.mjs set-unlisted --port 4620 --base /worlds --slug release-probe --unlisted true`.)
-2. `node tools/world-launcher/op.mjs set-test --port 4620 --base /worlds --slug release-probe --test true`
-3. On the laptop: make the folder, then in it `node <repo>/tools/god-skill/eden-god.mjs register https://sim.eden.art/worlds/w/release-probe/`
-   and `node <repo>/tools/god-skill/eden-god.mjs pair` (it prints a `#godpair/<code>` link and waits). On eden2:
-   `op.mjs god-pending --port 4620 --base /worlds --slug release-probe` lists it, and
-   `op.mjs god-approve --port 4620 --base /worlds --slug release-probe --code <code>` approves it for the world's owner;
-   `pair` then exits holding the god token. No signed-in step. Never open the folder's `.eden-god.json`.
-4. Live check of the operator TEST-Soul commands: a test agent asks to join release-probe as `TestProbe` (no window code);
-   `op.mjs soul-pending --slug release-probe` lists it with `test: true`; `soul-approve --request <ap_…> --name TestProbe`;
-   the agent's poll holds a Soul token; `soul-message --soul <s_…> --name TestProbe --text "walk to the well"`, the agent
-   acks it, `soul-inbox` shows `acknowledged`; `soul-delete --soul <s_…> --name TestProbe`. `op.mjs audit --slug release-probe`
-   shows every call `by: operator`, never the message text.
+1. **Assembles** `we-<sha12>` (or `we-<sha12>-root` for `legacy`) in `.lane/release/<build>`: `git archive HEAD`
+   (committed files only, so no `.env`, data or keys), `BUILD`, and the web app built with `--base /worlds/` (`/` for
+   legacy). An earlier local copy is moved aside, never deleted.
+2. **Checks the build**: every asset URL is under the base; with the CDN on, the bundle carries the CDN origin and a
+   `cdn-manifest-*.json`; the Eden experience pin (`VITE_EDEN_EXPERIENCE_WORLD_IDS`) is compiled in. Hashed assets get
+   `.br`/`.gz` siblings (`precompress.mjs`).
+3. **Adds the Mars web assets** from `MARS_WEB_SRC` (default `.lane/mars-web`; `tools/playtest/arena/assets-overlay.mjs
+   <dir>` builds one from the public site). `/modular` is linked to the commit's own `mars/viewer/public/modular`.
+   For `legacy` it writes `FILES.sha256` over every file.
+4. **Writes `RELEASE-MANIFEST.json`** (`release-manifest.mjs snapshot`): every file, symlink and mode.
+5. **Uploads** to the host with `rsync --link-dest` against the stage's current release. A directory that already
+   holds the same build is reused only when its manifest matches and `release-manifest.mjs verify` passes; a partial
+   or different upload is refused, never overwritten. Use a new commit instead.
+6. **Installs** (`install.sh`, idempotent; not for legacy) and the server's Linux dependencies
+   (`pnpm install --frozen-lockfile --filter @sim/server...`) as the `simworlds` user.
+7. **Activates** with `activate.sh` unless `--no-activate` (legacy is never activated by release.sh; ship.sh does it).
+   Production refuses to activate without `/etc/sim-worlds/production-auth.env` ([auth](operations/auth.md)).
 
-Guards (op-souls.mjs, apps/server/src/op-souls.ts): operator Soul and god commands are loopback only, on worlds flagged
-test (registry `test: true` or `<data>/op-test-worlds.json`), never a product world or an old-world fork. Souls are
-approved only for TEST names (`Test…`/`test-…`) as the synthetic account `op:test-operator`. Kwyjibo is refused by id and
-name, plus anything in `<data>/op-deny-souls.json`. `god-approve` is also refused while any live Soul in the world belongs
-to anyone but `op:test-operator`, and it never claims an unowned world.
+release.sh never prunes local or remote releases. Focused check: `node --test tools/test-harness/release-no-delete.test.mjs`.
 
-## What a release does
-1. `activate.sh` points the stage link at the new release, keeping the old one as `<stage>.previous`.
-2. It runs `systemctl reload sim-worlds@<stage>` (SIGHUP to the keeper), which starts the handover:
-   - **prepare**: the running launcher finishes any world creation, holds new boots and registry writes, and lists its
-     running worlds.
-   - **start**: the new launcher starts and adopts those worlds. It proxies to them and boots nothing yet.
-   - **switch**: new connections go to the new launcher. The old one forwards whatever still reaches it, answering with
-     `Connection: close`, so each of its connections ends cleanly after its next response. It does not close idle
-     connections at the switch: Caddy may be sending a request on one at that instant, and a POST lost that way cannot
-     be replayed (a 502 page). Connections still idle close when the old launcher exits. In steady state the launcher
-     keeps idle connections 130 s, longer than Caddy's 2 min, so Caddy closes them, never the launcher mid-request.
-   - **take over**: one world at a time, the old launcher stops the world (it saves a snapshot and its process exits),
-     then the new launcher boots it on the same data. Requests and viewer sockets for that world wait for it; they do
-     not fail. A world never has two writers.
-     - **pre-warm**: before the old process stops, the new launcher starts the world's next process in standby
-       (`SIM_STANDBY=1`, `apps/server/src/standby.ts`): it loads all its code, then waits for SIGUSR2 without opening
-       its database or port. The world keeps serving from the old process meanwhile. After the stop, SIGUSR2 makes it
-       open the data and listen, so the pause is the stop plus opening (measured locally 0.3-0.6 s per world instead
-       of 1.1-1.7 s). If standby fails, that world boots cold, as before. `SIM_PREWARM=0` (keeper env) turns it off.
-       A standby process takes 230-240 MB (new worlds and the eden/mars forks alike, Node 22). A world is pre-warmed
-       only when the unit has at least 768 MB under its cgroup memory limit (MemoryHigh 5G / MemoryMax 6G on eden2)
-       and the host has that much available above `--min-free-mb`; otherwise it boots cold and `activate.sh` says why
-       (`SIM_PREWARM_NEED_MB` changes the 768).
-     - **canary**: the first world (not an old-world fork) moves first and must also answer `/v1/config`. If it cannot,
-       nothing else moves: the old launcher serves again and boots that world on its own code, requests that waited
-       for it are forwarded there, the new launcher exits, and `keeper.json` says `rolled-back`. Only that world paused
-       (about 1.5 s locally); no reload, no error page. `SIM_HANDOVER_CANARY=0` (keeper env) turns it off.
-   - **exit**: the old launcher finishes its last responses and exits.
-3. On `rolled-back` (canary failed) `activate.sh` points the stage link back to `<stage>.previous`, prints the canary
-   world's log tail and exits 1: the previous release never stopped serving. Otherwise the same checks as before run: the health check must report the new build, and every registered world must
-   answer. If either fails, the stage link goes back to `<stage>.previous` and the unit is reloaded again, which runs
-   the same handover in reverse. If that reload fails, the unit is restarted.
+| Variable | Default | Effect |
+|---|---|---|
+| `SIM_DEPLOY_HOST`, `SIM_DEPLOY_USER` | none / `root` | SSH target of the production host |
+| `SIM_WORLDS_BASE` | `/worlds` | Production path prefix |
+| `SIM_ASSETS_CDN_ENABLED` | `1` | `0` builds without the asset CDN for one release; other values are refused |
+| `SIM_ASSETS_CDN_ORIGIN` | `https://assets.eden.art` | CDN origin compiled into the build |
+| `VITE_EDEN_EXPERIENCE_WORLD_IDS` | the qualified Eden world id | Worlds that get the Eden experience; empty disables the check |
+| `SIM_GOATCOUNTER` | site default | Visitor counter code or URL; `off` disables ([analytics](operations/analytics.md)) |
+| `SIM_GOD_UPLOADS_CDN` | `1` | Route god uploads through the CDN Worker |
+| `SIM_PREBUILT_WEB_ROOT` | unset | Use web builds made elsewhere (below) |
+| `MARS_WEB_SRC` | `.lane/mars-web` | Mars web asset overlay |
 
-If the new launcher fails before the switch, the old one carries on untouched. If a world cannot boot on the new
-release, `keeper.json` reports it, the world stays down rather than run twice, and the rollback brings it back.
+**Prebuilt web.** With `SIM_PREBUILT_WEB_ROOT` set to a directory holding `<build>/dist` and `<build>/WEB-BUILD.json`
+for both builds, release.sh installs those instead of running Vite (`prebuilt-web.mjs install`). The receipt must
+match the full source SHA, build id, base path, CDN flag and origin and the Eden pin; every artifact hash is checked
+before and after copying. `modal-web-build.py` produces such builds on Modal.
 
-The keeper writes its state to `<data>/keeper.json`: keeper pid and sha, the active build, and the last handover with
-each world's time.
+## Activation and handover
 
-## When it is a restart instead
-`release.sh --reload` (and `activate.sh … --reload`) hands over even when the release carries a changed `keeper.mjs`:
-the running keeper stays and runs the new launcher (pre-warm works; the canary needs the new keeper, which takes effect
-at the next restart). Use it to ship a keeper change without a full restart.
+`activate.sh <stage> <release dir> [--restart|--reload]` runs on the host as root (release.sh calls it over SSH). It
+moves the stage link `/srv/sim-worlds/<stage>` to the new release, keeping the old one as `<stage>.previous`, then
+either reloads or restarts the unit:
 
-After a `--reload`, keeper.json still names the old keeper's sha, so the next release with an unchanged `keeper.mjs`
-would also restart: keep passing `--reload` until a planned `--restart` at a quiet time installs the new keeper.
+- **Reload** (the running unit is the keeper and the release carries the same `keeper.mjs`, or `--reload`):
+  `systemctl reload` sends SIGHUP and the keeper hands the worlds over to the new launcher without closing the port.
+- **Restart** (first install, a changed `keeper.mjs` without `--reload`, or `--restart`): every world restarts.
 
-**A restart without the error page** (optional, `deploy/sim-worlds@.socket`): with the socket unit enabled for a stage,
-systemd holds the port, so during a restart new connections wait in the socket's backlog instead of being refused (no
-Caddy 502 page; requests wait for the new keeper, 1-1.6 s locally) and viewers reconnect as in a handover. Switching
-it on is itself one last restart (commands in the unit file's header). Measured through a Caddy stand-in under a
-POST/GET storm: restart without the socket 181 refused requests (502) per restart, with it 1 (a request in flight on
-the stopping launcher).
+The handover:
 
-`activate.sh` restarts the unit (all worlds blink, as before) on the first install of the keeper, when the release
-carries a changed `keeper.mjs`, or when given `release.sh --restart`. A change to the unit file or to
-`/etc/sim-worlds/<stage>.conf` (port, data, caps) also needs `--restart`, because the keeper keeps the arguments it
-started with.
+1. **prepare**: the running launcher finishes any world creation, holds new boots and registry writes, and lists its
+   running worlds.
+2. **start**: the new launcher starts and adopts those worlds; it proxies to them and boots nothing yet.
+3. **switch**: new connections go to the new launcher. The old one answers what still reaches it with
+   `Connection: close`, so each connection ends cleanly after its next response. The launcher keeps idle connections
+   130 s, longer than the reverse proxy's idle timeout, so the proxy closes them, never the launcher mid-request.
+4. **take over**: one world at a time, the old launcher stops the world (it saves a snapshot and exits), then the new
+   launcher boots it on the same data. Requests and viewer sockets for that world wait; they do not fail. A world
+   never has two writers.
+   - **pre-warm**: before the stop, the new launcher starts the world's next process in standby (`SIM_STANDBY=1`,
+     `apps/server/src/standby.ts`): it loads its code and waits for SIGUSR2 without opening its database or port. The
+     pause is then the stop plus opening the data. A world is pre-warmed only when the unit's cgroup and the host both
+     have room (768 MB by default, `SIM_PREWARM_NEED_MB`); otherwise it boots cold. `SIM_PREWARM=0` turns it off.
+   - **canary**: the first world (not an old-world fork) moves first and must answer `/v1/config`. If it cannot,
+     nothing else moves: the old launcher serves again, the new one exits and `keeper.json` says `rolled-back`.
+     `SIM_HANDOVER_CANARY=0` turns it off.
+5. **exit**: the old launcher finishes its last responses and exits.
 
-## What a viewer sees
-The page and the API never get a refused connection, so there is no proxy error page. Each world's viewer socket
-drops once, while that world moves; the viewer reconnects by itself. "Reconnecting…" appears only after 3 s down
-(`viewer-arrival.ts`). A page running the previous bundle keeps running. It reloads at once only if the protocol
-changed; otherwise it swaps bundles after the tab has been hidden for a minute (`useSim.ts`).
+After the handover activate.sh waits up to 60 s for `http://127.0.0.1:<port><base>/__sim/healthz` to report the new
+build, then requires every world in `<data>/worlds.json` to answer `<base>/w/<slug>/v1/config` within 90 s. On a
+canary roll-back it moves the link back and exits 1. On any other failure it moves the link back to
+`<stage>.previous` and reloads (or restarts) again, which runs the same handover in reverse; a failed reverse reload
+falls back to a restart. The keeper records its pid, sha, the active build and the last handover per world in
+`<data>/keeper.json`.
 
-## Measuring
-`deploy/swap-probe.mjs --origin http://127.0.0.1:<port> --base /worlds --slugs a,b --out probe.json` GETs the homepage
-and each world every 100 ms. It holds one viewer socket per world and reports, per target, refused connections, 5xx,
-the longest error run, the slowest request, and how long each world's socket was down. `--posts` adds a POST per
-world (to an unknown route; any 4xx counts as answered), which is what catches a connection closed under a request.
-Locally, put a reverse proxy with Caddy's transport defaults in front of the keeper and probe through it: the proxy's
-502s are exactly what a visitor would see (lane W rig: `team/scratch/r31w/`).
+**Reload with a changed keeper.** `--reload` hands over even when the release carries a new `keeper.mjs`: the
+running keeper stays and runs the new launcher (no canary until the new keeper is installed). `keeper.json` then
+still names the old keeper, so keep passing `--reload` until a planned `--restart` at a quiet time. A change to the
+unit file or to `/etc/sim-worlds/<stage>.conf` (port, data, caps) also needs `--restart`.
 
-## Nightly backups: versioned (restic)
-`sim-worlds-backup@<stage>.timer` (03:30 UTC) runs `deploy/backup-restic.mjs backup <stage>` as `simworlds`. It is separate
-from ship.sh's compact backup, which a release still takes first. Each night it:
+**Restarts without refused connections.** The optional `deploy/sim-worlds@.socket` lets systemd hold the port, so
+during a restart new connections wait in the socket backlog instead of being refused. Its header has the commands to
+switch it on (one last restart).
 
-1. copies `accounts.sqlite`, `forks/accounts.sqlite` and every `worlds/<slug>/sim.db` with SQLite's online backup API
-   in one step, so the copies are consistent while the worlds run, and runs `PRAGMA quick_check` on each copy;
-2. adds `worlds.json`, `audit.jsonl` and the uploaded files in `worlds/assets` (backup.mjs never had these). It copies
-   only files that are new or changed into the mirror at `/srv/sim-worlds-backups/staging/<stage>`;
-3. takes one restic snapshot of that mirror into `/srv/sim-worlds-backups/restic`, tagged `<stage>`;
-4. **deletes** old snapshots: `forget --prune` keeps 7 daily, 4 weekly and 6 monthly snapshots per stage
-   (`SIM_BACKUP_KEEP`; `off` skips this step, so nothing is deleted). Then `check` reads a seventh of the data, so all of it is read once a week;
-5. copies the snapshots off the box to `SIM_BACKUP_OFFSITE` (an R2 bucket) and applies the same retention there.
-   This step runs only when that setting is present.
+**What a viewer sees.** The page and API never get a refused connection. Each world's viewer socket drops once while
+that world moves and reconnects by itself; "Reconnecting…" appears only after 3 s (`apps/web/src/viewer-arrival.ts`).
+A page running the previous bundle reloads at once only if the protocol changed; otherwise it swaps bundles after
+the tab has been hidden for a minute (`useSim.ts`).
 
-The script exits 1 if any database fails its check; the other databases are still snapshotted. host-health flags it.
+## Rollback
 
-Until restic is set up (no `restic` binary, no password file, or no repository), each run takes the old dated copy
-instead (`backup.mjs`, newest 3 nights in `/srv/sim-worlds-backups/<stage>/YYYYMMDD`) and says so on its first line, so
-shipping this before the one-time setup never costs a night.
+- **Automatic:** activate.sh puts `<stage>.previous` back on a failed handover, health check or world boot.
+- **By hand:** run the commands ship.sh wrote to `ROLLBACK.txt`, which are of the form
 
-Restic stores only the chunks it has not seen before, compressed. The copies keep the live file's page layout, so
-unchanged pages are byte-identical from night to night. Measured on 15 real eden2 backups (lane BK, 2026-10-20):
-~13 MB a night for production + legacy, against ~260 MB for a dated full copy. Retention caps the repository at ~240 MB
-at today's sizes. The floor is set by each world's 5 MB whole-state JSON snapshot, which it rewrites every 5 minutes.
+  ```sh
+  ssh "$SIM_DEPLOY_USER@$SIM_DEPLOY_HOST" bash <previous>/tools/world-launcher/deploy/activate.sh production <previous> --reload
+  ssh "$SIM_DEPLOY_USER@$SIM_DEPLOY_HOST" bash <previous-root>/tools/world-launcher/deploy/activate.sh legacy <previous-root> --reload
+  ```
 
-Settings live in `/etc/sim-worlds/backup.env` (`backup.env.example`). The repository password is
-`/etc/sim-worlds/restic.pass`, root:simworlds 0640. Without that password the backups cannot be read. The script
-never creates a repository: if the disk or the path is missing, it fails instead of starting an empty one.
+  Do not move the stage link yourself first: activate.sh records `<stage>.previous` only when the link still points
+  at the old release.
+- Rollback changes code only. World databases keep every accepted event; never restore an older database to make old
+  code run. Restoring data is a separate, deliberate operation ([disaster recovery](operations/disaster-recovery.md)).
 
-- Restore (one command; never overwrites a non-empty directory; quick_checks every database, exit 1 if any is bad):
-  `node /srv/sim-worlds/production/tools/world-launcher/deploy/backup-restic.mjs restore production <latest|YYYY-MM-DD|id> <empty dir>`.
-  The directory is laid out like `/srv/sim-worlds-data/<stage>`. `... list [<stage>]` shows the snapshots.
-- Boot one restored world locally: `ENABLE_WORLD_ENGINE=1 SOUL_LIFECYCLE=1 node tools/god-skill/dev-world.mjs <slug> <port> --data <dir>/worlds/<slug>`.
-  Without `SOUL_LIFECYCLE=1`, which the launcher sets, a production world's history refuses the engine
-  (`+crew-removal/1`).
-- Put a world back live: stop it, swap its `sim.db` for the restored one, start it. Only R does this.
-- Rollback to the dated full copies: point the unit's ExecStart back at `deploy/backup.mjs` (kept in the tree).
-- Tests: `node --test tools/world-launcher/backup-restic.test.mjs` (real restic; it skips when restic is not installed).
-- eden2 has restic 0.16.4 from apt; the script uses only flags that 0.16 has.
+## The release-probe world
+
+The probe's god CLI edits go to a dedicated world: unlisted, flagged test, owned by an operator account, with no
+Soul a person owns. Releases never edit a person's world, and preflight stops when `SHIP_PROBE_CLI` is missing. One-time
+setup on the production host (`op.mjs` accepts only direct loopback requests; `<port>` and `<base>` are the
+production stage's):
+
+```sh
+node tools/world-launcher/op.mjs create-world --port <port> --base /worlds --name "Release probe (scratch)" \
+  --template hello-hamlet --owner <account id> --slug release-probe --unlisted
+node tools/world-launcher/op.mjs set-test --port <port> --base /worlds --slug release-probe --test true
+```
+
+Then, in an empty folder on the machine that will run ship.sh, register and pair a god for it:
+
+```sh
+node tools/god-skill/eden-god.mjs register https://sim.eden.art/worlds/w/release-probe/
+node tools/god-skill/eden-god.mjs pair          # prints a pairing code and waits
+# on the host:
+node tools/world-launcher/op.mjs god-pending --port <port> --base /worlds --slug release-probe
+node tools/world-launcher/op.mjs god-approve --port <port> --base /worlds --slug release-probe --code <code>
+```
+
+Keep that folder as a secret of the release environment and point `SHIP_PROBE_CLI` at it; never print its session
+file. Operator Soul and god commands work only on loopback and on worlds flagged test (`apps/server/src/op-souls.ts`,
+`tools/world-launcher/op-souls.mjs`); they approve only TEST names for a synthetic operator account, and `god-approve`
+is refused while any live Soul in the world belongs to anyone else.
+
+## Retention
+
+Nothing is pruned automatically. `tools/world-launcher/deploy/retention.sh --host "$SIM_DEPLOY_USER@$SIM_DEPLOY_HOST"` lists what
+keep-N would delete on the host: routine compact backups beyond the newest 10 per stage (other backup names are never
+touched) and legacy releases beyond the newest 5, always keeping every release a link points at or a process uses.
+Dry run is the default; `--apply` deletes and should be run only after reading the dry-run list. `--keep-backups` and
+`--keep-releases` change the numbers (at least 3 and 2). Test: `tools/world-launcher/deploy/retention.test.sh`.
+
+## Measuring a handover
+
+`deploy/swap-probe.mjs --origin http://127.0.0.1:<port> --base /worlds --slugs a,b --out probe.json [--posts]` GETs the
+homepage and each world every 100 ms, holds one viewer socket per world, and reports refused connections, 5xx, the
+longest error run, the slowest request and each socket's downtime. `--posts` adds a POST per world, which catches a
+connection closed under a request. Run it through a reverse proxy with production-like transport settings to see
+what a visitor would.

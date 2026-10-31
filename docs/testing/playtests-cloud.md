@@ -1,90 +1,99 @@
-# Playtest in a cloud session
+# Cloud playtests
 
-`run-replay.sh` replays the frozen set (ROOT-CAUSES §E, `review/scorecard.mjs` FROZEN) against a fix branch on a
-dedicated cloud box and commits the results to the `playtest-results` branch.
+`tools/playtest/cloud/run-replay.sh` runs a playtest on a dedicated Linux machine: the frozen replay set, one
+scenario or one directed cast. It runs against a server branch and commits the results to the `playtest-results`
+branch. `cloud/pull-results.sh` brings them back for scoring. See [playtests](playtests.md) for the framework.
 
-## The prompt
+## Run
 
-Create a Claude Code cloud session on `genekogan/sim`, branch **`lane/playtest-20261024`** (the runner lives there),
-and give it exactly:
+From a clone of this repository:
 
-> Start the runner detached so it outlives any tool call (the harness stops foreground Bash at 10 minutes and background
-> tasks at 30; the replay needs 1 to 3 hours):
-> `cd /home/user/sim && nohup setsid bash tools/playtest/cloud/run-replay.sh lane/soul-fix-20261025 fix-r1 1 > /tmp/replay-fix-r1.log 2>&1 &`
-> then poll with foreground calls under 10 minutes each (`sleep 540; tail -n 30 /tmp/replay-fix-r1.log; pgrep -f run-replay.sh || echo FINISHED`)
-> until FINISHED, and report the SCORECARD.md path and its first 60 lines, the playtest-results push result and CLOUD.md.
+```sh
+bash tools/playtest/cloud/run-replay.sh <server-branch> <out-name> [repeats=1]
+PLAYTEST_SCENARIO=tools/playtest/scenarios/<x>.json   bash tools/playtest/cloud/run-replay.sh ...   # one scenario
+PLAYTEST_DIRECT=tools/playtest/scenarios/casts/<x>.json bash tools/playtest/cloud/run-replay.sh ...  # one directed cast
+```
 
-Change the three arguments per run: `<fix-branch> <out-name> [repeats]`. A rerun with the same out-name resumes.
-If the session starts on another branch, prefix the prompt with "git fetch origin lane/playtest-20261024 && git checkout
-lane/playtest-20261024, then".
+`<out-name>` may use letters, digits, `.`, `_` and `-`. Rerunning with the same out-name resumes every step. A replay
+can take hours, so start it detached when the shell that runs it has a time limit:
 
-## A directed session (swarm director, `PLAYTEST_DIRECT`)
+```sh
+nohup setsid bash tools/playtest/cloud/run-replay.sh main fix-r1 2 > replay-fix-r1.log 2>&1 &
+```
 
-`PLAYTEST_DIRECT=<cast.json>` runs `playtest.mjs direct <cast> --headless` once per repeat instead of the frozen set
-(the cast's `console.script` plays the console; verdict in `<run>/director/VERDICT.md`, story in `<run>/story.html`).
-The session must be on the branch that has `director/swarm/` (`lane/swarm-director-20261026` until it is merged):
+## Steps
 
-> `cd /home/user/sim && git fetch origin lane/swarm-director-20261026 && git checkout lane/swarm-director-20261026 &&
-> PLAYTEST_DIRECT=tools/playtest/scenarios/casts/seven-dwarves.json nohup setsid bash tools/playtest/cloud/run-replay.sh main dwarves-r1 1 > /tmp/dwarves-r1.log 2>&1 &`
-> then poll (`sleep 540; tail -n 30 /tmp/dwarves-r1.log; pgrep -f run-replay.sh || echo FINISHED`) until FINISHED, and
-> report `results/dwarves-r1/seven-dwarves-r1/director/VERDICT.md` in full, the playtest-results push result and CLOUD.md.
+Everything is created beside the clone, in its parent directory.
 
-The first argument is the server branch the world runs (`main` = the live Sim build). Seven haiku seats plus one Opus
-planner call; expect 40–60 minutes.
+1. Check out `origin/<server-branch>` detached in `../server` (a rerun moves it to the branch's current head).
+2. `pnpm install --frozen-lockfile` in the clone and in `../server`. Build `../server/apps/web` unless
+   `dist/.built-sha` already names that commit.
+3. `node tools/playtest/arena/assets-overlay.mjs ../mars-web --server-root ../server` builds the Mars web asset
+   overlay from the public site, resumably, with an `overlay-manifest.json` of url, bytes and sha256. It also sets
+   `PLAYTEST_MARS_WEB`. A dev world without an overlay would proxy those assets from an origin a sandboxed network may
+   not reach.
+4. `playtest.mjs preflight --server-root ../server --force-machine` writes `cloud-preflight.json`. The play is skipped
+   if preflight is not ok.
+5. The play itself is one of:
+   - `replay-set --frozen tools/playtest/frozen/frozen.json --repeats N --force-machine`
+   - `run $PLAYTEST_SCENARIO` once per repeat
+   - `direct $PLAYTEST_DIRECT --headless` once per repeat (the cast's console script plays the console; the verdict is
+     in `<run>/director/VERDICT.md`)
 
-## What it does (beside the clone, in its parent directory)
+   The machine is dedicated, so machine-gate breaches are recorded instead of waited on.
+6. `cloud/compress-shots.mjs` converts every PNG to JPEG (≤ 1024 px, q75) and rewrites `.png` references in text files.
+7. `CLOUD.md` records the server and playtest commits, toolchain, memory and load before and after, and per-step
+   timings.
+8. A secret guard scans the results for token-shaped strings and refuses to commit if it finds any. Otherwise the
+   results are committed under `results/<out-name>/` on `playtest-results` (an orphan branch on first use) and pushed
+   with backoff. Files over 95 MB are left out and listed in `OMITTED-LARGE-FILES.txt`.
 
-1. `git worktree add ../server origin/<fix-branch>` (detached; a rerun checks out the branch's current head).
-2. `pnpm install --frozen-lockfile` in the clone and in `../server`; `npx vite build` in `../server/apps/web`
-   (skipped when `dist/.built-sha` already names the fix sha).
-3. `node tools/playtest/arena/assets-overlay.mjs ../mars-web --server-root ../server`: the MARS_WEB_DIR overlay from
-   production URLs (manifests and Draco under `/mars-assets/`, `/browser/campus.glb`, the humanoid kit and every part it
-   names, the environment meshes), resumable, with `overlay-manifest.json` (url, bytes, sha256). Needed because a dev
-   world otherwise proxies `/modular` and `/browser` to sim.mars.college, which the cloud network does not allow.
-   `PLAYTEST_MARS_WEB` is set to it; `provision.mjs` also finds `<server-root>/../mars-web` on its own.
-4. `playtest.mjs preflight --server-root ../server --force-machine` → `cloud-preflight.json`.
-5. `playtest.mjs replay-set --server-root ../server --out ../results/<out-name> --repeats N --force-machine
-   --frozen tools/playtest/frozen/frozen.json`. The box is dedicated, so gate breaches are recorded, not waited on.
-6. `cloud/compress-shots.mjs`: every PNG → JPEG ≤ 1024 px (q75); `.png` references in text files become `.jpg`.
-   story.html keeps its inline thumbnails.
-7. `CLOUD.md`: nproc, memory and load before/after, fix sha, playtest sha, toolchain, per-step timings.
-8. Secret guard (token-shaped strings stop the commit), then commit `results/<out-name>/` on `playtest-results`
-   (orphan branch on first use) and `git push origin playtest-results` with backoff. Files over 95 MB are left out and
-   listed in `OMITTED-LARGE-FILES.txt`.
+Exit codes: the play's own (0 ok, 2 preflight or gate), 3 secret guard, 4 push failed (results stay committed
+locally in `../results-branch`).
 
-Exit code: the replay set's (0 ok, 2 preflight/gate), 3 secret guard, 4 push failed (results committed locally in
-`../results-branch`).
+`PLAYTEST_CLOUD_SKIP=step,step` skips named steps. For example, check the git plumbing from a throwaway clone whose
+`origin` is a scratch bare repository:
 
-## Environment it expects
+```sh
+PLAYTEST_CLOUD_SKIP=install-playtest,install-server,web-build,overlay,preflight,replay-set \
+  bash tools/playtest/cloud/run-replay.sh <branch> <out-name> 1
+```
 
-Ubuntu 24.04 as root, node 22 (adds `--experimental-strip-types` below 22.18), pnpm 10 (corepack fallback), the global
-`playwright` module with browsers under `/opt/pw-browsers`, an authenticated `claude` CLI, no Codex, network to package
-managers, sim.eden.art, assets.eden.art and GitHub. ImageMagick is installed with apt when no image tool exists.
+## Environment
 
-## Portability pieces (lib/platform.mjs)
+Linux with Node 22 (the script adds `--experimental-strip-types` below 22.18), pnpm 10 (installed through corepack if
+missing), the global `playwright` module with browsers (`/opt/pw-browsers` is used when present), an authenticated
+`claude` CLI, and network access to package registries, the public Sim and asset sites, and the Git remote.
+ImageMagick is installed with apt when no image tool exists. Codex is optional: `direct` substitutes a Claude seat
+(`PLAYTEST_CODEX_SUBSTITUTE_MODEL`, default `sonnet`) when `codex` is not installed.
 
-- Playwright: `$PLAYTEST_PLAYWRIGHT_PKG`, then the global `playwright` (NODE_PATH, `npm root -g`, /usr/lib, cwd), then
-  `<server-root>/mars/viewer`, then the laptop viewer. `PLAYWRIGHT_BROWSERS_PATH` is set only when the macOS cache or
-  `/opt/pw-browsers` exists.
-- Chromium: darwin uses the scenario's gpu (Metal); linux always headless SwiftShader with `--no-sandbox
-  --disable-dev-shm-usage`. The scenario's `gpu: metal` is ignored on Linux.
-- Memory gate: vm_stat on darwin, MemAvailable on linux. Quota: skipped with a note when `<usage-tool>` is absent.
-- Thumbnails: sips on darwin, else ImageMagick (`magick`/`convert`), else ffmpeg.
+`tools/playtest/lib/platform.mjs` holds the platform differences:
 
-## The frozen bundle
+- Playwright comes from `PLAYTEST_PLAYWRIGHT_PKG`, then the global `playwright`, then `<server-root>/mars/viewer`.
+- Chromium on macOS uses the scenario's GPU setting. On Linux it always runs headless SwiftShader with
+  `--no-sandbox --disable-dev-shm-usage`.
+- The memory gate reads `vm_stat` on macOS and `MemAvailable` on Linux.
+- Thumbnails come from `sips` on macOS, else ImageMagick, else ffmpeg.
+- The plan-usage check is skipped when `PLAYTEST_USAGE_PY` points at nothing.
 
-The cloud box has no `<team>/playtest/runs`, so `tools/playtest/frozen/frozen.json` carries each frozen run's replay
-scenario and baseline measures (no screenshots or transcripts). Rebuild it on the laptop after the oracles or the frozen
-set change, and commit it:
+## Frozen bundle
 
-    node tools/playtest/playtest.mjs freeze-bundle [--baseline <team>/playtest/replays/<replay-set>]
+A cloud machine does not have the original run folders, so `tools/playtest/frozen/frozen.json` carries each frozen
+run's replay scenario and baseline measures. Rebuild it where the run folders are after the oracles or the frozen set
+change, and commit it:
 
-`--baseline` adds a previous replay set's measures per label; replay-set then prefers them over the original runs
-(scripted replay against scripted replay) and the SCORECARD names the baseline used per run.
+```sh
+node tools/playtest/playtest.mjs freeze-bundle --runs-root <runs-dir> [--baseline <replay-set-dir>]
+```
 
-## Local dry check of the git plumbing
+`--baseline` stores a previous replay set's measures per label. `replay-set` then prefers them over the original
+runs (scripted replay against scripted replay), and the scorecard names the baseline used for each run.
 
-    PLAYTEST_CLOUD_SKIP=install-playtest,install-server,web-build,overlay,preflight,replay-set \
-      bash tools/playtest/cloud/run-replay.sh <branch> <out-name> 1
+## Pull results
 
-from a throwaway clone whose `origin` is a scratch bare repo.
+```sh
+bash tools/playtest/cloud/pull-results.sh <out-name> <dest-root> [<baseline-out-name>]
+```
+
+This extracts `results/<out-name>` from `origin/playtest-results` into `<dest-root>/<out-name>`. With a baseline
+(already pulled), it rescores with `replay-set --score-only` and writes `SCORECARD-vs-<baseline>.md`.
