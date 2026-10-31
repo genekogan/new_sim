@@ -6,11 +6,12 @@ import {pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 import {auditPublicEffects} from './effect-audit.mjs';
 import {seatIdentity,insidePolygon} from '../../review/journey-oracles.mjs';
+import {gardenPoolOf,poolGardenAt,poolGardenRegion} from './garden-pool.mjs';
 const at=v=>typeof v==='number'&&Number.isFinite(v)?v:typeof v==='string'?Date.parse(v):NaN;
 const row=(id,status,detail,evidence=[])=>({id,status,detail,evidence});
 const xz=p=>Array.isArray(p)?p.length===3?[p[0],p[2]]:p.length===2?p:null:p&&[p.x,p.z];
 const current=s=>s?.pos?.src!=='lastReceipt'&&(s?.currentBody===true||['here','owner','world'].includes(s?.pos?.src));
-const inside=(s,r)=>{const p=xz(s.pos),circle=Array.isArray(r.pos)&&Number.isFinite(r.radiusM);return p?.every(Number.isFinite)&&(circle||r.includePolygon)&&(!circle||Math.hypot(p[0]-r.pos[0],p[1]-r.pos[1])<=r.radiusM)&&(!r.includePolygon||insidePolygon(p,r.includePolygon))&&(!r.excludePolygon||!insidePolygon(p,r.excludePolygon));};
+const inside=(s,r)=>{const p=xz(s.pos),circle=Array.isArray(r.pos)&&Number.isFinite(r.radiusM);return p?.every(Number.isFinite)&&(circle||r.includePolygon)&&(!circle||Math.hypot(p[0]-r.pos[0],p[1]-r.pos[1])<=r.radiusM)&&(!r.includePolygon||insidePolygon(p,r.includePolygon))&&(!r.excludePolygon||!insidePolygon(p,r.excludePolygon))&&(!r.poolRef||poolGardenAt(p,r.pool)?.ref===r.poolRef);};
 const locationMissing=(s,p)=>p.placeIds&&(!xz(s.pos)?.every(Number.isFinite)||typeof s.place!=='string'||s.placeProvenance!=='explicit-native-most-specific-place');
 const locationMatches=(s,p)=>inside(s,p.region)&&(!p.placeIds||!locationMissing(s,p)&&p.placeIds.includes(s.place)&&(Number.isFinite(s.level)?s.level===p.level:p.placeLevels?.[s.place]===p.level));
 const activity=s=>typeof s.activity==='string'?s.activity:s.activity?.kind;
@@ -267,12 +268,17 @@ export function scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGap
   if(Number.isFinite(scheduled))check(scheduled>=t0&&scheduled-t0<=spec.maximumTriggerWaitSec*1000,'motion trigger outside frozen wait');
  }else if(spec.kind==='garden-group-overlap'){
   const from=at(p?.overlapFrom),to=at(p?.overlapTo);need(Number.isFinite(from)&&Number.isFinite(to),'garden overlap timestamps');
-  if(Number.isFinite(from)&&Number.isFinite(to)){
+  // garden-pool-v2: the proof names the pool garden; the first overlap is the
+  // earliest across the sealed pool (exact ties to the earlier pool entry).
+  const pool=gardenPoolOf(scenario),named=pool?.find(g=>g.ref===p?.gardenRef),gardenRegion=pool?named&&poolGardenRegion(named,pool):scenario.venue.gardenRegion;
+  if(pool&&!named)need(false,'sealed pool garden named by trigger proof');
+  const holdsIn=region=>scenario.actors.map(a=>observedHolds({samples:actor(a.id).samples,phase:{region,holdSec:spec.minimumOverlapSec},from:Math.max(t0+scenario.timing.meetingOffsetSec*1000,t0+a.releaseOffsetSec*1000),to:cutoff,maxGapSec}).windows);
+  if(Number.isFinite(from)&&Number.isFinite(to)&&gardenRegion){
    check(from>=t0+scenario.timing.meetingOffsetSec*1000&&to-from>=spec.minimumOverlapSec*1000,'garden overlap duration/order');
    // Retain each independently sampled run's bracketing endpoints. Slicing
    // every actor to a common timestamp drops valid boundary observations and
    // falsely shortens an asynchronous intersection. Gaps still break runs.
-   const groups=scenario.actors.map(a=>observedHolds({samples:actor(a.id).samples,phase:{region:scenario.venue.gardenRegion,holdSec:spec.minimumOverlapSec},from:Math.max(t0+scenario.timing.meetingOffsetSec*1000,t0+a.releaseOffsetSec*1000),to:cutoff,maxGapSec}).windows),together=groups.every(windows=>windows.some(w=>w.from<=from&&w.to>=to));
+   const groups=holdsIn(gardenRegion),together=groups.every(windows=>windows.some(w=>w.from<=from&&w.to>=to));
    if(!together){if(scenario.actors.every(a=>bodyCoverageComplete(actor(a.id),from,to,maxGapSec)))check(false,'three current bodies do not share declared garden interval');else need(false,'complete current garden overlap proof');}
    if(together){
     const available=Math.max(...scenario.actors.map((a,i)=>{
@@ -282,7 +288,11 @@ export function scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGap
     check(Number.isFinite(available)&&available<=delivered,'garden overlap evidence became available after delivery');
     if(p?.proofAvailableAt!==undefined){const reported=at(p.proofAvailableAt);check(Number.isFinite(reported)&&reported>=available&&reported<=delivered,'garden proof availability contradicts source samples or delivery');}
    }
-   const first=overlap(groups,spec.minimumOverlapSec);
+   let first=overlap(groups,spec.minimumOverlapSec);
+   if(pool){
+    const firsts=pool.map(g=>({g,o:overlap(holdsIn(poolGardenRegion(g,pool)),spec.minimumOverlapSec)})).filter(x=>x.o),earliest=firsts.reduce((a,b)=>b.o.from<a.o.from?b:a,firsts[0]);
+    first=earliest?.o??null;if(earliest)check(earliest.g.ref===named.ref,'trigger names a pool garden other than the first observed pool-garden overlap');
+   }
    if(first){exact(from,first.from,'not the first observed garden overlap');exact(to,first.from+spec.minimumOverlapSec*1000,'garden trigger postponed past first required overlap');}else need(false,'first garden overlap proof');
    exact(observed,to,'garden trigger timestamp mismatch');exact(scheduled,to,'garden delivery schedule mismatch');
   }
@@ -328,8 +338,20 @@ export function scoreDisturbance({scenario,disturbance,evidence,t0,cutoff,maxGap
  }
  return row('disturbance:'+disturbance.id,failures.length?'fail':missing.length?'unknown':'pass',failures.length?failures.join('; '):missing.length?'Missing '+[...new Set(missing)].join(', '):'Frozen trigger, timing, recipient and native delivery proof agree',d.evidence??[]);
 }
+/** garden-pool-v2 binding, mirroring the endpoint rule: the reviewer binds
+ * semantic.agreedGardenRef to a sealed pool garden; another garden is
+ * out-of-fixture; no agreement keeps the v1 default (venue.gardenRef). */
+function agreedGarden(scenario,evidence){
+ const pool=gardenPoolOf(scenario);if(!pool)return null;
+ const ref=evidence.semantic?.agreedGardenRef;
+ if(ref===undefined||ref===null){const g=pool.find(g=>g.ref===scenario.venue.gardenRef);return {ref:g.ref,region:poolGardenRegion(g,pool),basis:'no-agreement-v1-default'};}
+ const g=pool.find(g=>g.ref===ref);
+ return g?{ref,region:poolGardenRegion(g,pool),basis:'agreed-pool-garden'}:{ref,outOfFixture:true,basis:'out-of-fixture'};
+}
 export function scoreContinuity({fixtures,oracles,evidence}){
  const scenario=fixtures.scenarios.find(s=>s.id===evidence.scenarioId);if(!scenario)throw Error('Unknown frozen scenario');
+ if(scenario.fixtureVersion!==undefined&&evidence.fixtureVersion!==scenario.fixtureVersion)throw Error(`Evidence must declare fixtureVersion ${scenario.fixtureVersion} for ${scenario.id}`);
+ const garden=agreedGarden(scenario,evidence),outOfFixture=g=>`out-of-fixture: agreed garden ${JSON.stringify(g.ref)} is outside the sealed garden pool; reported, never scored as failure or success`;
  const t0=at(evidence.t0);if(!Number.isFinite(t0))throw Error('Evidence requires UTC T0');
  const cutoff=t0+scenario.timing.endOffsetSec*1000,meeting=t0+scenario.timing.meetingOffsetSec*1000;
  const bindings=evidence.bindings??{},rows=[],actors=evidence.participants??{},maxGap=oracles.numeric.maxSampleGapSec;
@@ -357,6 +379,10 @@ export function scoreContinuity({fixtures,oracles,evidence}){
     const ref=evidence.semantic?.finalEndpointRef,c=scenario.endpointCandidates.find(c=>c.ref===ref);
     if(!c){rows.push(row(actor.id+':'+phase.name,'unknown','Final endpoint must be semantically bound to a sealed candidate'));continue;}
     phase.region=c.region;phase.receipt.targetRefs=[ref];
+   }
+   if(phase.name==='garden visit'&&garden){
+    if(garden.outOfFixture){rows.push(row(actor.id+':'+phase.name,'unknown',outOfFixture(garden)));continue;}
+    phase.region=garden.region;phase.receipt.targetRefs=[garden.ref];
    }
    if(phase.name==='audience attendance')phase.region=scenario.venue.audienceRegion;
    if(phase.receipt?.verb==='walk')phase.receipt.completed=true;
@@ -420,7 +446,8 @@ export function scoreContinuity({fixtures,oracles,evidence}){
  if(scenario.id==='eden-walk-three'){
   const allComplete=scenario.actors.every(a=>actors[a.id]?.coverageComplete===true),miss=allComplete?'fail':'unknown';
   const groupAt=(region,from,to,seconds)=>overlap(scenario.actors.map(a=>observedHolds({samples:actors[a.id]?.samples,phase:{region,holdSec:seconds},from:Math.max(from,t0+a.releaseOffsetSec*1000),to,maxGapSec:maxGap}).windows),seconds);
-  for(const [id,region,from,to]of [['initial-three-way-overlap',scenario.venue.meetingRegion,meeting-30000,meeting+scenario.timing.lateActorArrivalToleranceSec*1000],['garden-three-way-overlap',scenario.venue.gardenRegion,meeting,cutoff]]){
+  for(const [id,region,from,to]of [['initial-three-way-overlap',scenario.venue.meetingRegion,meeting-30000,meeting+scenario.timing.lateActorArrivalToleranceSec*1000],['garden-three-way-overlap',garden?garden.region??null:scenario.venue.gardenRegion,meeting,cutoff]]){
+   if(!region){rows.push(row(id,'unknown',outOfFixture(garden)));continue;}
    const proof=groupAt(region,from,to,scenario.timing.minimumGroupOverlapSec);rows.push(row(id,proof?'pass':miss,'Three independently observed current positions overlap for frozen hold',proof?[proof]:[]));
   }
   const final=scenario.endpointCandidates.find(c=>c.ref===evidence.semantic?.finalEndpointRef),revised=final&&evidence.semantic?.originalEndpointRef&&final.ref!==evidence.semantic.originalEndpointRef;
@@ -467,7 +494,7 @@ export function scoreContinuity({fixtures,oracles,evidence}){
  const review=evidence.semantic,required=[...oracles.semanticRubric.common,...oracles.semanticRubric.scenarios[scenario.id]];
  for(const item of required){const r=review?.rubricVersion===oracles.semanticRubric.version?review.reviews?.find(r=>r.id===item.id):null;rows.push(row('semantic:'+item.id,r&&['pass','fail'].includes(r.status)&&r.evidence?.length?r.status:'unknown',r?.reason??item.pass,r?.evidence));}
  const status=evidence.fixtureVerified!==true?'unknown':rows.some(r=>r.status==='fail')?'fail':rows.every(r=>r.status==='pass')?'pass':'unknown';
- return {schema:'continuity-score/1',readingMatchVersion:READING_MATCH_VERSION,proposalRevision:fixtures.proposalRevision??null,scenarioId:scenario.id,status,readiness:scenario.fixtureStatus,rows,limits:'Proposal scorer. Missing group integration/coverage remains unknown; this output does not certify baseline, holdout or soak acceptance.'};
+ return {schema:'continuity-score/1',readingMatchVersion:READING_MATCH_VERSION,proposalRevision:fixtures.proposalRevision??null,scenarioId:scenario.id,...(garden?{fixtureVersion:scenario.fixtureVersion,gardenRule:scenario.gardenRule,garden:{ref:garden.ref,basis:garden.basis}}:{}),status,readiness:scenario.fixtureStatus,rows,limits:'Proposal scorer. Missing group integration/coverage remains unknown; this output does not certify baseline, holdout or soak acceptance.'};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const evidence=JSON.parse(readFileSync(process.argv[2],'utf8'));

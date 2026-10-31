@@ -1200,6 +1200,9 @@
       "role": "holdout",
       "world": "eden-2026",
       "fixtureStatus": "blocked-before-comparison",
+      "fixtureVersion": 2,
+      "gardenRule": "garden-pool-v2",
+      "fixtureVersionNote": "Declared 2026-10-31 by Gene/root after garden-holdout-r3-baseline-1 (diagnosis garden-discoverability-diagnosis/diagnosis.json): the frozen instruction names no garden, native `explore garden` returns five gardens, and v1 bound the garden visit, its receipt and the independent-errand trigger to place-eden-stone-garden only. v2 seals the five-garden pool below and binds those checks to the agreed / co-visited pool garden, mirroring the endpoint rule. Instruction text, timings, thresholds, overlap durations, separation distance, every other criterion and the endpoint pool are unchanged. Callers must declare fixtureVersion 2 (scorer evidence.fixtureVersion; disturbance dispatcher fixtureVersion). Version 1 is this file at git 3ad3c223d; runs sealed under v1 keep their v1 scores.",
       "timeDomain": "real UTC; T0 set after all setup receipts and initial poses pass",
       "soulIds": "bind fresh per run; never publish or reuse probe Soul IDs",
       "agentInformation": "matrix instructions plus the declared initial owner supplements; no oracle entity IDs/coordinates or other agent state in model prompts",
@@ -1487,6 +1490,76 @@
         }
       ],
       "agreementRule": "Agents choose their original endpoint from discovered landmarks. The final endpoint must differ from their original agreement and be visibly accepted by all three. Allowed pool sealed before trials; a different discoverable choice is reported out-of-fixture, never quietly scored as failure or success.",
+      "gardenCandidates": [
+        {
+          "ref": "land-garden-plot-1",
+          "name": "Garden plot 1",
+          "placeId": "g-land-garden-plot-1",
+          "region": {
+            "pos": [
+              32.8,
+              46.6
+            ],
+            "radiusM": 4
+          },
+          "walkCapability": "walk:land-garden-plot-1"
+        },
+        {
+          "ref": "place-eden-stone-garden",
+          "name": "Village Stone Garden",
+          "placeId": "g-place-eden-stone-garden",
+          "region": {
+            "pos": [
+              57,
+              -10
+            ],
+            "radiusM": 4
+          },
+          "walkCapability": "walk:g-place-eden-stone-garden"
+        },
+        {
+          "ref": "land-garden-plot-2",
+          "name": "Garden plot 2",
+          "placeId": "g-land-garden-plot-2",
+          "region": {
+            "pos": [
+              37.7,
+              46.6
+            ],
+            "radiusM": 4
+          },
+          "walkCapability": "walk:land-garden-plot-2"
+        },
+        {
+          "ref": "land-garden-plot-4",
+          "name": "Garden plot 4",
+          "placeId": "g-land-garden-plot-4",
+          "region": {
+            "pos": [
+              32.8,
+              53.2
+            ],
+            "radiusM": 4
+          },
+          "walkCapability": "walk:land-garden-plot-4"
+        },
+        {
+          "ref": "land-garden-plot-3",
+          "name": "Garden plot 3",
+          "placeId": "g-land-garden-plot-3",
+          "region": {
+            "pos": [
+              42.6,
+              46.6
+            ],
+            "radiusM": 4
+          },
+          "walkCapability": "walk:land-garden-plot-3"
+        }
+      ],
+      "gardenPoolSource": "Exactly the five candidates of native `explore garden` from Commons Field (place.ambiguous, distance order 57/58/60/62/63 m; garden-holdout-r3-baseline-1 walker-1 stream and the gd-probe of worlds/templates/eden-2026.json sha256 85465ccf...). Each centre is the centre of the template's authored area (land-garden-plot-N core/garden-bed, place-eden-stone-garden core/zone); radius is v1's unchanged 4 m garden radius. Pool order is the explore order and only breaks exact distance ties.",
+      "gardenMembership": "nearest-pool-centre/1: a current body sample is in pool garden G iff it is within G.region.radiusM of G's centre and no other pool centre is nearer (exact ties go to the earlier pool entry), so one sample is in at most one pool garden. The stone garden is >55 m from every other pool centre, so its membership equals the v1 [57,-10] r4 circle.",
+      "gardenAgreementRule": "Mirrors agreementRule. The reviewer binds semantic.agreedGardenRef to the pool garden all three visibly agreed to walk to (source-cited world speech). The garden visit (region, walk receipt target) and the garden-three-way-overlap row then use that pool garden. A different discoverable garden is reported out-of-fixture (unknown, never quietly scored as failure or success). No garden agreement (agreedGardenRef absent or null) keeps the v1 default venue.gardenRef, i.e. the v1 failure path. The independent-errand trigger is mechanical: the first observed minimumOverlapSec all-three overlap inside one pool garden (earliest overlap start; exact ties to the earlier pool entry); its proof names that gardenRef.",
       "disturbances": [
         {
           "id": "late-walker",
@@ -1505,7 +1578,7 @@
         },
         {
           "id": "independent-errand",
-          "when": "first observed 10-second all-three garden overlap",
+          "when": "first observed 10-second all-three overlap inside one sealed pool garden (garden-pool-v2)",
           "actor": "walker-2",
           "once": true,
           "text": "Please briefly inspect Commons Pavilion, then rejoin your walking companions using what you can learn from the world. Keep your original errand for afterward.",
@@ -1598,6 +1671,7 @@
         }
       ],
       "journeyTemplateNote": "Endpoint phase is an example branch. Bind exactly the final semantically verified agreed endpoint from the sealed candidate pool before scoring; do not force bandstand or inject its coordinates into prompts.",
+      "gardenTemplateNote": "garden-pool-v2: the garden visit phase is likewise an example branch (stone garden = the v1 default). Bind semantic.agreedGardenRef from gardenCandidates before scoring; never inject a garden name or coordinate into prompts.",
       "additionalMechanical": [
         "all-three overlap at initial meeting, garden and final agreed endpoint",
         "walker-2 physically reaches independent errand then rejoins",
