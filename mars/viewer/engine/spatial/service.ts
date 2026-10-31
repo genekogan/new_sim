@@ -490,7 +490,8 @@ export class Spatial {
     // the navigation epoch moves with the static world only: windows hold the same tiles wherever they lie, so a walk's
     // corridor, smoothing and single-file passages (narrowId: window-independent names) stay valid when windows move
     if (changed) { this.epoch++; this.aroundCache.clear(); }
-    this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
+    if (this.tileReads) this.scene = this.pages.scenes[0];   // a tile-reading replica faces no window: no window grids
+    else this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
     if (changed) this.stats.pagedChanged++; else this.stats.pagedMoved++;
     this.stats.pagedMs += performance.now() - t0;
     return true;
