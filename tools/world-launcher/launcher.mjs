@@ -100,7 +100,7 @@ import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
 import { EXISTING_WORLDS, decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 import { makeHandoff } from './handoff.mjs';
-import { MicroCache, launcherFlood, requestClass, short, soulCeilings } from './flood.mjs';
+import { MicroCache, launcherFlood, listenTimeoutMs, refusalBody, requestClass, short, soulCeilings } from './flood.mjs';
 import { readLive, serveMetrics } from './metrics.mjs';   // lane L7
 import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
 import { isUnlisted, publicWorlds } from './listing.mjs';
@@ -120,6 +120,8 @@ export function withHeap(d, heapMb) {
 }
 /** How a world the launcher cannot reach right now is reported (children.mjs ensure() error codes; LOAD-CONTRACT §4). */
 const WORLD_CODES = { held: 'world.held', starting: 'world.starting' };
+/** The dark soul.slow-down hint on C2 reads at amber (lane srv-shed; LOAD-CONTRACT §2b "Refusal shapes"). */
+const SLOW_DOWN_HINT = Object.freeze({ header: 'soul.slow-down', retryAfterMs: 5000, message: 'The world is busy and asked you to slow down for 5 s between reads' });
 /** LOAD-CONTRACT §1 levels; at HOT ones the proxy sheds C2 and caches C3 for 2 s. After a restart, C1/C2 ramp up over RAMP_MS. */
 const LEVELS = ['green', 'amber', 'red', 'black'], HOT = new Set(['red', 'black']), RAMP_MS = 60_000;
 function hostHealth(dataDir) {
@@ -583,13 +585,20 @@ export async function openLauncher(cfg = {}) {
     // Stage B (lane B-port): shedding is for a world that cannot answer. At red/black a C2 read its read workers answer
     // (live.json lists them, lag ≤ READ_SHED_LAG_GENS) goes to them instead of being refused here (counted by level)
     if (held?.scope?.startsWith('load:') && readTarget(slug, w, edgeRest, req.method, url.search, { maxLagGens: READ_SHED_LAG_GENS })) held = null;
-    if (held) { ceilings.note(slug, held.code, held.scope); json(res, 503, { ok: false, code: held.code, slug, message: held.message, retry_after: held.s }, { 'retry-after': String(held.s), 'cache-control': 'no-store' }); return; }
+    if (held) { ceilings.note(slug, held.code, held.scope); json(res, 503, { ...refusalBody(held.code, held.message, held.s * 1000, held.scope), slug }, { 'retry-after': String(held.s), 'cache-control': 'no-store' }); return; }
     // lane L1: the Soul API's ceilings (flood.mjs soulCeilings), answered at once without the world
     // lane B-serve: a C2 read the world's read workers will answer is exempt from the world budget (main's share); it is
     // charged if it reaches main after all (no worker by the time it is routed, a fallback, a worker that forwarded it)
     const toWorker = !retried && !!readTarget(slug, w, edgeRest, req.method, url.search);
-    const gated = retried ? null : ceilings.check(req, slug, url.pathname.slice(wp(slug).length) || '/', behindProxy, { toWorker });
+    // lane srv-shed: a listen over its listen ceiling is held up to listenHoldMs for a slot (the oldest listener on that
+    // key released first once it is past its own deadline) and answered; refused at once only at red/black
+    const level = levelOf(slug);
+    let gated = retried ? null : ceilings.check(req, slug, edgeRest, behindProxy, { toWorker, level, deadlineMs: edgeCls === 'listen' ? listenTimeoutMs(edgeRest, url.search) : 0, evict: () => res.destroy() });
+    if (gated?.hold) { gated = await gated.hold(() => clientGone(req, res)); if (!gated) return; if (clientGone(req, res)) { gated.release?.(); return; } }
     if (gated?.refuse) { json(res, gated.refuse.status, gated.refuse.body, gated.refuse.headers); return; }
+    // lane srv-shed (LOAD-CONTRACT §2b): at amber a C2 read is served, marked with the dark soul.slow-down hint (headers
+    // only; no refusal, the world's own admission still applies)
+    if (edgeCls === 'C2' && level === 'amber') { res.setHeader('x-sim-hint', SLOW_DOWN_HINT.header); res.setHeader('x-sim-hint-retry-after-ms', String(SLOW_DOWN_HINT.retryAfterMs)); res.setHeader('x-sim-hint-message', SLOW_DOWN_HINT.message); }
     if (gated) res.once('close', gated.release);
     // P2: one flooding visitor or agent is refused here (every world shares this loop), before its world is contacted: a
     // refusal neither boots nor wakes a sleeping world, keeps it awake, counts as its use, nor counts as a look or an agent
@@ -698,18 +707,21 @@ export async function openLauncher(cfg = {}) {
    *  25 % -> 100 %, by Soul so one Soul is not admitted and refused in turn) and for C2 at red/black (C3 is micro-cached). */
   function admission(slug, gated) {
     const st = pool.status(slug), now = Date.now();
-    if (st.status === 'starting' || st.status === 'restarting') return { code: 'world.starting', scope: 'boot', s: 5, message: 'the world is starting; try again in 5 s' };
+    if (st.status === 'starting' || st.status === 'restarting') return { code: 'world.starting', scope: 'boot', s: 5, message: 'The world is starting up. It asked you to wait 5 s' };
     if (st.status !== 'running') return null;
     const heavy = gated.cls === 'C1' || gated.cls === 'C2';
     if (heavy && st.rampFrom && now - st.rampFrom < RAMP_MS) {
       const age = now - st.rampFrom, share = 0.25 + 0.75 * (age / RAMP_MS);
       const at = gated.soul ? (parseInt(createHash('sha256').update(gated.soul).digest('hex').slice(0, 8), 16) / 2 ** 32) : Math.random();
-      if (at >= share) { const s = Math.max(1, Math.ceil(((at - 0.25) / 0.75 * RAMP_MS - age) / 1000)); return { code: 'world.busy', scope: 'ramp', s, message: `the world has just restarted and is letting Souls back in; try again in ${s} s` }; }
+      if (at >= share) { const s = Math.max(1, Math.ceil(((at - 0.25) / 0.75 * RAMP_MS - age) / 1000)); return { code: 'world.busy', scope: 'ramp', s, message: `The world has just restarted and is letting Souls back in a few at a time. It asked you to wait ${s} s` }; }
     }
     const level = levelOf(slug);
-    if (gated.cls === 'C2' && HOT.has(level)) { const s = level === 'black' ? 5 : 2; return { code: 'world.busy', scope: `load:${level}`, s, message: `the world is very busy (${level}); try again in ${s} s` }; }
+    if (gated.cls === 'C2' && HOT.has(level)) { const s = level === 'black' ? 5 : 2; return { code: 'world.busy', scope: `load:${level}`, s, message: `The world is very busy (${level}) and asked you to wait ${s} s before reading again; actions still go through` }; }
     return null;
   }
+  /** lane srv-shed: the ceilings' refusals since this launcher started, by world then code (worlds with none left out).
+   *  Public on /__sim/healthz (counts only, no Soul, account or address): sim-watch alerts on their growth. */
+  function refusedByWorld() { const out = {}; for (const w of registry.worlds) { const r = ceilings.refused(w.slug); if (Object.keys(r).length) out[w.slug] = r; } return out; }
   /** A C3 public read from the micro-cache (LOAD-CONTRACT §2): one world call per URL per ttl, shared by every caller. */
   async function cachedRead(req, res, p, slug, url, ttlMs) {
     const key = `${slug} ${url.pathname}${url.search} ${req.headers['accept-encoding'] ?? ''} ${req.headers.authorization ? short(req.headers.authorization) : ''}`;
@@ -883,14 +895,14 @@ export async function openLauncher(cfg = {}) {
         json(res, 200, { origin, publicOrigin: prod.publicOrigin, devAuth: prod.devAuth, dataDir, range, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, memAvailableMb: memAvailableMb(), children: registry.worlds.map((w) => ({ slug: w.slug, viewers: live.get(w.slug) ?? 0, heapMb: w.fork ? (w.worldHeapMb ?? cfg.forkHeapMb ?? 1536) : worldHeapMb(w, prod.worldHeapMb), ...pool.status(w.slug) })) }); return;
       }
       // lane L7: Prometheus text for the worlds and the launcher (LOAD-CONTRACT §5), loopback only
-      if (path === '/__sim/metrics' && req.method === 'GET') { if (!direct(req)) { json(res, 404, { ok: false, code: 'not-found' }); return; } serveMetrics(res, { launcher: { build: BUILD, maxRunning: prod.maxRunning, maxWorlds: MAX_WORLDS, memAvailableMb: memAvailableMb() }, clientErrors: errors, worlds: registry.worlds.map((w) => ({ slug: w.slug, ...pool.status(w.slug), refused: ceilings.refused(w.slug), ...(readStats.has(w.slug) ? { read: { ...readStats.get(w.slug) } } : {}), live: readLive(registry.worldDir(w.slug)) })) }); return; }
+      if (path === '/__sim/metrics' && req.method === 'GET') { if (!direct(req)) { json(res, 404, { ok: false, code: 'not-found' }); return; } serveMetrics(res, { launcher: { build: BUILD, maxRunning: prod.maxRunning, maxWorlds: MAX_WORLDS, memAvailableMb: memAvailableMb() }, clientErrors: errors, worlds: registry.worlds.map((w) => ({ slug: w.slug, ...pool.status(w.slug), refused: ceilings.refused(w.slug), listenHeld: ceilings.held(w.slug), ...(readStats.has(w.slug) ? { read: { ...readStats.get(w.slug) } } : {}), live: readLive(registry.worldDir(w.slug)) })) }); return; }
       if ((path === '/__sim/healthz' || path === '/healthz') && (req.method === 'GET' || req.method === 'HEAD')) {
         const running = registry.worlds.filter((w) => pool.status(w.slug).status === 'running').length;
         const host = hostHealth(dataDir); // deploy/host-health.mjs (timer): `hostOk` (+ short `hostCodes` when not ok) public, the numbers loopback-only
         // lane L1: the guard's findings now, not at the timer's next run: wedged, held, crashloop, bootSlow (codes public, texts loopback)
         const worldProblems = pool.problems(), wcodes = [...new Set(worldProblems.map((x) => x.code))];
         const hostOk = (host ? host.ok : true) && !wcodes.length, hostCodes = [...new Set([...(host && !host.ok ? host.codes ?? [] : []), ...wcodes])];
-        json(res, 200, { ok: true, service: 'world-launcher', build: BUILD, auth: auth ? 'clerk' : 'dev', worlds: registry.worlds.length, running, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, ...(host || wcodes.length ? { hostOk, ...(hostOk ? {} : { hostCodes }) } : {}), ...(direct(req) && worldProblems.length ? { worldProblems } : {}), clientErrorsNew: errors.newSinceRelease(), clientErrorsRate10m: errors.rate10m(), ...(direct(req) ? { memAvailableMb: memAvailableMb(), ...(host ? { host } : {}) } : {}) }); return;
+        json(res, 200, { ok: true, service: 'world-launcher', build: BUILD, auth: auth ? 'clerk' : 'dev', worlds: registry.worlds.length, running, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, ...(host || wcodes.length ? { hostOk, ...(hostOk ? {} : { hostCodes }) } : {}), ...(direct(req) && worldProblems.length ? { worldProblems } : {}), clientErrorsNew: errors.newSinceRelease(), clientErrorsRate10m: errors.rate10m(), refused: refusedByWorld(), ...(direct(req) ? { memAvailableMb: memAvailableMb(), ...(host ? { host } : {}) } : {}) }); return;
       }
       const to = redirects?.target(req, path, url);
       if (to) { res.writeHead(302, { location: to, 'cache-control': 'no-store' }).end(); return; }

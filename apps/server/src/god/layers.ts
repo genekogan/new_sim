@@ -332,7 +332,8 @@ export class GodLayers {
 
   // ---------- Soul capabilities and acts ----------
 
-  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, here: Vec2 | null) {
+  /** `offers` false (a focused build that names no buy/pay): the refusals on `caps` only, no economy offers listed. */
+  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, here: Vec2 | null, offers = true) {
     const sites = this.h.closingSites?.() ?? [];
     // ownership on the bridge's own caps: seats, hands and surfaces of private things
     for (const c of caps) {
@@ -354,7 +355,7 @@ export class GodLayers {
       const r = this.refusal(c.target.id, soul) ?? (c.verb === 'pick-up' && economyOn() ? this.forSale(c.target.id, soul) : null);
       if (r) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }
     }
-    if (!here || !economyOn()) return;
+    if (!offers || !here || !economyOn()) return;
     const mine = this.walletOf(soul);
     for (const e of this.m.entities.values()) {
       if (!e.price) continue;

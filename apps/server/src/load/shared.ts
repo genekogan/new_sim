@@ -24,14 +24,18 @@ export const S = {
   readWorkers: 22, // read workers alive
   readLagGens: 23, // the largest delta gap (generations) between the main thread and a live read worker
   readPorts: 24,   // 4 slots: each read worker's loopback HTTP port (0 = none)
-  size: 28,
+  // admission calibration (lane srv-admission-calib): EWMA of the tick's own ms over quiet loop windows (monitor.ts);
+  // 0 = not measured yet. admission.ts reads it for the frame budget (frameBudgetMs).
+  quietTickMs: 28,
+  size: 29,
 } as const;
 
 export type LiveJson = {
   v: 1; pid: number; at: number; phase: Phase;
   boot?: {stage: BootStage; tick: number; target: number};
   loop: {lastTurnAgeMs: number; delayP99Ms: number};
-  tick?: {world: number; service5s: number; p99Ms: number};
+  /** quietAvgMs: the tick's own average ms in quiet windows (EWMA; 0 = not measured yet), which sets the frame budget. */
+  tick?: {world: number; service5s: number; p99Ms: number; quietAvgMs: number};
   heap: {usedMb: number; limitMb: number; gcPct10s: number};
   level: Level;
   queue?: {depth: number; oldestMs: number};
@@ -62,7 +66,7 @@ export function liveOf(a: Float64Array, pid: number, now: number): LiveJson {
     level: LEVELS[a[S.level]] ?? 'green', shed: {reads: a[S.shedReads], acts: a[S.shedActs]}};
   if (phase.startsWith('boot:')) out.boot = {stage: (bp.boot?.stage ?? 'restore') as BootStage, tick: bp.boot?.tick ?? 0, target: bp.boot?.target ?? 0};
   if (serving) {
-    out.tick = {world: a[S.worldTick], service5s: r2(a[S.service5s]), p99Ms: r1(a[S.tickP99Ms])};
+    out.tick = {world: a[S.worldTick], service5s: r2(a[S.service5s]), p99Ms: r1(a[S.tickP99Ms]), quietAvgMs: r1(a[S.quietTickMs])};
     out.queue = {depth: a[S.queueDepth], oldestMs: Math.round(a[S.queueOldestMs])};
     out.souls = {awake: a[S.awake], waiting: a[S.waiting], connected: a[S.connected]};
   }

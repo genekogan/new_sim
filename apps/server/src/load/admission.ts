@@ -5,7 +5,7 @@
 // whose client went away is dropped. It queues, delays and refuses; it never chooses or retries an act for a Soul.
 import {createHash} from 'node:crypto';
 import type {Context, MiddlewareHandler} from 'hono';
-import type {Level} from './shared.ts';
+import {S, sharedLoad, type Level} from './shared.ts';
 import {crowdedNote} from './waking.ts';
 
 export type Cls = 'C0' | 'C1' | 'C2' | 'C3';
@@ -40,18 +40,39 @@ export function classify(method: string, path: string): RouteClass | null {
   return null;
 }
 
-/** Dial values (LOAD-CONTRACT §1). Frame budget: request ms per 50 ms frame. Refill: per-Soul bucket multiplier. */
+/** Dial values (LOAD-CONTRACT §1, §2b). Frame budget: request ms per 50 ms frame. These are the caps (tuned on the laptop);
+ *  the budget a world gets is calibrated to what its own tick leaves of the frame (frameBudgetMs below). */
 export const FRAME_BUDGET_MS: Record<Level, number> = {green: 25, amber: 15, red: 8, black: 0};
-export const REFILL_X: Record<Level, number> = {green: 1, amber: 0.5, red: 0.25, black: 0.25};
-const COOL_MS = 60_000, FRAME_MS = 50, CAPACITY_MS = 2000, GOD_SHARE = 0.25, DEFAULT_EST_MS = 20, ANSWER_MARGIN_MS = 250, ACTIVE_MS = 60_000;
+/** Share of the frame's slack (50 ms − the quiet tick) the requests may take, by level (lane srv-admission-calib). */
+export const FRAME_SLACK_K: Record<Level, number> = {green: 0.6, amber: 0.4, red: 0.2, black: 0};
+/** Floor, so a world whose quiet tick nearly fills the frame still answers (slowly) rather than never. */
+export const FRAME_BUDGET_FLOOR_MS: Record<Level, number> = {green: 2, amber: 1, red: 0.5, black: 0};
+export const FRAME_MS = 50;
+/** The calibrated frame budget: min(cap, max(floor, k × max(0, 50 − quietTickMs))). quietTickMs = the monitor's EWMA of
+ *  the tick's own ms in quiet windows (monitor.ts QuietTick; 0 = not measured yet → the caps). Production (tick 12 ms):
+ *  22.8/15/7.6/0; a box ticking at 35 ms: 9/6/3/0; the laptop (tick ≤ 8 ms): 25/15/8/0. */
+export function frameBudgetMs(level: Level, quietTickMs: number): number {
+  const cap = FRAME_BUDGET_MS[level];
+  if (!(quietTickMs > 0) || !Number.isFinite(quietTickMs)) return cap;
+  return Math.min(cap, Math.max(FRAME_BUDGET_FLOOR_MS[level], FRAME_SLACK_K[level] * Math.max(0, FRAME_MS - quietTickMs)));
+}
+/** The god's bucket (the reserve, unchanged): 25 % of the green cap's throughput × this multiplier by level. The Souls'
+ *  refill has the level folded into the frame budget instead (refillPerS). */
+export const GOD_REFILL_X: Record<Level, number> = {green: 1, amber: 0.5, red: 0.25, black: 0.25};
+export const SOUL_REFILL_MAX_PER_S = 200;
+const COOL_MS = 60_000, CAPACITY_MS = 2000, GOD_SHARE = 0.25, DEFAULT_EST_MS = 20, ANSWER_MARGIN_MS = 250, ACTIVE_MS = 60_000;
 
 type Job = {key: string; god: boolean; route: RouteClass; arrival: number; deadline: number; closed: () => boolean;
   settle: (v: 'run' | 'dropped' | Refusal) => void; finished: Promise<void>; finish: () => void};
 type Bucket = {tokens: number; at: number; seen: number};
+type Strikes = {slow: number[]; busy: number[]; coolUntil: number; retryUntil: number};
 /** Socket-independent (Stage B): a job is (key = Soul or god, class, deadline, `closed()` = "has the asker gone", and the
  *  ticket as its reply handle). The HTTP middleware below is one front end; a worker's MessagePort can be another. */
 export type Ticket = {refusal: Refusal} | {turn: Promise<'run' | 'dropped' | Refusal>; done: () => void; waitedMs: () => number};
 
+export type AdmissionOpts = {now?: () => number; yieldTurn?: () => Promise<void>;
+  /** The quiet tick ms (default: the monitor's, from the process's shared numbers, S.quietTickMs). */
+  quietTickMs?: () => number};
 export class Admission {
   level: Level = 'green';
   readonly queue: Job[] = [];
@@ -65,21 +86,29 @@ export class Admission {
    *  budget, and every job's measured time is debited, so a job longer than the budget is paid back by the frames
    *  after it. Whatever the sum of the per-Soul budgets, requests never take more than budget/50 of the thread. */
   private credit = FRAME_BUDGET_MS.green; private creditAt = 0;
-  private strikes = new Map<string, {slow: number[]; busy: number[]; coolUntil: number}>();
+  /** Per principal: strike times, the cool-down's end, and when the Retry-After it was last given elapses (retryUntil). */
+  private strikes = new Map<string, Strikes>();
   private share = {god: 0, souls: 0};   // decaying ms spent, for the god's reserve
   private draining = false; private wake: NodeJS.Timeout | null = null; private soon: NodeJS.Immediate | null = null; private sweeper: NodeJS.Timeout | null = null;
   private now: () => number;
-  private o: {now?: () => number; yieldTurn?: () => Promise<void>};
-  constructor(o: {now?: () => number; yieldTurn?: () => Promise<void>} = {}) { this.o = o; this.now = o.now ?? (() => performance.now()); }
+  private o: AdmissionOpts;
+  private quietTick: () => number;
+  constructor(o: AdmissionOpts = {}) { this.o = o; this.now = o.now ?? (() => performance.now()); this.quietTick = o.quietTickMs ?? (() => sharedLoad[S.quietTickMs]); }
+  /** This level's frame budget (request ms per 50 ms frame), calibrated from the measured quiet tick (frameBudgetMs). */
+  frameBudget(level: Level = this.level) { return frameBudgetMs(level, this.quietTick()); }
 
-  /** Load dial (LOAD-CONTRACT §1): frame budget 25/15/8/0 ms and bucket refill ×1/×0.5/×0.25/×0.25. */
+  /** Load dial (LOAD-CONTRACT §1): frame budget (frameBudgetMs, at most 25/15/8/0 ms) and bucket refill ×1/×0.5/×0.25/×0.25. */
   setLoadLevel(level: Level) { this.level = level; this.kick(); }
   queueStats() { const now = this.now(); let oldest = 0; for (const j of this.queue) oldest = Math.max(oldest, now - j.arrival); return {depth: this.queue.length, oldestMs: Math.round(oldest)}; }
   /** Principals (Souls + god) with a heavy request in the last minute: the `awake` of the refill formula. */
   active() { const now = this.now(); let n = 0; for (const b of this.buckets.values()) if (now - b.seen < ACTIVE_MS) n++; return Math.max(1, n); }
   estimate(id: string) { return this.est.get(id) ?? DEFAULT_EST_MS; }
-  /** ms per ms of refill for one principal: min(200, 500/awake) ms/s × the level's dial; the god's bucket is the reserve. */
-  private refill(god: boolean) { const perS = god ? 1000 * GOD_SHARE * FRAME_BUDGET_MS.green / FRAME_MS : Math.min(200, 500 / this.active()); return perS * REFILL_X[this.level] / 1000; }
+  /** Refill of one principal's bucket, ms per s. A Soul: min(200, 20 × frameBudget / awake), so the Souls' buckets together
+   *  refill at the frame budget's own throughput (20 frames/s × budget ms) and a crowd never earns more than the dispatcher
+   *  can serve (srv-admission-calib: the old 500/awake × {1, .5, .25} was the laptop's green budget at every box). The god:
+   *  the reserve, 25 % of the green cap × GOD_REFILL_X (unchanged). */
+  refillPerS(god = false) { return god ? 1000 * GOD_SHARE * FRAME_BUDGET_MS.green / FRAME_MS * GOD_REFILL_X[this.level] : Math.min(SOUL_REFILL_MAX_PER_S, (1000 / FRAME_MS) * this.frameBudget() / this.active()); }
+  private refill(god: boolean) { return this.refillPerS(god) / 1000; }
   private bucket(key: string, god: boolean, now: number) {
     let b = this.buckets.get(key);
     if (!b) { b = {tokens: CAPACITY_MS, at: now, seen: now}; this.buckets.set(key, b); }
@@ -99,22 +128,25 @@ export class Admission {
     const now = this.now(), read = r.route.cls === 'C2';
     const cool = this.cooling(r.key, now);
     if (cool) { this.shed.slow++; if (read) this.shed.reads++; else this.shed.acts++; return {refusal: {status: 429, code: 'soul.slow-down', retryAfterS: cool, message: 'this Soul has asked for too much in a short time; the world answers it again in a minute'}}; }
-    if (this.outstanding.has(r.key)) { this.shed.busy++; if (read) this.shed.reads++; this.strike(r.key, r.god, 'busy', now); return {refusal: {status: 429, code: 'soul.busy', retryAfterS: 1, message: 'a previous request from this Soul is still being answered'}}; }
+    if (this.outstanding.has(r.key)) { this.shed.busy++; if (read) this.shed.reads++; this.strike(r.key, r.god, 'busy', now); return this.told(r.key, r.god, now, {status: 429, code: 'soul.busy', retryAfterS: 1, message: 'a previous request from this Soul is still being answered'}); }
     const b = this.bucket(r.key, r.god, now); b.seen = now;
     const est = this.estimate(r.route.id);
-    if (read && this.level === 'black') { this.shed.reads++; return {refusal: busyRefusal(this.level)}; }
+    if (read && this.level === 'black') { this.shed.reads++; return this.told(r.key, r.god, now, busyRefusal(this.level)); }
     if (read && b.tokens < est && this.contended(r.key)) {
-      this.shed.slow++; this.shed.reads++; this.strike(r.key, r.god, 'slow', now);
+      // §2b strike only for an impolite request: one that came back before the Retry-After it was last given had
+      // elapsed. A Soul that waited and is still over budget is refused again with a Retry-After, but not struck
+      // (eden2, 2026-10-31: honest Souls collected 3 strikes and a 60 s cool-down, 45-59 % of all read wall time)
+      this.shed.slow++; this.shed.reads++; if (this.impolite(r.key, now)) this.strike(r.key, r.god, 'slow', now);
       const rate = this.refill(r.god);
-      return {refusal: {status: 429, code: 'soul.slow-down', retryAfterS: Math.max(1, Math.ceil((est - b.tokens) / Math.max(rate, 1e-6) / 1000)), message: 'this Soul has asked for a lot in a short time; the world can answer it again shortly'}};
+      return this.told(r.key, r.god, now, {status: 429, code: 'soul.slow-down', retryAfterS: Math.min(COOL_MS / 1000, Math.max(1, Math.ceil((est - b.tokens) / Math.max(rate, 1e-6) / 1000))), message: 'this Soul has asked for a lot in a short time; the world can answer it again shortly'});
     }
     const deadline = now + Math.min(r.route.deadlineMs, r.hintMs && r.hintMs > 0 ? r.hintMs : Infinity);
     // a read that cannot start before its deadline (the time already queued, paid at the frame budget) is answered now,
     // not after the client has waited for nothing; acts always queue (refused only past their deadline)
     if (read && this.queue.length) {
       let ahead = 0; for (const j of this.queue) ahead += this.estimate(j.route.id);
-      const wait = ahead * FRAME_MS / Math.max(1, FRAME_BUDGET_MS[this.level]);
-      if (now + wait + est + ANSWER_MARGIN_MS >= deadline) { this.shed.reads++; return {refusal: {...busyRefusal(this.level), retryAfterS: Math.max(busyRefusal(this.level).retryAfterS, Math.ceil(wait / 1000))}}; }
+      const wait = ahead * FRAME_MS / Math.max(1, this.frameBudget());
+      if (now + wait + est + ANSWER_MARGIN_MS >= deadline) { this.shed.reads++; return this.told(r.key, r.god, now, {...busyRefusal(this.level), retryAfterS: Math.max(busyRefusal(this.level).retryAfterS, Math.ceil(wait / 1000))}); }
     }
     let settle!: Job['settle'], finish!: () => void;
     const turn = new Promise<'run' | 'dropped' | Refusal>(res => { settle = res; });
@@ -135,7 +167,7 @@ export class Admission {
     return {turn, waitedMs: () => (ranAt || this.now()) - now, done: () => { if (isDone) return; isDone = true; this.outstanding.delete(r.key); finish(); this.kick(); }};
   }
 
-  private creditNow(now: number) { const budget = FRAME_BUDGET_MS[this.level]; this.credit = Math.min(budget, this.credit + (now - this.creditAt) * budget / FRAME_MS); this.creditAt = now; return this.credit; }
+  private creditNow(now: number) { const budget = this.frameBudget(); this.credit = Math.min(budget, this.credit + (now - this.creditAt) * budget / FRAME_MS); this.creditAt = now; return this.credit; }
   /** Debit a job's measured time: the world credit, the god/Souls shares, the principal's bucket, the route estimate. */
   private charge(key: string, god: boolean, id: string, ms: number, startedAt: number) {
     this.creditNow(startedAt); this.credit -= ms; this.spentMs += ms;
@@ -143,15 +175,22 @@ export class Admission {
     const b = this.bucket(key, god, startedAt + ms); b.tokens -= ms;
     const e = this.est.get(id); this.est.set(id, e === undefined ? ms : e * 0.8 + ms * 0.2);
   }
-  /** §2b cool-down: over budget 3× (or 20 refusals for overlapping requests) in a minute → 60 s of slow-down.
+  /** §2b cool-down: over budget impolitely 3× (or 20 refusals for overlapping requests) in a minute → 60 s of slow-down.
    *  The god is never cooled (it is never starved; its share is the reserve). */
   private strike(key: string, god: boolean, kind: 'slow' | 'busy', now: number) {
     if (god) return;
-    let s = this.strikes.get(key); if (!s) { s = {slow: [], busy: [], coolUntil: 0}; this.strikes.set(key, s); }
-    const xs = s[kind]; xs.push(now); while (xs.length && now - xs[0] > 60_000) xs.shift();
+    const s = this.strikesOf(key), xs = s[kind]; xs.push(now); while (xs.length && now - xs[0] > 60_000) xs.shift();
     if (s.slow.length >= 3 || s.busy.length >= 20) { s.coolUntil = now + COOL_MS; s.slow.length = 0; s.busy.length = 0; this.shed.cooled++; }
-    if (this.strikes.size > 4096) for (const [k, x] of this.strikes) if (x.coolUntil < now && !x.slow.length && !x.busy.length) this.strikes.delete(k);
+    if (this.strikes.size > 4096) for (const [k, x] of this.strikes) if (x.coolUntil < now && x.retryUntil < now && !x.slow.length && !x.busy.length) this.strikes.delete(k);
   }
+  private strikesOf(key: string) { let s = this.strikes.get(key); if (!s) { s = {slow: [], busy: [], coolUntil: 0, retryUntil: 0}; this.strikes.set(key, s); } return s; }
+  /** A refusal given to a principal: remember when its Retry-After elapses (the politeness test of the next refusal). */
+  private told(key: string, god: boolean, now: number, refusal: Refusal): {refusal: Refusal} {
+    if (!god) this.strikesOf(key).retryUntil = now + refusal.retryAfterS * 1000;
+    return {refusal};
+  }
+  /** Did this request arrive before the Retry-After this principal was last given had elapsed? */
+  private impolite(key: string, now: number) { const s = this.strikes.get(key); return !!s && now < s.retryUntil; }
   /** Seconds left of this principal's cool-down, or 0. */
   private cooling(key: string, now: number) { const s = this.strikes.get(key); return s && s.coolUntil > now ? Math.ceil((s.coolUntil - now) / 1000) : 0; }
   /** Answer what can no longer be answered in time, drop what nobody waits for. */
@@ -162,7 +201,7 @@ export class Admission {
       if (now + Math.min(this.estimate(j.route.id), 1000) + ANSWER_MARGIN_MS >= j.deadline) {
         this.queue.splice(i, 1); this.outstanding.delete(j.key);
         if (j.route.cls === 'C2') this.shed.reads++; else this.shed.acts++;
-        j.settle(busyRefusal(this.level));
+        j.settle(this.told(j.key, j.god, now, busyRefusal(this.level)).refusal);
       }
     }
   }
@@ -196,7 +235,7 @@ export class Admission {
       while (this.queue.length) {
         let now = this.now();
         this.sweep(now);
-        const budget = FRAME_BUDGET_MS[this.level];
+        const budget = this.frameBudget();
         if (this.creditNow(now) <= 0) { this.later(budget > 0 ? Math.min(1000, -this.credit * FRAME_MS / budget + 1) : FRAME_MS); return; }
         const i = this.pick(now);
         if (i < 0) { this.later(FRAME_MS); return; }

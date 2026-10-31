@@ -362,13 +362,13 @@ export class Hub {
       // Cache only serialized strings for this broadcast, after each recipient's
       // public/private projection. No mutable fact survives across messages.
       const strings=new Map<ServerMsg,Record<string,string>>();
-      for(const c of this.clients){if(!c.ready||c.ws.readyState!==1||filter&&!filter(c))continue;this.send(c,m,strings);}
+      for(const c of this.clients){if(!c.ready||c.ws.readyState!==1||filter&&!filter(c))continue;this.hold(c.ws);this.send(c,m,strings);}
       return;
     }
     if(this.lifecycleSouls&&(m.t==='brain'||m.t==='stats')){
       for(const c of this.clients){
         if(!c.ready||c.ws.readyState!==1)continue;
-        if(!this.refreshAuthority(c)||filter&&!filter(c))continue;this.send(c,m);
+        if(!this.refreshAuthority(c)||filter&&!filter(c))continue;this.hold(c.ws);this.send(c,m);
       }
       return;
     }
@@ -376,8 +376,20 @@ export class Hub {
     // a batch is never dropped for backpressure (lane W1, research D6): a missing one is a seq gap, and the gap costs the
     // viewer a whole new snapshot (1.4 MB for Eden 2026); right after a join the join set alone is over 1 MB queued
     for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED && m.t !== 'batch') continue;
-      const out=this.kernelWire(c,m,s,rest);c.sent += out.length; c.ws.send(out); }
+      const out=this.kernelWire(c,m,s,rest);c.sent += out.length; this.hold(c.ws); c.ws.send(out); }
   }
+  /** srv-hub-physics: a tick's broadcasts reach each viewer as one socket write. The first broadcast frame a socket gets in
+   *  this turn of the event loop corks it; the turn's end (process.nextTick, after the tick's synchronous work) uncorks
+   *  every held socket, which flushes its frames in one writev (was one write per frame per viewer: N×K for a burst of K
+   *  messages). The frames, their bytes and their order are unchanged; ws's own per-frame cork nests inside this one. */
+  private held = new Set<import('node:stream').Duplex>();
+  private hold(ws: WebSocket) {
+    const sock = (ws as unknown as {_socket?: import('node:stream').Duplex})._socket;
+    if (!sock || this.held.has(sock) || sock.destroyed) return;
+    sock.cork(); this.held.add(sock);
+    if (this.held.size === 1) process.nextTick(this.release);
+  }
+  private release = () => { for (const sock of this.held) sock.uncork(); this.held.clear(); };
   /** take-chunk-ref/1 peers: a kernel view that differs from the last one this socket was sent only in its tick (the hub
    *  re-broadcasts it every 200 ticks: old Eden ~208 KB each) travels as {t:'kernel-tick',tick}. Call only right before
    *  ws.send(result): it records what the peer now has. */

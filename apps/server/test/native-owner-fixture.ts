@@ -17,7 +17,10 @@ export const worldId = 'eden-local-lifecycle';
 export const factory = await marsFactory(GREEN_FIELD_WORLD);
 export async function accept<T>(host: WorldHost, promise: Promise<T>): Promise<T> {
   let done = false; promise.then(() => done = true, () => done = true);
-  for (let i = 0; i < 50 && !done; i++) { await setImmediate(); host.drainInputs(); }
+  // At least 50 turns, then on until a 2.5 s bound (just past the create's 2 s HTTP wait): a request that polls on a
+  // 20 ms timer (waitLifecycle) can settle a millisecond after 50 fast turns end (lane srv-r5fix-births).
+  const bound = performance.now() + 2500;
+  for (let i = 0; !done && (i < 50 || performance.now() < bound); i++) { await setImmediate(); host.drainInputs(); }
   assert.ok(done, 'request settled through the actual sequencer'); return promise;
 }
 export function fixture(path: string, engineFactory = factory, options?:{durableClockV1?:boolean}) {

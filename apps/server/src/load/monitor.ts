@@ -5,6 +5,7 @@
 import {monitorEventLoopDelay, PerformanceObserver, type IntervalHistogram} from 'node:perf_hooks';
 import v8 from 'node:v8';
 import {LEVELS, S, sharedLoad, type Level} from './shared.ts';
+import {frameBudgetMs} from './admission.ts';
 
 export type Signals = {service: number; loopP99Ms: number; heapFrac: number; gcFrac: number; oldestMs: number};
 const RANK: Record<Level, number> = {green: 0, amber: 1, red: 2, black: 3};
@@ -28,7 +29,11 @@ export class LevelState {
     const b = this.baselineMs;
     if (s.service < 0.2) this.starvedSince ??= now; else this.starvedSince = null;
     if ((s.heapFrac > 0.92 && s.gcFrac > 0.40) || (this.starvedSince !== null && now - this.starvedSince >= BLACK_SERVICE_MS)) return 'black';
-    if (s.service < 0.5 || s.loopP99Ms > loopEnter(1000, b) || s.heapFrac > 0.85 || s.oldestMs > 6000) return 'red';
+    if (s.service < 0.5 || s.loopP99Ms > loopEnter(1000, b) || s.heapFrac > 0.85) return 'red';
+    // Queue age enters amber (the slow-down hint) but never red and never holds a level: at red the request budget is
+    // 8 ms/frame, so a queue that red itself starves could keep red forever (the eden2 bench, 2026-10-31: red held for
+    // whole windows at tick service 1.0 while the launcher shed every read as world.busy). Whether the thread is behind
+    // is what service / loop delay / heap say.
     if (s.service < 0.8 || s.loopP99Ms > loopEnter(200, b) || s.heapFrac > 0.70 || s.oldestMs > 2000) return 'amber';
     return 'green';
   }
@@ -36,8 +41,8 @@ export class LevelState {
     const b = this.baselineMs;
     switch (level) {
       case 'black': return s.service >= 0.4 && s.heapFrac < 0.85;
-      case 'red': return s.service >= 0.7 && s.loopP99Ms < loopLeave(400, b) && s.heapFrac < 0.75 && s.oldestMs < 3000;
-      case 'amber': return s.service >= 0.9 && s.loopP99Ms < loopLeave(100, b) && s.heapFrac < 0.60 && s.oldestMs < 1000;
+      case 'red': return s.service >= 0.7 && s.loopP99Ms < loopLeave(400, b) && s.heapFrac < 0.75;
+      case 'amber': return s.service >= 0.9 && s.loopP99Ms < loopLeave(100, b) && s.heapFrac < 0.60;
       default: return true;
     }
   }
@@ -74,6 +79,27 @@ export class QuietBaseline {
   }
 }
 
+/** The quiet tick (lane srv-admission-calib; LOAD-CONTRACT §2b): an EWMA of the tick's own average ms over the quiet loop
+ *  windows (the same test as QuietBaseline), which sets the admission frame budget (admission.ts frameBudgetMs: the
+ *  requests get a share of what the tick leaves of each 50 ms frame). Alpha 0.1 per 5 s window: a time constant of ~10
+ *  windows (~50 s, half-life ~33 s), long enough to average over a large world's heavy ticks (one every 10-15 s) and short
+ *  enough to follow a world that grows within a minute or two. Until the first quiet window, non-warm windows with tick
+ *  service >= 0.95 seed it provisionally (a world that boots straight into load still calibrates); the first quiet window
+ *  replaces that seed. A window needs >= 20 ticks of its own (1 s) to count. */
+export const QUIET_TICK_ALPHA = 0.1, QUIET_TICK_MIN_TICKS = 20;
+export class QuietTick {
+  value = 0;
+  /** true once a quiet window has been learned (the provisional seed is then no longer fed). */
+  quietSeen = false;
+  /** A completed window's own tick average and whether it was quiet / served (service >= 0.95). Returns the EWMA. */
+  window(avgMs: number, quiet: boolean, served: boolean): number {
+    if (!Number.isFinite(avgMs) || avgMs < 0) return this.value;
+    if (quiet && !this.quietSeen) { this.quietSeen = true; this.value = avgMs; return this.value; }
+    if (quiet || (!this.quietSeen && served)) this.value = this.value > 0 ? this.value + QUIET_TICK_ALPHA * (avgMs - this.value) : avgMs;
+    return this.value;
+  }
+}
+
 /** What the monitor reads from the world (WorldHost satisfies it). */
 export type HostLike = {engine: {world: {tick: number}}; tickMs: number[]; paused: boolean; pace: number; baseRate: number; readonly running: boolean; readonly clockAvailable: boolean};
 export type Dial = (level: Level) => void;
@@ -100,9 +126,10 @@ const TICK_MS = 50, MIN_WINDOW_SAMPLES = 100;
 export class LoadMonitor {
   readonly state = new LevelState();
   readonly baseline: QuietBaseline;
+  readonly quietTick = new QuietTick();
   private windowMs: number;
   private startedAt: number | null = null;
-  private quiet = {depth: 0, reqMs: 0, service: 1};   // the current loop window: max queue depth, request ms at its start, min tick service
+  private quiet = {depth: 0, reqMs: 0, service: 1, tick0: 0};   // the current loop window: max queue depth, request ms at its start, min tick service, world tick at its start
   get level(): Level { return this.state.level; }
   signals: Signals = {service: 1, loopP99Ms: 0, heapFrac: 0, gcFrac: 0, oldestMs: 0};
   tickStats = {avg: 0, max: 0, n: 0, p99: 0};
@@ -126,7 +153,7 @@ export class LoadMonitor {
   register(name: string, dial: Dial) { this.dials.set(name, dial); try { dial(this.level); } catch (e) { console.error(`[load] dial ${name} failed`, e); } }
   start() {
     if (this.timer) return;
-    this.hist = monitorEventLoopDelay({resolution: 10}); this.hist.enable(); this.histAt = this.startedAt = this.now(); this.quiet = {depth: 0, reqMs: this.o.requestMs?.() ?? 0, service: 1};
+    this.hist = monitorEventLoopDelay({resolution: 10}); this.hist.enable(); this.histAt = this.startedAt = this.now(); this.quiet = {depth: 0, reqMs: this.o.requestMs?.() ?? 0, service: 1, tick0: this.o.host.engine.world.tick};
     try { this.obs = new PerformanceObserver(list => { for (const e of list.getEntries()) this.gc.push({at: this.now(), ms: e.duration}); }); this.obs.observe({entryTypes: ['gc']}); } catch { this.obs = null; }
     this.timer = setInterval(() => this.sample(), this.o.sampleMs ?? 250); this.timer.unref();
     this.sample();
@@ -184,7 +211,7 @@ export class LoadMonitor {
     a[S.heapUsedMb] = hs.used_heap_size / 1048576; a[S.heapLimitMb] = hs.heap_size_limit / 1048576; a[S.gcPct10s] = 100 * gcMs / 10_000;
     a[S.level] = LEVELS.indexOf(to); a[S.queueDepth] = q.depth; a[S.queueOldestMs] = q.oldestMs;
     a[S.awake] = this.souls.awake; a[S.waiting] = this.souls.waiting; a[S.connected] = this.souls.connected;
-    a[S.shedReads] = shed.reads; a[S.shedActs] = shed.acts; a[S.sampledAt] = now;
+    a[S.shedReads] = shed.reads; a[S.shedActs] = shed.acts; a[S.sampledAt] = now; a[S.quietTickMs] = this.quietTick.value;
     return to;
   }
   /** A loop window closed: feed the quiet baseline (QuietBaseline). The serving warm-up windows are not quiet. Public for tests. */
@@ -194,7 +221,13 @@ export class LoadMonitor {
     const quiet = !warm && this.quiet.depth === 0 && reqMs - this.quiet.reqMs < QUIET_REQUEST_FRAC * spanMs && this.quiet.service >= 0.95;
     const own = this.tickStats.n > 0 ? Math.min(loopP99Ms, 1.25 * this.tickStats.p99 + 10) : loopP99Ms;
     this.state.baselineMs = this.baseline.window(own, quiet);
-    this.quiet = {depth: 0, reqMs, service: 1};
+    // the window's own ticks: the last (ticks run since it opened) entries of the host's tick-time ring (one per tick)
+    const h = this.o.host, tick = h.engine.world.tick, n = Math.min(h.tickMs.length, tick - this.quiet.tick0);
+    if (!warm && n >= QUIET_TICK_MIN_TICKS) {
+      let sum = 0; for (let i = h.tickMs.length - n; i < h.tickMs.length; i++) sum += h.tickMs[i];
+      this.a[S.quietTickMs] = this.quietTick.window(sum / n, quiet, this.quiet.service >= 0.95);
+    }
+    this.quiet = {depth: 0, reqMs, service: 1, tick0: tick};
   }
   /** Mark a main-thread turn without a full sample (after a tick). */
   turn() { this.a[S.lastTurnAt] = this.now(); }
@@ -208,6 +241,7 @@ export class LoadMonitor {
   health() {
     const s = this.signals;
     return {level: this.level, service5s: Math.round(100 * s.service) / 100, loopP99Ms: Math.round(s.loopP99Ms), heapPct: Math.round(100 * s.heapFrac), gcPct10s: Math.round(100 * s.gcFrac),
-      tickP99Ms: Math.round(10 * this.tickStats.p99) / 10, loopBaselineMs: Math.round(this.state.baselineMs), queue: this.o.queue?.() ?? {depth: 0, oldestMs: 0}, souls: this.souls};
+      tickP99Ms: Math.round(10 * this.tickStats.p99) / 10, loopBaselineMs: Math.round(this.state.baselineMs),
+      quietTickMs: Math.round(10 * this.quietTick.value) / 10, frameBudgetMs: Math.round(10 * frameBudgetMs(this.level, this.quietTick.value)) / 10, queue: this.o.queue?.() ?? {depth: 0, oldestMs: 0}, souls: this.souls};
   }
 }

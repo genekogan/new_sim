@@ -615,7 +615,9 @@ export class GodNav {
 
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, focus?: MenuFocus | null) {
     const selected=this.selectedWalks(soul);if(!selected)return;
-    for(const {t,d} of selected.pick)if(this.wantsThing(focus,t))this.offerWalk(soul,t,d,selected,caps,plans);
+    // srv-act-words (D): a focused words walk keeps only the walks its words can choose (focus.walkKeep, the ledger's test)
+    const at={...selected,keep:focus?.walkKeep?.keep};
+    for(const {t,d} of selected.pick)if(this.wantsThing(focus,t))this.offerWalk(soul,t,d,at,caps,plans);
   }
   /** L3 item 4: whether a focused build (EdgeLedger.bindOne) needs this thing's offers (walk, sit, hang out, stroll). */
   private wantsThing(f: MenuFocus | null | undefined, t: Thing): boolean {
@@ -815,15 +817,19 @@ export class GodNav {
     return true;
   }
 
-  private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null }, caps: EdgeCapability[], plans: Plans, onlyWalk=false) {
+  private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null; keep?: NonNullable<MenuFocus['walkKeep']>['keep'] }, caps: EdgeCapability[], plans: Plans, onlyWalk=false) {
     const { here, myLevel, seated, exit } = at;
     const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) return;
-    const g0 = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
+    const where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
+    const target: EdgeCapability['target'] = t.semanticPart?.entity ? { id: t.semanticPart.entity, kind: 'object' } : place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' };
+    // (srv-act-words D: a walk the focused words cannot choose is not built: no goal, no route check)
+    if (at.keep && !at.keep({ id, verb: 'walk', label: where, ...(t.aliases?.length ? { aliases: t.aliases } : {}), target })) return;
+    const g0 = this.goal(t, here, soul.entityId);
     // RESOLVE2: a goal up on a roof (or a raised floor) the main ground has no way up to is never offered as available
     // (a roof bench with no stair: the walk 'completed' in the lobby below)
     const E = this.E, cut = !!g0 && (g0.level > 0 || !!t.semanticPart) && !!E.navCheckV1 && !!E.navWarmV1?.(0) && E.navCheckV1([{ id, ...g0 }])[0]?.ok === false;
     const goal = cut ? null : g0;
-    const cap: EdgeCapability = { id, verb: 'walk', label: where, ...(t.aliases?.length?{aliases:t.aliases}:{}), target: t.semanticPart?.entity ? { id: t.semanticPart.entity, kind: 'object' } : place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
+    const cap: EdgeCapability = { id, verb: 'walk', label: where, ...(t.aliases?.length?{aliases:t.aliases}:{}), target, available: !!goal,
       ...(goal ? {} : { blocked: cut ? { code: 'route.unreachable', reason: `${t.ref} is up where no stair or ramp from the ground reaches.` } : this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
     caps.push(cap);
     if (!goal) return;

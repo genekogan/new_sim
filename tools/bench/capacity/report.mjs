@@ -35,6 +35,19 @@ function stageB(L, receipt, by) {
     L.push(`| ${base} | ${rs[0].N} | ${key.split('@')[1] ?? '—'} | ${range(H(rs, 'tickService'), 3)} | ${range(H(rs, 'healthzP99Ms'))} | ${range(sbh(rs, 'rawReadP99Ms'))} | ${kinds} | ${range(sbh(rs, 'rawActP99Ms'))} | ${range(sbh(rs, 'cliReadP99Ms'))} | ${range(sbh(rs, 'readsPerS'), 1)} | ${range(sbh(rs, 'rawReadRefusedShare'), 2)} | ${share} (${hw}) | ${range(sbh(rs, 'fallbacks'))} | ${range(sbh(rs, 'processCpuSPerS'), 2)} / ${range(sbh(rs, 'mainCpuSPerS'), 2)} / ${range(sbh(rs, 'workerCpuSPerS'), 2)} | ${range(H(rs, 'rssPeakMb'))} | ${range(H(rs, 'heapPeakMb'))} | ${range(sbh(rs, 'timeouts'))} | ${oc} |`);
   }
   L.push('', 'worker-served = of the requests the launcher routed to a worker, the share it answered itself (the rest it forwarded to main over its intents port); here on worker = raw `here` answers the worker computed (x-sim-read-cpu-ms). Oracle = B-facade\'s HTTP cross-thread compare of `here` (main\'s port, then a worker\'s, same Soul, equal tick) on the sampled share of reads.', '');
+  // r3 (2026-10-31): the world's level through the windows and the answered-only latency, apart from the designed waits
+  L.push('### What the Souls were answered (r3: answered = 2xx, Retry-After waits taken out; levels = /healthz `load.level` samples in the active windows)', '');
+  L.push('| arm | worker | green gate | active levels (worse window) | answered read p99 ms | answered act p99 ms | read wall p99 ms (incl. waits) | refused | reads that waited | refusals by who:code | world tick p99 max ms | service5s min | queue oldest max ms |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+  for (const key of receipt.arms) {
+    const rs = by[key] ?? []; if (!rs.length) continue;
+    const gate = rs.map((r) => r.stageb?.gate ? (r.stageb.gate.ok ? `${r.stageb.gate.waitedS} s` : `NOT (${r.stageb.gate.waitedS} s)`) : 'off').join(' · ');
+    const lv = rs.map((r) => { const a = r.windows?.activeA?.levels, b = r.windows?.activeB?.levels, red = (x) => (x?.red ?? 0) + (x?.black ?? 0), w = red(a) >= red(b) ? a : b; return w ? Object.entries(w).map(([k, v]) => `${k} ${v}`).join(' ') : '—'; }).join(' · ');
+    const W = (k) => rs.map((r) => Math.max(...['activeA', 'activeB'].map((n) => r.windows?.[n]?.[k] ?? -Infinity))).map((x) => (x === -Infinity ? null : x));
+    const Wmin = (k) => rs.map((r) => Math.min(...['activeA', 'activeB'].map((n) => r.windows?.[n]?.[k] ?? Infinity))).map((x) => (x === Infinity ? null : x));
+    const tags = {}; for (const r of rs) for (const n of ['activeA', 'activeB']) for (const [t, c] of Object.entries(r.stageb?.windows?.[n]?.refusalsByTag ?? {})) tags[t] = (tags[t] ?? 0) + c;
+    L.push(`| ${key} | ${key.split('@')[1] ?? '—'} | ${gate} | ${lv} | ${range(sbh(rs, 'rawReadOkP99Ms'))} | ${range(sbh(rs, 'rawActOkP99Ms'))} | ${range(sbh(rs, 'rawReadP99Ms'))} | ${range(sbh(rs, 'rawReadRefusedShare'), 2)} | ${range(sbh(rs, 'rawReadWaitedShare'), 2)} | ${Object.entries(tags).map(([t, c]) => `${t} ${c}`).join(', ') || '—'} | ${range(W('tickP99MaxMs'))} | ${range(Wmin('service5sMin'), 2)} | ${range(W('queueOldestMaxMs'))} |`);
+  }
+  L.push('');
   const pins = Object.values(by).flat().map((r) => r.stageb?.pins).filter((p) => p?.length);
   if (pins.length) L.push(`CPU pinning (taskset -a): ${[...new Set(pins.flat().map((p) => `${p.ok ? 'ok' : 'FAILED'} ${p.allowed ?? ''}`))].join(', ')}; ${pins.filter((p) => p.length > 1).length} runs re-pinned after a world restart.`, '');
   const ex = Object.values(by).flat().flatMap((r) => r.stageb?.headline?.oracle?.examples ?? []).slice(0, 3);

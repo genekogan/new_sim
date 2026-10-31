@@ -49,13 +49,16 @@ if (VIA && CLI_FILE !== resolve(join(ROOT, 'tools/world-launcher/soul/eden.mjs')
 if (VIA && SLICE) throw new Error('--via-launcher with --slice is not built yet (the slice would wrap the launcher, not the world); use --cpus');
 const LOAD = opt('load', 'v1'), RW_MODES = opt('read-worker', '').split(',').filter(Boolean), RW_N = Number(opt('read-workers', 1)), CLI_SOULS = Number(opt('cli-souls', 3));
 const VIEWERS = Number(opt('viewers', 6)), BUDGET = ((b) => (b === 'default' ? '' : b))(opt('world-budget-rps', LOAD === 'stageb' ? '200' : '')), ORACLE_RATE = Number(opt('oracle-rate', 0.01)), JOIN_PAR = Number(opt('join-concurrency', LOAD === 'stageb' ? 4 : 1)), CPUS = opt('cpus', '');
+// r3 (2026-10-31): the active windows start only once the world has been green for GREEN_HOLD_S (Souls connected and listening,
+// no commands), at most GREEN_GATE_S after the join; eden2 6a4171dbb ran its windows inside the join storm's red tail
+const GREEN_GATE_S = Number(opt('green-gate-s', LOAD === 'stageb' ? 300 : 0)), GREEN_HOLD_S = Number(opt('green-hold-s', 20));
 if (!['v1', 'stageb'].includes(LOAD)) throw new Error('--load v1|stageb');
 if ((RW_MODES.length || LOAD === 'stageb' || CPUS) && !VIA) throw new Error('--load stageb, --read-worker and --cpus run through the launcher: add --via-launcher');
 if (RW_MODES.some((m) => m !== 'on' && m !== 'off')) throw new Error('--read-worker off|on|off,on');
 if (CPUS && !sh0('taskset', ['-V'])) throw new Error('--cpus needs Linux taskset');
 const MODES = RW_MODES.length ? RW_MODES : [null];
 const PH = SHORT ? { warm: 10, idle: 10, active: 20, calib: 5 } : { warm: 60, idle: 30, active: 120, calib: 20 };
-const TICK_HZ = 20, BUSY = /\b(world\.busy|world\.crowded|world\.starting|soul\.busy|soul\.slow-down|rate-limited)\b/;
+const TICK_HZ = 20, BUSY = /\b(world\.busy|world\.crowded|world\.starting|soul\.busy|soul\.slow-down|rate-limited|client\.rate|account\.rate)\b/;
 const TARGETS = ['the bandstand', 'the commons', 'the pond', 'the classroom', 'the orchard', 'the kitchen', 'the garden', 'the plaza'];
 const SEARCH = ['bench', 'seat', 'door', 'book', 'table'];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -216,7 +219,7 @@ async function stopWorld(w) {
 }
 async function healthz(timeoutMs = 5000) {
   const t = now();
-  try { const r = await fetch(`${BASE}/healthz`, { signal: AbortSignal.timeout(timeoutMs) }); const d = r.ok ? await r.json() : null; return { ok: !!d, ms: now() - t, tick: d?.tick, tickMs: d?.tickMs }; }
+  try { const r = await fetch(`${BASE}/healthz`, { signal: AbortSignal.timeout(timeoutMs) }); const d = r.ok ? await r.json() : null; return { ok: !!d, ms: now() - t, tick: d?.tick, tickMs: d?.tickMs, ...(d?.load ? { level: d.load.level, service5s: d.load.service5s, loopP99Ms: d.load.loopP99Ms, queueOldestMs: d.load.queue?.oldestMs ?? null, tickP99Ms: d.load.tickP99Ms, baselineMs: d.load.loopBaselineMs } : {}) }; }
   catch { return { ok: false, ms: timeoutMs, tick: null }; }
 }
 
@@ -240,11 +243,18 @@ async function join_(run, i) {
   writeFileSync(join(dir, 'eden.mjs'), Buffer.from(await (await fetch(`${BASE}/eden.mjs`)).arrayBuffer()));
   const soul = { i, dir };
   const a = await runCli(soul, ['register', BASE], 60_000);
-  // v2: a create the proxy answered 502/503 (a slow world under N concurrent creates) is tried again, up to 3 times
-  // (a fresh name per try: a create whose answer was lost may have made the Soul, and the same name then answers 409
-  // name-taken with exit 0 and no token)
-  let b; for (let k = 0; k < (LOAD === 'stageb' ? 3 : 1); k++) { b = await runCli(soul, ['create', k ? `Bench${i}t${k}` : `Bench${i}`], 120_000); if (existsSync(join(dir, '.eden-agent.json')) && JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) break; run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(5000); }
-  if (!JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
+  // v3 (srv-cli-lifecycle): the SAME name on every try, until the folder holds a token or 120 s pass. Soul CLI 2.5.3
+  // waits itself (up to 120 s) for a create the world is still finishing (503 lifecycle-pending) and a re-run of the same
+  // create resumes that Soul, also after a lost answer (409 name-taken by this folder's own create). v2's fresh name per
+  // try left a half-made Soul behind on every late create and added load (eden2 B-soak r3: every N=50/100 arm).
+  const token = () => { try { return JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token ?? null; } catch { return null; } };
+  const t0 = now(); let b;
+  for (let k = 0; ; k++) {
+    b = await runCli(soul, ['create', `Bench${i}`], 150_000);
+    if (token() || now() - t0 >= 120_000) break;
+    run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(2000);
+  }
+  if (!token()) throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
   soul.token = JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token;
   return soul;
 }
@@ -338,17 +348,25 @@ const RAW = {
   act: (n) => ['POST', '/v1/edge/act', { capability: n % 3 === 2 ? 'sit down' : `go to ${pick(TARGETS)}`, params: {} }], say: () => ['POST', '/v1/edge/say', { text: 'hello from the capacity bench' }],
 };
 const rawHeaders = (soul) => ({ authorization: `Bearer ${soul.token}`, 'content-type': 'application/json', 'x-forwarded-for': `10.77.${soul.i >> 8}.${(soul.i & 255) + 1}` });
+// who refused and why: the launcher's ceilings answer with the world's slug in the body (load:<level> / ramp / boot from
+// the message), the world's own admission (soul.busy, soul.slow-down, world.busy past a deadline) without it
+function refusalTag(status, code, d) {
+  const m = String(d?.message ?? ''), by = d?.slug ? 'launcher' : 'world';
+  const why = by === 'launcher' ? (/\((red|black)\)/.exec(m)?.[1] ? `load:${/\((red|black)\)/.exec(m)[1]}` : /restarted/.test(m) ? 'ramp' : /starting/.test(m) ? 'boot' : 'ceiling') : '';
+  return `${by}:${code}${why ? `:${why}` : ''}`;
+}
 async function rawCmd(run, soul, op, n) {
   const [method, path, body] = RAW[op](n), cls = CLASS[op], deadline = cls === 'C1' ? 90_000 : 60_000, t = now();
   const headers = { ...rawHeaders(soul), ...(method === 'POST' && op !== 'resolve' ? { 'idempotency-key': `${soul.i}-${t}-${n}` } : {}) };
-  let status = 0, code = null, worker = false, cpuMs = null, busy = 0, failed = 0;
+  let status = 0, code = null, worker = false, cpuMs = null, busy = 0, failed = 0, waitMs = 0, level = null; const refusals = [];
   for (;;) {
     const left = deadline - (now() - t); if (left <= 0) { status = -1; break; }
     try {
       const r = await fetch(`${BASE}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(Math.min(left, cls === 'C2' ? 25_000 : 40_000)) });
       const d = await r.json().catch(() => ({})); status = r.status; code = d?.error?.code ?? d?.code ?? null;
-      worker = r.headers.get('x-sim-read-cpu-ms') != null; cpuMs = worker ? Number(r.headers.get('x-sim-read-cpu-ms')) : null;
-      if ((status === 429 || status === 503) && BUSY.test(String(code)) && busy < 3) { busy++; const ra = Number(r.headers.get('retry-after')); await sleep(Math.min(left, (Number.isFinite(ra) && ra > 0 ? ra * 1000 : 1000 * 2 ** busy) * (1 + 0.2 * Math.random()))); continue; }
+      worker = r.headers.get('x-sim-read-cpu-ms') != null; cpuMs = worker ? Number(r.headers.get('x-sim-read-cpu-ms')) : null; level = r.headers.get('x-sim-load') ?? level;
+      if ((status === 429 || status === 503) && BUSY.test(String(code))) refusals.push(refusalTag(status, code, d));
+      if ((status === 429 || status === 503) && BUSY.test(String(code)) && busy < 3) { busy++; const ra = Number(r.headers.get('retry-after')), w0 = now(); await sleep(Math.min(left, (Number.isFinite(ra) && ra > 0 ? ra * 1000 : 1000 * 2 ** busy) * (1 + 0.2 * Math.random()))); waitMs += now() - w0; continue; }
       break;
     } catch (e) {
       if (now() - t >= deadline) { status = -1; break; }
@@ -357,7 +375,7 @@ async function rawCmd(run, soul, op, n) {
     }
   }
   const outcome = status === -1 ? 'timeout' : status >= 200 && status < 300 ? 'ok' : status === 0 ? 'unreachable' : (status === 429 || status === 503) && BUSY.test(String(code)) ? 'refused' : 'error';
-  const r = { soul: soul.i, cmd: op, cls, at: t, ms: now() - t, code: status, outcome, raw: true, ...(worker ? { worker: true, cpuMs } : {}), ...(busy ? { busyWaits: busy } : {}), ...(outcome === 'error' ? { err: `${status} ${code ?? ''}` } : {}) };
+  const r = { soul: soul.i, cmd: op, cls, at: t, ms: now() - t, code: status, outcome, raw: true, ...(worker ? { worker: true, cpuMs } : {}), ...(busy ? { busyWaits: busy, waitMs: Math.round(waitMs) } : {}), ...(refusals.length ? { refusals } : {}), ...(level ? { level } : {}), ...(outcome === 'error' ? { err: `${status} ${code ?? ''}` } : {}) };
   run.rec?.(r);
   if (op !== 'act' && op !== 'say' && run.oracle && Math.random() < ORACLE_RATE) oracleSample(run, soul).catch(() => {});
   return r;
@@ -457,6 +475,7 @@ async function oneRun(arm, rep, mode = null) {
     const relaunch = souls.map((s) => s.cli ? holdListen(run, s) : (rawListen(run, s), () => {}));
     if (SB) for (let v = 0; v < VIEWERS; v++) viewer(run, hello); else for (const s of souls) { waitStream(run, s); viewer(run, hello); }
     run.mode = 'idle'; const loops = souls.map((s) => SB ? sbLoop(run, s, arm === 'incident') : soulLoop(run, s, arm === 'incident'));
+    if (GREEN_GATE_S > 0) { phase = 'gate'; run.gate = await greenGate(health); log(`${key} r${rep}: ${run.gate.ok ? `green for ${GREEN_HOLD_S} s after ${run.gate.waitedS} s` : `NOT green after ${run.gate.waitedS} s (levels ${JSON.stringify(run.gate.levels)}); windows start anyway, labelled`}`); }
     const relauncher = arm === 'incident' ? setInterval(() => { for (let i = 0; i < 3; i++) relaunch[i](); }, 20_000) : null;
     const window = async (name, s, m) => { phase = name; run.mode = m; const m0 = mode ? await launcherReadMetrics() : null, t = now(); await sleep(s * 1000); const m1 = mode ? await launcherReadMetrics() : null;
       return { name, from: t, to: now(), ...(m0 && m1 ? { routed: m1.routed - m0.routed, fallback: m1.fallback - m0.fallback } : {}) }; };
@@ -481,6 +500,16 @@ async function oneRun(arm, rep, mode = null) {
     await stopWorld(w);
   }
 }
+async function greenGate(health) {   // waits (Souls idle) until every /healthz sample of the last GREEN_HOLD_S s says green
+  const t = now();
+  for (;;) {
+    await sleep(1000);
+    const from = now() - GREEN_HOLD_S * 1000, tail = health.filter((x) => x.at >= Math.max(t, from));
+    if (now() - t >= GREEN_HOLD_S * 1000 && tail.length >= GREEN_HOLD_S / 2 && tail.every((x) => x.ok && (x.level ?? 'green') === 'green')) return { ok: true, waitedS: +((now() - t) / 1000).toFixed(1) };
+    if (now() - t >= GREEN_GATE_S * 1000) return { ok: false, waitedS: +((now() - t) / 1000).toFixed(1), levels: levelShare(health.filter((x) => x.at >= t)) };
+  }
+}
+function levelShare(h) { const out = {}; const k = h.filter((x) => x.level); for (const x of k) out[x.level] = (out[x.level] ?? 0) + 1; for (const l in out) out[l] = +(out[l] / k.length).toFixed(3); return k.length ? out : null; }
 async function helloText() {
   try { const { anonymousHello } = await import(pathToFileURL(join(ROOT, 'packages/client/src/hello.ts')).href); return anonymousHello(false); }
   catch { return JSON.stringify({ t: 'hello' }); }
@@ -516,6 +545,9 @@ function summarize({ arm, rep, N, w, windows, cmds, health, proc, run, calibrati
       rssMbMean: p.length ? +(p.reduce((s, x) => s + x.rssMb, 0) / p.length).toFixed(1) : null,
       heapMbMean: p.filter((x) => x.heapMb != null).length ? +(p.filter((x) => x.heapMb != null).reduce((s, x) => s + x.heapMb, 0) / p.filter((x) => x.heapMb != null).length).toFixed(1) : null,
       commands: c.length, outcomes,
+      levels: levelShare(h), service5sMin: h.some((x) => x.service5s != null) ? Math.min(...h.filter((x) => x.service5s != null).map((x) => x.service5s)) : null,
+      tickP99MaxMs: h.some((x) => x.tickP99Ms != null) ? Math.max(...h.filter((x) => x.tickP99Ms != null).map((x) => x.tickP99Ms)) : null,
+      queueOldestMaxMs: h.some((x) => x.queueOldestMs != null) ? Math.max(...h.filter((x) => x.queueOldestMs != null).map((x) => x.queueOldestMs)) : null,
     };
   }
   // M5 wedge: longest span after boot with no healthz answer
@@ -537,7 +569,11 @@ function stagebSummary({ key, mode, cliN, windows, cmds, proc, wstats, run, w })
   const inW = (x, wd) => x.at >= wd.from && x.at <= wd.to, per = {};
   for (const wd of windows.filter((x) => x.name !== 'warm')) {
     const c = cmds.filter((x) => inW(x, wd) && x.outcome !== 'timeout'), raw = c.filter((x) => x.raw), cli = c.filter((x) => !x.raw);
-    const byKind = {}; for (const k of ['here', 'observe', 'caps', 'resolve', 'around', 'act', 'say']) { const v = raw.filter((x) => x.cmd === k); if (v.length) byKind[k] = { n: v.length, p50: pct(v.map((x) => x.ms), 0.5), p99: pct(v.map((x) => x.ms), 0.99), refused: v.filter((x) => x.outcome === 'refused').length, ...(k === 'here' ? { onWorker: v.filter((x) => x.worker).length } : {}) }; }
+    // r3: p99/p50 = wall time incl. designed Retry-After waits and final refusals (as before); okP99 = answered (2xx) only,
+    // with the waits before the answer taken out (the world's/launcher's service time as the Soul saw it)
+    const okMs = (v) => v.filter((x) => x.outcome === 'ok').map((x) => x.ms - (x.waitMs ?? 0));
+    const byKind = {}; for (const k of ['here', 'observe', 'caps', 'resolve', 'around', 'act', 'say']) { const v = raw.filter((x) => x.cmd === k); if (v.length) byKind[k] = { n: v.length, p50: pct(v.map((x) => x.ms), 0.5), p99: pct(v.map((x) => x.ms), 0.99), ok: v.filter((x) => x.outcome === 'ok').length, okP50: pct(okMs(v), 0.5), okP99: pct(okMs(v), 0.99), refused: v.filter((x) => x.outcome === 'refused').length, ...(k === 'here' ? { onWorker: v.filter((x) => x.worker).length } : {}) }; }
+    const refusalsByTag = {}; for (const x of raw) for (const tag of x.refusals ?? []) refusalsByTag[tag] = (refusalsByTag[tag] ?? 0) + 1;
     const all = cmds.filter((x) => inW(x, wd)), rawC2 = all.filter((x) => x.raw && x.cls === 'C2');
     const p = proc.filter((x) => inW(x, wd) && x.cpuS != null), procCpu = p.length > 1 ? (p.at(-1).cpuS - p[0].cpuS) / ((p.at(-1).at - p[0].at) / 1000) : null;
     let served = 0, forwarded = 0, wcpu = 0, wspan = 0, lagMax = 0, restarts = 0;
@@ -556,6 +592,8 @@ function stagebSummary({ key, mode, cliN, windows, cmds, proc, wstats, run, w })
     per[wd.name] = {
       rawReadP99Ms: pct(raw.filter((x) => x.cls === 'C2').map((x) => x.ms), 0.99), rawReadP50Ms: pct(raw.filter((x) => x.cls === 'C2').map((x) => x.ms), 0.5), rawActP99Ms: pct(raw.filter((x) => x.cls === 'C1').map((x) => x.ms), 0.99),
       cliReadP99Ms: pct(cli.filter((x) => x.cls === 'C2').map((x) => x.ms), 0.99), cliActP99Ms: pct(cli.filter((x) => x.cls === 'C1').map((x) => x.ms), 0.99),
+      rawReadOkP99Ms: pct(okMs(raw.filter((x) => x.cls === 'C2')), 0.99), rawReadOkP50Ms: pct(okMs(raw.filter((x) => x.cls === 'C2')), 0.5), rawActOkP99Ms: pct(okMs(raw.filter((x) => x.cls === 'C1')), 0.99),
+      rawReadWaitedShare: rawC2.length ? +(rawC2.filter((x) => x.busyWaits).length / rawC2.length).toFixed(3) : null, refusalsByTag,
       byKind, readsPerS: +(rawC2.length / ((wd.to - wd.from) / 1000)).toFixed(2), rawReadRefusedShare: rawC2.length ? +(rawC2.filter((x) => x.outcome === 'refused').length / rawC2.length).toFixed(3) : null,
       timeouts: all.filter((x) => x.outcome === 'timeout').length, errors: all.filter((x) => x.outcome === 'error' || x.outcome === 'unreachable').length,
       ...(mode ? { routed: wd.routed ?? null, fallbacks: wd.fallback ?? null } : {}),
@@ -568,7 +606,8 @@ function stagebSummary({ key, mode, cliN, windows, cmds, proc, wstats, run, w })
   const kinds = {}; for (const k of ['here', 'observe', 'caps', 'resolve', 'around', 'act', 'say']) { const v = [A.byKind?.[k]?.p99, B.byKind?.[k]?.p99].filter((x) => x != null); if (v.length) kinds[k] = Math.max(...v); }
   const hereN = (A.byKind?.here?.n ?? 0) + (B.byKind?.here?.n ?? 0), hereW = (A.byKind?.here?.onWorker ?? 0) + (B.byKind?.here?.onWorker ?? 0);
   return { stageb: { key, mode, cliSouls: cliN, joinS: run.joinS ?? null, joinRetries: run.joinRetries ?? 0, windows: per, pins: w.pins ?? null,
-    headline: { rawReadP99Ms: worse('rawReadP99Ms', true), rawActP99Ms: worse('rawActP99Ms', true), cliReadP99Ms: worse('cliReadP99Ms', true), cliActP99Ms: worse('cliActP99Ms', true), readP99ByKind: kinds,
+    gate: run.gate ?? null,
+    headline: { rawReadOkP99Ms: worse('rawReadOkP99Ms', true), rawActOkP99Ms: worse('rawActOkP99Ms', true), rawReadWaitedShare: worse('rawReadWaitedShare', true), rawReadP99Ms: worse('rawReadP99Ms', true), rawActP99Ms: worse('rawActP99Ms', true), cliReadP99Ms: worse('cliReadP99Ms', true), cliActP99Ms: worse('cliActP99Ms', true), readP99ByKind: kinds,
       readsPerS: worse('readsPerS', false), rawReadRefusedShare: worse('rawReadRefusedShare', true), timeouts: sum('timeouts'), errors: sum('errors'),
       routed: sum('routed'), fallbacks: sum('fallbacks'), workerServedShare: worse('workerServedShare', false), hereOnWorkerShare: mode === 'on' && hereN ? +(hereW / hereN).toFixed(3) : null,
       workerRestarts: sum('workerRestarts'), lagGensMax: worse('lagGensMax', true), processCpuSPerS: worse('processCpuSPerS', true), workerCpuSPerS: worse('workerCpuSPerS', true), mainCpuSPerS: worse('mainCpuSPerS', true),

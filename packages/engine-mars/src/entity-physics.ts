@@ -3,7 +3,7 @@
 // solids (wall segments, closed doors), stairs (links) — and the fixtures/items it registers with the same ids.
 // The fold applies it to plain world state (`world.entityPhysicsV1` + `world.entities`), so live, restored and
 // replayed engines agree without ever reading the entity model.
-import { hashOf, hashStable, PART_TEXT, stableStringify } from '../../../mars/viewer/engine/core/hash.ts';
+import { hashOf, hashPhysicsResumable, PART_TEXT, stableStringify, trustPhysicsText, type PhysicsHashMark } from '../../../mars/viewer/engine/core/hash.ts';
 import { pointInObb, type Vec2 } from '../../../mars/viewer/engine/core/math.ts';
 import type { EntityPhysicsV1 } from '../../../mars/viewer/engine/spatial/edits.ts';
 import type { Level, Link, Obstacle, Surface } from '../../../mars/viewer/engine/spatial/types.ts';
@@ -76,13 +76,19 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   cur.byEntity = sortKeys(cur.byEntity); cur.assets = sortKeys(cur.assets);
   cur.bounds = floorBounds(cur);
   for (const p of [...Object.values(cur.byEntity), ...Object.values(cur.assets)]) if (p && typeof p === 'object' && !PART_TEXT.has(p)) PART_TEXT.set(p, flat(stableStringify(p)));
-  cur.hash = hashStable({ levels: cur.levels, byEntity: cur.byEntity, assets: cur.assets }, PART_TEXT as unknown as ReadonlyMap<object, string>);
+  // srv-hub-physics item 2: the digest resumes from prev's at the first changed entity (same bytes, same hash)
+  const { hash, mark } = hashPhysicsResumable({ levels: cur.levels, byEntity: cur.byEntity, assets: cur.assets }, PART_TEXT as unknown as ReadonlyMap<object, string>, prev && HASH_MARK.get(prev));
+  cur.hash = hash;
   cur.baseKey = hashOf({ levels: cur.levels, bounds: cur.bounds });
   // Seal the existing replace-never-mutate ownership contract only after all
   // derived fields are complete. Unchanged parts retain their admitted shapes.
   prepareImmutableSnapshotData(cur, '$.entityPhysicsV1');
+  if (mark) HASH_MARK.set(cur, mark);
+  trustPhysicsText(cur);   // srv-hub-physics item 3: its hash is of exactly the texts hash.ts caches for it
   return cur;
 }
+/** srv-hub-physics item 2: where the next physics' hash can resume (hash.ts hashPhysicsResumable), by physics value. */
+const HASH_MARK = new WeakMap<EntityPhysicsV1, PhysicsHashMark>();
 
 /** L4 #7 (audit 2026-10-31): the physics a world-edit event was built into by its producer (the god bridge builds it to
  *  log its hash), with the hash and seq of the physics it was built from. The engine's fold adopts that very value when

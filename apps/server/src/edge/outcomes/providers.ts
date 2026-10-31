@@ -6,8 +6,8 @@ const object=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.
 const clip=(v:unknown,max=300)=>typeof v==='string'?v.replace(/\s+/g,' ').trim().slice(0,max):'';
 /** Privacy comes from existing public/entitled projections, never raw object or other-Soul stream tables. */
 export function terminalSnapshot(ledger:EdgeLedger,soul:EdgeSoul,kind:string):OutcomeSnapshot{
- const worldId=ledger.host.worldId,tick=ledger.host.engine.world.tick,end=bodyEnd(ledger,soul.soulId),places=ledger.map(),base={worldId,tick,place:end?.place??null,placePath:ledger.placePathOf(soul.soulId).filter(p=>p.kind!=='occupier').map(p=>p.id),pos:end?.pos??null,walkable:places.filter(p=>p.walkable).map(p=>p.id)};
- if(!['use-computer','listen'].includes(kind))return{...base,sections:[],materials:[]};
+ const worldId=ledger.host.worldId,tick=ledger.host.engine.world.tick,end=bodyEnd(ledger,soul.soulId),full=['use-computer','listen'].includes(kind),places=full?ledger.map():[],walkable=full?places.filter(p=>p.walkable).map(p=>p.id):ledger.walkablePlaceIdsV1(),base={worldId,tick,place:end?.place??null,placePath:ledger.placePathOf(soul.soulId).filter(p=>p.kind!=='occupier').map(p=>p.id),pos:end?.pos??null,walkable};
+ if(!full)return{...base,sections:[],materials:[]};
  const visible=(ledger.comms?.objects.visibleTo(soul)??[]).map(object),sections:TerminalSection[]=[],materials:OutcomeSnapshot['materials']=[];
  const fact=(section:string,text:string,about=worldId,untrusted=false)=>({fact:text,about,source:`town:${section}:${worldId}:${tick}`,provenance:untrusted?'soul-text' as const:'world-fact' as const,untrusted});
  const directory=ledger.db.db.prepare('SELECT id,name,description FROM souls WHERE world_id=? AND retired_at IS NULL ORDER BY name,id LIMIT 20').all(worldId) as {id:string;name:string;description:string}[];

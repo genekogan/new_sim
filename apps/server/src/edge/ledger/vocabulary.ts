@@ -205,6 +205,34 @@ export const NOWHERE = ' Nothing like it exists anywhere in this world, so walki
 const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fishing: 'fish', gardening: 'garden', weeding: 'garden', swinging: 'swing', stargazing: 'stargaze', picnicking: 'picnic', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
+/** srv-act-words: the plain words an act may resolve on a focused build (`EdgeLedger.wordsFocused`): one walk to a named
+ *  place, standing up, a wave, a wander. (Rotation 2: sits and dances went back to the words menu. Their launch admission
+ *  reads the engine's paged clearance, whose answer near a body depends on the windows the last menu queries opened: after
+ *  a focused build 4 of 15 dances were refused pose.no-room that the whole menu's build admitted, the world identical;
+ *  oracle --gap 20, k=230.) Other shapes read offers beyond their own verbs
+ *  (chains, finding, gaits, bikes, rides and steering, "go <doing>", behind / nearest, floors, the refusal table, social
+ *  phrasing) and resolve on the whole menu, as before. */
+const WORDS_FOCUS_SHAPE = /^(?:please\s+)?(?:(?:go|walk|head)(?:\s+over|\s+back)?\s+(?:to|into|inside|towards?)\s+[a-z0-9' -]+|stand(?:\s+up)?|get\s+up|wave|wander)[.!]?$/;
+const WORDS_FOCUS_NOT = /\b(?:then|and|jog\w*|run|running|sprint\w*|hurry|cycl\w*|bik\w*|bicycl\w*|board\w*|embark|aboard|row\w*|boat\w*|ride|rides|riding|fly\w*|flight|leave|disembark|alight|start|depart|carousel|merry|ferris|balloon|punt|basket|behind|nearest|closest|nearby|anywhere|somewhere|upstairs|downstairs|floor|storey|story|top|level|find|seek|search|look)\b/;
+/** srv-act-words: the verbs plain words of a focus shape can read while they resolve (resolveWords), or null (the whole
+ *  menu): every verb parseCapability tests for these words (leading-word candidates and their VERBS synonyms, the INTENTS
+ *  and leisure verbs that match, ACT_ALIASES both ways), the offers the sit / stroll rules read (rest, sit-ground,
+ *  warm-by-fire; wander and stroll) and object offers (a god-built thing's
+ *  actions are verbs too). The offers of these verbs are the whole menu's (bindFocus), so the words resolve the same. */
+export function wordsFocusVerbsV1(input: string): Set<string> | null {
+  const raw = input.trim(), text = raw.toLowerCase().replace(/\s+/g, ' ');
+  if (!raw || raw.length > 160 || raw.includes(':') || !WORDS_FOCUS_SHAPE.test(text) || WORDS_FOCUS_NOT.test(text) || GO_FOR.test(raw) || FIND.test(raw)) return null;
+  if (NOT_YET.some(([re]) => re.test(text))) return null;
+  const out = new Set<string>(['object']), words = raw.split(/\s+/);
+  for (let n = 1; n <= Math.min(4, words.length); n++) {const k = words.slice(0, n).join('-').toLowerCase().trim().replace(/[\s_]+/g, '-'); out.add(k); if (VERBS[k]) out.add(VERBS[k]);}
+  for (const [re, v] of INTENTS) if (re.test(text)) out.add(v);
+  if (LEISURE_LEAD.test(raw)) for (const [re, v] of LEISURE_OBJECTS) if (re.test(text)) out.add(v);
+  for (const v of [...out]) {if (ACT_ALIASES[v]) out.add(ACT_ALIASES[v]); for (const [k, a] of Object.entries(ACT_ALIASES)) if (a === v) out.add(k);}
+  if (out.has('stroll') || out.has('wander')) {out.add('stroll'); out.add('wander');}
+  if (out.has('sit')) {out.add('rest'); out.add('sit-ground'); out.add('warm-by-fire');}
+  if (/\b(?:fire|campfire|warm)\b/.test(text)) out.add('warm-by-fire');
+  return out;
+}
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
 export function parseCapability(input: string, verbs: Set<string>): {verb: string; rest: string} {
   const raw = input.trim(), i = raw.indexOf(':');
@@ -671,10 +699,47 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   return {...unknown(`Nothing offered matches "${input}"; read capabilities again.`), ...(PLACE_VERBS.has(verb) && left.length && !ctx.withheld?.includes(left.join(' ')) ? {seek: left} : {})};
 }
 
+// srv-act-words: the places by id, once per places listing (vocabPlaces keeps the listing; isAncestor is asked for every
+// pair of a pool's offers: a Map per call was 2-3 ms of every walk resolved in words)
+const PLACES_BY_ID = new WeakMap<VocabContext['places'], Map<string, VocabContext['places'][number]>>();
 function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined): boolean {
-  const byId = new Map(ctx.places.map(p => [p.id, p]));
+  let byId = PLACES_BY_ID.get(ctx.places); if (!byId) {byId = new Map(ctx.places.map(p => [p.id, p])); PLACES_BY_ID.set(ctx.places, byId);}
   for (let p = id ? byId.get(id) : undefined, n = 0; p && n < 20; p = p.parent ? byId.get(p.parent) : undefined, n++) if (p.parent === ancestor) return true;
   return false;
+}
+/** srv-act-words (D): for a focused walk to these destination words, a test passing every walk offer the words could choose
+ *  (resolveWords' walk pool rules), so a focused build may skip building the rest (their route goals): an offer is kept
+ *  when any destination word (or its everyday synonym) is one of its own words (target id, id, label, target names, the
+ *  place it stands in, aliases), or its target is a place any such word names (name, id, aliases, kind, description: every
+ *  placeMatch tier and pass, leniently) or one inside or around such a place (3b: the place itself, its inner offers, the
+ *  containing place). Every rule that chooses a walk reads only offers like these; the rest are read by unknown answers,
+ *  which go to the words menu. Null (build every walk) for words other rules read whole: no word left after filler, here
+ *  / now words, numbers (numberWords), and a word the typo fallback could re-read (one no place spells exactly: typoFix
+ *  reads the offers' words). */
+const KEEP_WHOLE = new Set(['here', 'nearby', 'near', 'anywhere', 'somewhere', 'down', 'now', 'nearest']);
+const PLACE_TOKENS = new WeakMap<readonly VocabPlace[], Set<string>>();
+export function walkKeepV1(dest: string, places: VocabPlace[], target: VocabContext['target']): ((c: Pick<EdgeCapability, 'id' | 'verb' | 'label' | 'aliases' | 'target'>) => boolean) | null {
+  const q = tokens(dest);
+  if (!q.some(w => !FILLER.has(w)) || q.some(w => KEEP_WHOLE.has(w) || /\d/.test(w) || w in NUMBER_WORDS)) return null;
+  let exact = PLACE_TOKENS.get(places);
+  if (!exact) {exact = new Set(); for (const p of places) for (const s of [p.name, p.id, p.description ?? '', ...(p.aliases ?? [])]) for (const t of tokens(s)) exact.add(t); PLACE_TOKENS.set(places, exact);}
+  if (q.some(w => w.length >= 4 && !FILLER.has(w) && !exact!.has(w))) return null;
+  const Q = [...new Set([...q, ...q.flatMap(w => SYNONYMS[w] ?? [])])], qs = q.join(' ');
+  const named = new Set(places.filter(p => {const W = placeWords(p); return W.ids.includes(qs) || W.name === qs || W.aliases.includes(qs) || Q.some(w => tokenHit(w, W.nameT) || tokenHit(w, W.kindT) || tokenHit(w, W.descT));}).map(p => p.id));
+  // ... with every place around (isAncestor's chain) and inside them
+  let byId = PLACES_BY_ID.get(places); if (!byId) {byId = new Map(places.map(p => [p.id, p])); PLACES_BY_ID.set(places, byId);}
+  const near = new Set(named);
+  for (const p of places) {
+    const chain: string[] = [];
+    for (let x: VocabPlace | undefined = p, n = 0; x && n < 21; x = x.parent ? byId.get(x.parent) : undefined, n++) chain.push(x.id);
+    if (chain.slice(1).some(id => named.has(id))) near.add(p.id);
+    if (named.has(p.id)) for (const id of chain) near.add(id);
+  }
+  return c => {
+    const id = c.target?.id; if (id && near.has(id)) return true;
+    const t = target(c as EdgeCapability), own = [id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names, ...t.around, ...(c.aliases ?? [])].flatMap(tokens);
+    return Q.some(w => tokenHit(w, own));
+  };
 }
 /** Places named by these words: own name/id first, then everyday synonyms, then description words; the most
  *  obvious first (by name over description, walkable, outermost, larger). */

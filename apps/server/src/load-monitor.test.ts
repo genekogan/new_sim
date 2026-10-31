@@ -1,7 +1,7 @@
 // srv-load: load levels with hysteresis (LOAD-CONTRACT §1), live.json from the shared numbers (§4).
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {BASELINE_CAP_MS, LevelState, LoadMonitor, QuietBaseline, STEP_DOWN_MS, type Signals} from './load/monitor.ts';
+import {BASELINE_CAP_MS, LevelState, LoadMonitor, QUIET_TICK_ALPHA, QuietBaseline, QuietTick, STEP_DOWN_MS, type Signals} from './load/monitor.ts';
 import {liveOf, newSharedLoad, S} from './load/shared.ts';
 import {attachBootSlots, bootPhase, bootSlots, bootTick} from './load/boot-progress.ts';
 
@@ -13,10 +13,20 @@ test('levels: enter on any condition, at once and straight to the highest that h
   assert.equal(l.update(calm, 0), 'green');
   assert.equal(l.update(at({loopP99Ms: 250}), 1), 'amber');
   assert.equal(new LevelState().update(at({heapFrac: 0.86}), 0), 'red');
-  assert.equal(new LevelState().update(at({oldestMs: 6500}), 0), 'red');
+  assert.equal(new LevelState().update(at({oldestMs: 6500}), 0), 'amber', 'queue age alone is amber (the hint), never red');
   assert.equal(new LevelState().update(at({service: 0.79}), 0), 'amber');
   assert.equal(new LevelState().update(at({heapFrac: 0.93, gcFrac: 0.41}), 0), 'black');
   assert.equal(new LevelState().update(at({heapFrac: 0.93, gcFrac: 0.2}), 0), 'red', 'a full heap alone is red, not black');
+});
+
+test('levels: a queue red itself starves cannot hold red (the red lock): service 1.0 with a 6 s queue steps down in 30 s', () => {
+  const l = new LevelState(); let t = 0;
+  l.update(at({service: 0.3}), t); assert.equal(l.level, 'red', 'a real stall enters red');
+  l.update(at({oldestMs: 6100}), t += 1000); assert.equal(l.level, 'red', 'the queue left behind is not yet 30 s calm');
+  l.update(at({oldestMs: 6100}), t += STEP_DOWN_MS); assert.equal(l.level, 'amber', 'service/loop/heap calm: down one step despite the queue');
+  l.update(at({oldestMs: 2500}), t += 1000); assert.equal(l.level, 'amber', 'a 2.5 s queue is between the amber bands: calm starts');
+  l.update(at({oldestMs: 2500}), t += STEP_DOWN_MS); assert.equal(l.level, 'green', 'and the queue cannot hold amber either');
+  assert.equal(new LevelState().update(at({oldestMs: 2500}), 0), 'amber', 'a 2 s queue still raises the hint');
 });
 
 test('levels: black on tick service < 0.2 only after 30 s of it', () => {
@@ -144,4 +154,36 @@ test('live.json: phases, boot progress through the absorbed L5 slots, and the tu
     assert.ok(live.loop.lastTurnAgeMs >= 40_000, 'a thread that stopped turning shows its age');
     assert.equal(live.v, 1); assert.equal(live.pid, 42);
   } finally { attachBootSlots(before.view as Float64Array, before.offset); }
+});
+
+test('quiet tick (srv-admission-calib): an EWMA over quiet windows; a provisional seed until the first quiet window', () => {
+  const q = new QuietTick();
+  assert.equal(q.window(30, false, true), 30, 'never quiet yet: a served window seeds it provisionally');
+  assert.equal(q.window(40, false, false), 30, 'an unserved, loaded window teaches nothing');
+  assert.equal(q.window(12, true, true), 12, 'the first quiet window replaces the provisional seed');
+  assert.equal(q.window(50, false, true), 12, 'after that, loaded windows teach nothing');
+  assert.ok(Math.abs(q.window(22, true, true) - (12 + QUIET_TICK_ALPHA * 10)) < 1e-9, 'quiet windows move it by alpha');
+  assert.equal(q.window(Number.NaN, true, true), 13);
+});
+
+test('monitor: the quiet tick is the window\'s own tick average, learned only in quiet windows, and published', () => {
+  let now = 0, reqMs = 0;
+  const host = {engine: {world: {tick: 0}}, tickMs: [] as number[], paused: false, pace: 1, baseRate: 1, running: true, clockAvailable: true};
+  const shared = newSharedLoad(), m = new LoadMonitor({host, now: () => now, shared, requestMs: () => reqMs, windowMs: 5000});
+  m.start(); m.stop();   // opens the first window at now = 0 (no histogram needed: windowDone is driven by hand)
+  const run = (ms: number, n = 100) => { for (let i = 0; i < n; i++) { host.engine.world.tick++; host.tickMs.push(ms); if (host.tickMs.length > 400) host.tickMs.splice(0, 200); } };
+  run(3); now = 5000; m.sample(); m.windowDone(10, now);   // the serving warm-up window: not learned
+  assert.equal(m.quietTick.value, 0);
+  run(12); now = 10_000; m.sample(); m.windowDone(10, now);
+  assert.equal(m.quietTick.value, 12, 'the window\'s own 100 ticks, not the 20 s ring (which still holds the warm-up 3 ms ticks)');
+  assert.equal(shared[S.quietTickMs], 12);
+  reqMs += 2000; run(35); now = 15_000; m.sample(); m.windowDone(10, now);
+  assert.equal(m.quietTick.value, 12, 'a loaded window (requests 40 % of it) teaches nothing');
+  run(14); now = 20_000; m.sample(); m.windowDone(10, now);
+  assert.ok(Math.abs(m.quietTick.value - 12.2) < 1e-9, String(m.quietTick.value));
+  m.sample();
+  assert.equal(m.health().quietTickMs, 12.2); assert.equal(m.health().frameBudgetMs, 22.7, 'green: 0.6 × (50 − 12.2)');
+  const before = bootSlots(); attachBootSlots(shared, S.boot);
+  try { bootPhase('serving', 0); assert.equal(liveOf(shared, 1, now).tick!.quietAvgMs, 12.2, 'live.json carries it for the launcher and the bench'); }
+  finally { attachBootSlots(before.view as Float64Array, before.offset); }
 });
