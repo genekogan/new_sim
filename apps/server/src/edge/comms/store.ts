@@ -48,13 +48,18 @@ export function afterCommit(db:Sql,callback:()=>void){
  if(frame){if(c.frames[0].untrackedParent)throw Error('edge-comms.untracked-outer-transaction');frame.callbacks.push(callback);}
  else{if(db.isTransaction)throw Error('edge-comms.untracked-outer-transaction');notifyCommitted(c,[callback]);}
 }
+/** L8: counts tracked rollbacks per connection (savepoint or outer), so an in-memory mirror of rows written inside a
+ *  transaction knows when to re-read them before the transaction ends. Raw untracked ROLLBACKs always end the
+ *  transaction, which a mirror sees as `db.isTransaction === false`. */
+const rollbacks=new WeakMap<Sql,number>();
+export function rollbackGeneration(db:Sql):number{return rollbacks.get(db)??0;}
 /** Atomic block that nests safely; publishing additionally tracks commit scope. */
 export function tx<T>(db: Sql, fn: () => T,options?:{immediate?:boolean;deferNotifications?:(notify:()=>void)=>void}): T {
  const c=context(db),name=`edge_comms_${++savepoints}`,frame:CommitFrame={callbacks:[],untrackedParent:c.frames.length?c.frames[0].untrackedParent:db.isTransaction};
  const immediate=options?.immediate===true;if(immediate&&(c.frames.length||db.isTransaction))throw Error('edge-comms.immediate-must-be-outer');
  db.exec(immediate?'BEGIN IMMEDIATE':`SAVEPOINT ${name}`);c.frames.push(frame);let out:T;
  try{out=fn();db.exec(immediate?'COMMIT':`RELEASE ${name}`);}
- catch(error){try{db.exec(immediate?'ROLLBACK':`ROLLBACK TO ${name}`);}finally{try{if(!immediate)db.exec(`RELEASE ${name}`);}finally{c.frames.pop();}}throw error;}
+ catch(error){rollbacks.set(db,(rollbacks.get(db)??0)+1);try{db.exec(immediate?'ROLLBACK':`ROLLBACK TO ${name}`);}finally{try{if(!immediate)db.exec(`RELEASE ${name}`);}finally{c.frames.pop();}}throw error;}
  c.frames.pop();const parent=c.frames.at(-1);
  if(parent)parent.callbacks.push(...frame.callbacks);else if(options?.deferNotifications)options.deferNotifications(()=>notifyCommitted(c,frame.callbacks));else notifyCommitted(c,frame.callbacks);
  return out;

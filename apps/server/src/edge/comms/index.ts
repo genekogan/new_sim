@@ -21,6 +21,7 @@ import {Fading} from './fading.ts';
 import {ensureCommsSchema,tx,afterCommit} from './store.ts';
 import {EventStreams, parseCursor} from './stream.ts';
 import {Webhooks, type Fetch} from './webhook.ts';
+import {TokenBuckets} from '../../flood.ts';
 
 export type CommsOptions = {
   now?: () => number;
@@ -179,7 +180,17 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     if(b.accepted)fading.touch(soul.soulId);
     return b.accepted ? {...rest, receipt: b.receipt} : {accepted: false, code: b.code, reason: b.reason, object: id, action: out.action};
   }));
-  app.get('/v1/edge/calendar', c => c.json(edgeBody({tick: core.tick(), items: objects.all().filter(o => o.kind === 'calendar-item' && (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)}))})));
+  // Public (no Soul token). L8: the items are serialized once per object-table change, not per request, and one visitor
+  // address may read it 60 times a minute (a request with no x-forwarded-for came from this machine: no limit).
+  const calendarReads = new TokenBuckets(1, 60);
+  let calendarItems: {changes: number; json: string} | undefined;
+  app.get('/v1/edge/calendar', c => {
+    const xff = c.req.header('x-forwarded-for'), wait = xff ? calendarReads.take(xff.split(',')[0].trim()) : 0;
+    if (wait) { c.header('Retry-After', String(Math.ceil(wait / 1000))); return failure(c, new EdgeError(429, 'rate-limited', 'More than 60 calendar reads a minute from your address; wait a moment.')); }
+    const changes = objects.generation();
+    if (calendarItems?.changes !== changes) calendarItems = {changes, json: JSON.stringify(objects.ofKind('calendar-item').filter(o => (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)})))};
+    return c.body(`${JSON.stringify(edgeBody({tick: core.tick()})).slice(0, -1)},"items":${calendarItems.json}}`, 200, {'Content-Type': 'application/json'});
+  });
   app.get('/v1/edge/digest', route(() => ({digest: steward.latestDigest()})));
 
   // Steward session endpoints (not Soul-authenticated).

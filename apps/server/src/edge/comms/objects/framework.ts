@@ -6,6 +6,7 @@ import {EdgeError} from '../../contract.ts';
 import {bodyCapabilityProblem} from '../../body/actions.ts';
 import type {CommsCore} from '../core.ts';
 import {tx} from '../store.ts';
+import {canonicalJson, objectTable, stateDigest} from './table.ts';
 import type {ActionCtx, BodyRequest, CarrierView, FieldSpec, ObjectEvent, ObjectKind, ObjectRecord, ParamSpec, Refusal, TimeCtx} from './types.ts';
 
 const OBJECT_ID = /^[a-z0-9][a-z0-9._-]{0,99}$/;
@@ -18,6 +19,19 @@ export function readOnlyObjectAdvance<F extends NonNullable<ObjectKind['advance'
   READ_ONLY_ADVANCES.add(advance);
   return advance;
 }
+
+const REFRESH_ONLY_ADVANCES = new WeakSet<NonNullable<ObjectKind['advance']>>();
+/** For an advance that is not time-driven: its result changes only when the kind's owner says so, and the owner then
+ * calls `refresh(ids)` (god-built things follow the entity world). Listings (`fresh()`, `visibleTo`, capabilities) skip
+ * it; `refresh`, `get`, actions and the sweep timer still apply it. */
+export function refreshOnlyObjectAdvance<F extends NonNullable<ObjectKind['advance']>>(advance: F): F {
+  REFRESH_ONLY_ADVANCES.add(advance);
+  return advance;
+}
+export const isRefreshOnlyObjectAdvance = (advance: unknown) => typeof advance === 'function' && REFRESH_ONLY_ADVANCES.has(advance as NonNullable<ObjectKind['advance']>);
+/** visibleTo's spatial filter: objects of these kinds are listed only when their `state.at` [x, z] lies within `radius`
+ * of `at` (a 32 m cell index), so a world of thousands of built things is not viewed whole for every observe. */
+export type NearFilter = {at: readonly [number, number]; radius: number; kinds: {has(kind: string): boolean}};
 
 export type ObjectActResult = {accepted: true; object: {id: string; version: number}; action: string; result?: Record<string, unknown>; bodies?: BodyRequest[]}
   | {accepted: false; code: string; reason: string; object: string; action: string};
@@ -36,33 +50,35 @@ export class Objects {
 
   private carrierRead = (id: string): CarrierView | null => { try { return (this.core.deps.ledger.carrierView?.(id) ?? null) as CarrierView | null; } catch { return null; } };
   private timeCtx(): TimeCtx { return {tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, carrier: this.carrierRead}; }
-  private row(id: string): ObjectRecord | undefined {
-    const r = this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? AND id = ?').get(this.core.worldId, id) as {body: string} | undefined;
-    return r ? JSON.parse(r.body) as ObjectRecord : undefined;
-  }
+  /** L8: the in-memory table (rows are frozen; copy before changing). */
+  private get table() { return objectTable(this.core.db, this.core.worldId); }
+  private row(id: string): ObjectRecord | undefined { return this.table.get(id); }
   private save(o: ObjectRecord) {
+    const body = JSON.stringify(o);
     this.core.db.prepare('INSERT INTO edge_comms_objects (world_id, id, kind, version, body, updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT (world_id, id) DO UPDATE SET version = excluded.version, body = excluded.body, updated_at = excluded.updated_at')
-      .run(this.core.worldId, o.id, o.kind, o.version, JSON.stringify(o), this.core.now());
+      .run(this.core.worldId, o.id, o.kind, o.version, body, this.core.now());
+    this.table.wrote(body);
   }
   private log(o: ObjectRecord, soulId: string | null, action: string, params: Record<string, unknown>) {
     this.core.db.prepare('INSERT INTO edge_comms_object_log (world_id, object_id, version, soul_id, action, params, tick, at) VALUES (?,?,?,?,?,?,?,?)')
       .run(this.core.worldId, o.id, o.version, soulId, action, JSON.stringify(params), this.core.tick(), this.core.now());
   }
-  all(): ObjectRecord[] {
-    return (this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? ORDER BY id').all(this.core.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as ObjectRecord);
-  }
-  /** Whether an object with this id exists (one indexed row, no body parsed). */
-  has(id: string): boolean {
-    return !!this.core.db.prepare('SELECT 1 FROM edge_comms_objects WHERE world_id = ? AND id = ?').get(this.core.worldId, id);
-  }
-  /** Every object id (`all()`'s ids, same order), no bodies parsed. */
-  ids(): string[] {
-    return (this.core.db.prepare('SELECT id FROM edge_comms_objects WHERE world_id = ? ORDER BY id').all(this.core.worldId) as {id: string}[]).map(r => r.id);
-  }
-  /** `all()` of one kind (same order): only that kind's bodies are parsed (S1 V7d: the layers' calendar every 2 s). */
-  ofKind(kind: string): ObjectRecord[] {
-    return (this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? AND kind = ? ORDER BY id').all(this.core.worldId, kind) as {body: string}[]).map(r => JSON.parse(r.body) as ObjectRecord);
-  }
+  /** Every object, ordered by id, from memory: a frozen array of frozen records (copy before changing anything). */
+  all(): ObjectRecord[] { return this.table.all() as ObjectRecord[]; }
+  /** Whether an object with this id exists. */
+  has(id: string): boolean { return this.table.has(id); }
+  /** Every object id (`all()`'s ids, same order; frozen). */
+  ids(): string[] { return this.table.ids() as string[]; }
+  /** `all()` of one kind (same order; frozen). */
+  ofKind(kind: string): ObjectRecord[] { return this.table.ofKind(kind) as ObjectRecord[]; }
+  /** The object table's generation: moves on every change (L9 Stage B: `table.snapshot()` / `table.changes(gen)`). */
+  generation(): number { return this.table.generation; }
+  /** L3 seam: the write-version of the objects near a point (table.ts `generationNear`). */
+  generationNear(at: readonly [number, number], radius: number): number { return this.table.generationNear(at, radius); }
+  /** L9 Stage B: the table's snapshot and its ordered delta stream (see table.ts). */
+  objectTable() { return this.table; }
+  /** Re-read every object row: only after SQL that wrote `edge_comms_objects` without the framework (tests, repairs). */
+  reload(): void { this.table.reload(); }
 
   /** Original creation input; private provenance survives actions and process restarts. */
   creationParams(id: string): Record<string, unknown> | undefined {
@@ -87,7 +103,7 @@ export class Objects {
       return o;
     });
   }
-  remove(id: string) { this.core.db.prepare('DELETE FROM edge_comms_objects WHERE world_id = ? AND id = ?').run(this.core.worldId, id); }
+  remove(id: string) { this.core.db.prepare('DELETE FROM edge_comms_objects WHERE world_id = ? AND id = ?').run(this.core.worldId, id); this.table.removed(id); }
 
   private inPlace(soulId: string, placeId: string): boolean {
     try { return this.core.deps.ledger.placePathOf(soulId).some(p => p.id === placeId); } catch { return false; }
@@ -112,12 +128,17 @@ export class Objects {
     const step = pre ?? kind?.advance?.(structuredClone(o.state), this.timeCtx());
     if (!kind || !step) return o;
     checkState(kind, step.state);
+    // L8 item 4: a step that changes nothing (same state, no events) is no write: no version, no `advance` log row.
+    if (!step.events?.length && canonicalJson(step.state) === stateDigest(o.state)) return o;
     const next = {...o, state: step.state, version: o.version + 1};
     if(persist){this.save(next); this.log(next, null, 'advance', {});this.emit(next, step.events ?? []);}
     return next;
   }
   /** Every object with its time-driven transitions applied (also the sweep timer). */
-  fresh(): ObjectRecord[] {
+  fresh(): ObjectRecord[] { return this.freshList(undefined, false); }
+  /** fresh() over `only` (records from all(), in id order), or over every object. `withRefreshOnly` also applies the
+   *  advances listings skip (the synchronous sweep). */
+  private freshList(only: readonly ObjectRecord[] | undefined, withRefreshOnly: boolean): ObjectRecord[] {
     // GODPERF: one read of every object, and a transaction only round an object that advances. Until something is written
     // here the rows are exactly what all() read (nothing else runs in between), so an object whose kind does not advance
     // is returned as read and a step computed on it is the step its own re-read would give; after the first write the rest
@@ -125,21 +146,25 @@ export class Objects {
     // re-read and parse per object: 3,292 on Eden 2026, ~47 ms of every listing.
     let wrote = false;
     const all = this.all, owned = all === ORIGINAL_ALL;
-    const rows: ObjectRecord[] = Reflect.apply(all, this, []);
+    const rows: readonly ObjectRecord[] = only ?? Reflect.apply(all, this, []);
     return rows.map(o => {
       if (!wrote) {
         const kind = this.kinds.get(o.kind), advance = kind?.advance;
+        if (advance && !withRefreshOnly && REFRESH_ONLY_ADVANCES.has(advance)) return o;
         const step = advance == null ? undefined : Reflect.apply(advance, kind, [owned && READ_ONLY_ADVANCES.has(advance) ? o.state : structuredClone(o.state), this.timeCtx()]);
         if (!kind || !step) return o;
-        wrote = true;
-        return tx(this.core.db, () => this.advanced(o, true, step));
+        const next = tx(this.core.db, () => this.advanced(o, true, step));
+        if (next !== o) wrote = true; // a no-op step wrote nothing and emitted nothing
+        return next;
       }
+      if (!withRefreshOnly) { const advance = this.kinds.get(o.kind)?.advance; if (advance && REFRESH_ONLY_ADVANCES.has(advance)) return this.row(o.id) ?? o; }
       return tx(this.core.db, () => { const cur = this.row(o.id); return cur ? this.advanced(cur) : o; });
     });
   }
   /** fresh() for just these objects (their kind's wanted state changed): no read of every object. */
   refresh(ids: Iterable<string>): void { for (const id of ids) tx(this.core.db, () => { const cur = this.row(id); if (cur) this.advanced(cur); }); }
-  sweep() { this.fresh(); }
+  /** Every object with every advance applied, the refresh-only ones included (the synchronous sweep). */
+  sweep(): ObjectRecord[] { return this.freshList(undefined, true); }
 
   /** Timer maintenance owns only the ordered ids across turns, never stale object bodies. A whole object's advance,
    * durable log and committed notifications finish before yielding; no transaction survives a yield. New ids wait for
@@ -193,14 +218,22 @@ export class Objects {
     });
   }
   /** Objects this Soul can see (for observe `here.objects` and GET /v1/edge/objects). */
-  visibleTo(soul: EdgeSoul) {
+  visibleTo(soul: EdgeSoul, near?: NearFilter) {
     const inPlace = this.inPlaceFor(soul.soulId);
-    return this.fresh().flatMap(o => {
+    return this.freshList(near ? this.nearCandidates(near) : undefined, false).flatMap(o => {
       const kind = this.kinds.get(o.kind);
       if (!kind || !this.visible(o, soul.soulId, kind, inPlace)) return [];
       const v = this.view(o, soul, inPlace);
       return [{id: v.id, kind: v.kind, name: v.name, placeId: v.placeId, here: inPlace(o.placeId), public: publicState(kind, o.state), untrusted: true}];
     });
+  }
+
+  /** Every object not of `near.kinds`, and those of `near.kinds` within the radius: in id order, as all() lists them. */
+  private nearCandidates(near: NearFilter): ObjectRecord[] {
+    const t = this.table, out: ObjectRecord[] = [];
+    for (const kind of t.kindsPresent()) if (!near.kinds.has(kind)) out.push(...t.ofKind(kind));
+    for (const id of t.near(near.at, near.radius)) { const o = t.get(id)!; if (near.kinds.has(o.kind)) out.push(o); }
+    return out.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   }
 
   act(id: string, soul: EdgeSoul, input: Record<string, unknown>): ObjectActResult {
@@ -274,10 +307,10 @@ export class Objects {
   capabilities(soul: EdgeSoul, only?: ReadonlySet<string>, places?: Map<string, string>): EdgeCapability[] {
     const inPlace = this.inPlaceFor(soul.soulId);
     // L3 (server reliability): a focused menu build names its objects; read and advance just those (as get() does), in all()'s id order
-    const rows = only ? [...only].filter(id => OBJECT_ID.test(id)).sort((a, b) => a < b ? -1 : a > b ? 1 : 0).flatMap(id => {const o = tx(this.core.db, () => {const cur = this.row(id); return cur ? this.advanced(cur) : undefined;}); return o ? [o] : [];}) : this.fresh();
+    const rows = only ? this.freshList([...only].flatMap(id => {const o = OBJECT_ID.test(id) ? this.row(id) : undefined; return o ? [o] : [];}).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0), false) : this.fresh();
     return rows.flatMap(o => {
       const kind = this.kinds.get(o.kind);
-      if (!kind || !this.visible(o, soul.soulId, kind, inPlace)) return [];
+      if (!kind || NO_ACTIONS(kind) || !this.visible(o, soul.soulId, kind, inPlace)) return [];
       const ctx = this.ctx(o, kind, soul, inPlace); places?.set(o.id, o.placeId);
       return this.actionsFor(o, kind, ctx).map(a => ({id: `object:${o.id}:${a.action}`, verb: 'object', label: `${a.label} (${o.name})`, object: o.id, action: a.action,
         target: {id: o.id, kind: o.kind}, available: a.available, ...(a.blocked ? {blocked: a.blocked} : {}), ...(Object.keys(a.params).length ? {params: a.params as Record<string, unknown>} : {})}));
@@ -285,7 +318,10 @@ export class Objects {
   }
   /** Extra hearers for `say` from Role relations (`addresses`). */
   addressees(soulId: string): {objectId: string; souls: string[]}[] {
-    return this.fresh().flatMap(o => {
+    const t = this.table, only: ObjectRecord[] = [];
+    for (const k of t.kindsPresent()) if (this.kinds.get(k)?.addressees) only.push(...t.ofKind(k));
+    if (!only.length) return [];
+    return this.freshList(only.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0), false).flatMap(o => {
       const kind = this.kinds.get(o.kind);
       const souls = kind?.addressees?.(o.state, soulId) ?? [];
       return souls.length ? [{objectId: o.id, souls}] : [];
@@ -295,6 +331,7 @@ export class Objects {
 
 // Capture once: kindOf() and public methods remain replaceable, but replacements cannot acquire parse ownership.
 const ORIGINAL_ALL = Objects.prototype.all;
+const NO_ACTIONS = (kind: ObjectKind) => { for (const _ in kind.actions) return false; return true; };
 
 function entitled(spec: FieldSpec, roles: string[]) { return spec.visibility === 'public' || spec.visibility.some(r => roles.includes(r)); }
 function publicState(kind: ObjectKind, state: unknown) {
