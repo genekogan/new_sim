@@ -50,6 +50,7 @@ export function record(t: OracleTally, read: string, soulId: string, diffs: Fiel
 // one Soul at a time and tallies them. A replica read that reached main-only state is counted apart (`mainOnly`): in a
 // worker it is forwarded to main, never answered wrong. A trade-off is counted only when the replica's verdict table
 // missed during that read.
+import {threadCpuUsage} from 'node:process';
 import type {WorldHost} from '../world.ts';
 import type {EdgeLedger} from '../edge/ledger/ledger.ts';
 import type {EdgeSoul} from '../edge/contract.ts';
@@ -57,8 +58,9 @@ import type {DeltaTap, StreamMessage} from './delta.ts';
 
 export type ReadName = 'here' | 'observe' | 'capabilities' | 'resolve' | 'around';
 export const READS: readonly ReadName[] = ['here', 'observe', 'capabilities', 'resolve', 'around'];
-export type Soak = {startedAt: number; rounds: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number; paths: Record<string, number>; lateDelta?: number}>; replica: unknown};
+export type Soak = {startedAt: number; rounds: number; /** thread CPU ms of the replica's per-round god-layer sync */ syncCpuMs: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number; paths: Record<string, number>; lateDelta?: number}>; replica: unknown};
 
+const cpu = () => {const u = threadCpuUsage(); return (u.user + u.system) / 1000;};
 export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {tap: DeltaTap; init: () => unknown; ask: (m: never[]) => void}, dbPath: string, o: {everyMs?: number; log?: (s: string) => void; logEveryMs?: number} = {}) {
   const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}, {hereFrame}, {aroundFrame}, {readBridgeSync, readBridgeCost}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts'), import('../edge/perception/here.ts'), import('../edge/perception/around.ts'), import('./read-bridge.ts')]);
   const {readFileSync, writeFileSync, mkdirSync} = await import('node:fs');
@@ -69,7 +71,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
   let warmMs = 0, warmed: unknown = null;
   /** as a worker does before 'ready': label connectivity outside any read (again after a rebuild) */
   const warm = () => {if (RW.spatial && warmed !== RW.spatial) {warmMs += RW.spatial.warmLabelsV1(); warmed = RW.spatial;}};
-  const S: Soak = {startedAt: Date.now(), rounds: 0, skipped: {}, replica: null,
+  const S: Soak = {startedAt: Date.now(), rounds: 0, syncCpuMs: 0, skipped: {}, replica: null,
     reads: Object.fromEntries(READS.map(r => [r, {...tally(), mainOnly: {}, liveMs: 0, replicaMs: 0, paths: {}}])) as Soak['reads']};
   const skip = (why: string) => {S.skipped[why] = (S.skipped[why] ?? 0) + 1;};
   src.tap.subscribe((m: StreamMessage) => {
@@ -112,19 +114,18 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     if (!(L as unknown as {bodyPlacesReady(): boolean}).bodyPlacesReady()) {skip('main-places'); return;}
     const all = souls(); if (!all.length) {skip('no-souls'); return;}
     const s = all[next++ % all.length]; S.rounds++;
-    readBridgeSync(H, RL);   // as a worker does before each read
+    {const c = cpu(); readBridgeSync(H, RL); S.syncCpuMs += cpu() - c;}   // as a worker does before each read (its CPU apart)
     for (const name of READS) {
       const T = S.reads[name];
-      let a: unknown, b: unknown, t = performance.now();
+      let a: unknown, b: unknown, t = cpu();
       const genOf = () => (L.comms as unknown as {objects?: {generation?(): number}} | undefined)?.objects?.generation?.(), g0 = genOf();
-      try {a = JSON.parse(JSON.stringify(ask[name](L, s, S.rounds)));} catch (e) {a = {error: String(e)};}
+      // (thread CPU of the read alone: the JSON copy both sides make for the compare is the harness's, not the read's)
+      try {const v = ask[name](L, s, S.rounds); T.liveMs += cpu() - t; a = JSON.parse(JSON.stringify(v));} catch (e) {T.liveMs += cpu() - t; a = {error: String(e)};}
       // (against the replica's generation, not this read's start: an earlier read of the same round may have written)
       const mainWrote = genOf() !== g0 || genOf() !== RW.R.objectGen;
-      T.liveMs += performance.now() - t;
-      const missBefore = RW.verdicts.missCount; t = performance.now();
-      try {b = JSON.parse(JSON.stringify(ask[name](RL, s, S.rounds)));}
-      catch (e) {T.replicaMs += performance.now() - t; if (e instanceof MainOnly) {const k = e.message.replace(/^read worker: | is main-only$/g, ''); T.mainOnly[k] = (T.mainOnly[k] ?? 0) + 1; T.reads++; continue;} b = {error: String(e)};}
-      T.replicaMs += performance.now() - t;
+      const missBefore = RW.verdicts.missCount; t = cpu();
+      try {const v = ask[name](RL, s, S.rounds); T.replicaMs += cpu() - t; b = JSON.parse(JSON.stringify(v));}
+      catch (e) {T.replicaMs += cpu() - t; if (e instanceof MainOnly) {const k = e.message.replace(/^read worker: | is main-only$/g, ''); T.mainOnly[k] = (T.mainOnly[k] ?? 0) + 1; T.reads++; continue;} b = {error: String(e)};}
       // observe's `at` is the wall clock of the call (two calls, two instants): not a field the replica can differ in
       if (name === 'observe' && a && b && typeof a === 'object' && typeof b === 'object') {delete (a as {at?: unknown}).at; delete (b as {at?: unknown}).at;}
       const missed = RW.verdicts.missCount > missBefore, diffs = diffFields(a, b);
@@ -141,7 +142,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     RL.knowledge.outbox.length = 0;
   };
   const iv = setInterval(() => {try {round();} catch (e) {skip('error'); console.error('[read-oracle]', e instanceof Error ? e.stack?.split('\n').slice(0, 3).join(' | ') : e);}}, o.everyMs ?? 1000); iv.unref();
-  const summary = () => ({...S, warmMs: Math.round(warmMs), replica: RW.cost, god: readBridgeCost(RL), verdicts: {hits: RW.verdicts.hits, misses: RW.verdicts.missCount},
+  const summary = () => ({...S, syncCpuMs: Math.round(S.syncCpuMs), warmMs: Math.round(warmMs), replica: RW.cost, god: readBridgeCost(RL), verdicts: {hits: RW.verdicts.hits, misses: RW.verdicts.missCount},
     reads: Object.fromEntries(READS.map(r => {const T = S.reads[r]; return [r, {...T, liveMs: Math.round(T.liveMs), replicaMs: Math.round(T.replicaMs)}];}))});
   const lg = setInterval(() => (o.log ?? console.log)('[read-oracle] ' + JSON.stringify(summary())), o.logEveryMs ?? 60_000); lg.unref();
   return {summary, stop: () => {clearInterval(iv); clearInterval(lg); H.close();}};
