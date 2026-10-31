@@ -20,6 +20,9 @@ test('pick-up presentation (entry 29 on M04): one reach clock for the drawn hand
  assert.ok(Math.abs(at(10+R-1).weight-1)<1e-9||ITEM_ARM_LEAD_SECONDS>ITEM_REACH_SECONDS,'full arm weight before the grasp');
  // the idle gesture fades out from the reach start on through the grasp and the withdraw, never cut
  let prev=1;for(let t=10;t<10+2*R;t++){const g=at(t).idleBlend;assert.ok(g<=prev+1e-12&&prev-g<=1.5*dt/ITEM_GESTURE_FADE_SECONDS+1e-9,'gesture fade at '+t+': '+prev+' → '+g);prev=g}
+ // the presented pick-up's recovery ends holding: the gesture keeps fading and never comes back (take 5: it did, then cut)
+ const rec={...take,releaseTick:10+2*R};for(let t=10+2*R;t<10+2*R+30;t++){const g=itemPresentation(rec,{right:'bowl'},t,dt).idleBlend;assert.ok(g<=prev+1e-12,'recovery gesture at '+t);prev=g}
+ assert.equal(itemPresentation(rec,{right:'bowl'},10+2*R+30,dt).idleBlend,0,'gone before the record clears');
  // a put starts holding: no gesture at any point until the release
  const put={...take,mode:'put',action:'a2'};for(let t=0;t<10+R;t++)assert.equal(itemPresentation(put,{right:'bowl'},t,dt).idleBlend,0);
  // interrupted halfway: the goal stops, the arm weight eases back to 0 over the engine's withdraw and stays 0 in recovery

@@ -55,6 +55,8 @@ export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:s
  const lead=smooth(s/ITEM_ARM_LEAD_SECONDS),back=cancelled?lead*(1-smooth((tick-transfer.cancelTick!)*dt/ITEM_REACH_SECONDS)):0;
  const goal=reaching?{goal:{hand:transfer.hand,p:transfer.target!,k:lead>1e-6?Math.min(1,reachK/lead):0}}:{};
  // After release the engine keeps the hand at its rest point through recovery: the drawn arm eases from it to the clip.
- if(transfer.releaseTick!==undefined){const r=smooth((tick-transfer.releaseTick)*dt/ITEM_RECOVERY_SECONDS);return{weight:holding?1:pickUp&&transfer.cancelTick!==undefined?0:1-r,idleBlend:Math.max(r,fade),...posture};}
+ // A pick-up's recovery ends holding the item: no gesture comes back (it would be cut when the record clears), only
+ // the reach-start fade runs out.
+ if(transfer.releaseTick!==undefined){const r=smooth((tick-transfer.releaseTick)*dt/ITEM_RECOVERY_SECONDS);return{weight:holding?1:pickUp&&transfer.cancelTick!==undefined?0:1-r,idleBlend:holding?fade:Math.max(r,fade),...posture};}
  return{weight:holding?1:cancelled?back:reaching?lead:pickUp?smooth(s/ITEM_REACH_SECONDS):1,idleBlend:fade,...goal,...posture};
 }

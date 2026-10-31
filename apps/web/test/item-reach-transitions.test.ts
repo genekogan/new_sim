@@ -45,7 +45,7 @@ const lerp3=(a:number[],b:number[],k:number)=>a.map((v,i)=>v+(b[i]-v)*k) as [num
 const M=BODY_MODEL,REST:[number,number,number]=[M.restHand.fwd,M.restHand.up,M.restHand.side],CARRY:[number,number,number]=[M.carryHand.fwd,M.carryHand.up,M.carryHand.side];
 
 /** One take as the engine records it: idle, pick-up reach to `grasp` (right hand), withdraw to the carry point holding,
- *  hold, put reach to `place`, release at the end of the withdraw to the rest point, recovery, idle. Yaw 0: forward +x,
+ *  the presented item's recovery (holding; take 5 drew folded arms back in here and cut them at its end: 0.59), hold, put reach to `place`, release at the end of the withdraw to the rest point, recovery, idle. Yaw 0: forward +x,
  *  right +z. */
 function frames(id:string,grasp:[number,number,number],place:[number,number,number]){
  const R=Math.round(ITEM_REACH_SECONDS/DT),Rec=Math.round(ITEM_RECOVERY_SECONDS/DT),out:{k:number;f:SampledHuman}[]=[];
@@ -56,6 +56,8 @@ function frames(id:string,grasp:[number,number,number],place:[number,number,numb
  const take:ItemTransferV1={item:'bowl',hand:'right',action:'a1',mode:'take',startTick:k-10,reachTick:k-1,target:grasp};
  for(let t=1;t<=R;t++)push(k++,'reach',lerp3(REST,grasp,smooth(t/R)),take,false);           // reach (not holding)
  for(let t=1;t<=R;t++)push(k++,'reach',lerp3(grasp,CARRY,smooth(t/R)),take,true);           // withdraw (holding)
+ const took={...take,releaseTick:k-1};
+ for(let t=1;t<=Rec;t++)push(k++,'idle',CARRY,took,true);                                   // pick-up recovery (holding)
  for(let j=0;j<30;j++)push(k++,'idle',CARRY,undefined,true);                                // holding
  const put:ItemTransferV1={item:'bowl',hand:'right',action:'a2',mode:'put',startTick:k-10,reachTick:k-1,target:place};
  for(let t=1;t<=R;t++)push(k++,'reach',lerp3(CARRY,place,smooth(t/R)),put,true);            // put reach (holding)
@@ -83,7 +85,7 @@ test('an item pick-up and put-down drawn on the real rig: no palm faster than 0.
 });
 
 test('a pick-up out of folded arms: the gesture fades out over the reach and the withdraw, no palm faster than 0.08',async()=>{
- const id=idWith(true,29.5,34),r=await measure(id,[.78,.75,0],[.6,.76,.05]);
+ const id=idWith(true,29.5,36),r=await measure(id,[.78,.75,0],[.6,.76,.05]);
  const start=r.rows.findIndex(x=>x.act==='reach');
  if(process.env.ITEM_DEBUG)console.log('fold worst',r.worst.toFixed(3),'@',r.at,'variety at reach',r.rows[start].variety.toFixed(2),'at grasp',r.rows[start+Math.round(ITEM_REACH_SECONDS/DT)].variety.toFixed(2));
  assert.ok(r.rows[start].variety>.9,'folded arms are playing when the reach starts');
