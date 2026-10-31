@@ -62,7 +62,7 @@ export const config = {
   // Lane L5: a periodic snapshot is also due once the ticks since the last one would take this long to replay (0 = off),
   // at most once per SNAPSHOT_MIN_GAP_MS; SNAPSHOT_EVERY_TICKS stays the ceiling.
   snapshotDebtMs: Number(env.SNAPSHOT_DEBT_MS ?? 3000),
-  snapshotMinGapMs: Number(env.SNAPSHOT_MIN_GAP_MS ?? 30_000),
+  snapshotMinGapMs: Number(env.SNAPSHOT_MIN_GAP_MS ?? 20_000),
   snapshotAfterReplayTicks: Number(env.SNAPSHOT_AFTER_REPLAY_TICKS ?? 200),
   seedNatives: env.SEED_NATIVES !== '0',
   maxSoulsPerUser: Number(env.MAX_SOULS_PER_USER ?? 20),

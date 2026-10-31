@@ -149,7 +149,7 @@ export class WorldHost {
    *  `snapshotMinGapMs` of wall time, and never more often than 20× the last capture's main-thread cost (capture ≤ 5 %
    *  of its interval). `snapshotEvery` ticks stays the ceiling. A boot that replayed more than `snapshotAfterReplayTicks`
    *  (0 = off; main.ts sets SNAPSHOT_AFTER_REPLAY_TICKS) snapshots on its first tick, so a second crash does not replay the gap again. */
-  snapshotDebtMs = 0; snapshotMinGapMs = 30_000; snapshotAfterReplayTicks = 0;
+  snapshotDebtMs = 0; snapshotMinGapMs = 20_000; snapshotAfterReplayTicks = 0;
   /** Engine-step time of the live ticks since the last snapshot: what a boot after a kill would replay. */
   replayDebtMs = 0;
   private lastSnapshotWall = performance.now();
