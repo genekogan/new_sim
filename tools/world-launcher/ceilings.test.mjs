@@ -50,6 +50,23 @@ test('ceilings: address rate, listen per Soul / account / address, account rate,
   assert.equal(c.socket('w8', '6.6.6.6'), null); many.forEach((m) => m.release()); assert.ok(c.socket('w8', '6.6.6.6'));
 });
 
+test('world budget (lane B-serve): a C2 read for the read workers skips it; chargeWorld takes it (refusing, or forced after the fact); C1 never skips', () => {
+  let t = 0; const c = soulCeilings({ now: () => t, log: () => {}, limitsFor: () => ({ worldBudgetRps: 2, accountHeavyPerMin: 100000 }) });
+  const get = (m = 'GET') => ({ method: m, headers: { authorization: 'Bearer sim_s_z_x' } });
+  for (let i = 0; i < 100; i++) { const r = c.check(get(), 'w', '/v1/edge/here', false, { toWorker: true }); assert.ok(r && !r.refuse && r.worldDeferred); r.release(); }
+  for (let i = 0; i < 4; i++) { const r = c.check(get(), 'w', '/v1/edge/here', false); assert.ok(!r.refuse && !r.worldDeferred, `main read ${i}`); r.release(); }   // the 2 s burst is untouched
+  assert.equal(c.check(get(), 'w', '/v1/edge/here', false).refuse.body.code, 'world.busy');
+  // an act is C1: toWorker never exempts it
+  t += 2000; for (let i = 0; i < 4; i++) c.check(get('POST'), 'w', '/v1/edge/act', false, { toWorker: true }).release();
+  assert.equal(c.check(get('POST'), 'w', '/v1/edge/act', false, { toWorker: true }).refuse.body.code, 'world.busy');
+  // a deferred read that reaches main: charged; refused when spent; forced debits push the next read back
+  t += 2000; assert.equal(c.chargeWorld('w'), null); assert.equal(c.chargeWorld('w'), null); assert.equal(c.chargeWorld('w'), null); assert.equal(c.chargeWorld('w'), null);
+  assert.equal(c.chargeWorld('w').refuse.body.code, 'world.busy');
+  assert.equal(c.chargeWorld('w', { force: true }), null);   // already answered by main: counted, never refused
+  t += 500; assert.ok(c.chargeWorld('w').refuse, 'in debt: the next main read waits');
+  t += 1500; assert.equal(c.chargeWorld('w'), null);
+});
+
 test('a 200 req/s hammer from one address: the world gets at most its budget, every refusal within 50 ms; C3 reads hit the world once a second', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'l1-ceil-'));
   const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);

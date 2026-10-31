@@ -9,13 +9,14 @@ export const LAUNCHER_FLOOD = Object.freeze({ godTokenPerS: 30, godTokenBurst: 9
 
 export class TokenBuckets {
   constructor(perS, burst, now = Date.now) { this.perS = perS; this.burst = burst; this.now = now; this.b = new Map(); this.calls = 0; }
-  /** 0 when allowed, else ms until one token is back */
-  take(key) {
+  /** 0 when allowed, else ms until one token is back. `force`: the request was already let through (counted after
+   *  the fact): take the token even when there is none, down to one burst of debt, and answer 0 */
+  take(key, force = false) {
     const now = this.now(); let e = this.b.get(key);
     if (!e) { e = { t: this.burst, at: now }; this.b.set(key, e); }
     else { e.t = Math.min(this.burst, e.t + Math.max(0, now - e.at) * this.perS / 1000); e.at = now; }
     if (++this.calls % 5000 === 0) for (const [k, x] of this.b) if (x.t + (now - x.at) * this.perS / 1000 >= this.burst) this.b.delete(k);
-    if (e.t >= 1) { e.t -= 1; return 0; }
+    if (e.t >= 1 || force) { e.t = Math.max(-this.burst, e.t - 1); return 0; }
     return Math.max(1, Math.ceil((1 - e.t) * 1000 / this.perS));
   }
 }
@@ -69,7 +70,7 @@ export const SOUL_CEILINGS = Object.freeze({
   soulListen: 4,            // listen/wait per Soul token
   accountListen: 12,        // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
   accountHeavyPerMin: 120,  // C1/C2 per account (as above) per minute
-  worldBudgetRps: 10,       // C1/C2 forwarded to the world per second, every Soul together (bursts of 2 s)
+  worldBudgetRps: 10,       // C1/C2 forwarded to the world's main thread per second, every Soul together (bursts of 2 s); reads its read workers answer are exempt
   maxBodyKb: 64,            // a Soul API request body (body uploads excepted)
   c3CacheMs: 1000,          // C3 public reads: one world call per this long per URL (the micro-cache)
 });
@@ -120,8 +121,17 @@ export function soulCeilings({ limitsFor = () => null, now = Date.now, log = (l)
       add(`c|${ip}`, 1); let done = false;
       return { release() { if (!done) { done = true; add(`c|${ip}`, -1); } } };
     },
-    /** One request to a world: null (not an API request: go on), { refuse } or { cls, soul, release() }. */
-    check(req, slug, rest, behindProxy) {
+    /** The world budget (main's share) for a request let through without it (`worldDeferred`): a read meant for the
+     *  read workers that goes to main after all. null = go on, else { refuse }; `force` (main already answered it): counted,
+     *  never refused. */
+    chargeWorld(slug, { force = false } = {}) {
+      const l = limits(slug), wait = bucket('world', l.worldBudgetRps, l.worldBudgetRps * 2).take(slug, force);
+      return wait ? no(slug, 503, 'world.busy', 'world', wait, 'this world is answering as many requests as it can') : null;
+    },
+    /** One request to a world: null (not an API request: go on), { refuse } or { cls, soul, release(), worldDeferred }.
+     *  `toWorker`: a C2 read the world's read workers will answer (Stage B): the world budget, which protects the tick
+     *  thread, is not taken here; chargeWorld() takes it if the read reaches main after all. */
+    check(req, slug, rest, behindProxy, { toWorker = false } = {}) {
       if (!rest.startsWith('/v1/') && rest !== '/healthz') return null;
       const cls = requestClass(rest, req.method), edge = rest.startsWith('/v1/edge/'), l = limits(slug);
       const xff = behindProxy ? req.headers['x-forwarded-for'] : undefined, ip = xff ? String(xff).split(',')[0].trim() : null;
@@ -139,11 +149,12 @@ export function soulCeilings({ limitsFor = () => null, now = Date.now, log = (l)
         if (n(`la|${acct}`) >= l.accountListen) return no(slug, 429, 'account.rate', 'account', 5000, `this account already holds ${l.accountListen} listening connections`);
       }
       if (heavy && acct) { const wait = bucket('acct', l.accountHeavyPerMin / 60, Math.max(1, Math.round(l.accountHeavyPerMin / 4))).take(acct); if (wait) return no(slug, 429, 'account.rate', 'account', wait, `more than ${l.accountHeavyPerMin} requests a minute from this account's Souls`); }
-      if (heavy) { const wait = bucket('world', l.worldBudgetRps, l.worldBudgetRps * 2).take(slug); if (wait) return no(slug, 503, 'world.busy', 'world', wait, 'this world is answering as many requests as it can'); }
+      const worldDeferred = heavy && toWorker && cls === 'C2';
+      if (heavy && !worldDeferred) { const wait = bucket('world', l.worldBudgetRps, l.worldBudgetRps * 2).take(slug); if (wait) return no(slug, 503, 'world.busy', 'world', wait, 'this world is answering as many requests as it can'); }
       const keys = [...(ip ? [`c|${ip}`] : []), ...(cls === 'listen' ? [...(ip ? [`l|${ip}`] : []), ...(soul ? [`ls|${soul}`, `la|${acct}`] : [])] : [])];
       for (const k of keys) add(k, 1);
       let done = false;
-      return { cls, soul, release() { if (done) return; done = true; for (const k of keys) add(k, -1); } };
+      return { cls, soul, worldDeferred, release() { if (done) return; done = true; for (const k of keys) add(k, -1); } };
     },
   };
 }

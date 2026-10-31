@@ -113,7 +113,9 @@ test('full mode (B-facade route set): observe and view to the worker too, with q
   const { L, make, call } = await launcher({ port: 5240, range: [5231, 5234], on: true, env: { FAKE_READ_MODE: 'full' } });
   try {
     const slug = await make('Full'); await advertised(L, slug);
-    for (const p of ['/v1/edge/here?include=doHere', '/v1/edge/observe', '/v1/edge/view', '/v1/edge/capabilities?all=1']) assert.equal((await call(slug, p)).body.from, 'worker', p);
+    for (const p of ['/v1/edge/here?include=doHere', '/v1/edge/observe', '/v1/edge/view?alt=only', '/v1/edge/capabilities?all=1']) assert.equal((await call(slug, p)).body.from, 'worker', p);
+    // lane B-serve: a view's picture (main's render worker) and a gaze (an attention write) are main's
+    for (const p of ['/v1/edge/view', '/v1/edge/view?mode=map', '/v1/edge/view?alt=only&gaze=left']) assert.notEqual((await call(slug, p)).body?.from, 'worker', p);
     assert.equal((await call(slug, '/v1/edge/around')).body.from, 'main');
     const off = await make('Off');
     const op = await fetch(`http://127.0.0.1:5240/__sim/op/set-read-workers`, { method: 'POST', body: JSON.stringify({ slug: off, readWorkers: 0 }) });
@@ -143,5 +145,33 @@ test('at red/black a read the workers answer is routed to them, not shed (lag â‰
     const m = await fetch(`${base}/__sim/metrics`).then((r) => r.text());
     const by = (lv) => Number(new RegExp(`^sim_world_read_routed_total\\{world="${slug}",level="${lv}"\\} (\\S+)$`, 'm').exec(m)?.[1]);
     assert.equal(by('red'), 1); assert.equal(by('black'), 1);
+  } finally { await L.close(); }
+});
+
+test('world budget (lane B-serve): reads the workers answer are exempt; what reaches main counts (a fallback, a worker relay); registry override', async () => {
+  const { L, base, make, call } = await launcher({ port: 5240, range: [5231, 5234], on: true, env: { FAKE_READ_MODE: 'full' } });
+  try {
+    const slug = await make('Budget'); await advertised(L, slug);
+    const set = await fetch(`${base}/__sim/op/set-limits`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slug, limits: { worldBudgetRps: 1, accountHeavyPerMin: 6000 } }) });
+    assert.equal(set.status, 200); assert.equal((await set.json()).limits.worldBudgetRps, 1);
+    const busy = (r) => r.status === 503 && r.body?.code === 'world.busy';
+    // 30 worker reads at once: none refused, though the world's budget is 1/s (burst 2)
+    const reads = await Promise.all(Array.from({ length: 30 }, (_, i) => call(slug, ['/v1/edge/here', '/v1/edge/observe', '/v1/edge/capabilities', '/v1/edge/view?alt=only'][i % 4])));
+    assert.ok(reads.every((r) => r.status === 200 && r.body.from === 'worker'), JSON.stringify(reads.map((r) => r.status)));
+    // C2 reads to main (a view's picture) still take it: the burst of 2, then world.busy
+    const main = []; for (let i = 0; i < 3; i++) main.push(await call(slug, '/v1/edge/view'));
+    assert.ok(!busy(main[0]) && !busy(main[1]), JSON.stringify(main.map((r) => r.status))); assert.ok(busy(main[2]), 'the third main read in a second is refused ' + JSON.stringify(main.map((r) => [r.status, r.body])));
+    // a worker fallback (a 500) is main's work: charged, and refused when the budget is spent
+    await sleep(2100); await call(slug, '/read-fail?m=500');
+    const fb = []; for (let i = 0; i < 3; i++) fb.push(await call(slug, '/v1/edge/here'));
+    assert.deepEqual(fb.map((r) => busy(r) ? 'busy' : r.body?.from), ['main', 'main', 'busy']);
+    // a worker that relays main's answer (no x-sim-read: worker): counted after the fact (never refused), so main's next read waits
+    await call(slug, '/read-fail?m=relay'); await sleep(2100);
+    const rel = []; for (let i = 0; i < 3; i++) rel.push(await call(slug, '/v1/edge/here'));
+    assert.ok(rel.every((r) => r.status === 200 && r.body.from === 'main-via-worker'), JSON.stringify(rel.map((r) => r.status)));
+    assert.ok(busy(await call(slug, '/v1/edge/view')), 'the relayed reads spent the budget');
+    await call(slug, '/read-fail?m=ok');
+    const m = await fetch(`${base}/__sim/metrics`).then((r) => r.text()), val = (name) => Number(new RegExp(`^${name}\\{world="${slug}"\\} (\\S+)$`, 'm').exec(m)?.[1]);
+    assert.equal(val('sim_world_read_main_answered_total'), 3); assert.equal(val('sim_world_read_fallback_refused_total'), 1); assert.equal(val('sim_world_read_fallback_total'), 3);
   } finally { await L.close(); }
 });
