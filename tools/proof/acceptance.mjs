@@ -5,7 +5,8 @@
 //   node tools/proof/acceptance.mjs check --body pr.md [--issue issue.md] [--proof proof.json] [--tier T2 |
 //        --files a,b | --base <ref>] [--label tier:T3 ...] [--head <sha>] [--json] [--comment out.md]
 //   node tools/proof/acceptance.mjs init --issue issue.md [--pr <n>] [--tier T2] [--issue-number <n>] [--commit <sha>]
-//        > .e2e/journal/<n>/proof.json      (issue: from --issue-number or a .e2e/journal/<n>/ path; commit: git HEAD)
+//        > .e2e/journal/<n>/proof.json      (issue: from --issue-number or a .e2e/journal/<n>/ path; commit: the
+//                                            git HEAD of the current directory, so run it from the PR's worktree)
 //   node tools/proof/acceptance.mjs pr --repo owner/name --pr <n> [--head <sha>] [--comment out.md]
 //        [--summary file] [--output file]          (proof-check.yml: reads the PR, its files, issue and proof.json
 //                                                   with `gh api`; prints the report; writes ok=true|false)

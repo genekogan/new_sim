@@ -68,10 +68,10 @@ CI runs the checks for the PR's paths. The `main` ruleset requires `ci-ok`, the 
 `path-guard`, `scrub-guard`), `proof-ok` and the changelog `fragment`, and every review thread resolved. PR CI runs
 `apps/server` and package tests, typecheck and the web build; it does not run `apps/web/src/*.test.ts` or
 `tools/world-launcher/*.test.mjs` (the release gate's `V4-web` and `V3-launcher-unit` do), so your focused runs of
-those are the PR's evidence. The `proof-check` bot keeps one comment up to date with the tier, the proof that tier needs, and which
-acceptance boxes have evidence. The `claude-review` workflow reviews every push, including whether the evidence
-supports each acceptance claim. `@claude` answers follow-ups, and the author answers each comment with a fix or a
-reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
+those are the PR's evidence. The `proof-check` bot keeps one comment up to date with the tier, the proof that tier
+needs, and which acceptance boxes have evidence. The `claude-review` workflow reviews every push, including whether
+the evidence supports each acceptance claim. `@claude` answers follow-ups, and the author answers each comment with
+a fix or a reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
 
 ## 7. Merge
 
