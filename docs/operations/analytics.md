@@ -22,7 +22,7 @@ fixed names. Each request goes out with `sendBeacon`, falling back to an image w
 ## What is not counted
 
 - Local and private hosts: `localhost`, `*.localhost`, `.test`, `.local`, `.internal`, `.lan`, `.home.arpa`,
-  `.ts.net`, loopback, private, link-local and CGNAT addresses. So dev servers, tests and e2e runs never count.
+  Tailscale MagicDNS names, loopback, private, link-local and CGNAT addresses. So dev servers, tests and e2e runs never count.
 - Automated browsers: `navigator.webdriver` is true for every Playwright run, including the release probe, walks,
   poster, stall and cdn-walk.
 - Screenshot looks: any URL with `?shot`.
