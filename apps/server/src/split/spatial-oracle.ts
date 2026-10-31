@@ -11,7 +11,7 @@ import type { TapRecord } from './spatial-tap.ts';
 const scenes = new Map<string, StaticExportV1>();
 let replica: SpatialReplica | undefined, key = '', fixture: FixtureRow | null = null, lastBodies = new Set<string>();
 const by = new Map<string, { n: number; eq: number; diff: number; inTick: number; ms: number }>();
-const diffs: unknown[] = [], builds: { key: string; kind: 'build' | 'rebuild'; ms: number }[] = [];
+const diffs: unknown[] = [], builds: { key: string; kind: 'build' | 'rebuild'; ms: number; warmMs: number }[] = [];
 let heapMax = 0, extMax = 0, total = 0, equal = 0;
 
 function onScene(k: string) {
@@ -19,7 +19,8 @@ function onScene(k: string) {
   const t0 = performance.now();
   if (!replica) replica = SpatialReplica.fromStaticScene(s, [], { fixture: (id) => (fixture && fixture.id === id ? fixture : undefined) });
   else replica.rebuild(s);
-  builds.push({ key: k, kind: builds.length ? 'rebuild' : 'build', ms: +(performance.now() - t0).toFixed(1) });
+  const ms = performance.now() - t0, w0 = performance.now(); replica.connectivityV1();   // labels complete (as a poll would need)
+  builds.push({ key: k, kind: builds.length ? 'rebuild' : 'build', ms: +ms.toFixed(1), warmMs: +(performance.now() - w0).toFixed(1) });
   key = k;
 }
 function setBodies(bodies: ReplicaBody[]) {
@@ -49,12 +50,31 @@ parentPort!.on('message', (msg: { t: string; id?: number; key?: string; scene?: 
     return;
   }
   if (msg.t === 'status') {
+    (globalThis as { gc?: () => void }).gc?.();
     const h = getHeapStatistics() as ReturnType<typeof getHeapStatistics> & { external_memory?: number }, pages = replica?.spatial.pagesInfo();
     parentPort!.postMessage({ id: msg.id, v: {
       total, equal, diff: total - equal, byMethod: Object.fromEntries([...by].map(([m, s]) => [m, { ...s, ms: +s.ms.toFixed(1) }])),
       builds, heapMB: +(h.used_heap_size / 1e6).toFixed(1), heapMaxMB: +(heapMax / 1e6).toFixed(1), externalMB: +((h.external_memory ?? 0) / 1e6).toFixed(1), externalMaxMB: +(extMax / 1e6).toFixed(1),
       rss: +(process.memoryUsage().rss / 1e6).toFixed(1), arrayBuffersMB: +(process.memoryUsage().arrayBuffers / 1e6).toFixed(1),
+      offHeapMB: replica ? offHeap(replica) : null,
       pages: pages ? { rects: pages.rects.length, built: pages.built, bytes: pages.bytes } : null, ground: replica?.spatial.ground?.stats ?? null, replicaStats: replica?.stats, diffs,
     } });
   }
 });
+/** Off-heap bytes (typed-array buffers, each counted once) reachable from the replica's parts, in MB. */
+function offHeap(r: SpatialReplica): Record<string, number> {
+  const seen = new Set<ArrayBufferLike>(), visited = new Set<object>();
+  const walk = (o: unknown): number => {
+    if (!o || typeof o !== 'object' || visited.has(o)) return 0;
+    visited.add(o);
+    if (ArrayBuffer.isView(o)) { if (seen.has(o.buffer)) return 0; seen.add(o.buffer); return o.buffer.byteLength; }
+    let n = 0;
+    if (o instanceof Map) for (const [k, v] of o) n += walk(k) + walk(v);
+    else if (o instanceof Set) for (const v of o) n += walk(v);
+    else for (const k of Object.keys(o)) n += walk((o as Record<string, unknown>)[k]);
+    return n;
+  };
+  const sp = r.spatial as unknown as Record<string, unknown>, mb = (n: number) => +(n / 1e6).toFixed(1);
+  const ground = walk(sp.ground), pages = walk(sp.pages), outside = walk(sp.outside), rest = walk(sp), conn = walk((r as unknown as { conn?: unknown }).conn);
+  return { ground: mb(ground), pages: mb(pages), outside: mb(outside), rest: mb(rest), conn: mb(conn), total: mb(ground + pages + outside + rest + conn) };
+}
