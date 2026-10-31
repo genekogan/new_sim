@@ -6,9 +6,10 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { openLauncher } from './launcher.mjs';
 import { clerkKeys, ISSUER, PUBLISHABLE_KEY } from '../../apps/server/test/clerk-fixture.ts';
+import { tmpdir } from 'node:os';
 
 test('account creation caps use verified owner, survive restart, serialize concurrent attempts and return Retry-After', { timeout: 240_000 }, async () => {
-  const scratch = process.env.SAFETY_SCRATCH ?? '<team>/scratch/safety';
+  const scratch = process.env.SAFETY_SCRATCH ?? tmpdir();
   mkdirSync(scratch, { recursive: true });
   const dir = mkdtempSync(join(scratch, 'creation-')), dataDir = join(dir, 'data'), templatesDir = join(dir, 'templates');
   mkdirSync(templatesDir);

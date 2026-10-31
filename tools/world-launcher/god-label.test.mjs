@@ -7,9 +7,10 @@ import { mkdirSync, writeFileSync, rmSync, mkdtempSync, existsSync } from 'node:
 import { join } from 'node:path';
 import { openLauncher } from './launcher.mjs';
 import { clerkKeys, ISSUER, PUBLISHABLE_KEY } from '../../apps/server/test/clerk-fixture.ts';
+import { tmpdir } from 'node:os';
 
 test('the god label is display text: a second account sees a visitor view, cannot take the world, and cannot wear the label', { timeout: 240_000 }, async () => {
-  const scratch = process.env.SAFETY_SCRATCH ?? '<team>/scratch/safety';
+  const scratch = process.env.SAFETY_SCRATCH ?? tmpdir();
   mkdirSync(scratch, { recursive: true });
   const dir = mkdtempSync(join(scratch, 'god-label-')), dataDir = join(dir, 'data'), templatesDir = join(dir, 'templates');
   mkdirSync(templatesDir);

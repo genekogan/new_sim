@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { startWorld } from '../../god-skill/dev-world.mjs';
 const exec = promisify(execFile);
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..'); // this checkout, whichever worktree
+export const MARS_TWO_TEMPLATE = resolve(ROOT, 'worlds/templates/mars-two.json');
+export const PATCH = resolve(ROOT, 'tools/mars-rotation/patch.mjs');
 export const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function boot({ slug = 'mars-rot', port, template, out, noGenesis }) {
   mkdirSync(out, { recursive: true, mode: 0o700 });

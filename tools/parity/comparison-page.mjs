@@ -1,5 +1,6 @@
 import {mkdirSync,copyFileSync,writeFileSync,readFileSync} from 'node:fs';
 import {resolve,basename} from 'node:path';
+import {requiredEnvPath} from '../lib/paths.mjs';
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const detail=x=>x&&typeof x==='object'?Object.entries(x).map(([key,value])=>`${key}: ${value}`).join(' · '):x;
 const stepDetail=(x,activity,side,behaviour)=>{
@@ -49,7 +50,8 @@ ${visual.liveOld?`<p class="scope"><b>Old side: the real old world with its full
 
 export function writeIndex(review){
   mkdirSync(review,{recursive:true});
-  const sourcePaths={handoff:'<team>/lanes/t3-engine-to-parity.md',cameras:'<team>/lanes/t3-engine-eden-views.json',lane:'<team>/lanes/t3-engine.md'};
+  const src=requiredEnvPath('PARITY_SOURCES_DIR','the directory holding t3-engine-to-parity.md, t3-engine-eden-views.json and t3-engine.md');
+  const sourcePaths={handoff:resolve(src,'t3-engine-to-parity.md'),cameras:resolve(src,'t3-engine-eden-views.json'),lane:resolve(src,'t3-engine.md')};
   const cameras=JSON.parse(readFileSync(sourcePaths.cameras,'utf8'));
   const sourceLinks={handoff:'sources/t3-engine-to-parity.md',cameras:'sources/t3-engine-eden-views.json',lane:'sources/t3-engine.md'};
   mkdirSync(resolve(review,'sources'),{recursive:true});

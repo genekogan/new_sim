@@ -1,10 +1,11 @@
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import { boot, addSoul, follow, stop, ROOT } from './lib.mjs';
+import { scratchDir } from '../../lib/paths.mjs';
 const { chromium } = createRequire(`${ROOT}/mars/viewer/package.json`)('@playwright/test');
-const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
-const out = '<team>/lanes/t3-mars-shots'; mkdirSync(out, { recursive: true });
-const ctx = await boot({ port: 5865, template: '<team>/scratch/mars/mars-two-82.json', out: '<team>/scratch/mars/rot/shot-82' });
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../../god-skill/lib/chrome-lease.mjs');
+const out = scratchDir('t3-mars-shots'); mkdirSync(out, { recursive: true });
+const ctx = await boot({ port: 5865, template: scratchDir('mars/mars-two-82.json'), out: scratchDir('mars/rot/shot-82') });
 const release = await chromeLease('mars', { waitMs: 45 * 60000 }); let browser;
 try {
   await addSoul(ctx); const snap = await ctx.api('/v1/world/snapshot', { as: 'public' });

@@ -4,17 +4,18 @@
 // else's slot, then real Chrome (through the shared lease) looks at it: videos play, hovering a piece shows its title
 // and maker, the soundscape logs which sources play where, and the mute button survives a reload.
 //
-//   node tools/art/e2e-art.mjs --port 6031 --out <team>/scratch/artsound/e2e [--media <dir>] [--keep]
+//   node tools/art/e2e-art.mjs --port 6031 --out .local/artsound/e2e [--media <dir>] [--keep]
 // Needs apps/web/dist (pnpm --filter @sim/web build). Uses only its own port and data; stops only the server it started.
 import { spawn, execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from '../lib/paths.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const argv = process.argv.slice(2), arg = (k, d) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d; };
-const port = Number(arg('port', 6031)), out = resolve(arg('out', '<team>/scratch/artsound/e2e')), media = resolve(arg('media', '<team>/scratch/artsound/media'));
+const port = Number(arg('port', 6031)), out = resolve(arg('out', scratchDir('artsound/e2e'))), media = resolve(arg('media', scratchDir('artsound/media')));
 if (port >= 4930 && port <= 4990) throw new Error('never use the live ports');
 const slug = 'artsound', base = `http://127.0.0.1:${port}/w/${slug}`;
 rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
@@ -75,7 +76,7 @@ try {
 
   let chromium = null; try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('no @playwright/test'); }
   if (chromium) {
-    const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+    const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
     const release = await chromeLease('artsound');
     try {
       for (const dpr of [2, 1]) {

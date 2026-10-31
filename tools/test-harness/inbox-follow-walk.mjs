@@ -11,9 +11,10 @@ import {mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {createInterface} from 'node:readline';
 import {startWorld} from '../god-skill/dev-world.mjs';
+import { scratchDir } from '../lib/paths.mjs';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
-const out = resolve(process.argv[2] ?? '<team>/scratch/inbox/follow');
+const out = resolve(process.argv[2] ?? scratchDir('inbox/follow'));
 const port = Number(process.argv[3] ?? 5962);
 if (!Number.isInteger(port) || port < 5960 || port > 5968) throw Error('This lane owns ports 5960–5969 only');
 mkdirSync(out, {recursive: true});

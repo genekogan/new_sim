@@ -2,6 +2,7 @@
 // Human comparison delivery. Exact-diff scores remain in scratch evidence only.
 import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {scratchDir} from '../lib/paths.mjs';
 import {captureVisual,safeLocalUrl} from './visual.mjs';
 import {comparisonPoses} from './comparison-poses.mjs';
 import {runComparisonBehaviour} from './compare-behaviour.mjs';
@@ -36,7 +37,7 @@ const behaviour=config.captureOnly?{rows:[],limits:['Camera retake only; residen
 save('resident-comparison.json',behaviour);
 let content;
 if(!config.captureOnly)try{content=await loadRepoComparison(world,{root,oldMarsMap:world==='mars'});save('content-internal.json',content);}catch(e){content={error:String(e)};}
-const review=config.captureOnly||config.views?.length?resolve(out,'retake-review'):'<team>/reviews/sim-compare-20261015';
+const review=config.captureOnly||config.views?.length?resolve(out,'retake-review'):(process.env.PARITY_REVIEW_DIR??scratchDir('parity/review'));
 const page=writeComparisonPage({review,config,visual,behaviour,poses});
 save('comparison.json',{schema:'sim-human-comparison/1',world,candidate:config.candidate,at:new Date().toISOString(),page,
   viewCount:visual.pairs.length,renderedViewPairs:visual.pairs.filter(p=>p.old&&p.candidate).length,errors:visual.errors,provenance:config.provenance});

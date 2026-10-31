@@ -11,11 +11,12 @@ import {spawn, execFileSync} from 'node:child_process';
 import {mkdirSync, rmSync, writeFileSync, readFileSync, existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {startWorld} from '../god-skill/dev-world.mjs';
+import { scratchDir } from '../lib/paths.mjs';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
 const args = process.argv.slice(2), flag = k => { const i = args.indexOf(`--${k}`); return i >= 0 ? args.splice(i, 2)[1] : undefined; };
 const idleMinutes = Number(flag('idle-minutes') ?? 0);
-const out = resolve(args[0] ?? '<team>/scratch/t4/msg/walk');
+const out = resolve(args[0] ?? scratchDir('t4/msg/walk'));
 const port = Number(args[1] ?? 6750);
 if (!Number.isInteger(port) || port < 6750 || port > 6759) throw Error('lane MSG owns ports 6750–6759 only');
 mkdirSync(out, {recursive: true});

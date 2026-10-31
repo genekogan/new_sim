@@ -10,11 +10,12 @@ import { loadavg } from 'node:os';
 import { createHash } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 import { freeMemGb } from '../playtest/lib/platform.mjs';
+import { measureSlot } from '../lib/paths.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const out = resolve(process.argv[2]);
 const port = 5981, base = `http://127.0.0.1:${port}/w/context-profile`;
-const slot = '<team>/lanes/MEASURE.slot';
+const slot = measureSlot();
 const started = Date.now(), deadline = started + 75000;
 const claim = `${new Date(started).toISOString()} eden-query-profile pid=${process.pid} until=${new Date(deadline + 5000).toISOString()}`;
 const abort = new AbortController();

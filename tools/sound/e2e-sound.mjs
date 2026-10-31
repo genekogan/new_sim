@@ -4,16 +4,17 @@
 // the pond and wood by night, and records which sources play there (`__edenSound.state()`), the output level, and that
 // mute silences it. Fake minds, no paid generation, no production data. Only stops the server it started.
 //
-//   node tools/sound/e2e-sound.mjs --port 6341 --out <team>/scratch/r31v/sound [--dprs 1,2]
+//   node tools/sound/e2e-sound.mjs --port 6341 --out .local/r31v/sound [--dprs 1,2]
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from '../lib/paths.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i >= 0 ? process.argv[i + 1] : d; };
-const port = Number(arg('port', 6341)), out = resolve(arg('out', '<team>/scratch/r31v/sound'));
+const port = Number(arg('port', 6341)), out = resolve(arg('out', scratchDir('r31v/sound')));
 const dprs = String(arg('dprs', '1,2')).split(',').map(Number);
 if (port < 6340 || port > 6359) throw new Error('lane V ports are 6340–6359');
 const slug = 'soundscape', base = `http://127.0.0.1:${port}/w/${slug}`;
@@ -63,7 +64,7 @@ try {
   await step('two residents arrive (fake minds)', async () => [await admin('/v1/souls', { name: 'Ana', description: 'probe resident' }), await admin('/v1/souls', { name: 'Ben', description: 'probe resident' })].map((r) => r.status), (s) => s.every((x) => x < 300));
 
   const chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium;
-  const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+  const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
   const release = await chromeLease('r31v-sound');
   try {
     const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });

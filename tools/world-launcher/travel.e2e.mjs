@@ -7,19 +7,20 @@
 //   node tools/world-launcher/travel.e2e.mjs [--port 6110] [--range 6111-6114] [--out <dir>] [--keep] [--cli]
 //
 // --cli also drives the Soul CLI (tools/edge-skill/eden-agent.mjs): `travel birch`, `observe` there, `travel home`.
-// Writes report.json in --out (default <team>/scratch/travel/e2e-<stamp>). Runs headless (no browser).
+// Writes report.json in --out (default .local/travel/e2e-<stamp>). Runs headless (no browser).
 import { execFile, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync, copyFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { scratchDir } from '../lib/paths.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : [])).filter((x) => x.length));
 const port = Number(args.port ?? 6110), range = typeof args.range === 'string' ? args.range : '6111-6114';
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-const out = resolve(typeof args.out === 'string' ? args.out : `<team>/scratch/travel/e2e-${stamp}`);
+const out = resolve(typeof args.out === 'string' ? args.out : scratchDir(`travel/e2e-${stamp}`));
 mkdirSync(out, { recursive: true });
 const origin = `http://127.0.0.1:${port}`;
 const report = { startedAt: new Date().toISOString(), port, range, steps: [], failures: [] };
