@@ -205,6 +205,31 @@ export const NOWHERE = ' Nothing like it exists anywhere in this world, so walki
 const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fishing: 'fish', gardening: 'garden', weeding: 'garden', swinging: 'swing', stargazing: 'stargaze', picnicking: 'picnic', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
+/** srv-act-words: the plain words an act may resolve on a focused build (`EdgeLedger.wordsFocused`): one walk to a named
+ *  place, a sit (on something), standing up, a wave, a dance, a wander. Other shapes read offers beyond their own verbs
+ *  (chains, finding, gaits, bikes, rides and steering, "go <doing>", behind / nearest, floors, the refusal table, social
+ *  phrasing) and resolve on the whole menu, as before. */
+const WORDS_FOCUS_SHAPE = /^(?:please\s+)?(?:(?:go|walk|head)(?:\s+over|\s+back)?\s+(?:to|into|inside|towards?)\s+[a-z0-9' -]+|sit(?:\s+down)?(?:\s+(?:on|in|at|by|under|near|beside)\s+[a-z0-9' -]+)?|stand(?:\s+up)?|get\s+up|wave|dance|wander)[.!]?$/;
+const WORDS_FOCUS_NOT = /\b(?:then|and|jog\w*|run|running|sprint\w*|hurry|cycl\w*|bik\w*|bicycl\w*|board\w*|embark|aboard|row\w*|boat\w*|ride|rides|riding|fly\w*|flight|leave|disembark|alight|start|depart|carousel|merry|ferris|balloon|punt|basket|behind|nearest|closest|nearby|anywhere|somewhere|upstairs|downstairs|floor|storey|story|top|level|find|seek|search|look)\b/;
+/** srv-act-words: the verbs plain words of a focus shape can read while they resolve (resolveWords), or null (the whole
+ *  menu): every verb parseCapability tests for these words (leading-word candidates and their VERBS synonyms, the INTENTS
+ *  and leisure verbs that match, ACT_ALIASES both ways), the offers the sit / stroll rules read (rest, sit-ground,
+ *  warm-by-fire; wander and stroll) and object offers (a god-built thing's
+ *  actions are verbs too). The offers of these verbs are the whole menu's (bindFocus), so the words resolve the same. */
+export function wordsFocusVerbsV1(input: string): Set<string> | null {
+  const raw = input.trim(), text = raw.toLowerCase().replace(/\s+/g, ' ');
+  if (!raw || raw.length > 160 || raw.includes(':') || !WORDS_FOCUS_SHAPE.test(text) || WORDS_FOCUS_NOT.test(text) || GO_FOR.test(raw) || FIND.test(raw)) return null;
+  if (NOT_YET.some(([re]) => re.test(text))) return null;
+  const out = new Set<string>(['object']), words = raw.split(/\s+/);
+  for (let n = 1; n <= Math.min(4, words.length); n++) {const k = words.slice(0, n).join('-').toLowerCase().trim().replace(/[\s_]+/g, '-'); out.add(k); if (VERBS[k]) out.add(VERBS[k]);}
+  for (const [re, v] of INTENTS) if (re.test(text)) out.add(v);
+  if (LEISURE_LEAD.test(raw)) for (const [re, v] of LEISURE_OBJECTS) if (re.test(text)) out.add(v);
+  for (const v of [...out]) {if (ACT_ALIASES[v]) out.add(ACT_ALIASES[v]); for (const [k, a] of Object.entries(ACT_ALIASES)) if (a === v) out.add(k);}
+  if (out.has('stroll') || out.has('wander')) {out.add('stroll'); out.add('wander');}
+  if (out.has('sit')) {out.add('rest'); out.add('sit-ground'); out.add('warm-by-fire');}
+  if (/\b(?:fire|campfire|warm)\b/.test(text)) out.add('warm-by-fire');
+  return out;
+}
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
 export function parseCapability(input: string, verbs: Set<string>): {verb: string; rest: string} {
   const raw = input.trim(), i = raw.indexOf(':');
@@ -671,8 +696,11 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   return {...unknown(`Nothing offered matches "${input}"; read capabilities again.`), ...(PLACE_VERBS.has(verb) && left.length && !ctx.withheld?.includes(left.join(' ')) ? {seek: left} : {})};
 }
 
+// srv-act-words: the places by id, once per places listing (vocabPlaces keeps the listing; isAncestor is asked for every
+// pair of a pool's offers: a Map per call was 2-3 ms of every walk resolved in words)
+const PLACES_BY_ID = new WeakMap<VocabContext['places'], Map<string, VocabContext['places'][number]>>();
 function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined): boolean {
-  const byId = new Map(ctx.places.map(p => [p.id, p]));
+  let byId = PLACES_BY_ID.get(ctx.places); if (!byId) {byId = new Map(ctx.places.map(p => [p.id, p])); PLACES_BY_ID.set(ctx.places, byId);}
   for (let p = id ? byId.get(id) : undefined, n = 0; p && n < 20; p = p.parent ? byId.get(p.parent) : undefined, n++) if (p.parent === ancestor) return true;
   return false;
 }
