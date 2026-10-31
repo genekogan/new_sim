@@ -137,7 +137,7 @@ export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; 
  *  last line. Only built with SIM_L4_STATS=1. */
 class BridgeStats {
   private steps = new Map<string, { n: number; ms: number; max: number }>();
-  private last = { spatial: { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0 }, perceive: 0, spots: 0, wall: performance.now(), cpu: process.cpuUsage() };
+  private last = { spatial: { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0, scans: 0, scanMs: 0, trusted: 0 }, perceive: 0, spots: 0, wall: performance.now(), cpu: process.cpuUsage() };
   /** A line is due a minute of wall time after the last (ticks may run slow). */
   due(): boolean { return performance.now() - this.last.wall >= 60_000; }
   add(name: string, t0: number): number {
@@ -151,7 +151,7 @@ class BridgeStats {
     const steps = [...this.steps].filter(([, v]) => v.ms >= 1).sort((x, y) => y[1].ms - x[1].ms).map(([k, v]) => `${k}=${Math.round(v.ms)}/${v.n}/${Math.round(v.max)}`).join(' ');
     const d = (k: keyof BridgeStats['last']['spatial']) => Math.round((sp?.[k] ?? 0) - this.last.spatial[k]);
     const pr = b.perceive.stats.runs - this.last.perceive, ds = b.activitySpots.stats.derives - this.last.spots;
-    const out = `[l4] cpu ${(cpuS / wallS).toFixed(3)} core over ${Math.round(wallS)} s; tick p50 ${q(.5)} p99 ${q(.99)} max ${q(1)} ms (n ${ticks.length}); paged syncs ${d('pagedSyncs')} moved ${d('pagedMoved')} changed ${d('pagedChanged')} ${d('pagedMs')} ms, grids ${d('gridBuilds')} ${d('gridMs')} ms; perceive runs ${pr} (last ${b.perceive.stats.lastIds}${b.perceive.stats.lastFull ? ' whole' : ''} ${b.perceive.stats.lastMs} ms); spots derives ${ds} (last ${b.activitySpots.stats.ms} ms); steps ms/n/max ${steps}`;
+    const out = `[l4] cpu ${(cpuS / wallS).toFixed(3)} core over ${Math.round(wallS)} s; tick p50 ${q(.5)} p99 ${q(.99)} max ${q(1)} ms (n ${ticks.length}); paged syncs ${d('pagedSyncs')} moved ${d('pagedMoved')} changed ${d('pagedChanged')} ${d('pagedMs')} ms, grids ${d('gridBuilds')} ${d('gridMs')} ms, nav scans ${d('scans')} ${d('scanMs')} ms trusted ${d('trusted')}; perceive runs ${pr} (last ${b.perceive.stats.lastIds}${b.perceive.stats.lastFull ? ' whole' : ''} ${b.perceive.stats.lastMs} ms); spots derives ${ds} (last ${b.activitySpots.stats.ms} ms); steps ms/n/max ${steps}`;
     if (sp) this.last.spatial = { ...sp }; this.last.perceive = b.perceive.stats.runs; this.last.spots = b.activitySpots.stats.derives; this.last.wall = now; this.last.cpu = cpu; this.steps.clear();
     return out;
   }

@@ -7,6 +7,7 @@ import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
 import { listTable, withEntityList, type EntityTable } from '../world/entity-list.ts';
 import { Profiler } from './profile.ts';
+import { navTrustClose, navTrustOpen } from '../spatial/nav-trust.ts';
 import { deadlockDiagnostics, exhaustedWaitMovers, recoverPersistentWaits } from './waits.ts';
 import { applySnapshot, captureSnapshot, captureSnapshotDeferred, decodeSnapshot, takeSnapshot, type Graph, type RuntimeInternals, type RuntimeSnapshot, type RuntimeSnapshotCapture, type RuntimeDeferredSnapshotCapture, type SnapshotOptions } from './snapshot.ts';
 
@@ -281,6 +282,11 @@ export class Runtime {
    *  the pass (none live, none waiting, no social return queued): then nothing can have added, removed or replaced an
    *  entity in between, and the pass sees the same entities in the same order as a listing of its own. */
   step(table?: EntityTable | null) {
+    // L4: trust (spatial/nav-trust.ts) is open only around nav-pure steps and the read-only pass; closed on any exit
+    navTrustClose();
+    try { this.stepInner(table); } finally { navTrustClose(); }
+  }
+  private stepInner(table?: EntityTable | null) {
     const noActionCode = this.live.size === 0 && this.waiting.size === 0 && !(this.services.socialReturns as unknown[] | undefined)?.length;
     this.world.tick++;
     const deferred = new Map<Live, StepResult>();
@@ -289,7 +295,10 @@ export class Runtime {
       const prof = this.prof;
       const t0 = prof ? prof.now() : 0;
       this.focus(l.rec.params);
+      if (l.def.navPure) navTrustOpen(); else navTrustClose();
       const r = l.def.step(this, l.exec, DT);
+      // finishing (or failing) runs other code (parents, follow-ups): nothing after it is trusted
+      if (r.status !== 'running' && r.status !== 'blocked') navTrustClose();
       if (prof) prof.add(`${l.rec.verb}.step`, prof.now() - t0);
       // Keep an existing persistent diagnostic stable until every mover has published this tick.
       if (l.rec.diagnostic?.code.startsWith('deadlock.') && (r.status === 'running' || r.status === 'blocked')) {
@@ -312,6 +321,7 @@ export class Runtime {
         this.finish(l, 'failed', r.diagnostic);
       }
     }
+    navTrustClose();
     recoverPersistentWaits(this, (owner, mover) => {
       const l = this.live.get(owner);
       return l?.def.recoverWait?.(this, l.exec, mover) ?? { status: 'unavailable', diagnostic: { code: 'deadlock.recovery-unavailable', message: `no safe recovery hook for ${owner}/${mover}`, subjects: [mover] } };
@@ -341,6 +351,8 @@ export class Runtime {
     // pass's entity list too (the recorder listed and sorted every id of a 4,900-entity world every tick)
     const passTable = noActionCode && table && table.entities === this.world.entities ? table : listTable(this.world.entities);
     this.passTable = passTable;
+    // invariants and observers only read the world: one static scan serves the whole pass
+    navTrustOpen();
     withEntityList(this.world, () => {
       for (const inv of this.invariants)
         for (const d of inv(this)) {
