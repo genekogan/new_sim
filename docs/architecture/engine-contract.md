@@ -3,7 +3,7 @@
 `packages/engine-contract` is the seam between the world server and any engine. Two engines implement it: the Mars
 adapter (`packages/engine-mars`, `ENGINE=mars`, used by every launcher world) and the toy engine
 (`packages/engine-toy`, the default when `ENGINE` is unset). Names mirror the Mars engine
-([engine snapshot](../mars/ENGINE-SNAPSHOT.md)).
+([Mars engine overview](../mars/README.md)).
 
 ## Shared types
 

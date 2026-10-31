@@ -1,50 +1,56 @@
 # Reading and computer chair quality
 
-Source-only lane: no live executor, server model, deploy or production state access.
+- `activity-poses.ts` lifts seated reading hands before arm IK, so the book stays on the palms and clear of the legs.
+- `core/office-desk@2` drops the eight baked scenery-chair shapes of immutable v1 and shrinks the collider/bake depth
+  from 1.254676 m to 0.7 m. The functional standalone office chair stays; surface/user slots, power and workstation are
+  unchanged, and the desk has no seat slot.
+- Only the four Eden library/office desk placements in `worlds/templates/eden-2026.json` use v2. Historical v1
+  definitions, authored specs and generic furnished buildings keep v1.
 
-- `activity-poses.ts` lifts seated reading hands before honest arm IK. The book remains on the actual palms.
-- `core/office-desk@2` removes the eight baked scenery-chair shapes in immutable v1. The functional standalone office chair stays. The collider/bake depth shrinks from 1.254676 m to 0.7 m. Surface/user slots, power and workstation remain unchanged; there is no desk seat slot.
-- Only the four explicit Eden library/office desk placements select v2; historical v1 definitions, authored specs and generic furnished buildings retain v1.
-
-Focused checks (native/renderer work requires root's shared quiet slot):
+## Checks
 
 ```sh
 node --test packages/world-compiler/src/core-kit/office-desk.test.ts tools/reading-chair-quality/desk-repair.test.mjs
-GLB_DIR=/absolute/pinned/modular/environment/ node --test tools/reading-chair-quality/reading-rig.test.mjs
+GLB_DIR=/absolute/modular/environment/ node --test tools/reading-chair-quality/reading-rig.test.mjs
 node tools/reading-chair-quality/conformance.mjs /absolute/output/desk-conformance.json
 node --test tools/reading-chair-quality/native-computer.test.mjs
 ```
 
-The rig check loads actual three resident rigs, deforms real skin and tests each leg triangle against every book page/cover box. It covers seats at 0.04, 0.47 and 0.7 m and four reading times. `GLB_DIR` selects an explicit pinned asset directory. `ACTIVITY_POSES_SOURCE` can select a retained exact baseline source file; `EXPECT_BOOK_INTERSECTION=1` verifies the old source reproduces contact. These are renderer geometry checks, not evidence that a Soul executed an action.
+The rig check loads three resident rigs, deforms real skin and tests each leg triangle against every book page and
+cover box, for seats at 0.04, 0.47 and 0.7 m and four reading times. `GLB_DIR` selects the asset directory;
+`ACTIVITY_POSES_SOURCE` selects an alternative `activity-poses` source, and `EXPECT_BOOK_INTERSECTION=1` asserts that
+source reproduces book contact (to confirm the check catches the old pose). `conformance.mjs` runs a narrow K=2
+conformance sweep over the office-desk revisions only. These are renderer geometry checks, not evidence that a Soul
+completed an action; `native-computer.test.mjs` checks the native computer activity.
 
-## Root-owned live patch preparation
+Renderer fixture: set `READING_CHAIR_ASSET_ROOT` to a `mars/viewer/public` tree (default: the checkout's) and
+`READING_CHAIR_BASELINE_SOURCE` to a baseline `activity-poses` source, start
+`node apps/web/node_modules/vite/bin/vite.js --config tools/reading-chair-quality/vite.config.mjs` (port 7846), then run
+`node tools/reading-chair-quality/renderer-proof.mjs /absolute/output/browser`. It writes six captures and a summary
+using headless Chrome; stop the Vite server afterwards.
 
-`planEdenDeskRepair(model, expected)` returns ordinary operations only. Public `place` creates new desk IDs/by/born/v. The real chairs stay at their exact IDs and poses, and an occupied unchanged chair is allowed. The removed desk alone must have an explicitly observed `usedBy:null`; do not invent null for a missing observation. The audit's `externalReferences` concerns actual active persisted semantic/build references, not an impossible claim that all other Souls' histories/programmes/future client queues are empty.
+## Replacing desks in a live world
 
-**Correction to the initial lane guidance:** the bridge registers a compiler `usesOne` hook that protects bodies, while the bridge's `refuse`/`prepare` path may plan ordinary walkouts. The compiler does not by itself promise to refuse every used furniture removal. Require fresh removed-desk queries, a sealed preview with no `wouldMove` or extra diff, and ordinary public `expect`/preview subtree guards. Requiring every retained chair to be empty or stopping other Souls was unnecessary. Do not stop, attend, re-pair or clear another human's Soul or queue for this repair.
+Existing worlds keep their v1 desks until an operator replaces them with ordinary God operations. Computer use is
+chair-bound (`use-computer.<chairId>`: sit on the chair, then face the desk), so replacing a desk at the same pose
+keeps the chair, its occupant and the activity. The new collider is a strict subset of the old one.
 
-Existing interfaces suffice; no new admin endpoint or in-process evaluator is required:
+1. Save fresh authenticated evidence: `GET /v1/god/snapshot`, `POST /v1/god/query {entity:ID}` for the four desks and
+   four chairs, `GET /v1/god/builds`, `/healthz` before and after, and the world seq after. List any active
+   semantic/meaning files that may reference the desks.
+2. `node tools/reading-chair-quality/prepare-public.mjs <evidence-input.json> <new output directory>` reads only those
+   saved files (no network, credentials or database) and writes the preview batch (undo group
+   `reading-chair-20261028`), version expectations for desks, chairs and ancestors, and the observed chair occupancy.
+   It refuses if a removed desk is in use, a desk/chair pair does not share parent and room slot, a build is open, or
+   a desk has children, or an authored edit happened during the audit window. `planEdenDeskRepair` in `desk-repair.mjs` is the equivalent
+   planner over a local model.
+3. `POST /v1/god/preview` the batch; require it accepted with no `wouldMove`. Inspect `GET /v1/god/preview/<id>`: exactly
+   four desk removals and four desk upserts, no chair, body or repair changes.
+4. Re-check health, build, seq and desk versions, then commit with `POST /v1/god/act {preview, expect, clientRef}` using
+   one stable `clientRef`. Send this envelope directly: the CLI `commit` omits the extra chair expectations. Keep
+   `result.ids`.
 
-- Authenticated `GET /v1/god/snapshot` returns every full Entity and the active library plus in-use definitions (`god.ts:825–856`). It omits definition authors and private wallets. It supplies all entity metadata needed for an ordinary authored desk replacement, but its hash must not be called an authoritative in-process model snapshot fingerprint. The existing model planner's fingerprint pins its supplied local model only. `prepare-public.mjs` instead consumes saved authenticated snapshot/query evidence directly and never constructs such a claim.
-- `POST /v1/god/query` with `{entity:ID}` returns actual `usedBy`, children, constraints and occupied slots. Read all four desks and retained chairs; require null only for removed desks and record actual retained-chair occupancy. The four pairs must share the same exact parent and room/floor slot.
-- Authenticated `GET /v1/god/builds` supplies open build claims/roots/inventories. Scan the complete authored entity/state snapshot and explicit known active meaning/semantic files for structural references. Ordinary historical receipts/journals retaining old IDs are provenance, not forward structural bindings. Child/inventory/constraint/unknown metadata or unsupported actual semantic references refuse pending concrete review.
-- `GET /healthz` records actual served build/world/native ticks; ticks may advance during this ordinary concurrent edit. No native pause or admin-user bearer is required. The replacement at the same pose removes geometry and adds no obstruction, keeps the real seat unchanged, and actuator state changes advance desk versions checked at commit. Keep the audit window short and re-read relevant versions/state/desk use. Do not change any human Soul control or the prior world pause state.
-- Public `/v1/edge/public/souls/:id` includes only last10 receipts. It is not an exhaustive pending-program audit. Own-Soul `/v1/edge/observe?include=receipts` has all open receipts, but do not obtain another owner's token for this task. An all-ledger observer is not a prerequisite for this bounded ordinary furniture edit.
-
-Current computer actions are chair-bound: `GodActivitySpots` names `use-computer.<chairId>` and the ledger plan is `sit(on:chairId)` followed by `pose(base:sit,face:[deskX,deskZ])`. No desk ID is in that native computer plan; the real native proof completes and retains the exact chair claim. The replacement collider is a strict subset and adds no obstruction. A sealed preview must change no chair/body and propose no walkout.
-
-Concrete root workflow: after the qualified deploy, collect fresh God snapshot, eight query responses keyed by actual ID, builds, health before/after and world seq after plus explicit active semantic JSON paths. Native ticks may advance; require the same served build/world and no intervening authored edit during the saved audit window. `node tools/reading-chair-quality/prepare-public.mjs <absolute evidence-input.json> <fresh output directory>` reads only those saved files and emits the ordinary preview batch, extra desk/chair/ancestor version expectations, actual occupied-chair observations and an honest identity-risk report. It has no fetch/credentials/DB/engine imports. It pins the four reviewed live pairs and exact old/new def hashes; old seq6732 inventory is not a fresh guard.
-
-`POST /v1/god/preview` with the generated batch, require accepted and absent/empty wouldMove, then `GET /v1/god/preview/<id>` to inspect the full sealed diff. Require exactly the four old desk removals and four new desk upserts, preserved metadata and no chair/body/repair changes. Recheck health/build, seq, old desk versions/state/use; an authored change requires a fresh plan. Commit `/v1/god/act` with `{preview,expect,clientRef}` using one stable unique clientRef. The simple CLI `commit` omits the extra retained-chair expect map; send the explicit act envelope. The public API has entity expectations and sealed preview subtree/affected guards; there is no general batch ifSeq field. Use the CLI's global `--no-build` if its registered folder has unrelated saved build metadata.
-
-Retain `result.ids` mapping `$desk0`–`$desk3` to actual new IDs and group `reading-chair-20261028`. Compare retained chair entity bytes/positions/IDs and replacement state/about/pose, recording that native occupancy may naturally progress while authoring. Verify ordinary native computer use and visuals after bridge projection, without changing prior world pause state. Do not force another owner's activity as proof. Root owns final gate/fresh-genesis/walk compatibility and release.
-
-Identity limitations are explicit. No public same-ID def upgrade exists: set has no def field, define refuses replacing core v1, and restore/restore-def are trusted internals/undo. A cached explicit old `object:<desk>:switch-on/off` refuses as `object.gone` or unknown after projection, rather than silently retargeting; fresh name/semantic resolution discovers the replacement. There is no guaranteed automatic repair of another agent's saved future queue. An already accepted actuator commits its on/off effect at acceptance (copied into the replacement); its cached wave target can lose target-facing if the old entity is gone. Do not claim every possible old desk-bound gesture is byte-identical or invent a complete-ledger audit. This is bounded ordinary authored-object identity behavior, separate from the preserved functional seat and chair-bound computer action.
-
-Rollback: discard a refused/extra-movement preview without mutation; no pause-state change is needed. For uncertain commit transport first query `/v1/god/requests/<clientRef>` (CLI request). For an accepted edit use ordinary `POST /v1/god/undo?group=reading-chair-20261028` / `undo --group reading-chair-20261028 --no-build --json`, respecting its normal conflict/body refusal. Retained compiler inverses restore old desk IDs and full metadata; semantic version counters remain monotonic. Never respawn guessed IDs, force a later dependency conflict or restore a database. Viewer-code rollback alone does not revert authored desk identity.
-
-Renderer fixture (one root-granted loopback slot): set `READING_CHAIR_ASSET_ROOT` to the pinned `mars/viewer/public` tree and `READING_CHAIR_BASELINE_SOURCE` to retained exact a6fe6 activity source, then run `node apps/web/node_modules/vite/bin/vite.js --config tools/reading-chair-quality/vite.config.mjs`. Run `node tools/reading-chair-quality/renderer-proof.mjs /absolute/output/browser` once, retain six captures/summary, inspect them and stop only the owned Vite PID. Chrome/context close in finally. Scripted frames are renderer geometry evidence; native activity completion is separate.
-
-## Retained lane evidence
-
-Source `0dfb33c758466afddbd5c5002aaabe575e1b9f64`: 36 actual rig/seat/time triangle-clearance cases pass, baseline `a6fe6f95dd223813754368265b1966f0640367c3` reproduces page/thigh contacts. Narrow v1/v2 K=2 conformance bakes, places and renders all 34 cases with exactly the documented construction-view finding. Six actual renderer captures pass with zero browser errors; source/helper/baseline/asset hashes, process custody and complete teardown are retained under `.lane/reading-chair-proof/owned-0dfb33c75/`. The first native invocation aborted before engine load due to a missing worktree dependency link; after approved dependency wiring to the shared painting-repair pnpm store (workspace links remain local), the same unchanged source’s corrected native invocation passes. Its real ledger-generated computer plan seats on the retained office chair, performs the activity, completes after 223 native ticks and retains that chair’s lasting claim, with zero runtime violations; receipt under `.lane/reading-chair-proof/native-corrected-0dfb33c75/`. These local ignored evidence paths are retained in the lane checkout, not bundled into source. The follow-up planner-only slot/occupied-chair audit guards and saved-public-evidence tool add no renderer/native runtime change, so those passing proofs are inherited explicitly rather than rerun. Live deployment and ordinary authored desk migration remain root-owned.
+If the commit response is lost, query `/v1/god/requests/<clientRef>` before retrying. To roll back, run
+`POST /v1/god/undo?group=reading-chair-20261028` (CLI: `undo --group reading-chair-20261028 --json`); compiler inverses
+restore the old desk IDs and metadata. A cached explicit old-desk action (for example `object:<desk>:switch-on`)
+refuses after replacement instead of retargeting; fresh name resolution finds the new desk.

@@ -1,21 +1,43 @@
 # Selected native lifecycle transition
 
-`selectedNativeCrewRemovalFactoryV1(selectedConfig)` wraps the existing exact native config and its `safeCrewRemoval:true` counterpart. It preserves the old genesis. Only the two exact rules versions are admitted; snapshot base and scene are checked before active phase decode. Default factories remain unchanged.
+How an existing native world adopts safe crew removal (`+crew-removal/1`) without changing its history.
 
-Install this reader before opening the selected world's history. At an actual naturally quiet, resumable native boundary, call the existing `host.adoptCrewRemovalPolicyV1('operator:…')` and drive the existing sequencer. The accepted event and header update are atomic. Existing bodies, identities, map, clock and original prefix do not change. This does not force quiet, cancel a body, fabricate a new snapshot or alter day configuration.
+`selectedNativeCrewRemovalFactoryV1(selectedConfig)` (`selected-crew-removal.ts`) wraps the world's exact native config
+and its `safeCrewRemoval:true` counterpart. It keeps the original genesis and admits only those two exact rules
+versions; snapshot base and scene are checked before the active phase is decoded. Default factories are unchanged.
 
-Before final public startup, qualify that acceptance on the candidate's canonical original-prefix data. Then enable `souls.enableLifecycle()` explicitly after boot. A restart whose actual engine already has `+crew-removal/1` reuses its accepted fact; do not append another transition. An ordinary original legacy startup with the flag absent does not install the reader or lifecycle producer. Auth/provider configuration remains separate.
+## Adopting
 
-The original Mars waiting programme must naturally finish after its separately accepted walk-settle policy before this transition can be accepted. A not-quiet refusal is a readiness result, not permission to force the body or clear the world quiet state.
+1. Install this reader before opening the world's history.
+2. At a naturally quiet, resumable native boundary, call `host.adoptCrewRemovalPolicyV1('operator:…')` and drive the
+   sequencer. The accepted event and header update are atomic. Bodies, identities, map, clock and the original prefix
+   do not change. Nothing forces quiet, cancels a body, fabricates a snapshot or alters day configuration. A not-quiet
+   refusal is a readiness result, not permission to force anything; a running waiting programme must finish first.
+3. Enable `souls.enableLifecycle()` explicitly after boot.
 
-Minimum reader after acceptance: this selected dual reader plus the existing crew-removal transition contract and safe removal runtime. The original legacy factory refuses the new header/checkpoint. An old-code rollback requires the preserved pre-acceptance whole-data lineage, never a relabelled header or discarded accepted event.
+A restart whose engine already has `+crew-removal/1` reuses the accepted fact; never append another transition. An
+ordinary legacy startup without the flag installs neither the reader nor the lifecycle producer. Auth and provider
+configuration stay separate. Qualify acceptance on a copy of the world's data before doing it on the real world.
 
-The focused fixtures use actual selected Mars2026-map/disassembly and Little Martians native factories, normal local owner lifecycle requests, SQLite and fake/quiesced model service. They do not qualify production accounts, canonical retirement execution, browser behavior or the corrected Mimos content.
+After acceptance the world needs this dual reader plus the crew-removal transition contract and safe-removal runtime;
+the original legacy factory refuses the new header. Rolling back to older code requires the preserved pre-acceptance
+data, never a relabelled header or a discarded accepted event.
 
 ## Launcher
 
-Native `openWorldServer` accepts only explicit `nativeLifecycleV1:true` to install the dual reader before boot and the lifecycle producer before listening. False/absence keeps the old factory and behavior. `checkOnly` never accepts a policy.
+Native `openWorldServer` (`tools/core/multiworld/world-server.mjs`) installs the dual reader before boot and the
+lifecycle producer before listening only with explicit `nativeLifecycleV1:true`; otherwise it keeps the old factory and
+behaviour. `checkOnly` never accepts a policy.
 
-If a canonical candidate is still doing accepted work, a trusted private operator can supply the internal function `prepareNativeLifecycle({host,souls,drive})` to wait for its actual native quiet boundary. The launcher does not implement a timeout, force quiet or cancel a programme on its behalf. No listener starts during that callback. Then the existing accepted policy is installed exactly once; a cold restart with the flag reuses the recorded fact. Root must bound the operator wait and preserve its first failure.
+If the world is still doing accepted work, the operator can pass `prepareNativeLifecycle({host,souls,drive})` to wait
+for its quiet boundary. No listener starts during that callback, and the launcher implements no timeout, forced quiet or
+cancellation, so the caller must bound the wait. The policy is then installed exactly once; a cold restart with the flag
+reuses the recorded fact.
 
-The standalone internal helper `installSelectedNativeLifecycleV1(host,souls,drive,author)` performs that same guarded acceptance and idempotent lifecycle enablement. It is not exposed as HTTP. The returned runtime context also exposes `bootstrapNativeLifecycle()` only when the explicit flag is enabled.
+`installSelectedNativeLifecycleV1(host,souls,drive,author)` (`selected-lifecycle-bootstrap.ts`) performs the same guarded
+acceptance and idempotent lifecycle enablement as an internal helper, not over HTTP. With the flag enabled, the returned
+runtime context also exposes `bootstrapNativeLifecycle()`.
+
+Tests: `apps/server/src/selected-native-lifecycle.test.ts` (Mars and Little Martians native factories, local owner
+lifecycle requests, SQLite, fake models). They do not cover production accounts, browser behaviour or retirement
+execution.

@@ -13,16 +13,17 @@ code from the **sampled tick** (never wall time), so a replay draws the same hea
 | `mars/viewer/engine/bodies/` | `Entity.body` helpers, model table, drawn pose, per-verb policy + admission, float planner, take helper |
 | `mars/viewer/engine/world/types.ts` | one optional field: `Entity.body?: { family: 'humanoid' \| 'floater'; model?; radius?; hoverHeight? }` |
 | `mars/viewer/app/engine-view/floaters.ts` | `FloaterView` (add / update / remove / sync) and `KinScenery` for three.js |
-| `mars/viewer/engine/test/floaters.test.ts` | 10 tests (see below) |
+| `mars/viewer/engine/test/floaters.test.ts` | floater body, policy, planner and rendering tests |
 | `tools/floaters/POLICY.md` | the verdict for every Mars verb (generated) |
-| `tools/floaters/shots/` | renders used to check facing, scale, hover and bob |
+| `tools/floaters/shots/` | renders from `preview.mjs`, used to check facing, scale, hover and bob (generated, not tracked) |
 
 Tools (isolated npm package; `npm install` here, nothing in the workspace):
-`node build-assets.mjs [--force]` rebuilds the models from `<lm-3d-models>` (read-only);
+`node build-assets.mjs --archive <3d-models-dir> [--force]` rebuilds the models from a local copy of the Little
+Martians 3D archive (read-only; it is not distributed with this repository);
 `node policy-table.mjs` regenerates POLICY.md; `node preview.mjs [mode[:tick[:model]] …]` bundles a preview
 and screenshots it with the system Chrome (`lineup`, `side`, `kin`, `axes:0:<model>`).
 
-## Integration notes for the lead
+## Integration
 
 1. **Seeding.** A Little Martian is an ordinary person entity (`kind: 'human'`, `human` state) with
    `body: { family: 'floater', model: 'verdelis' }` (`withBody(human(...), body)`). Absent `body` =
@@ -37,7 +38,6 @@ and screenshots it with the system Chrome (`lineup`, `side`, `kin`, `axes:0:<mod
    floater's radius. Stairs/ladders/climbs/beams are refused by name (`floater.stairs-unsupported`, …,
    with the link ids); level changes only through link ids declared in `openings` (or `ramp` links),
    glided continuously. `sampleFloat(track, s)` gives ground point (for `pose.p`), hover point and yaw.
-   Final locomotion wiring (a float verb or a walk_to profile hook) is yours.
 4. **Rendering.** `const v = new FloaterView(scene, { baseUrl: '/worlds/littlemartians/characters/', dracoDecoderPath })`;
    `v.sync(floaterBodiesOfTake(take))`; each redraw `v.update(frame.entities, take.startTick + frame.tick, take.dt)`.
    Pass the **absolute** tick so the bob is continuous across streamed take chunks. TakePeople must skip
@@ -48,7 +48,7 @@ and screenshots it with the system Chrome (`lineup`, `side`, `kin`, `axes:0:<mod
    2 × radius. `v.object(id)` is the holder for selection rays / follow cameras.
 5. **Kin.** `new KinScenery(scene, opts).place([{ model: 'chebel', p: [x, y, z] }, …])`, then `update(tick)`.
 
-## Decisions made here (review)
+## Decisions
 
 - **Facing offsets are measured, not flock.html's ORIENT.** Six-axis renders (`shots/axes-*.png`) show
   every scan upright with its face exactly along +Z (Verdelis, Mycos, Nyx) or −Z (Kalama, Kweku, Ada,
@@ -69,5 +69,5 @@ and screenshots it with the system Chrome (`lineup`, `side`, `kin`, `axes:0:<mod
   `activity: 'sit'` and settles to the mat for `sleepPose`. No seated posture exists.
 - Openings must be declared by the building author (link ids); a building with only stairs is
   unreachable upstairs for floaters, by design.
-- The licence of the scans is not recorded in the archive (manifest `license: null`); they are Vanessa
-  Rosa's work, included on Gene's authorization for this private project.
+- The scans are artwork by Vanessa Rosa (Little Martians), used with permission and not covered by the repository
+  licence (see [ASSETS.md](../../ASSETS.md)); the manifest records `license` per model.

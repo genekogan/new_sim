@@ -1,7 +1,6 @@
-# Playtest Reviewer rubric (condensed from ACCEPT3 SCORING-NOTES, frozen copy v1)
+# Playtest Reviewer rubric (frozen copy v1)
 
-Source: `<team>/scratch/soul2/accept3/SCORING-NOTES.md` (ACCEPT3 manual scoring notes; comparison authority
-ACCEPTANCE-2 "Scores" and "Every W and P"). This file condenses it for one request at a time in a playtest session.
+This file condenses the project's manual playtest scoring notes for one request at a time in a playtest session.
 A change to this file is a versioned rubric change and is recorded in every run's `replay.json` (`rubric.sha256`).
 
 ## Scores: one of H / P / M / W per request

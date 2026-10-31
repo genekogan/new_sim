@@ -41,7 +41,7 @@ and reviewed supplements accept a final source-snapshot path; its hash must matc
 the overlay provenance. Apply the primary overlay first, then its supplement.
 See `worlds/meaning/live/README.md`. New physical fixtures require separate
 reviewed God edits and verification before their descriptions can be applied.
-The approved Mars pond and Eden pier bench have a bounded helper:
+The two reviewed physical fixtures, the Mars pond and the Eden pier bench, have a bounded helper:
 
 ```sh
 node --experimental-strip-types tools/meaning/fixtures.mjs plan mars-two /absolute/god-folder /absolute/fixture-receipt.json --expected-world-id ACTUAL_WORLD_ID
@@ -59,7 +59,4 @@ lost response reuses the same request; it must not invent another operation.
 If an uncommitted preview expires, stop and inspect the request journal and exact
 preimages before making a fresh plan. Rollback restores only this receipt's fields
 and refuses to overwrite intervening edits. Retain receipts and before/after
-snapshots with the release evidence.
-
-The unified 2026-10-27 release permits live Eden, Mars College and godmode-lab
-only. Little Martians overlays are offline template content; arium is excluded.
+snapshots.

@@ -1,11 +1,13 @@
-# Ambient beds (lane AMBIENT, Soul tranche)
+# Ambient beds
 
-Seamless 24 s mono loops (48 kbps mp3, 24 kHz) played by `../ambient-beds.ts` under the procedural soundscape. Each file is the
-loop plus a 0.5 s copy of its head, so `loopStart = 0.1 s, loopEnd = 24.1 s` stays seamless whatever the mp3 encoder delay.
-All CC0 1.0 (licence checked on each freesound page, 2026-10-23); logged in team/asset-scouting/SOURCES.csv.
-Built by team/scratch/soul/ambient/tools/make_loops.py (steadiest window, equal-power 3 s crossfade baked in, RMS -26 dBFS).
+Seamless 24 s mono loops (48 kbps mp3, 24 kHz) played by `../ambient-beds.ts` under the procedural soundscape. Each file
+is the loop plus a 0.5 s copy of its head, so `loopStart = 0.1 s, loopEnd = 24.1 s` stays seamless whatever the mp3
+encoder delay. Each loop is the steadiest window of its source with an equal-power 3 s crossfade baked in, at RMS
+-26 dBFS. The audio files are media, fetched with `node tools/assets/pull.mjs`.
 
-| file | source (freesound) | author |
+All sources are CC0 1.0 on freesound:
+
+| file | source (freesound id, title) | author |
 | --- | --- | --- |
 | birds.mp3 | 463903 Birds In Spring (Scotland) | BurghRecords |
 | crickets.mp3 | 333221 Night Crickets Back Porch | hdfreema |
