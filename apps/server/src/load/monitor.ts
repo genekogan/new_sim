@@ -107,7 +107,8 @@ export class LoadMonitor {
   readonly state = new LevelState();
   readonly baseline: QuietBaseline;
   private windowMs: number;
-  private quiet = {depth: 0, reqMs: 0};   // the current loop window: max queue depth, request ms at its start
+  private startedAt: number | null = null;
+  private quiet = {depth: 0, reqMs: 0, service: 1};   // the current loop window: max queue depth, request ms at its start, min tick service
   get level(): Level { return this.state.level; }
   signals: Signals = {service: 1, loopP99Ms: 0, heapFrac: 0, gcFrac: 0, oldestMs: 0};
   tickStats = {avg: 0, max: 0, n: 0, p99: 0};
@@ -131,7 +132,7 @@ export class LoadMonitor {
   register(name: string, dial: Dial) { this.dials.set(name, dial); try { dial(this.level); } catch (e) { console.error(`[load] dial ${name} failed`, e); } }
   start() {
     if (this.timer) return;
-    this.hist = monitorEventLoopDelay({resolution: 10}); this.hist.enable(); this.histAt = this.now(); this.quiet = {depth: 0, reqMs: this.o.requestMs?.() ?? 0};
+    this.hist = monitorEventLoopDelay({resolution: 10}); this.hist.enable(); this.histAt = this.startedAt = this.now(); this.quiet = {depth: 0, reqMs: this.o.requestMs?.() ?? 0, service: 1};
     try { this.obs = new PerformanceObserver(list => { for (const e of list.getEntries()) this.gc.push({at: this.now(), ms: e.duration}); }); this.obs.observe({entryTypes: ['gc']}); } catch { this.obs = null; }
     this.timer = setInterval(() => this.sample(), this.o.sampleMs ?? 250); this.timer.unref();
     this.sample();
@@ -152,7 +153,7 @@ export class LoadMonitor {
     const service = owed >= 2 ? Math.min(1, ran / owed) : 1;
     // event-loop delay p99 over the last ~5 s (two rotating windows)
     const q = this.o.queue?.() ?? {depth: 0, oldestMs: 0};
-    this.quiet.depth = Math.max(this.quiet.depth, q.depth);
+    this.quiet.depth = Math.max(this.quiet.depth, q.depth); this.quiet.service = Math.min(this.quiet.service, service);
     let loopP99 = this.prevLoopP99;
     if (this.hist) {
       if (this.hist.count > 0) loopP99 = Math.max(loopP99, this.hist.percentile(99) / 1e6);
@@ -171,7 +172,10 @@ export class LoadMonitor {
     const sorted = ms.length ? [...ms].sort((x, y) => x - y) : [];
     this.tickStats = {avg: ms.length ? Math.round(10 * sum / ms.length) / 10 : 0, max: Math.round(10 * max) / 10, n: ms.length, p99: sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(0.99 * sorted.length))] : 0};
     if (this.o.souls && now - this.soulsAt >= 2000) { this.soulsAt = now; try { this.souls = this.o.souls(); } catch { /* presence is best effort */ } }
-    const from = this.level, to = this.o.drill ? (this.state.level = this.o.drill) : this.state.update(this.signals, now);
+    // the serving turn's own warm-up (JIT, first projections) is not load: loop delay counts for levels once two windows
+    // have closed (the first window's p99 carries into the second); service, heap and queue count at once
+    const warm = this.startedAt !== null && now - this.startedAt < 2 * this.windowMs, judged = warm ? {...this.signals, loopP99Ms: 0} : this.signals;
+    const from = this.level, to = this.o.drill ? (this.state.level = this.o.drill) : this.state.update(judged, now);
     if (to !== from) this.changed(from, to);
     if (to === 'black') {
       this.blackSince ??= now;
@@ -185,12 +189,16 @@ export class LoadMonitor {
     a[S.shedReads] = shed.reads; a[S.shedActs] = shed.acts; a[S.sampledAt] = now;
     return to;
   }
-  /** A loop window closed: feed the quiet baseline (nothing queued, requests under 5 % of the window). Public for tests. */
+  /** A loop window closed: feed the quiet baseline. Quiet = nothing queued, requests under 5 % of the window and tick
+   *  service ≥ 0.95. The sample is the window's loop p99 bounded by the world's own tick p99 (×1.25 + 10 ms): what
+   *  sets a quiet world's floor is its ticks, so un-admitted main-thread work (account creation, a god import) in an
+   *  otherwise quiet window is not learned as normal. Public for tests. */
   windowDone(loopP99Ms: number, now: number) {
     const reqMs = this.o.requestMs?.() ?? 0, spanMs = Math.max(1, now - this.histAt);
-    const quiet = this.quiet.depth === 0 && reqMs - this.quiet.reqMs < QUIET_REQUEST_FRAC * spanMs;
-    this.state.baselineMs = this.baseline.window(loopP99Ms, quiet, now);
-    this.quiet = {depth: 0, reqMs};
+    const quiet = this.quiet.depth === 0 && reqMs - this.quiet.reqMs < QUIET_REQUEST_FRAC * spanMs && this.quiet.service >= 0.95;
+    const own = this.tickStats.n > 0 ? Math.min(loopP99Ms, 1.25 * this.tickStats.p99 + 10) : loopP99Ms;
+    this.state.baselineMs = this.baseline.window(own, quiet, now);
+    this.quiet = {depth: 0, reqMs, service: 1};
   }
   /** Mark a main-thread turn without a full sample (after a tick). */
   turn() { this.a[S.lastTurnAt] = this.now(); }

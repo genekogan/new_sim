@@ -78,7 +78,7 @@ test('quiet baseline: boot median over 60 s, only quiet windows, slow rise, fast
 });
 
 test('monitor: a synthetic 170 ms quiet tick (real event-loop histogram) is learned as the baseline; load is not', async () => {
-  const host = {engine: {world: {tick: 0}}, tickMs: [] as number[], paused: false, pace: 1, baseRate: 1, running: false, clockAvailable: true};
+  const host = {engine: {world: {tick: 0}}, tickMs: [...Array(97).fill(5), 170, 170, 170], paused: false, pace: 1, baseRate: 1, running: false, clockAvailable: true};
   let reqMs = 0, depth = 0;
   const m = new LoadMonitor({host, shared: newSharedLoad(), sampleMs: 50, windowMs: 600, requestMs: () => reqMs, queue: () => ({depth, oldestMs: 0})});
   const block = (ms: number) => { const end = performance.now() + ms; while (performance.now() < end) { /* a 170 ms tick */ } };
@@ -94,6 +94,14 @@ test('monitor: a synthetic 170 ms quiet tick (real event-loop histogram) is lear
     assert.ok(Math.abs(m.state.baselineMs - learned) < 1e-9, 'loaded windows do not move it');
     assert.equal(m.health().loopBaselineMs, Math.round(learned));
   } finally { clearInterval(ticker); m.stop(); }
+});
+
+test('monitor: un-admitted main-thread work in a quiet window is bounded by the world\'s own tick p99', () => {
+  const host = {engine: {world: {tick: 0}}, tickMs: [...Array(97).fill(5), 170, 170, 170], paused: false, pace: 1, baseRate: 1, running: false, clockAvailable: true};
+  const m = new LoadMonitor({host, now: () => 5000, shared: newSharedLoad()});
+  m.sample();   // tick stats: p99 170
+  m.windowDone(2500, 5000);   // an account creation blocked the loop for 2.5 s; nothing was queued
+  assert.equal(m.state.baselineMs, 1.25 * 170 + 10);
 });
 
 test('monitor: tick service counts dilation and slow frames as missed, a paused or stopped clock as served', () => {
