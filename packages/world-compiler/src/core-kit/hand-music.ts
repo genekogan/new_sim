@@ -42,30 +42,30 @@ const radio: DefInput = {
   schema: 'def/1', name: 'core-radio', version: 2,
   description: 'A wooden valve radio on a narrow console shelf, with a power knob, a tuning knob, a lit dial and a panel light. A Soul turns it on and off and changes the station by hand; everyone nearby hears the same station.',
   tags: ['music', 'radio', 'hand-operated'], form: 'point',
-  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0, shapes: [
     // the console shelf: top, apron, four legs, a lower shelf
-    { kind: 'box', at: [0, 1.005, 0], size: [0.62, 0.03, 0.36], round: 0.008, tint: 'shelf' },
+    { kind: 'box', at: [0, 1.005, 0], size: [0.62, 0.03, 0.36], tint: 'shelf' },
     { kind: 'box', at: [0, 0.96, 0.165], size: [0.56, 0.06, 0.02], tint: 'shelf' },
     ...[[-0.27, -0.15], [0.27, -0.15], [-0.27, 0.15], [0.27, 0.15]].map(([x, z]) => ({ kind: 'box', at: [x, 0.495, z], size: [0.036, 0.99, 0.036], tint: 'shelf' })),
     { kind: 'box', at: [0, 0.32, 0], size: [0.56, 0.022, 0.31], tint: 'shelf' },
     // the radio case with a rounded top
-    { kind: 'box', at: [0, 1.02 + Y + 0.14, -0.02], size: [0.5, 0.28, 0.24], round: 0.03, tint: 'wood' },
-    { kind: 'cyl', at: [0, 1.02 + Y + 0.27, -0.02], r: 0.12, h: 0.5, segments: 16, tint: 'wood', roll: Math.PI / 2 },
+    { kind: 'box', at: [0, 1.02 + Y + 0.14, -0.02], size: [0.5, 0.28, 0.24], tint: 'wood' },
+    { kind: 'cyl', at: [0, 1.02 + Y + 0.27, -0.02], r: 0.12, h: 0.5, segments: 12, tint: 'wood', roll: Math.PI / 2 },
     { kind: 'box', at: [0, 1.02 + Y + 0.135, FZ + 0.002], size: [0.46, 0.25, 0.008], tint: 'face' },
     // speaker grille: cloth behind three slats
     { kind: 'box', at: [-0.11, 1.02 + Y + 0.14, FZ + 0.008], size: [0.19, 0.2, 0.006], tint: 'cloth' },
-    ...[-0.17, -0.11, -0.05].map(x => ({ kind: 'box', at: [x, 1.02 + Y + 0.14, FZ + 0.013], size: [0.014, 0.2, 0.006], tint: 'wood' })),
+    ...[-0.15, -0.07].map(x => ({ kind: 'box', at: [x, 1.02 + Y + 0.14, FZ + 0.013], size: [0.014, 0.2, 0.006], tint: 'wood' })),
     // the dial window, lit while on, with a mark per station and a sliding needle
     { kind: 'box', at: [0.11, 1.02 + Y + 0.2, FZ + 0.008], size: [0.2, 0.07, 0.006], tint: 'dark', when: '!@on' },
     { kind: 'box', at: [0.11, 1.02 + Y + 0.2, FZ + 0.008], size: [0.2, 0.07, 0.006], tint: 'dial', glow: 1, when: '@on' },
     ...[0.05, 0.11, 0.17].map(x => ({ kind: 'box', at: [x, 1.02 + Y + 0.226, FZ + 0.0125], size: [0.005, 0.016, 0.003], tint: 'mark' })),
     { kind: 'box', at: [0.11, 1.02 + Y + 0.2, FZ + 0.014], size: [0.005, 0.06, 0.004], tint: 'needle', role: 'needle', pivot: [0.11, 1.02 + Y + 0.2, FZ + 0.014] },
     // the panel light between the knobs: a dark jewel, amber and lit while on
-    { kind: 'cyl', at: [0.11, 1.02 + Y + 0.085, FZ + 0.01], r: 0.011, h: 0.012, segments: 10, tint: 'dark', pitch: Math.PI / 2, when: '!@on' },
-    { kind: 'cyl', at: [0.11, 1.02 + Y + 0.085, FZ + 0.01], r: 0.011, h: 0.012, segments: 10, tint: 'jewel', glow: 1, pitch: Math.PI / 2, when: '@on' },
+    { kind: 'cyl', at: [0.11, 1.02 + Y + 0.085, FZ + 0.01], r: 0.011, h: 0.012, segments: 6, tint: 'dark', pitch: Math.PI / 2, when: '!@on' },
+    { kind: 'cyl', at: [0.11, 1.02 + Y + 0.085, FZ + 0.01], r: 0.011, h: 0.012, segments: 6, tint: 'jewel', glow: 1, pitch: Math.PI / 2, when: '@on' },
     // power knob (the hand goes here for on/off) and tuning knob (for the station), with a white line that turns
-    { kind: 'cyl', at: [0.05, 1.02 + Y + 0.07, FZ + 0.02], r: 0.028, h: 0.032, segments: 14, tint: 'valve', pitch: Math.PI / 2 },
-    { kind: 'cyl', at: [0.17, 1.02 + Y + 0.07, FZ + 0.02], r: 0.028, h: 0.032, segments: 14, tint: 'tuner', pitch: Math.PI / 2, role: 'knob', pivot: [0.17, 1.02 + Y + 0.07, FZ + 0.02] },
+    { kind: 'cyl', at: [0.05, 1.02 + Y + 0.07, FZ + 0.02], r: 0.028, h: 0.032, segments: 8, tint: 'valve', pitch: Math.PI / 2 },
+    { kind: 'cyl', at: [0.17, 1.02 + Y + 0.07, FZ + 0.02], r: 0.028, h: 0.032, segments: 8, tint: 'tuner', pitch: Math.PI / 2, role: 'knob', pivot: [0.17, 1.02 + Y + 0.07, FZ + 0.02] },
     { kind: 'box', at: [0.17, 1.02 + Y + 0.085, FZ + 0.037], size: [0.005, 0.022, 0.003], tint: 'tick', role: 'knob', pivot: [0.17, 1.02 + Y + 0.07, FZ + 0.02] }] } } as unknown as DefInput['make'],
   params: rp as DefInput['params'], palette: R,
   state: { on: { type: 'bool', default: false }, station: { type: 'enum', values: [...RADIO_STATIONS], default: RADIO_STATIONS[0] } } as DefInput['state'],
