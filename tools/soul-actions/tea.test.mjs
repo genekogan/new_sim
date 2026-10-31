@@ -143,7 +143,7 @@ test('making tea: a real cup of tea from a kettle filled, boiled and poured by h
   await done(`put-on:${id('table')}`);
   assert.equal(byName('cup').in.parent, id('table'), 'on the table'); assert.equal(id('cup'), cupId, 'same identity'); assert.equal(state('cup').tea, 1);
   const nearCup = await here(); const cupRow = objOf(nearCup, 'cup');
-  assert.deepEqual(cupRow?.state, {tea: true}, 'a nearby Soul sees a cup of tea');
+  assert.deepEqual(cupRow?.state, {tea: 1}, 'a nearby Soul sees a cup of tea (entry 44: how much, to one decimal)');
   report.contextBytes.cupRow = JSON.stringify(cupRow).length; report.contextBytes.cupFact = JSON.stringify({state: cupRow.state}).length - 2;
   report.checks.push('cup of tea carried and set on the table, same id, tea 1');
 

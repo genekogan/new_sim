@@ -89,6 +89,9 @@ export function createTea(h: TeaHost) {
   const walk = (st: Vec3, face: number): Step => ({ verb: 'mars:walk_to', params: { x: r3(st[0]), z: r3(st[2]), level: 0, face: r3(face) } });
   // entry 41's M04 finding: an idle gesture is let go before a hand reaches (let-go.ts), never faded over the reach
   const LET_GO: Step = { verb: 'mars:let_go_v1', params: {} };
+  // entry 44: an act that starts with a walk lets an idle gesture go first, standing (a hand at the hair after giving a cup
+  // dropped 0.10 m per 50 ms as the walk's own gesture fade took it in 0.4 s; the let-go takes 1.1 s)
+  const letGoFirst = (steps: Step[]): Step[] => (steps[0]?.verb === 'mars:walk_to' ? [LET_GO, ...steps] : steps);
 
   /** Fill steps for a kettle on a counter: take it, fill it under the nearest tap, put it back where it was. */
   function fillSteps(kettle: string, me: Vec2): Step[] | Refusal {
@@ -242,8 +245,9 @@ export function createTea(h: TeaHost) {
     const me: Vec2 = [body.pose.p[0], body.pose.p[2]];
     if ((action === 'drink' || action === 'sip' || action === 'wash') && isTeaCupDef(def as never)) {
       const r = action === 'wash' ? washPlan(soul.entityId, id, me) : drinkPlan(soul.entityId, id, me, action === 'sip');
-      if (!('code' in r)) planned.delete(soul.entityId);
-      return r;
+      if ('code' in r) return r;
+      planned.delete(soul.entityId);
+      return { ...r, steps: letGoFirst(r.steps) };
     }
     const busy = Object.values(ents()).find((x: any) => x?.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId && !things().kettles.includes(x.id));
     if (busy) return { code: 'tea.hands-full', reason: `You are holding ${m.pathOf(busy.id)}; put it down first.` };
@@ -253,7 +257,7 @@ export function createTea(h: TeaHost) {
     if (!kettle) return isTeaCupDef(def as never) ? { code: 'tea.no-kettle', reason: `There is no kettle within ${NEAR_CUP} m of ${m.pathOf(id)}.` } : null;
     const k = heat(kettle), level = num(stateOf(kettle).level), litres = litresOf(defOf(kettle)!, (m.entities.get(kettle)?.params ?? {}) as Record<string, unknown>) || KETTLE_LITRES, cupL = CUP_LITRES / litres;
     const kname = m.pathOf(kettle);
-    const ok = (steps: Step[] | Refusal, summary: string): TeaPlan | Refusal => ('code' in steps ? steps : (planned.set(soul.entityId, kettle), { steps, summary }));
+    const ok = (steps: Step[] | Refusal, summary: string): TeaPlan | Refusal => ('code' in steps ? steps : (planned.set(soul.entityId, kettle), { steps: letGoFirst(steps), summary }));
     if (action === 'fill') {
       if (level >= 0.98) return { code: 'tea.kettle-full', reason: `${kname} is already full.` };
       return ok(fillSteps(kettle, me), `Filled ${kname} at the tap and put it back on the counter.`);

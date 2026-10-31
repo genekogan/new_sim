@@ -47,7 +47,7 @@ export const ENGINE_LIPS = { fwd: 0.085, up: 1.545 } as const;
 export const CHEST_HOLD = { fwd: 0.2, down: 0.36, side: 0.05 } as const;
 /** Timeline constants (s). */
 export const C = {
-  grip: 0.7, raise1: 1.4, tiltIn: 1.0, hold: 0.7, tiltOut: 0.8, lower: 1.1, pause: 1.8, raise: 1.1, toCarry: 1.2,
+  grip: 0.7, raise1: 1.4, tiltIn: 1.15, hold: 0.7, tiltOut: 0.9, lower: 1.1, pause: 1.8, raise: 1.1, toCarry: 1.2,
   washIn: 1.1, valveReach: 0.9, valveHold: 0.35, valveRelease: 0.7, run: 1.6, swirl: 1.4, tipIn: 1.2, tipHold: 0.8, tipOut: 0.9, washOut: 1.1,
   abortOut: 1.0,
 } as const;

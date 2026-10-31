@@ -13,7 +13,7 @@ const run=promisify(execFile),wait=ms=>new Promise(r=>setTimeout(r,ms));
 const snap=await(await fetch(base+'/v1/world/snapshot')).json(),id=n=>snap.entities.find(e=>e.name===n).id,ids={kettle:id('kettle'),cup:id('cup'),cup2:id('cup-two'),sink:id('sink'),counter:id('counter'),table:id('table')};
 const camera=async(eye,at,why)=>{await page.evaluate(({eye,at})=>{const a=window.__simEntity;a.controls.target.set(...at);a.camera.position.set(...eye);a.camera.lookAt(a.controls.target);a.controls.update();},{eye,at});marks.push({tick:samples.at(-1)?.tick,at:Date.now(),camera:why??'set',eye,look:at});};
 // views: the counter; the table from its long side (both faces in profile across it); the sink from behind his right
-const VIEW={counter:[[1.55,1.5,1.75],[-0.05,0.98,2.95]],table:[[2.6,1.55,-0.55],[2.6,1.15,1.4]],tableSide:[[4.45,1.62,1.4],[2.6,1.2,1.4]],sink:[[-1.15,1.55,1.85],[-2.2,1.0,3.0]],wide:[[0.4,2.6,-1.6],[0.6,0.8,2.2]],face:[[1.5,1.62,1.55],[0.2,1.35,2.45]]};
+const VIEW={counter:[[1.55,1.5,1.75],[-0.05,0.98,2.95]],table:[[2.6,1.55,-0.55],[2.6,1.15,1.4]],tableSide:[[4.45,1.62,1.4],[2.6,1.2,1.4]],sink:[[-2.05,1.5,4.6],[-2.4,0.95,3.15]],wide:[[0.4,2.6,-1.6],[0.6,0.8,2.2]],face:[[1.5,1.62,1.55],[0.2,1.35,2.45]]};
 const STATIONS={counter:[0,2.55],sink:[-2.75,2.85],table:[2.6,1.4]};
 // what the viewer draws, every 50 ms: bodies (bones, head, hands), the mugs (drawn pose, the cup timeline's debug, the
 // world state), the tap's stream, the rinse water's stream, the tap's voice
@@ -40,7 +40,20 @@ const ready=async(n=1)=>{await page.waitForFunction((n)=>window.__simEntity?.con
  if(await on.count())await on.click();else if(await off.count()){await off.click();await page.waitForTimeout(300);if(await on.count())await on.click();}
  try{await page.waitForFunction(()=>window.__edenSound.state().ctx==='running',null,{timeout:30000});}catch(e){await page.keyboard.press('KeyM');await page.keyboard.press('KeyM');await page.waitForFunction(()=>window.__edenSound.state().ctx==='running',null,{timeout:15000}).catch(()=>marks.push({audio:'not unlocked after reload'}));}};
 const sampling=()=>{timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s){s.phase=phase;samples.push(s);await steer();}}catch{}finally{busy=false;}},50);};
-const seatIds={};const bodyOf=async(seat)=>{if(!seatIds[seat]){const h=await cli(seat,['here'],60000);seatIds[seat]=h.me?.entity??h.me?.id??null;}return seatIds[seat];};
+const seatIds={};const bodyOf=async(seat)=>{if(!seatIds[seat]){const h=await cli(seat,['here'],60000),p=h.me?.pos,b=p&&samples.at(-1)?.bodies.map(b=>[b,Math.hypot(b.p[0]-p[0],b.p[2]-p[1])]).sort((a,c)=>a[1]-c[1])[0];seatIds[seat]=b&&b[1]<0.6?b[0].id:null;}return seatIds[seat];};
+const bodyNow=id=>samples.at(-1)?.bodies.find(b=>b.id===id);
+// the hand-over seen side on: from the midpoint of the two, square to the line between them, on the side away from the table
+const pairCam=async(a,b,why)=>{const A=bodyNow(a),Bb=bodyNow(b);if(!A||!Bb)return;const m=[(A.p[0]+Bb.p[0])/2,(A.p[2]+Bb.p[2])/2],dx=Bb.p[0]-A.p[0],dz=Bb.p[2]-A.p[2],L=Math.hypot(dx,dz)||1,n=[-dz/L,dx/L],t=STATIONS.table,away=Math.sign(n[0]*(m[0]-t[0])+n[1]*(m[1]-t[1]))||1;
+ await camera([m[0]+n[0]*away*2.3,1.55,m[1]+n[1]*away*2.3],[m[0],1.1,m[1]],why);};
+// the table top close, from the side away from the people: both mugs (one empty, one clean) in view
+const tableCam=async(why)=>{const s=samples.at(-1);const cs=['cup','cup2'].map(k=>s?.cups?.[k]?.p).filter(Boolean);if(cs.length<2||!s.bodies.length)return camera(...VIEW.table,why);
+ const m=[(cs[0][0]+cs[1][0])/2,(cs[0][1]+cs[1][1])/2,(cs[0][2]+cs[1][2])/2],b=[s.bodies.reduce((a,x)=>a+x.p[0],0)/s.bodies.length,s.bodies.reduce((a,x)=>a+x.p[2],0)/s.bodies.length];
+ let d=[m[0]-b[0],m[2]-b[1]];const L=Math.hypot(...d)||1;d=[d[0]/L,d[1]/L];await camera([m[0]+d[0]*1.05,m[1]+0.75,m[2]+d[1]*1.05],[m[0],m[1]+0.03,m[2]],why);};
+// a drinker seen from the side of the hand that holds the mug, a little in front: the mug and the face in three-quarter profile
+const sideCam=async(id,why,hand='right',other)=>{const b=bodyNow(id),o=other&&bodyNow(other);if(!b)return;const c=Math.cos(b.yaw),n=Math.sin(b.yaw),sd=hand==='right'?1:-1,r=[-n*sd,c*sd];
+ // half way to the other drinker (both in frame, in profile), from the side of the hand that holds his mug
+ const k=o?Math.min(1.1,Math.max(0.35,((o.p[0]-b.p[0])*c+(o.p[2]-b.p[2])*n)/2)):0.35;
+ await camera([b.p[0]+c*k+r[0]*2.5,1.55,b.p[2]+n*k+r[1]*2.5],[b.p[0]+c*k,1.3,b.p[2]+n*k],why);};
 const stills=async(name)=>{mkdirSync(out+'/stills',{recursive:true});await page.screenshot({path:`${out}/stills/${name}.png`});};
 try{
  await page.goto(base+'/?eye=0.4,2.6,-1.6&at=0.6,0.8,2.2');await ready(plan==='cal'?1:2);await startAudio('audio-1');sampling();
@@ -59,18 +72,24 @@ try{
   phase='pick';await act('ada','pick up the cup');await here('ada','holding the tea');
   phase='offer';follow=await bodyOf('ada');lastView='';const g=send('ada','offer Ben the tea');
   for(let t0=Date.now();Date.now()-t0<40000;){const h=await cli('ben',['here'],60000);if(h.me?.offer){reads.push({seat:'ben',note:'offer line',at:Date.now(),tick:samples.at(-1)?.tick,me:h.me,bytes:JSON.stringify({...h,tick:0}).length});break;}await wait(400);}
-  follow=null;await camera(...VIEW.table,'table hand-over');await act('ben','accept');await g;await page.waitForTimeout(2000);
+  // the camera side on once Ada has come to stand in front of Ben (the offer line reaches him as she sets off)
+  {const a=await bodyOf('ada'),b=await bodyOf('ben');for(let t0=Date.now();Date.now()-t0<30000;){const A=bodyNow(a),Bb=bodyNow(b);if(A&&Bb&&A.bones.walkW===0&&Math.hypot(A.p[0]-Bb.p[0],A.p[2]-Bb.p[2])<1.3)break;await wait(150);}
+   follow=null;await pairCam(a,b,'hand-over side on');}
+  await act('ben','accept');await g;await page.waitForTimeout(2000);
   phase='brew2';follow=await bodyOf('ada');lastView='';await act('ada','make a cup of tea',240);await act('ada','pick up the cup');follow=null;
-  phase='drink';await camera(...VIEW.tableSide,'table side: both drink');const [da,db]=await Promise.all([act('ada','drink the tea',240),act('ben','drink the tea',240)]);void da;void db;
+  phase='drink';const ben=await bodyOf('ben'),ada=await bodyOf('ada');await camera(...VIEW.wide,'wide: both go to drink');const both=Promise.all([act('ada','drink the tea',240),act('ben','drink the tea',240)]);
+  // once both stand drinking, the camera on Ben's mug side (the receiver)
+  for(let t0=Date.now();Date.now()-t0<30000;){const s=samples.at(-1);const hb=s?.bodies.find(b=>b.id===ben),ha=s?.bodies.find(b=>b.id===ada);if(hb?.cup&&ha?.cup&&hb.bones.walkW===0){await sideCam(ben,'drink: both in profile, Ben mug side',hb.cup.hand,ada);break;}await wait(150);}
+  await both;
   await here('ben','drunk');
   phase='set-down';await act('ben','put the cup on the table');await act('ada','put the cup on the table');await page.waitForTimeout(1500);await here('ben','empty mugs on the table');
-  phase='wash';follow=await bodyOf('ben');lastView='table';await act('ben','wash the cup',240);follow=null;await camera(...VIEW.table,'table');await page.waitForTimeout(3000);await here('ben','after washing');
+  phase='wash';follow=await bodyOf('ben');lastView='table';await act('ben','wash the cup',240);follow=null;await page.waitForTimeout(1500);await tableCam('table top: the empty mug and the clean mug');await page.waitForTimeout(4000);await here('ben','after washing');
   // restart: the world stops and starts again on the same data; the page reloads
   phase='restart';await stopAudio('audio-1');clearInterval(timer);await page.waitForTimeout(200);
   const world=JSON.parse(readFileSync(scene+'/world.json'));marks.push({restart:'stop',at:Date.now(),tick:samples.at(-1)?.tick,pid:world.pid});process.kill(world.pid);
   for(let i=0;i<100;i++){try{await fetch(base+'/healthz');await wait(200);}catch{break;}}
   await run(process.execPath,['tools/soul-actions/start-serve-tea.mjs'],{cwd:new URL('../..',import.meta.url).pathname,env:{...process.env,SOUL_TEA_SCENE:scene},timeout:300000});marks.push({restart:'started',at:Date.now()});
-  await page.goto(base+'/?eye=2.6,1.55,-0.55&at=2.6,1.15,1.4');await ready(2);await startAudio('audio-2').catch(e=>marks.push({audio2:String(e)}));phase='after-restart';sampling();await camera(...VIEW.table,'table after restart');
+  await page.goto(base+'/?eye=2.6,1.55,-0.55&at=2.6,1.15,1.4');await ready(2);await startAudio('audio-2').catch(e=>marks.push({audio2:String(e)}));phase='after-restart';sampling();await page.waitForTimeout(1500);await tableCam('table top after restart');
   await page.waitForTimeout(6000);await here('ben','after restart');
  }
  assert.deepEqual(errors,[]);pass=true;

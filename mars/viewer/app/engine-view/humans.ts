@@ -95,6 +95,12 @@ type View = {
   /** Soul Actions 44: a mug drunk from or rinsed (cup.ts), on the take clock. */
   cup?:CupMotion;
   cupTime?:number;
+  /** Soul Actions 44: the idle hand-off last frame, and the weight a let-go fades its gesture out from. */
+  idleLast?:number;
+  letGoFrom?:{tick:number;from:number};
+  /** Soul Actions 44: the walk age last frame (a smaller one is a new walk), and the gesture level shown when it started. */
+  walkKey?:number;
+  handoffAtWalk?:number;
   /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
   transfer?:HandTransfer;
   transferTime?:number;
@@ -251,6 +257,12 @@ export type SampledHuman = {
   /** Soul Actions 44: a mug drunk from or rinsed (cup.ts), on the take clock. */
   cup?:CupMotion;
   cupTime?:number;
+  /** Soul Actions 44: the idle hand-off last frame, and the weight a let-go fades its gesture out from. */
+  idleLast?:number;
+  letGoFrom?:{tick:number;from:number};
+  /** Soul Actions 44: the walk age last frame (a smaller one is a new walk), and the gesture level shown when it started. */
+  walkKey?:number;
+  handoffAtWalk?:number;
   /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
   transfer?:HandTransfer;
   transferTime?:number;
@@ -659,8 +671,9 @@ export class HumanViews {
     // a 0.26 m one-frame dip as the kettle hand passed 1.2 m on its way up to a pour.
     // Soul Actions 44: a mug at the lips or under a tap asks nothing of the body while drinking (it is brought to the
     // mouth, the mouth is not brought to it); under a tap the body leans a little toward the hold, on the frame's own ease
+    // ('stand', entry 33's reach at or above the hips: under 'walk' the knees bent and the hips went back at the basin)
     if(v.cup&&!walking){const m=v.cup,c=cupFrame(m,(v.cupTime??0)-m.startTick*DT);if(m.stage==='drink'||!m.hold)return NEUTRAL;
-      const k=(c.a==='hold'?1-c.k:0)+(c.b==='hold'?c.k:0),t=toBody(m.hold[0],m.hold[1]+MUG.wrapUp,m.hold[2],m.hand==='left'?-1:1),q=solvePosture(d,[t],'walk');
+      const k=(c.a==='hold'?1-c.k:0)+(c.b==='hold'?c.k:0),t=toBody(m.hold[0],m.hold[1]+MUG.wrapUp,m.hold[2],m.hand==='left'?-1:1),q=solvePosture(d,[t],'stand');
       return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
     if(v.watering&&!v.handActuator&&!walking){const m=v.watering,k=wateringFrame(m,(v.wateringTime??0)-m.startTick*DT).right,t=toBody(m.hold[0],m.hold[1],m.hold[2],1),q=solvePosture(d,[t],t.up>d.hipH+0.15?'walk':'hips');return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
     // A hand actuator (not a door) whose hand points are all at or above the hip joints is a standing reach: lean, never dip.
@@ -924,7 +937,11 @@ export class HumanViews {
     // the let-go is the newest record: fading out over it, then off for a second (the reach is about to start); a reach
     // that never comes lets the idle back in over TRANSFER_HANDOFF. A reach begun within that second after it is `letGone`.
     const letGoing = !!lg && lg.startTick >= driverStart, letGone = !!lg && !letGoing && (driverStart - lg.startTick) * DT <= lg.seconds + 1;
-    const letIdle = !letGoing ? 1 : lgS < lg!.seconds ? 1 - smooth(lgS / lg!.seconds) : smooth((lgS - lg!.seconds - 1) / TRANSFER_HANDOFF);
+    // entry 44: a let-go fades the gesture out from the weight it had when the let-go began, not from full weight: right
+    // after a kettle was put down its gesture was still fading back in (0.03), and a let-go for the next pick-up switched it
+    // on at 0.99 in one frame (the free arm swung behind the back) before fading it out
+    if (letGoing && v.letGoFrom?.tick !== lg!.startTick) v.letGoFrom = {tick: lg!.startTick, from: lgS < 0.25 && v.idleLast !== undefined ? v.idleLast : 1};
+    const letIdle = !letGoing ? 1 : lgS < lg!.seconds ? (v.letGoFrom?.from ?? 1) * (1 - smooth(lgS / lg!.seconds)) : smooth((lgS - lg!.seconds - 1) / TRANSFER_HANDOFF);
     const fadeOut = letGone ? 0 : v.transfer?.mode === 'put' && transferS >= 0 && !handoff ? 0 : reachFade;
     // entry 43 (entry 41's M04 finding): after an opted-in put the arm goes back over the recovery first, then idle
     // gestures fade in over TRANSFER_HANDOFF (29 blended both over the same 1.2 s: folded arms swept in as the arm fell)
@@ -933,6 +950,7 @@ export class HumanViews {
     const putReturn = relS < ITEM_RECOVERY_SECONDS + TRANSFER_HANDOFF ? smooth((relS - ITEM_RECOVERY_SECONDS) / TRANSFER_HANDOFF) : 1;
     if (relS >= ITEM_RECOVERY_SECONDS + TRANSFER_HANDOFF) v.itemReleasedAt = undefined;
     const idleHandoff = Math.min(putReturn, letGoing ? letIdle : v.itemPose ? (letGone && v.itemPose.take ? 0 : v.itemPose.idleBlend) : (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, fadeOut)) : v.transfer?.endTick !== undefined ? smooth(((v.transferTime ?? tSec) - v.transfer.endTick * DT) / TRANSFER_HANDOFF) : v.transfer && transferS >= 0 ? fadeOut : 1));
+    v.idleLast = idleHandoff;
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
@@ -950,7 +968,11 @@ export class HumanViews {
     if ((v.activity === 'idle' || GAIT_ACTS.has(v.activity)) && v.walkAge !== undefined && v.walkAge < GESTURE_FADE && b.sitW === 0 && !engineHands && freeBody && !lib.cur) {
       const g = 1 - smooth(v.walkAge / GESTURE_FADE), on = v.restAgeAtWalk === undefined ? 1 : smooth(Math.min(1, v.restAgeAtWalk / IDLE_VARIETY_ONSET));
       const n0 = extra.idleNeutral ? neutralWeight(h.name, tSec) * on : 0, v0 = gv && libAction(v.rig, gv.clip) ? (1 - n0) * gv.w * on : 0;
-      const want = (n0 + v0) * g, have = neutralW + variantW;
+      // entry 44: the gesture level at the walk start is what was shown then: a gesture let go before setting off (let-go,
+      // then the walk) is not put back on the arms (folded arms reappeared at full weight in one frame as she set off)
+      if (v.walkKey === undefined || v.walkAge < v.walkKey - 0.05) v.handoffAtWalk = v.walkAge < 0.25 ? v.idleLast ?? 1 : 1;
+      v.walkKey = v.walkAge;
+      const want = (n0 + v0) * g * (v.handoffAtWalk ?? 1), have = neutralW + variantW;
       if (want > have + 1e-4 && hgOff < 1e-4) { const k = Math.min(20, (want - have) / Math.max(1e-3, 1 - want)) / (n0 + v0); armsN = n0 * k; armsV = v0 * k; }
     }
     const libOn = new Set<THREE.AnimationAction>();
