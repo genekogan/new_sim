@@ -849,11 +849,11 @@ export class HumanViews {
     };
     if (lib.cur) libAt(lib.cur.act, curW, lib.cur.time);
     if (lib.prev) libAt(lib.prev.act, prevW, lib.prev.time);
-    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, tSec + (hashId(h.name) % 7));
+    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, variantTime(variant!.clip, h.name, tSec));
     if (neutralW > 0) libAt(gestureAction(v.rig, 'Idle_Neutral'), neutralW, tSec);
     if (neutralW + variantW > 1e-4) libAt(idleBodyAction(v.rig), neutralW + variantW, b.idleT);
     if (armsN > 0) libAt(armsAction(v.rig, 'Idle_Neutral'), armsN, tSec);
-    if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, tSec + (hashId(h.name) % 7));
+    if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, variantTime(gv.clip, h.name, tSec));
     if (jog) { const sp = jog.getClip().name === 'Sprint_Loop' ? v.rig.template.sprintSpeed : v.rig.template.jogSpeed; libAt(jog, runW, sp ? v.dist / sp : tSec); }
     for (const x of v.libOn) if (!libOn.has(x)) x.stop();
     v.libOn = libOn;
@@ -1375,6 +1375,12 @@ export class HumanViews {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 type LibOne = { pick: LibraryPick; act: THREE.AnimationAction; clip: string; time: number };
 type LibPlan = { cur: LibOne | null; prev: LibOne | null; fade: number; sleep: boolean; still: boolean; water: boolean };
+/** Playback rate of an idle variant clip. Idle_LookAround_Loop at the library's speed drops a hand from the head to the
+ *  hip at up to 0.19 m per 50 ms (0.164–0.172 on 1.72 m bodies; entry 33, take 08: 0.158 m per 50 ms 1.2 s after a torch put-out; take 02:
+ *  0.164), faster than any hand reach or release (≤ 0.15); at 0.7 it peaks at ≤ 0.14 on 1.65–1.85 m bodies (idle-gesture-speed.test.ts). */
+const VARIANT_RATE: Readonly<Record<string, number>> = { Idle_LookAround_Loop: 0.7 };
+/** Clip time of a person's idle variant at depicted seconds t (a per-person offset, at the clip's rate). */
+export const variantTime = (clip: string, id: string, t: number) => (t + (hashId(id) % 7)) * (VARIANT_RATE[clip] ?? 1);
 /** Idle variety from the library: about 9 s in every 37 s (per person, offset from Idle_Neutral) a person looks around
  *  or folds their arms. */
 function idleVariant(id: string, t: number): { clip: string; w: number } | null {
