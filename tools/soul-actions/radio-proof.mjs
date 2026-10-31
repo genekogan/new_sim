@@ -16,7 +16,7 @@ const sample=()=>page.evaluate(()=>{const api=window.__simEntity,f=api?.contactF
 const act=async(seat,words)=>{const start=Date.now(),tick=await page.evaluate(()=>window.__simEntity.depictedTick),r=await promisify(execFile)(process.execPath,['eden.mjs','act',words,'--wait','120','--json'],{cwd:scene+'/'+seat,timeout:180000}),result=JSON.parse(r.stdout);commands.push({seat,words,start,sentTick:tick,end:Date.now(),result});writeFileSync(out+'/commands.json',JSON.stringify(commands,null,2));assert.equal(result.accepted,true,JSON.stringify(result));assert.equal(result.receipt?.phase,'completed',JSON.stringify(result));return result;};
 try{
  await post('/v1/god/env',{timeOfDay:'16:00',timeScale:0,weather:{kind:'clear'}});
- await page.goto(base+(process.env.SOUL_RADIO_EYE??'/?eye=-1.55,1.65,2.75&at=-0.1,1.15,3.85'));await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1&&window.__edenSound,null,{timeout:180000});
+ await page.goto(base+(process.env.SOUL_RADIO_EYE??'/?eye=-1.35,1.6,2.85&at=-0.1,1.15,3.85'));await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1&&window.__edenSound,null,{timeout:180000});
  await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(2500);await installFrameStamp(page);
  writeFileSync(out+'/initial.yml',await page.locator('body').ariaSnapshot());viewport=await page.evaluate(()=>({w:innerWidth,h:innerHeight,dpr:devicePixelRatio}));
  await page.getByRole('button',{name:'Music is on: turn off',exact:true}).click();await page.waitForFunction(()=>window.__edenSound.state().ctx==='running');
