@@ -142,7 +142,7 @@ const neonSign: DefInput = {
     valve: { type: 'color', default: '#4a4f57', doc: 'switch box colour (the hand goes here)' }, lever: { type: 'color', default: '#c9ccd2', doc: 'switch lever colour' },
     tube: { type: 'color', default: '#ff3d8e', doc: 'lettering tube colour' }, border: { type: 'color', default: '#2fd6ff', doc: 'border tube colour' } } as DefInput['params'],
   palette: { frame: '#1c1d21', board: '#121318', valve: '#4a4f57', lever: '#c9ccd2', tube: '#ff3d8e', border: '#2fd6ff' },
-  state: { on: { type: 'bool', default: false }, text: { type: 'string', max: 32, default: 'OPEN' } } as DefInput['state'],
+  state: { on: { type: 'bool', default: false }, text: { type: 'string', max: 32, lines: 2, default: 'OPEN' } } as DefInput['state'],
   // the coloured spill on the ground in front of the board (the viewer draws the glow on the board itself)
   components: { lights: [{ color: '#ff3d8e', range: 5, on: true, at: [-0.45, 1.78, 0.7] }, { color: '#ff3d8e', range: 5, on: true, at: [0.45, 1.78, 0.7] }],
     sound: { kind: 'hum', radius: 9, volume: 0.32, when: 'on', mode: 'loop', variant: 2 } } as DefInput['components'],
