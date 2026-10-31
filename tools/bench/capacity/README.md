@@ -68,6 +68,23 @@ with `--slice`.
 node tools/bench/capacity/bench.mjs --root <checkout> --fixture <compact copy> --world-key eden-2026 --via-launcher --port 5153 --heap-mb 2048 --arms hostile,incident --out <dir>
 ```
 
+## Stage B: read worker off vs on (`--load stageb`, METRICS.md v2)
+
+Through the launcher only. Each arm runs once per read-worker mode, back to back; `on` writes the registry fields
+`op.mjs set-read-workers` / `set-limits` write (`readWorkers`, `limits.worldBudgetRps` 200) and the launcher passes
+`SIM_READ_MODE=2` to the world. 3 CLI Souls + raw-HTTP Souls (the CLI's requests and etiquette) so N = 100 fits beside
+production. The report adds a side-by-side table (tick, healthz, read p99 per kind, worker-served share, fallbacks,
+main vs worker CPU, oracle sample), the Stage B target table and M8 per mode.
+
+```bash
+# laptop (INDICATIVE)
+node tools/bench/capacity/bench.mjs --root "$PWD" --fixture <compact copy> --world-key eden-2026 --via-launcher --port 5271 --child-range 5272-5279 --heap-mb 2048 --load stageb --read-worker off,on --arms n6,n24 --repeats 1 --out <dir>
+# eden2 (as root; the launcher and world run as simworlds; world + its threads pinned to CPUs 6-7)
+node bench.mjs --root /srv/sim-bench/src-<sha> --fixture /srv/sim-bench/fixtures/eden-2026.db --world-key eden-2026 --via-launcher --port 5151 --child-range 5152-5159 --heap-mb 2048 --host-label eden2-slice --world-user simworlds --cpus 6-7 --load stageb --read-worker off,on --arms n6,n12,n24,n50,n100 --repeats 2 --out <dir>
+```
+
+The exact eden2 recipe for a run is in the B-soak lane status file (`team/lanes/srv-b-soak.md`).
+
 ## Recorded baseline (2026-10-31, before the server-reliability fixes)
 
 Fixture: the compact Eden 2026 copy, sha256 `d0921000a7ef…`, heap cap 768 MB unless noted; two repeats per arm, shown
