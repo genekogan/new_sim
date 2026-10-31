@@ -53,11 +53,13 @@ jobs:
         run: >-
           node --test --test-concurrency=1
           tools/assets/manifest.test.mjs
+          tools/assets/mars-web.test.mjs
           .github/scripts/ci-scope.test.mjs
           .github/scripts/guards.test.mjs
           .github/scripts/merge-train.test.mjs
           .github/scripts/install-hooks.test.mjs
           tools/proof/tier.test.mjs
+          tools/proof/gate.test.mjs
           tools/proof/acceptance.test.mjs
           tools/proof/upload.test.mjs
           tools/changelog/compile.test.mjs
@@ -105,6 +107,10 @@ jobs:
             types-web)
               pnpm typecheck
               pnpm --filter @sim/web build
+              # The Mars viewer's static site holds the people's character set (/modular); without it no world
+              # draws people (issue #395). Build it as the first run does, then fail if the set is missing.
+              pnpm build:viewer
+              node tools/assets/mars-web.mjs --check
               ;;
             packages)
               pnpm -r --filter '!mars-campus-viewer' --filter '!@sim/server' test

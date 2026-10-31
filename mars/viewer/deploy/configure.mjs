@@ -1,7 +1,14 @@
 import { build } from 'esbuild';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir, copyFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url),
   out = new URL('dist/server/', root);
+// `build:cloudflare` packages a staged Cloudflare release of the standalone site. The Sim server needs only
+// `build` (the static site in dist/client), which a fresh clone can run.
+if (!existsSync(new URL('.cloudflare/large-assets.json', root))) {
+  console.error('configure: no .cloudflare/large-assets.json. Stage the release first (python3 deploy/prepare.py), or use `build` for the static site the Sim server serves.');
+  process.exit(1);
+}
 await mkdir(out, { recursive: true });
 const assets = await readFile(
   new URL('.cloudflare/large-assets.json', root),

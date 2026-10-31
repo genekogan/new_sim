@@ -24,7 +24,7 @@ Get the tier of the current diff with `node tools/proof/tier.mjs --base origin/m
 
 ## 1. Boot a fake-mind world
 
-Needs a built web client (`pnpm install --frozen-lockfile && pnpm --filter @sim/web build`; skip if
+Needs a built web client (`pnpm install --frozen-lockfile && pnpm build`; skip if
 `apps/web/dist/index.html` exists and is current for your change). In a fresh clone the build's prebuild check fails
 until the web media are in place: `node tools/assets/pull.mjs --only 'apps/web/**'` (a few files) is enough for it.
 
@@ -98,6 +98,12 @@ node tools/proof/upload.mjs --pr $N --proof .e2e/journal/$ISSUE/proof.json .e2e/
   `SIM_PROOF_UPLOAD_URL` (+ `SIM_PROOF_UPLOAD_TOKEN`) switches to another endpoint, such as a CDN.
 - With `--proof`, the links are written into proof.json `media[]`, and proof.json is uploaded last. Paste its link
   and the clip links into the PR's Proof section. The `journal` skill covers proof.json.
+- **Inline preview.** GitHub serves release assets as downloads, so an mp4 link never plays in the PR. For each
+  video, `upload.mjs` makes a small animated GIF with ffmpeg (`<clip>.preview.gif`: the first 6 s at real speed, at
+  most 5 MB), uploads it beside the clip, records it as `media[].preview` and prints a line like
+  `[![desktop.mp4](…pr-412.desktop.preview.gif)](…pr-412.desktop.mp4)`. Paste that line: the preview plays in the
+  PR and clicking it opens the full clip. When the change shows later in the clip, pick the window with
+  `--preview-start <s>` (and `--preview-seconds <s>`). The preview is a pointer, not the proof: the uncut mp4 is.
 - **Exit 3: the upload is blocked** (no `gh`, not signed in, no permission, or no network, as in many cloud
   sessions). Tell the user which clips are waiting and where. Post a PR comment with each clip's duration,
   viewport, sidecar summary (marks, console errors, commit), and the exact `record.mjs` command and steps file, so

@@ -57,6 +57,19 @@ test('wait polls until the checks conclude, and times out', async () => {
   assert.deepEqual(stuck.missing, ['ci-ok']);
 });
 
+test('wait: a failure must hold for two polls, so a re-run started by an approval is not missed', async () => {
+  let calls = 0;
+  const run = (id, status, conclusion) => [{ check_runs: [{ id, name: 'proof-ok', status, conclusion }] }];
+  const rerun = { ghAll: path => path.includes('/statuses') ? [] : (++calls === 1 ? run(1, 'completed', 'failure') : calls === 2 ? run(2, 'queued', null) : run(2, 'completed', 'success')) };
+  assert.equal((await wait({ repo: 'o/r', sha: 's', required: ['proof-ok'], api: rerun, sleep: async () => {}, pollSec: 0 })).result, 'pass');
+  calls = 0;
+  const failing = { ghAll: path => path.includes('/statuses') ? [] : (calls++, run(1, 'completed', 'failure')) };
+  const r = await wait({ repo: 'o/r', sha: 's', required: ['proof-ok'], api: failing, sleep: async () => {}, pollSec: 0 });
+  assert.equal(r.result, 'fail');
+  assert.equal(calls, 2);
+  assert.deepEqual(r.failed, ['proof-ok (failure)']);
+});
+
 test('next: oldest eligible PR first; an unapproved T3 is skipped with one comment', () => {
   const prs = {
     5: { number: 5, title: 'engine', labels: [{ name: 'merge:ready' }], head: { ref: 'agent/5-x', sha: 'a5', repo: { full_name: 'o/r' } }, base: { ref: 'main' } },

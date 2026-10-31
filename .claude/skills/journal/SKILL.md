@@ -126,16 +126,18 @@ Check it locally before you push the body. The `proof-ok` check runs the same co
 node tools/proof/acceptance.mjs check --body .e2e/journal/$N/pr.md --issue .e2e/journal/$N/issue.md \
   --proof .e2e/journal/$N/proof.json --base origin/main
 ```
-Open the PR as a draft and mark it ready once the proof is attached. Interrupted work stays a draft with honest
-unmet boxes. Never mark it done.
+Open the PR as a draft and mark it ready once the proof is attached (`proof-ok` is skipped on drafts and runs on
+ready for review; until then the local check above is your check). Interrupted work stays a draft with honest unmet
+boxes. Never mark it done.
 
 ## 8. Stop for review
 
 - **T0–T2**: once `ci-ok`, the security checks, the changelog check and `proof-ok` are green and the Claude review
   has no blocking findings, the PR may go to the merge train (`merge:ready`) if the issue or the maintainer said so.
 - **T3/T4**: stop. Ask the maintainer for review in the PR. Do not start dependent work on top of an unreviewed T3
-  result; independent work may continue. A review is not permission to merge or ship. The merge train waits for
-  the maintainer's approval.
+  result; independent work may continue. A review is not permission to merge or ship. `proof-ok` stays red until
+  the maintainer approves (`tools/proof/gate.mjs`); never approve, add `approved:maintainer` or `proof:waived`
+  yourself.
 - Answer review findings with fixes or reasons. Revisions stay in the same milestone.
 
 Report back: the PR link, the tier, each criterion with met, unmet or deferred, the proof links, and what is left.

@@ -46,7 +46,7 @@ Paths (all overridable): checkout `SIM_CHECKOUT` (default: this repo), state `SI
 ## Before starting: server root
 - **Server root** (`--server-root`, default: the checkout) must be a built Sim checkout containing
   `tools/god-skill/dev-world.mjs`, `apps/web/dist/index.html` and `tools/world-launcher/soul/eden.mjs`; the scripts
-  refuse otherwise. Build with `pnpm install --frozen-lockfile && pnpm --filter @sim/web build`. Say which root you used.
+  refuse otherwise. Build with `pnpm install --frozen-lockfile && pnpm build`. Say which root you used.
 - Optional read-only check: `node tools/playtest/playtest.mjs preflight --server-root <root>` (usage, CLI versions,
   load, free memory; starts nothing).
 - Cameras need Playwright and Chromium (`PLAYWRIGHT_BROWSERS_PATH`, `/opt/pw-browsers` when present). No GPU needed.

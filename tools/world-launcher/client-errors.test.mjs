@@ -1,7 +1,7 @@
 // Lane ERR: client error reports are deduplicated, bounded (rate, table, disk) and keep no personal data.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, statSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { browserOf, clientErrors, scrub, scrubPath } from './client-errors.mjs';
@@ -81,6 +81,19 @@ test('new kinds are counted from the build that went live; a later release start
   // a handover: the old generation writes after the new one read the table; the new one (nothing unsaved) re-reads it
   b.flush(); t += 1000; a.ingest('1.1.1.3', UA_DESK, body({ b: 'we-one', e: [{ k: 'arrival', m: 'not done in 60 s', s: 'snapshot' }] })); a.flush();
   assert.ok(b.summary().top.some((r) => r.kind === 'arrival'));
+});
+
+test('#406: a handover write is read even when it lands on the same mtime (coarse file clocks on Linux)', () => {
+  let t = 1_800_000_000_000; const dir = mkdtempSync(join(tmpdir(), 'cerr-'));
+  const a = clientErrors({ dir, build: 'we-one', now: () => t, limits: { flushMs: 1 } });
+  const b = clientErrors({ dir, build: 'we-two', now: () => t, limits: { flushMs: 1 } });
+  b.ingest('192.0.2.2', UA_DESK, body({ b: 'we-two', e: [{ k: 'gl', m: 'context lost' }] })); b.flush();
+  const file = join(dir, 'agg.json'), stamp = 1_800_000_000;   // whole seconds: exact through utimes
+  utimesSync(file, stamp, stamp); assert.equal(b.summary().kinds, 1);   // b has now seen the table at this mtime
+  t += 1000; a.ingest('192.0.2.3', UA_DESK, body({ b: 'we-one', e: [{ k: 'arrival', m: 'not done in 60 s', s: 'snapshot' }] })); a.flush();
+  utimesSync(file, stamp, stamp);   // the second write got the first one's timestamp
+  assert.equal(statSync(file).mtimeMs, stamp * 1000);
+  assert.ok(b.summary().top.some((r) => r.kind === 'arrival'), 'the newer generation reads the replaced table');
 });
 
 test('bad input is refused without storing anything', () => {

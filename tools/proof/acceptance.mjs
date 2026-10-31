@@ -9,7 +9,8 @@
 //                                            git HEAD of the current directory, so run it from the PR's worktree)
 //   node tools/proof/acceptance.mjs pr --repo owner/name --pr <n> [--head <sha>] [--comment out.md]
 //        [--summary file] [--output file]          (proof-check.yml: reads the PR, its files, issue and proof.json
-//                                                   with `gh api`; prints the report; writes ok=true|false)
+//                                                   with `gh api`; prints the report; writes ok=true|false; T3-T4
+//                                                   also need the maintainer's sign-off, tools/proof/gate.mjs)
 //
 // Exit codes: 0 proof-ok, 1 proof missing or invalid, 2 usage error. `pr` always exits 0 unless the tool itself
 // failed; it reports the verdict through --output so the workflow can post the comment first.
@@ -30,6 +31,9 @@ import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { POLICY_PATH, loadPolicy as loadTierPolicy, tierFor } from './tier.mjs';
+import { APPROVED_LABEL, labelAddedBy, maintainerSignOff, needsSignOff } from './gate.mjs';
+
+export { labelAddedBy };
 
 export const SCHEMA = 'sim-proof/1';
 export const MARKER = '<!-- sim-proof-check -->';
@@ -292,7 +296,21 @@ export function checkPr({ body = '', tier = 'T0', issueBody = null, proof = unde
     }
   }
   const uniq = [...new Set(problems)];
-  return { ok: uniq.length === 0, tier, checks: [...need], rows, problems: uniq, warnings: [...new Set(warnings)], checklist, links: { videos, images, proofJson: proofLinks } };
+  const clips = clipPreviews(videos, images, proof);
+  return { ok: uniq.length === 0, tier, checks: [...need], rows, problems: uniq, warnings: [...new Set(warnings)], checklist, links: { videos, images, proofJson: proofLinks }, clips };
+}
+
+/** Each clip with its inline preview (tools/proof/upload.mjs uploads `<clip>.preview.gif` beside it): from proof.json
+ *  `media[].preview`, else an image link in the PR named after the clip. GitHub serves release mp4s as downloads, so the
+ *  comment embeds the preview and links it to the clip. */
+export function clipPreviews(videos = [], images = [], proof = null) {
+  const media = Array.isArray(proof?.media) ? proof.media : [];
+  const stem = u => decodeURIComponent(String(u).split(/[?#]/)[0].split('/').pop() ?? '').replace(/\.[^.]+$/, '');
+  return videos.map(video => {
+    const fromProof = media.find(m => m?.url === video && typeof m.preview === 'string' && /^https:\/\//.test(m.preview))?.preview;
+    const s = stem(video), fromBody = images.find(i => /\.gif(\?|#|$)/i.test(i) && new RegExp(`^${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.preview(-\\d+)?$`).test(stem(i)));
+    return { video, preview: fromProof ?? fromBody ?? null };
+  });
 }
 
 /** The bot comment (updated in place by proof-check.yml). */
@@ -312,9 +330,15 @@ export function renderComment(result, { required = [], files = [], raisedByLabel
   }
   const { videos, images, proofJson } = result.links;
   out.push('', `Proof links: ${videos.length} video, ${images.length} image, ${proofJson.length ? 'proof.json linked' : 'no proof.json'}.`);
+  const clips = result.clips ?? [];
+  if (clips.length) {
+    const name = u => decodeURIComponent(String(u).split(/[?#]/)[0].split('/').pop());
+    out.push('', '**Clips** (a preview plays here; click it for the full, uncut clip):', '');
+    for (const c of clips) out.push(c.preview ? `[![${name(c.video)}](${c.preview})](${c.video})` : `- [${name(c.video)}](${c.video}) (no inline preview: \`tools/proof/upload.mjs\` makes one)`);
+  }
   if (result.problems.length) out.push('', '**To fix**', ...result.problems.map(p => `- ${p}`));
   if (result.warnings.length) out.push('', '**Warnings**', ...result.warnings.map(w => `- ${w}`));
-  out.push('', '<sub>Updated on every edit and push. How to fill it: `.claude/skills/journal/SKILL.md`. A maintainer can waive with the `proof:waived` label.</sub>');
+  out.push('', '<sub>Updated on every edit, push, label and review. How to fill it: `.claude/skills/journal/SKILL.md`. T3-T4 also need the maintainer\'s sign-off (`tools/proof/gate.mjs`). A maintainer can waive with the `proof:waived` label.</sub>');
   return out.join('\n');
 }
 
@@ -347,12 +371,11 @@ async function fetchProof(url, fetchImpl = fetch) {
   } catch (e) { return { error: e.message }; }
 }
 
-/** Who most recently added `name` to an issue or PR, from its events (null if never). */
-export function labelAddedBy(events, name) {
-  const hit = [...events].reverse().find(e => e?.event === 'labeled' && e.label?.name === name);
-  return hit?.actor?.login ?? null;
-}
-
+/**
+ * proof-check's verdict for one PR: the journal-entry check for its tier and, at T3-T4, the maintainer gate
+ * (tools/proof/gate.mjs). The gate is part of `proof-ok` because the `main` ruleset requires no approving review (T0-T2
+ * merge on green), so this required check is what stops `gh pr merge --auto` landing a T3/T4 PR without the maintainer.
+ */
 export async function prMode({ repo, pr, head, gh = ghJson, fetchImpl = fetch, policy = loadChecks(), maintainer = process.env.SIM_MAINTAINER || repo.split('/')[0] }) {
   const warningsOut = [];
   const p = gh(`repos/${repo}/pulls/${pr}`);
@@ -361,11 +384,29 @@ export async function prMode({ repo, pr, head, gh = ghJson, fetchImpl = fetch, p
   const t = tierFor(files, loadTierPolicy(), labels);
   const required = policy.required[t.tier] ?? [];
   const author = p.user?.login ?? '';
-  const waivedBy = labels.includes('proof:waived') ? labelAddedBy(gh(`repos/${repo}/issues/${pr}/events?per_page=100`, ['--paginate', '--slurp']).flat(), 'proof:waived') : null;
+  const headSha = head ?? p.head?.sha ?? null;
+  let events = null;
+  const prEvents = () => (events ??= gh(`repos/${repo}/issues/${pr}/events?per_page=100`, ['--paginate', '--slurp']).flat());
+  const waivedBy = labels.includes('proof:waived') ? labelAddedBy(prEvents(), 'proof:waived') : null;
   if (waivedBy && waivedBy !== maintainer) warningsOut.push(`the \`proof:waived\` label was added by ${waivedBy}, not the maintainer (${maintainer}); it does not count`);
-  if (waivedBy === maintainer || author === 'dependabot[bot]') {
-    const why = waivedBy === maintainer ? `Waived by the maintainer with the \`proof:waived\` label.` : 'Dependency update from Dependabot: CI is its proof.';
-    const result = { ok: true, tier: t.tier, rows: [], problems: [], warnings: [], checklist: [], links: { videos: [], images: [], proofJson: [] } };
+  const waived = waivedBy === maintainer;
+  // The maintainer gate. A maintainer's waiver is itself their sign-off.
+  let gate = null;
+  if (needsSignOff(t.tier)) {
+    gate = waived ? { ok: true, detail: `waived by @${maintainer} (\`proof:waived\`)` }
+      : maintainerSignOff({ reviews: gh(`repos/${repo}/pulls/${pr}/reviews?per_page=100`, ['--paginate', '--slurp']).flat(),
+        events: labels.includes(APPROVED_LABEL) ? prEvents() : [], labels, maintainer, head: headSha });
+    if (gate.warning) warningsOut.push(gate.warning);
+  }
+  const addGate = result => {
+    if (!gate) return result;
+    result.rows.unshift({ name: 'maintainer sign-off', ok: gate.ok, detail: gate.detail });
+    if (!gate.ok) { result.problems.unshift(`maintainer sign-off: ${gate.detail}`); result.ok = false; }
+    return result;
+  };
+  if (waived || author === 'dependabot[bot]') {
+    const why = waived ? `Waived by the maintainer with the \`proof:waived\` label.` : 'Dependency update from Dependabot: CI is its proof.';
+    const result = addGate({ ok: true, tier: t.tier, rows: [], problems: [], warnings: warningsOut, checklist: [], links: { videos: [], images: [], proofJson: [] } });
     return { result, comment: renderComment(result, { required, files: t.byFile, raisedByLabel: t.raisedByLabel, note: why }) };
   }
   const body = p.body ?? '';
@@ -374,9 +415,9 @@ export async function prMode({ repo, pr, head, gh = ghJson, fetchImpl = fetch, p
   if (issueNums.length) { try { const i = gh(`repos/${repo}/issues/${issueNums[0]}`); if (!i.pull_request) issueBody = i.body ?? ''; } catch { /* unreadable issue: skip the carry check */ } }
   const proofUrl = urls(body).find(isProofJson);
   const proof = proofUrl ? await fetchProof(proofUrl, fetchImpl) : undefined;
-  const result = checkPr({ body, tier: t.tier, issueBody, proof, head: head ?? p.head?.sha, policy });
+  const result = addGate(checkPr({ body, tier: t.tier, issueBody, proof, head: headSha, policy }));
   result.warnings.push(...warningsOut);
-  return { result, comment: renderComment(result, { required, files: t.byFile, raisedByLabel: t.raisedByLabel, note: p.draft ? 'Draft PR: the check runs, but nobody expects it to pass yet.' : null }) };
+  return { result, comment: renderComment(result, { required, files: t.byFile, raisedByLabel: t.raisedByLabel, note: p.draft ? 'Draft PR: proof-check skips drafts and runs when the PR is marked ready for review.' : null }) };
 }
 
 async function main(argv) {

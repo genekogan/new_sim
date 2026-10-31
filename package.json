@@ -7,9 +7,10 @@
   },
   "packageManager": "pnpm@10.27.0",
   "scripts": {
-    "predev": "node tools/assets/pull.mjs --check --quiet --set web,runtime || echo 'warning: media missing, run pnpm assets:pull'",
-    "dev": "pnpm -r --parallel --filter ./apps/* dev",
-    "build": "pnpm --filter @sim/web build",
+    "predev": "(node tools/assets/pull.mjs --check --quiet --set web,runtime || echo 'warning: media missing, run pnpm assets:pull') && node tools/assets/mars-web.mjs",
+    "dev": "pnpm -r --parallel --filter './apps/*' dev",
+    "build": "pnpm --filter @sim/web build && node tools/assets/mars-web.mjs",
+    "build:viewer": "node tools/assets/mars-web.mjs",
     "pretest": "node tools/assets/pull.mjs --check --quiet --set web,runtime",
     "test": "pnpm -r --filter '!mars-campus-viewer' test && pnpm test:mars",
     "test:replay": "pnpm --filter @sim/server test:replay",

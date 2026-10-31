@@ -48,8 +48,11 @@ a `version` (for the changelog and tag) and optional `label`, `baseline` (defaul
    and creates the GitHub Release.
 
 The site's public changelog page (`<base>/changelog`, `https://sim.eden.art/worlds/changelog`) is `CHANGELOG.md`
-rendered into the web build (`apps/web/changelog.html`, `apps/web/src/changelog-page.ts`). Because publish runs after
-ship, a release's own notes appear on the page from the next release's build on.
+rendered into the web build (`apps/web/changelog.html`, `apps/web/src/changelog-page.ts`). So that the page shows the
+release being shipped, the ship job first compiles the shipped fragments into a copy outside the tree
+(`tools/changelog/compile.mjs --out`) and the build renders that copy (`SIM_CHANGELOG_FILE`); the tree stays exactly
+HEAD. Publish then writes the same section, with the same date from preflight, into the committed `CHANGELOG.md`. A
+laptop `ship.sh` run renders the committed `CHANGELOG.md` unless you set `SIM_CHANGELOG_FILE` the same way.
 
 Configuration lives in GitHub, never in the repository; preflight names whatever is missing:
 
