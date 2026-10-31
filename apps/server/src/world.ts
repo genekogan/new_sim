@@ -144,6 +144,18 @@ export class WorldHost {
   listeners: HostListener[] = [];
   ring: Batch[] = [];
   lastSnapshotTick = 0;
+  /** Adaptive snapshot cadence (lane L5): a periodic snapshot is also due once the ticks since the last one cost
+   *  `snapshotDebtMs` of engine time to replay (0 = off; main.ts sets SNAPSHOT_DEBT_MS), at most one per
+   *  `snapshotMinGapMs` of wall time, and never more often than 20× the last capture's main-thread cost (capture ≤ 5 %
+   *  of its interval). `snapshotEvery` ticks stays the ceiling. A boot that replayed more than `snapshotAfterReplayTicks`
+   *  (0 = off; main.ts sets SNAPSHOT_AFTER_REPLAY_TICKS) snapshots on its first tick, so a second crash does not replay the gap again. */
+  snapshotDebtMs = 0; snapshotMinGapMs = 30_000; snapshotAfterReplayTicks = 0;
+  /** Engine-step time of the live ticks since the last snapshot: what a boot after a kill would replay. */
+  replayDebtMs = 0;
+  private lastSnapshotWall = performance.now();
+  private snapshotSoon: string | null = null;
+  /** Main-thread ms of the last completed snapshot (capture + finish + serialize + persist). */
+  lastSnapshotCostMs = 0;
   extra: Record<string, unknown> = {};       // module state persisted with snapshots (narrator schedule etc.)
   tickMs: number[] = [];
   /** The last boot's phases (lane L5): restore = snapshot read + decode + engine restore; replay = stepping logged history to its head. */
@@ -160,7 +172,7 @@ export class WorldHost {
   private recoveryBaseline: SnapshotBody | null = null;
   /** Owned checkpoint captured at the latest periodic boundary, before deferred encoding finishes. */
   private recoveryCapture: (() => SnapshotBody) | null = null;
-  private periodicSnapshot: { engine: Engine; previousTick: number; immediate: NodeJS.Immediate | null } | null = null;
+  private periodicSnapshot: { engine: Engine; previousTick: number; previousDebt: { ms: number; wall: number; soon: string | null }; immediate: NodeJS.Immediate | null } | null = null;
   private snapshotGeneration = 0;
   /** Edge worlds: the Souls' bodies' poses at the start of the latest tick (valid: the previous tick passed the invariants). */
   private validPoses: { tick: number; poses: Map<string, RecoveryPose> } | null = null;
@@ -281,6 +293,8 @@ export class WorldHost {
     this.resetAcc();
     // After a logged recovery the baseline is the replayed head, so the next fault neither rereads nor nests its recipe.
     const canCapture = !this.engine.canSnapshot || this.engine.canSnapshot();
+    this.replayDebtMs = 0; this.lastSnapshotWall = performance.now();
+    if (this.snapshotAfterReplayTicks > 0 && replayTicks > this.snapshotAfterReplayTicks) this.snapshotSoon = `replayed ${replayTicks} ticks`;
     if (snap && (lastRepair === null || !canCapture)) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
     else if (canCapture) this.recoveryBaseline = this.captureBody();
     // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
@@ -502,6 +516,7 @@ export class WorldHost {
     // 2. step the engine
     let out: ReturnType<Engine['step']>;
     const previousViolations = this.engine.runtime.violations.length;
+    const tStep = performance.now();
     try { out = this.engine.step(); if (this.engine.runtime.violations.length > previousViolations) throw new Error(JSON.stringify(this.engine.runtime.violations.slice(previousViolations))); }
     catch (error) { this.recoverFault(error); return; }
     this.advanceLives();
@@ -513,6 +528,7 @@ export class WorldHost {
     this.reconcileIntentObservations();
     this.observeIntentActions();
     this.afterPrograms(out.programs, false);
+    this.replayDebtMs += performance.now() - tStep;
     if(this.durableClockV1){
       // Derived effects become durable before this elapsed body tick is sent.
       // Listener-generated next inputs retain their ordinary queue semantics.
@@ -525,7 +541,7 @@ export class WorldHost {
     // 3. broadcast
     if (now % BATCH_TICKS === 0) this.flush();
     if (now % HEARTBEAT_TICKS === 0) this.heartbeat();
-    if (now - this.lastSnapshotTick >= this.snapshotEvery) this.schedulePeriodicSnapshot();
+    if (this.snapshotDue(now)) this.schedulePeriodicSnapshot();
     this.tickMs.push(performance.now() - t0);
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
     for (const l of this.listeners) { try { l.afterTickComplete?.(now); } catch { /* observers cannot undo a completed tick */ } }
@@ -1663,6 +1679,28 @@ export class WorldHost {
 
   // ------------------------------------------------------------ snapshots
   snapshotMs = { capture: 0, persist: 0, finish: 0, serialize: 0 };
+  /** The periodic snapshot is due: the tick ceiling, a requested one, or enough replay debt (see `snapshotDebtMs`). */
+  snapshotDue(now = this.engine.world.tick): boolean {
+    if (now - this.lastSnapshotTick >= this.snapshotEvery) return true;
+    if (this.snapshotSoon) return true;
+    if (!(this.snapshotDebtMs > 0) || this.replayDebtMs < this.snapshotDebtMs) return false;
+    return performance.now() - this.lastSnapshotWall >= Math.max(this.snapshotMinGapMs, 20 * this.lastSnapshotCostMs);
+  }
+  /** Wall ms since the last capture of the head (a boot counts as one: it starts from what is durable). */
+  snapshotAgeMs(): number { return performance.now() - this.lastSnapshotWall; }
+  /** Snapshot on demand (lane L5; LOAD-CONTRACT planned restart, the stop path, entering red). `now: true` captures and
+   *  persists the head synchronously before returning (a planned restart or a stop); otherwise the snapshot is taken at
+   *  the end of the next tick through the sliced periodic path, so the caller's tick is not lengthened. Returns null
+   *  when the clock is unavailable (a failed world snapshots nothing). */
+  requestSnapshot(reason: string, options?: { now?: boolean }): { tick: number; pending: boolean } | null {
+    if (!this.clockAvailable) return null;
+    if (!options?.now) { this.snapshotSoon ??= reason; return { tick: this.engine.world.tick, pending: true }; }
+    const t0 = performance.now(), r = this.saveSnapshot(true);
+    console.log(`[snapshot] ${reason}: tick ${r.tick}${r.pending ? ' (head not serializable: checkpoint logged)' : ''} in ${Math.round(performance.now() - t0)} ms`);
+    return { tick: r.tick, pending: !!r.pending };
+  }
+  /** A capture took the head: the replay debt starts again from here. */
+  private snapshotTaken() { this.replayDebtMs = 0; this.lastSnapshotWall = performance.now(); this.snapshotSoon = null; }
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
   saveSnapshot(sync = true): { tick: number; stateHash: string; pending?: undefined } | { pending: boolean; tick: number; stateHash?: undefined } {
     this.assertClockReady();
@@ -1691,9 +1729,10 @@ export class WorldHost {
     this.recoveryBaseline = body; this.recoveryCapture = null;
     const meta = { tick: runtime.tick, seq: this.seq, stateHash: runtime.stateHash, physicalHash: this.engine.physicalHash(), rulesVersion: this.engine.rulesVersion, body };
     this.snapshotMs.capture = performance.now() - t0;
-    this.lastSnapshotTick = runtime.tick;
+    this.lastSnapshotTick = runtime.tick; this.snapshotTaken();
     const generation = this.snapshotGeneration;
-    const persist = () => { if (generation !== this.snapshotGeneration) return; const t1 = performance.now(); this.db.saveSnapshot(this.worldId, meta); this.snapshotMs.persist = performance.now() - t1; };
+    const persist = () => { if (generation !== this.snapshotGeneration) return; const t1 = performance.now(); this.db.saveSnapshot(this.worldId, meta); this.snapshotMs.persist = performance.now() - t1;
+      this.lastSnapshotCostMs = this.snapshotMs.capture + this.snapshotMs.persist; };
     if (sync) persist(); else setImmediate(persist);
     return { tick: runtime.tick, stateHash: runtime.stateHash };
   }
@@ -1719,13 +1758,13 @@ export class WorldHost {
     const steps = checkpoint ? checkpoint.steps() : (function* (): Generator<void, EngineCheckpoint, void> {
       return { snapshot: yield* legacySteps!, physicalHash: physicalHash! };
     })();
-    const job = { engine, previousTick: this.lastSnapshotTick, immediate: null as NodeJS.Immediate | null };
+    const job = { engine, previousTick: this.lastSnapshotTick, previousDebt: { ms: this.replayDebtMs, wall: this.lastSnapshotWall, soon: this.snapshotSoon }, immediate: null as NodeJS.Immediate | null };
     this.periodicSnapshot = job;
     // Keep at most the preceding completed body while hashes are pending. It is
     // never substituted for this ticket during normal recovery; failed tickets
     // stop the clock instead of publishing a recovery from an older frontier.
     this.recoveryCapture = materialize;
-    this.lastSnapshotTick = tick;
+    this.lastSnapshotTick = tick; this.snapshotTaken();
     this.snapshotMs.capture = performance.now() - t0;
     this.snapshotMs.finish = 0; this.snapshotMs.serialize = 0;
     const current = () => this.periodicSnapshot === job && this.engine === engine;
@@ -1759,6 +1798,7 @@ export class WorldHost {
         later(() => {
           const at = performance.now(); this.db.saveSnapshotSerialized(this.worldId, meta, json);
           this.snapshotMs.persist = performance.now() - at;
+          this.lastSnapshotCostMs = this.snapshotMs.capture + this.snapshotMs.finish + this.snapshotMs.serialize + this.snapshotMs.persist;
           this.periodicSnapshot = null;
         });
       });
@@ -1780,6 +1820,8 @@ export class WorldHost {
     if (job.immediate) clearImmediate(job.immediate);
     this.periodicSnapshot = null;
     this.lastSnapshotTick = job.previousTick;
+    // the debt the cancelled capture would have cleared is still owed (a superseding snapshot clears it again)
+    this.replayDebtMs += job.previousDebt.ms; this.lastSnapshotWall = job.previousDebt.wall; this.snapshotSoon ??= job.previousDebt.soon;
   }
   private persistClockFrontier():void {
     try{

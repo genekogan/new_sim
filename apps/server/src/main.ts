@@ -97,6 +97,7 @@ async function plainFactory() {
 // ground/1 (lane L8): every terrain recipe this entity world logged resolves by hash before the engine replays
 if (config.worldEngine) loadGroundRecipes(db, config.worldId);
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
+host.snapshotDebtMs = config.snapshotDebtMs; host.snapshotMinGapMs = config.snapshotMinGapMs; host.snapshotAfterReplayTicks = config.snapshotAfterReplayTicks;
 bootAt.open = performance.now();
 const boot = host.boot();
 bootAt.engine = performance.now();
@@ -258,6 +259,8 @@ server.listen(config.port, config.host, () => {
 const shutdown = async (sig: string) => {
   if (closing) return; closing = true;
   bootPhase('stopping', host.engine.world.tick);
+  // Lane L5: a durable head first, before any draining that could outlast the launcher's stop grace (then SIGKILL).
+  if (host.snapshotAgeMs() > 10_000) { try { host.requestSnapshot(`${sig}: before draining`, { now: true }); } catch (e) { console.error('[world] early snapshot failed', e); } }
   if (writesInFlight.size) {
     const n = writesInFlight.size, t = performance.now();
     await Promise.race([Promise.all(writesInFlight), new Promise((r) => setTimeout(r, WRITE_DRAIN_MS))]);
