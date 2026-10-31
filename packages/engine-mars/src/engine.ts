@@ -1922,6 +1922,14 @@ export class MarsEngine implements Engine {
   /** lane NAV (nav-connect/1, connectivity.ts): the world's level-0 connectivity, relabelled for what changed since the last
    *  read (only the edited ground tiles on a ground world). The main area is the one holding the arrival point. Pure read. */
   private conn?:NavConnectivity;
+  private epochSpatial?:Spatial;private epochSeen=-1;private staticEpoch=0;
+  /** Load lane L4: the static-geometry epoch — a counter that moves exactly when what the walk planner sees of the static
+   *  world changed since the last call (a god commit, a layer or def change, a world edit, a construction phase, a re-based
+   *  or replaced spatial service). It is read after a spatial sync, so it is the planner's own change test (Spatial.epoch,
+   *  `navChanged`), monotonic over this engine's life. Consumers key derived caches on it instead of scanning the world
+   *  (punt search, menu sources). Inside readPassV1 it costs nothing more than an integer compare. */
+  staticEpochV1():number{const sp=this.rt.services.spatial as Spatial;sp.sync(this.rt.world);
+    if(sp!==this.epochSpatial||sp.epoch!==this.epochSeen){this.epochSpatial=sp;this.epochSeen=sp.epoch;this.staticEpoch++;}return this.staticEpoch;}
   connectivityV1():NavConnectivity{this.navWarmV1(Infinity);return this.conn!;}
   /** lane NAV: is each standing point connected to the main walkable area (levels and stairs as the planner sees them)?
    *  Points off the main component, and upper floors, are settled by the planner (reachV1 to the nearest main point). */

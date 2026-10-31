@@ -161,6 +161,8 @@ export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
 const PERCEIVE_SLICE_MS = Number(process.env.PERCEIVE_SLICE_MS ?? 8);
+/** Build notices that change nothing a Soul perceives (no step label, no closure): they never start a catch-up. */
+const PERCEPTION_QUIET_BUILD = new Set<string>(['alive', 'claimed', 'released', 'taken']);
 const WRITE_BACK_SLICE_MS = 8;
 type WriteBackUnit = { key: string; ops: Op[]; body?: string };
 type WriteBackBody = { pose: string; entity: Entity | undefined };
@@ -236,7 +238,10 @@ export class EngineBridge {
     this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
-    this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
+    // L4 (audit #8): only notices that change what a build's things are seen as (started, a new step, paused/resumed,
+    // done, abandoned, closure lifted, rewound) re-derive perception; the lead's `alive` heartbeat (sent on its ordinary
+    // requests) and claim hand-offs change no step and no closure, and each one forced a whole pass over ~5,000 things.
+    this.god.onBuild((e) => { if (!PERCEPTION_QUIET_BUILD.has(e.kind) && this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
       afterTick: (tick, context) => { try { this.afterTickWork(tick, context?.startedAtMs); } catch (error) { this.failProjection(error); throw error; } },
       onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
@@ -267,7 +272,7 @@ export class EngineBridge {
     // R8: residents near a visible map change hear of it once per request; a build near them, at start and at done.
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
     this.god.onBuild(e => this.buildNotice(e));
-    this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
+    this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, bodies: () => this.modelBodies(), levelAt: (x, z, y) => this.levelAt(x, z, y),
       placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
     if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
     if (this.edge) {
@@ -1359,6 +1364,15 @@ export class EngineBridge {
   }
 
   /** Birth: the Soul's body becomes an entity (core/humanoid) with the engine's own id (spec 31 §3 rule 3). */
+  /** The model's body entities (L4: the activity-spot key leaves them out). Seeded by one scan, kept by births, retires
+   *  and commits; each read re-checks membership, so a body missed here only costs an extra derive. */
+  private bodyIds: Set<string> | null = null;
+  private modelBodies(): number {
+    const m = this.model;
+    if (!this.bodyIds) { this.bodyIds = new Set(); for (const [id, e] of m.entities) if (e.def === BODY_DEF) this.bodyIds.add(id); }
+    let n = 0; for (const id of this.bodyIds) if (m.entities.get(id)?.def === BODY_DEF) n++; else this.bodyIds.delete(id);
+    return n;
+  }
   bodyBorn(p: { entityId: string; soulId: string; name: string }) {
     if (this.model.entities.has(p.entityId) || !this.model.def(BODY_DEF)) return;
     const b = this.engine.world.entities[p.entityId];
@@ -1367,7 +1381,7 @@ export class EngineBridge {
     const name = this.model.names.has(`world/${slug}`) ? `${slug}-${p.entityId.slice(2, 6)}` : slug;
     const entity = { id: p.entityId, name, def: BODY_DEF, in: { parent: 'world' }, p: pos, r: 0, anchor: 'center', state: {}, by: 'engine', born: this.god.opts.tick(), v: 1 } as unknown as Entity;
     const r = this.engineAct([{ op: 'restore', entity } as Op], `birth: ${p.name}'s body`);
-    if (r.accepted) this.stats.bodies++; else this.log(`body entity for ${p.entityId} refused: ${JSON.stringify(r.failures).slice(0, 300)}`);
+    if (r.accepted) { this.stats.bodies++; this.bodyIds?.add(p.entityId); } else this.log(`body entity for ${p.entityId} refused: ${JSON.stringify(r.failures).slice(0, 300)}`);
   }
   bodyRetired(p: { entityId: string }) {
     if (!this.model.entities.has(p.entityId)) return;

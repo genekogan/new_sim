@@ -19,6 +19,8 @@ export type SpotsHost = {
   engine: { world: { entities: Record<string, any> }; standableNearV1?(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null };
   /** Bumped by every god edit (not by a Soul carrying a cup about). */
   version(): string | number;
+  /** How many of the model's entities are Souls' bodies (derive never reads them): a birth or retire keeps the spots. */
+  bodies?(): number;
   levelAt(x: number, z: number, y: number): number;
   /** Innermost place holding a point (a room, a building, an area), and its name. */
   placeAt(at: V2, level: number): string | null;
@@ -71,7 +73,9 @@ export class GodActivitySpots {
     if (!this.wanted || this.cache?.key === this.key() || this.h.catchingUp?.()) return false;
     this.wanted = false; this.get(); return true;
   }
-  private key() { return `${this.h.version()}:${this.h.model.entities.size}`; }
+  /** What the spots are a function of: the god's edits (and entity physics) and how many non-body entities the model
+   *  holds. L4: bodies are left out — a Soul arriving or leaving re-derived all ~1,000 spots (~130 ms on eden2). */
+  private key() { return `${this.h.version()}:${this.h.model.entities.size - (this.h.bodies?.() ?? 0)}`; }
   private get(): SpotsData {
     const key = this.key();
     if (this.cache?.key === key) return this.cache.value;
