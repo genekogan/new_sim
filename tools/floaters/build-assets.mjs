@@ -38,7 +38,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
 const OUT = path.join(REPO, 'worlds', 'littlemartians', 'characters');
 const argv = process.argv.slice(2);
-const ARCHIVE = argv.includes('--archive') ? argv[argv.indexOf('--archive') + 1] : path.join(os.homedir(), 'Dev', 'littlemartians', '3d-models');
+// The Little Martians 3d-models archive (not in the repo): --archive <dir>, or LM_3D.
+const ARCHIVE = argv.includes('--archive') ? argv[argv.indexOf('--archive') + 1] : process.env.LM_3D;
 const FORCE = argv.includes('--force');
 
 // optimize.mjs constants, verbatim
@@ -171,6 +172,7 @@ async function describe(io, file) {
 }
 
 async function main() {
+  if (!ARCHIVE) throw new Error('pass --archive <dir> (or set LM_3D) to the Little Martians 3d-models archive');
   if (!fs.existsSync(path.join(ARCHIVE, 'manifest.json'))) throw new Error(`archive not found at ${ARCHIVE}`);
   fs.mkdirSync(path.join(OUT, 'kin'), { recursive: true });
   const archive = JSON.parse(fs.readFileSync(path.join(ARCHIVE, 'manifest.json'), 'utf8'));
@@ -245,7 +247,7 @@ async function main() {
         bytes: bytes.length,
         sha256: sha256(bytes),
         source: {
-          archive: '<lm-3d-models> (read-only)',
+          archive: 'Little Martians 3d-models archive (read-only)',
           archiveId: src.archiveId,
           title: meta.title,
           canonicalPath: `3d-models/${meta.path}`,

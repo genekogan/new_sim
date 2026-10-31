@@ -3,16 +3,16 @@
 # build-kit.mjs writes mars/viewer/public/modular/humanoid/ (rigs, parts, kit.json) and the def's part enums.
 #   tools/humanoid/build-kit.sh [SOURCE_DIR ...]
 # Each SOURCE_DIR holds Quaternius "Ultimate Modular" .blend files, flat or under men/ and women/ (men → the masc
-# frame, women → the fem frame). Default: the Mars appearance research folder (read-only), which has the three
+# frame, women → the fem frame). The Mars appearance research folder (read-only, not in the repo) has the three
 # hand-mapped characters (Casual_2, Punk, Woman_Casual). The other 18 CC0 characters go in
 #   .lane/quaternius-blends/men/*.blend and .lane/quaternius-blends/women/*.blend
 # (Quaternius Drive, "Individual Characters/Blends"), then:
-#   tools/humanoid/build-kit.sh <mars-media>/reconstruction/2026-campus/modular/research/appearance <team>/assets/quaternius-blends   (the canonical copy since 2026-10-11; extracted from Gene's Ultimate Modular Men/Women zips)
+#   tools/humanoid/build-kit.sh <appearance-research-dir> <quaternius-blends-dir>   (the blends extracted from the Ultimate Modular Men/Women zips)
 # New characters get automatic part ids and palette slots (build-kit.mjs autoCharacter); one whose skeleton is not
 # a frame's bind pose is skipped and named. Check the result in the lab (README.md) before committing the kit.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd); root=$(cd "$here/../.." && pwd)
-[ $# -gt 0 ] || set -- "<mars-media>/reconstruction/2026-campus/modular/research/appearance"
+[ $# -gt 0 ] || { echo "usage: build-kit.sh SOURCE_DIR ... (e.g. the Mars appearance research folder; not in the repo)" >&2; exit 2; }
 blender=$(command -v blender || { [ -x /opt/homebrew/bin/blender ] && echo /opt/homebrew/bin/blender; } || echo /Applications/Blender.app/Contents/MacOS/Blender)
 out="$root/.lane/t2/src"; rm -rf "$out"; mkdir -p "$out"   # fresh: a removed source never lingers in the kit
 frames="$out/frames.json"; echo '{' > "$frames.tmp"; sep=''
