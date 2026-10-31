@@ -1,5 +1,5 @@
 import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
-import {itemPresentation,type ItemPresentation} from '../../engine/items/presentation.ts';
+import {insidePoint,itemPresentation,type ItemPresentation} from '../../engine/items/presentation.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -1019,7 +1019,12 @@ export class HumanViews {
         if (q) targets[i] = new THREE.Vector3(q[0], q[1], q[2]);
         // an empty-handed item pick-up: from the drawn palm to the fixed grasp point on the reach clock (presentation.ts `goal`)
         const g = v.itemPose?.goal;
-        if (g && q && armSide(v, i) === g.hand) { h.updateMatrixWorld(true); const from = palm(arm, V()); targets[i]!.set(g.p[0], g.p[1], g.p[2]).sub(from).multiplyScalar(g.k).add(from); }
+        if (g && q && armSide(v, i) === g.hand) {
+          h.updateMatrixWorld(true); const from = palm(arm, V());
+          // entry 42: into a container the goal takes the engine's arc over the lip (same control points, from the drawn palm)
+          if (g.via) { const q = insidePoint([from.x, from.y, from.z], g.via, g.p, g.k); targets[i]!.set(q[0], q[1], q[2]); }
+          else targets[i]!.set(g.p[0], g.p[1], g.p[2]).sub(from).multiplyScalar(g.k).add(from);
+        }
       });
       // A hand on the engine's mouth landmark (items/body.ts: 0.15 m ahead of the body axis at 1.58 m,
       // −0.45 seated) would cover the rig's face (its lips are ~7 cm further back and 3 cm lower): the

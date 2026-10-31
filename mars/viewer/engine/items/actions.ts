@@ -8,7 +8,7 @@
 // its own activity this tick, because they are submitted later) and publish `human.baseActivity` =
 // the activity they are layered on ('sit' = seated).
 import { z } from 'zod';
-import {ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS} from './presentation.ts';
+import {insidePoint,ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS,type InsideVia} from './presentation.ts';
 import { angleDelta, clamp, heading, q6, rot2, wrapAngle, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
@@ -31,8 +31,8 @@ import {
   type BodyFrame, type Hand,
 } from './body.ts';
 import {
-  BODY_REACH, followHand, graspPoint, heldBy, inHand, isItem, placeOnGround, placeOnSlot, putInHand,
-  reachOf, reachStation, slotOccupant, surfaceSlot, whereIs, type Station, type SurfaceSlot,
+  BODY_REACH, fitsInside, fixtureLocal, fixturePoint, followHand, graspPoint, heldBy, inHand, isItem, placeOnGround, placeOnSlot, putInHand,
+  reachOf, reachStation, slotOccupant, storedIn, surfaceSlot, whereIs, type Station, type SurfaceSlot,
 } from './model.ts';
 
 const id80 = z.string().min(1).max(80);
@@ -146,7 +146,7 @@ export const holdItems: ActionDef<{ actor: string }, null, HoldExec> = {
 
 type TransferParams = { actor: string; item: string; hand?: Hand; surfaceSlot?: string };
 type Dest = { slot: SurfaceSlot; ownerPose: Entity['pose']; ownerDef: string } | { ground: Vec3 };
-type TransferProgram = { hand: Hand; station?: Station; target: Vec3; dest?: Dest };
+type TransferProgram = { hand: Hand; station?: Station; target: Vec3; dest?: Dest; inside?: SurfaceSlot };
 type TransferExec = {
   id: string; mode: 'take' | 'put'; actor: string; item: string; hand: Hand; station?: Station; target: Vec3; dest?: Dest;
   phase: 'approach' | 'turn' | 'reach' | 'withdraw' | 'cancel-withdraw' | 'recover'; child?: Children; error?: Diagnostic; t: number; from?: Vec3; to?: Vec3;
@@ -154,7 +154,45 @@ type TransferExec = {
   reachTicks?: number;
   /** Item support at plan time (take): the item must still be there when the hand arrives. */
   source?: string;
+  /** Entry 42: the place inside a container the item goes into or comes out of, and the hand's current arc over its lip. */
+  inside?: SurfaceSlot; via?: InsideVia;
 };
+
+// ---- inside a container (Soul Actions entry 42) ----
+
+/** Arc heights tried over a container's lip (m above it), lowest first. */
+const LIFT_STEPS = Array.from({ length: 16 }, (_, i) => 0.04 + i * 0.02);
+/** A container front's thickness behind its face (m): the band a stored thing must clear the lip over. */
+const FRONT_BAND = 0.02;
+/** The hand's path into (or out of) a container (presentation.ts insidePoint): up over the lip in front of it, across to
+ *  straight above the place at the lip's height, then straight down to it (or the reverse). The lowest lift whose whole
+ *  path keeps the thing (an empty hand: the hand) above the lip wherever its footprint is over the front band; `size` is
+ *  the held item's catalog size, null for an empty hand. */
+function insideArc(owner: Entity, slot: SurfaceSlot, from: Vec3, to: Vec3, into: boolean, size: readonly number[] | null): InsideVia {
+  const ins = slot.inside!, l = slot.local!, half = size ? Math.max(size[0], size[2]) / 2 : 0.05, drop = size ? 0 : 0.04;
+  const place = into ? to : from, low = fixtureLocal(owner, place)[1], j = fixturePoint(owner, [l[0], Math.max(ins.lip + drop, low), l[2]]);
+  let via: InsideVia | null = null;
+  for (const lift of LIFT_STEPS) {
+    const h = ins.lip + drop + lift, front = fixturePoint(owner, [l[0], h, ins.face + half + 0.06]), above = fixturePoint(owner, [l[0], h, l[2]]);
+    // the straight part's share: the arc's end speed (3·lift per unit) equals the straight part's (its length per unit)
+    const straight = Math.max(1e-3, j[1] - low), share = (3 * lift) / (3 * lift + straight);
+    via = into ? { into, c1: front, c2: above, j, a: share } : { into, c1: above, c2: front, j, a: 1 - share };
+    let ok = true;
+    for (let i = 0; i <= 64 && ok; i++) {
+      const q = fixtureLocal(owner, insidePoint(from, via, to, i / 64));
+      if (q[2] + half >= ins.face - FRONT_BAND && q[2] - half <= ins.face && q[1] - drop < ins.lip - 1e-6) ok = false;
+    }
+    if (ok) break;
+  }
+  const r = (v: Vec3) => v.map(q6) as Vec3;
+  return { into, c1: r(via!.c1), c2: r(via!.c2), j: r(via!.j), a: q6(via!.a) };
+}
+/** Where a body stands to reach into a container: its authored stand point, facing the place inside. */
+function insideStation(owner: Entity, slot: SurfaceSlot): Station {
+  const p = fixturePoint(owner, [slot.inside!.stand[0], 0, slot.inside!.stand[1]]);
+  return { p: [p[0], p[2]], yaw: heading([slot.p[0] - p[0], slot.p[2] - p[2]]) };
+}
+const handPath = (ex: TransferExec, k: number): Vec3 => (ex.via ? insidePoint(ex.from!, ex.via, ex.to!, k) : lerp3(ex.from!, ex.to!, k));
 
 const supportKey = (e: Entity) => JSON.stringify(e.support ?? null);
 
@@ -190,14 +228,15 @@ function planTake(rt: Runtime, p: TransferParams) {
     if (!owner || !s.slot) return fail('item.unsupported-source', `${it.id} rests on ${s.on}, which is not a surface an item can be taken from`, [it.id, s.on]);
   } else if (s?.kind !== 'ground') return fail('item.unsupported-source', `${it.id} is ${whereIs(rt.world, it)}; only items on a surface or the ground can be taken`, [it.id]);
   const target = graspPoint(it);
-  const st = fromHere(a, target) ?? reachStation(rt, a, target, owner, `${it.id} (${whereIs(rt.world, it)})`, presentedDepth(it));
+  const stored = owner ? storedIn(rt.world, it) : null;
+  const st = stored ? insideStation(owner!, stored) : fromHere(a, target) ?? reachStation(rt, a, target, owner, `${it.id} (${whereIs(rt.world, it)})`, presentedDepth(it));
   if ('code' in st) return { ok: false as const, diagnostic: { ...st, subjects: [...new Set([...(st.subjects ?? []), it.id])] } };
   const here = Math.abs(st.p[0] - a.pose.p[0]) < 0.05 && Math.abs(st.p[1] - a.pose.p[2]) < 0.05;
   if (!here) {
     const d = checkStations(rt, [{ actor: p.actor, p: st.p, level: a.human!.level }]);
     if (d) return { ok: false as const, diagnostic: d };
   }
-  return { ok: true as const, program: { hand, station: st, target } as TransferProgram };
+  return { ok: true as const, program: { hand, station: st, target, ...(stored ? { inside: stored } : {}) } as TransferProgram };
 }
 
 /** Clear radius a thing needs on the ground (half its footprint diagonal). */
@@ -234,17 +273,21 @@ function planPut(rt: Runtime, p: TransferParams) {
   const occ = slotOccupant(rt.world, slot.owner, slot.slot);
   if (occ) return fail('item.slot-occupied', `${slot.id} already has ${occ.id} on it`, [slot.id, occ.id]);
   const owner = rt.world.entities[slot.owner];
+  if (slot.inside && !fitsInside(CATALOG[it.def].size, slot.inside.fit)) {
+    const [w, h, d] = CATALOG[it.def].size, [fw, fh, fd] = slot.inside.fit, m = (v: number) => v.toFixed(2);
+    return fail('item.does-not-fit', `${it.id} (${m(w)} × ${m(h)} × ${m(d)} m) does not fit in ${slot.id} (up to ${m(fw)} × ${m(fh)} × ${m(fd)} m)`, [p.actor, it.id, slot.owner]);
+  }
   const g = CATALOG[it.def].handling!.grips[1][0].local;
   const q = rot2([g[0], g[2]], owner.pose.yaw);
   const target: Vec3 = [slot.p[0] + q[0], slot.p[1] + g[1], slot.p[2] + q[1]];
-  const st = fromHere(a, slot.p) ?? reachStation(rt, a, slot.p, owner, `surface slot ${slot.id}`, presentedDepth(it));
+  const st = slot.inside ? insideStation(owner, slot) : fromHere(a, slot.p) ?? reachStation(rt, a, slot.p, owner, `surface slot ${slot.id}`, presentedDepth(it));
   if ('code' in st) return { ok: false as const, diagnostic: st };
   const here = Math.abs(st.p[0] - a.pose.p[0]) < 0.05 && Math.abs(st.p[1] - a.pose.p[2]) < 0.05;
   if (!here) {
     const d = checkStations(rt, [{ actor: p.actor, p: st.p, level: a.human!.level }]);
     if (d) return { ok: false as const, diagnostic: d };
   }
-  return { ok: true as const, program: { hand, station: st, target, dest: { slot, ownerPose: { ...owner.pose, p: [...owner.pose.p] }, ownerDef: owner.def } } as TransferProgram };
+  return { ok: true as const, program: { hand, station: st, target, dest: { slot, ownerPose: { ...owner.pose, p: [...owner.pose.p] }, ownerDef: owner.def }, ...(slot.inside ? { inside: slot } : {}) } as TransferProgram };
 }
 
 function transfer(mode: 'take' | 'put', verb: string, description: string, schema: z.ZodType<TransferParams>): ActionDef<TransferParams, TransferProgram, TransferExec> {
@@ -264,7 +307,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
     plan: (rt, p) => (mode === 'take' ? planTake(rt, p) : planPut(rt, p)),
     start(rt, p, prog, id) {
       const a = rt.world.entities[p.actor];
-      const ex: TransferExec = { id, mode, actor: p.actor, item: p.item, hand: handOf(rt, p), station: prog.station, target: prog.target, dest: prog.dest, phase: 'turn', t: 0, source: supportKey(rt.world.entities[p.item]) };
+      const ex: TransferExec = { id, mode, actor: p.actor, item: p.item, hand: handOf(rt, p), station: prog.station, target: prog.target, dest: prog.dest, phase: 'turn', t: 0, source: supportKey(rt.world.entities[p.item]), ...(prog.inside ? { inside: prog.inside } : {}) };
       if (prog.station && (Math.abs(prog.station.p[0] - a.pose.p[0]) >= 0.05 || Math.abs(prog.station.p[1] - a.pose.p[2]) >= 0.05)) {
         const ch = walkCrew(rt, id, [{ actor: p.actor, p: prog.station.p, yaw: prog.station.yaw, level: a.human!.level }]);
         if ('code' in ch) ex.error = ch;
@@ -287,7 +330,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         return{status:'completed',outputs:{item:ex.item,hand:ex.hand,support:it.support}};
       }
       if(ex.phase==='cancel-withdraw'){
-        const R=ex.reachTicks??ticks(REACH_TIME);ex.t++;const q=lerp3(ex.from!,ex.to!,smooth(ex.t/R));setHand(a,ex.hand,q);a.human!.activity='reach';
+        const R=ex.reachTicks??ticks(REACH_TIME);ex.t++;const q=handPath(ex,smooth(ex.t/R));setHand(a,ex.hand,q);a.human!.activity='reach';
         if(inHand(rt.world,ex.actor,ex.hand))followHand(it,q,a.pose.yaw);
         if(ex.t<R)return{status:'running',phase:'cancel-withdraw'};
         ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};
@@ -319,16 +362,19 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         // This step also advances t to one tick of reach, so the phase origin is
         // the preceding interval boundary (full weight at the actual grasp).
         // The fixed grasp / placement point lets the renderer solve one posture for the whole reach.
-        if(a.human!.itemTransferV1?.action===ex.id){a.human!.itemTransferV1.reachTick=rt.tick-1;a.human!.itemTransferV1.target=ex.target.map(x=>Math.round(x*1000)/1000) as [number,number,number];}
         ex.t = 0;
         ex.from = handNow(a, ex.hand, bodyFrame(a));
         ex.to = ex.target;
+        // entry 42: into a container, up over its lip and down to the place inside (the drawn pick-up hand takes the same arc)
+        const box = ex.inside && rt.world.entities[ex.inside.owner];
+        ex.via = box ? insideArc(box, ex.inside!, ex.from, ex.to, true, ex.mode === 'put' ? CATALOG[it.def].size : null) : undefined;
+        if(a.human!.itemTransferV1?.action===ex.id){a.human!.itemTransferV1.reachTick=rt.tick-1;a.human!.itemTransferV1.target=ex.target.map(x=>Math.round(x*1000)/1000) as [number,number,number];if(ex.via){const mm=(v:Vec3)=>v.map(x=>Math.round(x*1000)/1000) as Vec3;a.human!.itemTransferV1.via={into:true,c1:mm(ex.via.c1),c2:mm(ex.via.c2),j:mm(ex.via.j),a:Math.round(ex.via.a*1e4)/1e4};}}
       }
       a.human!.activity = 'reach';
       ex.t++;
       const R = ex.reachTicks ?? ticks(REACH_TIME);
       const k = smooth(ex.t / R);
-      const q = lerp3(ex.from!, ex.to!, k);
+      const q = handPath(ex, k);
       setHand(a, ex.hand, q);
       const holding = (ex.mode === 'take') === (ex.phase === 'withdraw');
       if (holding) followHand(it, q, a.pose.yaw);
@@ -370,6 +416,9 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         ex.phase = 'withdraw';
         ex.t = 0;
         ex.from = q;
+        // entry 42: out of a container the same way, up from the place inside and back over the lip
+        const box = ex.inside && rt.world.entities[ex.inside.owner];
+        ex.via = box ? insideArc(box, ex.inside!, q, ex.to!, false, ex.mode === 'take' ? CATALOG[it.def].size : null) : undefined;
         return { status: 'running', phase: 'withdraw' };
       }
       const presented = a.human!.itemTransferV1?.action === ex.id;
@@ -393,7 +442,10 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       // light items: stop at once; an item already grasped stays in hand (hold_items keeps it there)
       if (a?.human) {
         if(a.human.itemTransferV1?.action===ex.id&&['reach','withdraw','cancel-withdraw','recover'].includes(ex.phase)){
-          if(ex.phase!=='recover'&&ex.phase!=='cancel-withdraw'){a.human.itemTransferV1.cancelTick=rt.tick;ex.from=handNow(a,ex.hand,bodyFrame(a));ex.to=inHand(rt.world,ex.actor,ex.hand)?carryHand(bodyFrame(a),ex.hand):restHand(bodyFrame(a),ex.hand);ex.phase='cancel-withdraw';ex.t=0;}
+          if(ex.phase!=='recover'&&ex.phase!=='cancel-withdraw'){a.human.itemTransferV1.cancelTick=rt.tick;ex.from=handNow(a,ex.hand,bodyFrame(a));const held=inHand(rt.world,ex.actor,ex.hand);ex.to=held?carryHand(bodyFrame(a),ex.hand):restHand(bodyFrame(a),ex.hand);
+            // entry 42: a hand already past a container's front comes back out over its lip
+            const box=ex.inside&&rt.world.entities[ex.inside.owner],inner=box&&fixtureLocal(box,ex.from)[2]<ex.inside!.inside!.face+.05;ex.via=box&&inner?insideArc(box,ex.inside!,ex.from,ex.to,false,held?CATALOG[held.def].size:null):undefined;
+            ex.phase='cancel-withdraw';ex.t=0;}
           return{ok:true,deferred:true};
         }
         if(a.human.itemTransferV1?.action===ex.id)delete a.human.itemTransferV1;

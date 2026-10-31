@@ -14,12 +14,25 @@ export const ITEM_GESTURE_FADE_SECONDS=2;
 export const ITEM_ARM_LEAD_SECONDS=.35;
 /** `target`: the grasp / placement point (world, m) the reach lerps to, fixed when the reach starts. `mode`: a pick-up
  *  ('take') or a put; absent on older records. `cancelTick`: the tick a reach was interrupted (the hand withdraws). */
-export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number]};
+type V3=[number,number,number];
+/** Entry 42: the hand's path into (or out of) a container. Into: a cubic arc from the start over the lip (`c1` in front,
+ *  `c2` above the place) down to `j` straight above the place at the lip, then straight down to the end; out: the
+ *  reverse. `a`: the share of the path parameter on the straight part's far side, chosen so the speed matches there. */
+export type InsideVia={into:boolean;c1:V3;c2:V3;j:V3;a:number};
+const bez3=(p:V3,b:V3,c:V3,d:V3,t:number):V3=>{const u=1-t,k0=u*u*u,k1=3*u*u*t,k2=3*u*t*t,k3=t*t*t;return [p[0]*k0+b[0]*k1+c[0]*k2+d[0]*k3,p[1]*k0+b[1]*k1+c[1]*k2+d[1]*k3,p[2]*k0+b[2]*k1+c[2]*k2+d[2]*k3];};
+const lin=(p:V3,q:V3,t:number):V3=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,p[2]+(q[2]-p[2])*t];
+/** A point on an inside path at parameter u (0 at `from`, 1 at `to`); the caller applies the smoothstep clock. */
+export function insidePoint(from:V3,v:InsideVia,to:V3,u:number):V3{
+ if(v.into)return u<v.a?bez3(from,v.c1,v.c2,v.j,u/v.a):lin(v.j,to,(u-v.a)/(1-v.a));
+ return u<v.a?lin(from,v.j,u/v.a):bez3(v.j,v.c1,v.c2,to,(u-v.a)/(1-v.a));
+}
+/** `via`: entry 42, the reach's path over a container's lip (world, m); absent: a straight reach. */
+export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number];via?:InsideVia};
 /** `posture`: bend toward the fixed grasp point, scaled by `k` — smoothstep up over the reach and down over the
  *  withdraw, the same clock as the engine's hand lerp, so the torso can neither pop nor hop between solutions.
  *  `goal`: a pick-up's empty-handed reach, drawn instead of the engine hand point: from the drawn palm (clip and idle
  *  gesture, before the arm IK) to the grasp point `p`, `k` of the way (the reach clock). */
-export type ItemPresentation={weight:number;idleBlend:number;transfer?:true;posture?:{target:[number,number,number];hand:'left'|'right';k:number};goal?:{hand:'left'|'right';p:[number,number,number];k:number}};
+export type ItemPresentation={weight:number;idleBlend:number;transfer?:true;posture?:{target:[number,number,number];hand:'left'|'right';k:number};goal?:{hand:'left'|'right';p:[number,number,number];k:number;via?:InsideVia}};
 const smooth=(n:number)=>{const k=Math.max(0,Math.min(1,n));return k*k*(3-2*k)};
 /** Reach hump on the transfer clock: 0 before the reach, 1 at the grasp, 0 again once the withdraw is over. */
 export function itemPostureK(transfer:ItemTransferV1,tick:number,dt:number){
@@ -53,7 +66,7 @@ export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:s
  const cancelled=reaching&&transfer.cancelTick!==undefined;
  const reachK=reaching?smooth((cancelled?transfer.cancelTick!-transfer.reachTick!:tick-transfer.reachTick!)*dt/ITEM_REACH_SECONDS):0;
  const lead=smooth(s/ITEM_ARM_LEAD_SECONDS),back=cancelled?lead*(1-smooth((tick-transfer.cancelTick!)*dt/ITEM_REACH_SECONDS)):0;
- const goal=reaching?{goal:{hand:transfer.hand,p:transfer.target!,k:lead>1e-6?Math.min(1,reachK/lead):0}}:{};
+ const goal=reaching?{goal:{hand:transfer.hand,p:transfer.target!,k:lead>1e-6?Math.min(1,reachK/lead):0,...(transfer.via?{via:transfer.via}:{})}}:{};
  // After release the engine keeps the hand at its rest point through recovery: the drawn arm eases from it to the clip.
  // A pick-up's recovery ends holding the item: no gesture comes back (it would be cut when the record clears), only
  // the reach-start fade runs out.

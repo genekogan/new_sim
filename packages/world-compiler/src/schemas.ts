@@ -35,7 +35,10 @@ export const componentsSchema = z.object({
   seat: z.object({ height: num.default(0.45) }).optional(),
   bed: z.object({ height: num.default(0.5) }).optional(),
   surface: z.object({ height: num }).optional(),
-  container: z.object({ capacity: num.positive(), of: z.array(z.string()).optional() }).optional(),
+  /** Soul Actions entry 42: `inside` makes a hand-operated container's `shelf` slots real storage places (contact.ts
+   *  containerInside): its mouth in the def frame at scale 1 (the lip a stored thing passes over, the front face, where a
+   *  body stands to reach in), what fits (`fit`, m) and the word for its inside ("drawer"). */
+  container: z.object({ capacity: num.positive(), of: z.array(z.string()).optional(), inside: z.object({ lip: num, face: num, stand: v2, fit: v3, word: z.string().max(24) }).strict().optional() }).optional(),
   carryable: z.object({ mass: num.positive(), grips: z.number().int().min(1).max(4).default(1) }).optional(),
   opening: z.object({ width: num.positive(), height: num.positive(), state: z.enum(['open', 'closed', 'always']).default('always') }).optional(),
   floor: z.object({ level: z.number().int().default(0), y: num.default(0) }).optional(),

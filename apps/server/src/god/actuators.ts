@@ -4,7 +4,7 @@
 // `object:<entity>:switch-off`, walks up to it, reaches out, and the lamp's state changes in the world (an engine edit:
 // in the ledger, broadcast to viewers, never the god's to undo). Nothing in the edge changes: the object framework's own
 // capabilities, admission, receipts and body plans carry it.
-import type { Entity, StoredDef } from '@sim/world-compiler';
+import { containerInside, type Entity, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { isContactActuator, CONTACT_REACH } from './contact-actuator.ts';
 import { afterCommit } from '../edge/comms/store.ts';
@@ -24,6 +24,13 @@ export const ACT_REACH = 1.6;
 export const actionsOf = (def: StoredDef): Action[] => { const w = waterActions(def); return w.length ? [...def.actions, ...w] : def.actions; };
 
 /** The fields of an entity's state the def's actions read or write, with defaults filled (public: Souls see them). */
+/** Soul Actions entry 42: a thing kept inside a container that is shut (a bowl in a closed drawer): nobody sees it, walks to
+ *  it or names it until the container is opened. */
+export function keptShut(m: Pick<WorldModel, 'entities' | 'resolvedDef'>, e: Entity): boolean {
+  if (e.in.parent === 'world' || !e.in.slot) return false;
+  const p = m.entities.get(e.in.parent), pd = p && m.resolvedDef(p.def), ins = containerInside(pd);
+  return !!ins && ins.slots.some((s) => s.id === e.in.slot) && actuatedState(p!, pd!).open !== true;
+}
 export function actuatedState(e: Entity, def: StoredDef): Record<string, unknown> {
   const fields = new Set<string>(waterFields(def));
   for (const a of actionsOf(def)) { for (const w of a.when) fields.add(w.field); for (const t of a.then) if ('field' in t) fields.add(t.field); }
@@ -72,6 +79,8 @@ export type ActuatorHost = {
   stateOf?(id: string): Record<string, unknown> | null;
   /** LAYERS: why this Soul may not touch it (a private thing of someone else's), or null. */
   access?(id: string, soul: EdgeSoul): Refusal | null;
+  /** Entry 42: why this action cannot happen now because the thing is in use (a drawer someone is reaching into), or null. */
+  busy?(id: string, action: string): Refusal | null;
   /** SOULFIX: a standing point within reach that the body can walk to (front, back, else any side), or null. */
   approach?(id: string, soul: EdgeSoul, front: Vec2 | null, radius?: number): { p: Vec2; level: number } | null;
   /** W5 water (water.ts): the things involved in moving water, and an atomic commit of several state changes. */
@@ -117,6 +126,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       const d = Math.hypot(s.at[0] - me[0], s.at[1] - me[1]);
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
+      const busy = s.key ? host.busy?.(s.key, a.name) : null; if (busy) return busy;
       if(host.deferContacts&&def.tags.includes('wall-window')&&s.key&&!host.contactPlan?.(ctx.soul,s.key,a.name))return {code:'contact.out-of-reach',reason:'This window handle is outside standing hand reach from your floor.'};
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
       return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));

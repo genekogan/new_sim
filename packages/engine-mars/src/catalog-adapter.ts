@@ -137,9 +137,13 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   const berths = berthSlots(d);
   if (seats.length || stands.length || fire.length || berths.length) out.slots = [...seats, ...stands, ...fire, ...berths];
   if (seats.length && crossSeated(d)) out.seatApproach = 'slot';
-  const tops = d.slots.filter((s) => s.kind === 'surface' || s.kind === 'shelf');
+  // Soul Actions entry 42: a hand-operated container's shelf slots are places inside it, one thing each at the slot itself
+  const inside = (c.container as { inside?: { lip: number; face: number; stand: [number, number]; fit: [number, number, number] } } | undefined)?.inside && d.tags.includes('hand-operated') ? (c.container as { inside: { lip: number; face: number; stand: [number, number]; fit: [number, number, number] } }).inside : undefined;
+  const tops = d.slots.filter((s) => s.kind === 'surface' || (s.kind === 'shelf' && !inside));
   if (tops.length) out.surfaceSlots = tops.flatMap((s) => surfaceLattice(s.id, tops.length === 1 ? w : Math.min(w, 1.2), tops.length === 1 ? dd : Math.min(dd, 0.8), s.height ?? s.p[1] ?? c.surface?.height ?? h, tops.length === 1 ? 0 : s.p[0], tops.length === 1 ? 0 : s.p[2]));
   else if (c.surface) out.surfaceSlots = surfaceLattice('top', w, dd, c.surface.height ?? h);
+  const stored = inside ? d.slots.filter((s) => s.kind === 'shelf') : [];
+  if (stored.length) out.surfaceSlots = [...(out.surfaceSlots ?? []), ...stored.map((s) => ({ id: s.id, local: [r4(s.p[0]), r4(s.p[1]), r4(s.p[2])] as [number, number, number], inside: { lip: r4(inside!.lip), face: r4(inside!.face), stand: [r4(inside!.stand[0]), r4(inside!.stand[1])] as [number, number], fit: inside!.fit.map(r4) as [number, number, number] } }))];
   const caps: NonNullable<AssetDef['capabilities']> = {};
   if (c.carryable && d.tags.includes('recorded-item')) caps.recordedItemPoseV1 = true;
   if (c.readable) caps.readable = { pages: Math.max(1, Math.round(c.readable.pages ?? 4)), maxSeatDistance: 0.65 };

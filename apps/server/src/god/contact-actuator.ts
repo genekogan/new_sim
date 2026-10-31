@@ -1,8 +1,8 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,slidePoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorHand,actuatorPoint,slidePoint,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
-import { opSchema, contactStateKey, DRAWER_TRAVEL, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
+import { opSchema, contactStateKey, containerInside, DRAWER_TRAVEL, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionsOf, actuatedState, thenPatch, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
@@ -32,14 +32,20 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     if(def.tags.includes('wall-window')&&(wp.y+params.opening.handleY-me[1]>1.65||wp.y+params.opening.handleY-me[1]<.35))return null;
     root=actuatorPoint(params.opening,params.opening.from).root;
    }else{const dx=me[0]-wp.x,dz=me[2]-wp.z,n=Math.hypot(dx,dz)||1;root=[wp.x+dx/n*.5,wp.y,wp.z+dz/n*.5];}
+   // entry 42: a body carrying something in the hand this would use operates with the other, free hand
+   const busy=body.human?.hands,usual=actuatorHand(params.opening),other=usual==='left'?'right':'left';
+   if(busy&&(busy.left||busy.right)&&!body.human?.handActuator&&!(busy[usual]&&busy[other]))params.hand=busy[usual]?other:usual;
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
   },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),key=def&&contactStateKey(def);
-   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean>={};
+   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean|string[]>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
+   // entry 42: what is inside an open container (names only, at most its few places); nothing while it is shut
+   const ins=state.open===true?containerInside(def):null;
+   if(ins){const slots=new Set(ins.slots.map(s=>s.id)),holds:string[]=[];for(const c of m.children.get(target)??[]){const x=m.entities.get(c);if(x&&slots.has(x.in.slot??''))holds.push(x.name??(m.resolvedDef(x.def)?.name.replace(/^core-/,'')??'something'));}if(holds.length)facts.holds=holds.sort();}
    return facts;
   },
   prepare(soul:EdgeSoul,target:string,action:string):ContactActuatorIntent|null{
@@ -52,7 +58,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(!e||!def||!a||binding(intent.target)!==intent.binding)return fail('contact.target-changed','The target changed during the approach; no action was applied.');
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
-   const hand=b?.human?.hands?.left??b?.human?.hands?.right;
+   const hand=motion?.hand?b?.human?.hands?.[motion.hand]:b?.human?.hands?.left??b?.human?.hands?.right;
    const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.slide?slidePoint(motion.slide,intent.action==='close'?motion.slide.to:motion.slide.from).hand:motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);

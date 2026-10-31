@@ -9,7 +9,7 @@ import { godFeature, isFlagDef } from './god-ui/features.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
-import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { WorldModel, containerInside, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
@@ -105,15 +105,32 @@ export class WorldEntityLayer {
   /** Recorded contact drives the leaf on the same depicted tick as the body,
    * including reach, swing and release. No wall-clock tween during native operation. */
   drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
+    this.movingBoxes.clear();
     for(const e of Object.values(entities)){
       const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m?.opening&&!m?.slide)continue;
+      this.movingBoxes.add(m.target);
       const d=this.drawn.get(m.target);if(!d)continue;
       const f=handActuatorFrame(m,(tick-m.startTick)*dt),target=this.model?.entities.get(m.target),scale=target?this.model!.worldPose(target).s||1:1;
       if(d.frozen)this.thaw(d);d.opening=undefined;
       // a hinged leaf turns by the recorded angle; a drawer (entry 24) slides by the recorded travel, in its own units
       d.obj.traverse(o=>{if(m.opening&&o.userData.role==='door')o.rotation.y=f.angle;if(m.slide&&o.userData.role==='drawer'&&typeof o.userData.restZ==='number')o.position.z=o.userData.restZ+f.pos/scale;});d.obj.updateMatrixWorld(true);
+      // entry 42: what is kept in a drawer rides with it (its places are where the drawer is pulled out to), and it is
+      // seen while the drawer or door moves; at rest a shut container hides it (interiorVisible)
+      for(const [id,box] of this.keptIn){
+        if(box!==m.target)continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
+        if(k.frozen)this.thaw(k);
+        if(m.slide){const off=f.pos-m.slide.travel;k.obj.position.set(k.to.p.x+m.slide.dir[0]*off,k.to.p.y,k.to.p.z+m.slide.dir[1]*off);k.settled=false;}
+        if(k.inst)this.instancer.set(k.inst,id,k.obj.position,k.obj.rotation.y,k.obj.scale.x,[k.obj.rotation.x,k.obj.rotation.z]);else k.obj.visible=true;
+        k.obj.updateMatrixWorld(true);
+      }
     }
   }
+  /** Entry 42: things kept inside a container (item id → container id), and the containers whose drawer or door a hand
+   *  is moving this frame. Only stored things, never a scan of the world. */
+  private keptIn=new Map<string,string>();
+  private movingBoxes=new Set<string>();
+  /** Entry 42, for proofs: whether a stored thing is drawn now and where. */
+  keptView(id:string){const d=this.drawn.get(id);return d?{box:this.keptIn.get(id)??null,visible:d.inst?(d.shown??true):d.obj.visible,p:d.obj.position.toArray()}:null;}
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
@@ -533,6 +550,8 @@ export class WorldEntityLayer {
   /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
   private interiorVisible(id: string, d: Drawn): boolean {
     if (!this.model) return true;
+    // entry 42: a thing kept in a shut drawer or locker is not seen, unless a hand is opening or closing it right now
+    const box = this.keptIn.get(id); if (box && !this.movingBoxes.has(box) && this.model.entities.get(box)?.state?.open !== true) return false;
     // P1: which building (if any) holds a thing, and on which slot, is found once per world revision (seq + drawn count),
     // not by walking the parent chain of all ~4,800 things every frame; kept on the thing itself (no lookup per frame)
     const key = this.seq * 1_048_576 + this.drawn.size;
@@ -618,7 +637,7 @@ export class WorldEntityLayer {
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);
     this.drawn.clear();
-    this.recordedItems.clear();this.missingItemAt.clear();this.lightMoves.clear();
+    this.recordedItems.clear();this.missingItemAt.clear();this.lightMoves.clear();this.keptIn.clear();this.movingBoxes.clear();
     for (const m of this.materials.values()) m.dispose();
     this.materials.clear();
     this.waterGroup.clear(); this.terrainGroup.clear(); this.thingsGroup.clear();
@@ -783,6 +802,7 @@ export class WorldEntityLayer {
     if (def.tags.includes('horizon')) this.horizonBy.add(e.id); else this.horizonBy.delete(e.id);
     const parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     if (parent && m.resolvedDef(parent.def)?.components.body) this.held.set(e.id, parent.id); else this.held.delete(e.id);
+    if (parent && containerInside(m.resolvedDef(parent.def))?.slots.some((s) => s.id === e.in.slot)) this.keptIn.set(e.id, parent.id); else this.keptIn.delete(e.id);
     const existing = this.drawn.get(e.id);
     const defHash = def.hash + ':' + JSON.stringify(e.params ?? {}) + ':' + JSON.stringify(e.state ?? {}) + ':' + JSON.stringify(e.shape ?? null) + ':' + JSON.stringify(e.r ?? 0);
     const builder = meshFor(def);
@@ -820,7 +840,7 @@ export class WorldEntityLayer {
     this.drawn.set(e.id, { ...(opening ? {opening} : {}), ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(mdef) ? { motion: { entity: e, def: mdef, yaw: wp.yaw, glowOnly: glowOnly(mdef) } } : {}) });
   }
   private undraw(id: string, delaySeconds = 0) {
-    this.held.delete(id); this.horizonBy.delete(id);
+    this.held.delete(id); this.horizonBy.delete(id); this.keptIn.delete(id);
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now + delaySeconds * 1000; d.dur = EASE_OUT_S;
   }

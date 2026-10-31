@@ -3,6 +3,7 @@
 import {z} from 'zod';
 import type {ActionDef,Diagnostic} from '../actions/types.ts';
 import type {Runtime} from '../runtime/runtime.ts';
+import type {Entity} from '../world/types.ts';
 import type {Spatial} from '../spatial/service.ts';
 import {dcos,dsin,heading,type Vec3} from '../core/math.ts';
 import {HUMAN_RADIUS} from '../world/catalog.ts';
@@ -14,7 +15,9 @@ const opening=z.object({floorY:z.number().finite().optional(),hinge:vec,yaw:z.nu
 // Soul Actions entry 24: a drawer slides straight out along `dir` (the chest's front, world xz); `at` is the knob closed,
 // `from`/`to` the travel out (m). The hand stays on the knob; the body keeps half a metre in front of it, facing the chest.
 const slide=z.object({at:vec,dir:z.tuple([z.number().finite(),z.number().finite()]),travel:z.number().min(.05).max(.8),from:z.number().min(0).max(.8),to:z.number().min(0).max(.8),floorY:z.number().finite()}).strict();
-export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),slide:slide.optional()}).strict();
+// Soul Actions entry 42: `hand` names the free hand when the other one carries something (a bowl in the right hand, the
+// drawer opened with the left); absent, the side's default hand as before.
+export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),slide:slide.optional(),hand:z.enum(['left','right']).optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
@@ -58,7 +61,7 @@ export function slidePoint(s:NonNullable<HandActuatorParams['slide']>,pos:number
  const hand:Vec3=[s.at[0]+s.dir[0]*pos,s.at[1],s.at[2]+s.dir[1]*pos];
  return {hand,root:[hand[0]+s.dir[0]*.5,s.floorY,hand[2]+s.dir[1]*.5] as Vec3};
 }
-export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');
+export const actuatorHand=(o?:HandActuatorParams['opening'],hand?:'left'|'right'):'left'|'right'=>hand??(o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right'));
 const issue=(code:string,message:string,subjects:string[]):Diagnostic=>({code:'contact.'+code,message,subjects});
 function blocked(rt:Runtime,p:HandActuatorParams,root:Vec3,angle:number):Diagnostic|null{
  const actor=rt.world.entities[p.actor],sp=rt.services.spatial as Spatial|undefined;
@@ -80,11 +83,16 @@ function blocked(rt:Runtime,p:HandActuatorParams,root:Vec3,angle:number):Diagnos
  return null;
 }
 type Exec={p:HandActuatorParams;motion:HandActuatorMotion;t:number;root:Vec3;yaw:number};
-function clear(rt:Runtime,ex:Exec){const h=rt.world.entities[ex.p.actor]?.human;if(!h)return;delete h.handActuator;delete h.hands;delete h.speed;h.activity='idle';}
+function clear(rt:Runtime,ex:Exec){const h=rt.world.entities[ex.p.actor]?.human;if(!h)return;delete h.handActuator;freeHand(h,ex.p);delete h.speed;h.activity='idle';}
+/** Lower the operating hand: the other hand keeps what it carries (entry 42); without `hand`, all hands as before. */
+function freeHand(h:NonNullable<Entity['human']>,p:HandActuatorParams){if(!p.hand||!h.hands){delete h.hands;return;}delete h.hands[p.hand];if(!h.hands.left&&!h.hands.right)delete h.hands;}
+/** Entry 42: the hands of `actor` that hold an item (hold_items keeps them at their carry points). */
+const holdingHands=(rt:Runtime,actor:string)=>{const out=new Set<string>();for(const e of Object.values(rt.world.entities))if(e.support?.kind==='in-hand'&&e.support.by===actor)out.add(e.support.hand);return out;};
 export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
  verb:'hand_actuator_v1',description:'Reach, operate a switch or hinged opening with continuous hand contact, and lower the arm before releasing the body.',schema:handActuatorParams,
- reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},{resource:'entity:'+p.target,mode:'exclusive'}],
- plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};if(!h||h.grip||h.hands||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
+ reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening,p.hand)),mode:'exclusive'},{resource:'entity:'+p.target,mode:'exclusive'}],
+ plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};const carried=p.hand&&h?.hands?holdingHands(rt,p.actor):null,carrying=!!carried&&Object.keys(h!.hands!).every(k=>carried.has(k))&&!carried.has(p.hand!);
+  if(!h||h.grip||(h.hands&&!carrying)||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
  start(rt,p,_plan,_id){const a=rt.world.entities[p.actor];return {p:structuredClone(p),motion:{...structuredClone(p),startTick:rt.tick,actionId:_id},t:0,root:[...a.pose.p],yaw:a.pose.yaw};},
  step(rt,ex,dt){
   const a=rt.world.entities[ex.p.actor],h=a?.human;if(!h)return {status:'failed',diagnostic:issue('body-gone','The original body is gone.',[ex.p.actor])};
@@ -97,7 +105,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   const face=ex.p.slide?heading([-ex.p.slide.dir[0],-ex.p.slide.dir[1]]):ex.p.opening?heading([-dsin(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side,-dcos(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side]):heading([point.hand[0]-a.pose.p[0],point.hand[2]-a.pose.p[2]]),turn=((face-ex.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/.4);
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
-  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
+  if(f.armDown){freeHand(h,ex.p);h.activity='idle';delete h.speed;}else if(ex.p.hand)h.hands={...(h.hands??{}),[ex.p.hand]:[...point.hand]};else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
   if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<HAND_REACH_SECONDS?'reaching':ex.t<HAND_REACH_SECONDS+handSwingSeconds(ex.motion)?'operating':'releasing'};
  },
  cancel(rt,ex){

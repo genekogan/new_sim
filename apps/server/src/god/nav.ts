@@ -15,6 +15,7 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import { humanTitle, meaningParts } from './meaning.ts';
 import { isShut } from './doors.ts';
+import { keptShut } from './actuators.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -178,6 +179,7 @@ export class GodNav {
       if (++n % 64 === 0) yield;
       if (!e.name) continue;
       const def = m.resolvedDef(e.def); if (!def || def.components.body || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
+      if (keptShut(m, e)) continue;   // entry 42: kept in a shut drawer or locker: not a place to walk to, nor a name nearby
       seen.add(e.id);
       try { things.push(...this.described(e, def, waters.get(e.id), stamp)); } catch { /* one odd thing never hides the rest */ }
     }
