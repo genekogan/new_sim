@@ -46,7 +46,9 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
  if(o.bodyPolicy==='door-natural-v2'&&o.side===1){
   // Stay beyond the free edge while pulling, rather than orbiting around the
   // hinge. The torso keeps facing the doorway; the hand follows the leaf.
-  const u=Math.max(0,Math.min(1,angle/HAND_OPEN_ANGLE)),ox=.35*u,oz=.45;
+  // Entry 31: pushing it shut from this side the body steps in with the leaf, and the drawn body trails its native root by
+  // ~3 cm, so the close keeps 3 cm more from the wall (0.38 m measured clearance natively, 0.353 drawn, was the margin).
+  const u=Math.max(0,Math.min(1,angle/HAND_OPEN_ANGLE)),ox=.35*u,oz=o.to===0&&o.from!==0?.48:.45;
   return {hand,root:[centre[0]+dcos(o.yaw)*ox+dsin(o.yaw)*oz,y,centre[2]-dsin(o.yaw)*ox+dcos(o.yaw)*oz] as Vec3};
  }
  const along=o.side<0?(o.bodyPolicy==='door-natural-v2'?-.35:-.5):0;
