@@ -145,7 +145,9 @@ function playSingers(host: Host, x: number, y: number, z: number) {
       s.voice.out.gain.setTargetAtTime(g, ctx.currentTime, 0.08);
       for (const n of sungNotes(who, now - 0.05, now + PIANO_AHEAD)) {
         if (s.done.has(n.t)) continue; s.done.add(n.t);
-        const at = audioNow + Math.max(0, n.t - now);
+        // the moment the piano's note of that second sounds, when it is already scheduled (a singer who starts mid-song
+        // joins on the piano's own note: scheduled a tick later from the world clock, it landed 5–10 ms off in take 3)
+        const at = pianoAt.get(`${who.seed}:${n.t}`) ?? audioNow + Math.max(0, n.t - now);
         s.voice.schedule(n, at, 1); voiceLog.push({ singer: r.body, with: who.seed, t: n.t, at, midi: n.midi, syl: n.syl, ...(pianoAt.has(`${who.seed}:${n.t}`) ? { pianoAt: pianoAt.get(`${who.seed}:${n.t}`) } : {}) });
         if (voiceLog.length > 400) voiceLog.splice(0, voiceLog.length - 400);
       }

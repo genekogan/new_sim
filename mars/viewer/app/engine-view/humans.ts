@@ -145,6 +145,8 @@ type View = {
   restFrom?: number;
   /** Idle variety weight drawn at the last render (Idle_Neutral + variant; diagnostics only). */
   variety?: number;
+  /** Entry 36: the idle-variety onset level when the body last stood idle (a singer's gesture fades out from it). */
+  singOnset?: number;
   /** Seconds since the current walk began (its weight left 0), and the rest clock then; undefined: not walking / long ago. */
   walkAge?: number;
   restAgeAtWalk?: number;
@@ -827,12 +829,17 @@ export class HumanViews {
     // Over GESTURE_FADE, not the 0.65 s reach: folded arms opening in 0.65 s still swung the free hand 0.13 m per 50 ms (0.084 over 1.2 s).
     const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE) : 0;
     // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
-    const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
-    const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : 1;
+    // Entry 36: likewise a singer's reach for the mic out of an idle gesture that had begun while she turned to it: the
+    // gesture fades out over GESTURE_FADE from the singing's start, at the onset level it had then (it was cut: 0.175 m
+    // per 50 ms in take 3), while the arm eases onto the mic
+    const singFade = v.activity === 'sing' && v.singOnset !== undefined && (v.since ?? 9) < GESTURE_FADE ? 1 - smooth((v.since ?? 9) / GESTURE_FADE) : 0;
+    const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0) || singFade > 0) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
+    const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : singFade > 0 ? singFade : 1;
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
-    const restOnset = v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
+    const restOnset = singFade > 0 ? v.singOnset! : v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
+    if (v.activity === 'idle') v.singOnset = restOnset; else if (v.activity !== 'sing') v.singOnset = undefined;
     const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
     const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset : 0;
