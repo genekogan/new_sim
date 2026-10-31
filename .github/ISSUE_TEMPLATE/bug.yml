@@ -1,0 +1,40 @@
+name: Bug
+description: Something in Sim is broken or behaves wrongly
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The world URL (or a fake-mind dev world), then each step. A screen recording helps a lot.
+      placeholder: |
+        1. Open /worlds/w/<world>/ on desktop
+        2. ...
+    validations: { required: true }
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [web client, world server, Souls, engine / navigation, world building, Mars, assets / CDN, release / ops, not sure]
+    validations: { required: true }
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: The build id from /worlds/__sim/healthz, or the commit if running locally.
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: e.g. desktop Chrome, phone Safari
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output or logs
+      render: text

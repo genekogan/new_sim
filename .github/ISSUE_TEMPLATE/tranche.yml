@@ -1,0 +1,33 @@
+name: Tranche / epic
+description: A planned body of work that groups several issues and PRs
+labels: ["type:epic", "needs:gene"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: The outcome in one or two sentences, as a visitor would notice it.
+    validations: { required: true }
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+    validations: { required: true }
+  - type: textarea
+    id: items
+    attributes:
+      label: Items
+      description: One line per issue or lane; link issues as they are filed.
+      placeholder: |
+        - [ ] #123 ...
+        - [ ] ...
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and proof
+      description: The bar for calling it done, and the proof tier (docs/process/PROOF-POLICY.yml) each item needs.
+    validations: { required: true }
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and open questions

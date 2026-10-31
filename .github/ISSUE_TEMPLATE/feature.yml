@@ -1,0 +1,28 @@
+name: Feature request
+description: A new capability or an improvement to an existing one
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is this for, and what can't they do today?
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should happen instead. Sketches, clips and references welcome.
+    validations: { required: true }
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Done when
+      description: Observable acceptance criteria, as a visitor or world builder would check them.
+      placeholder: |
+        - [ ] ...
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [web client, world server, Souls, engine / navigation, world building, Mars, assets / CDN, release / ops, not sure]
