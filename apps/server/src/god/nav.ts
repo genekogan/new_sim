@@ -100,6 +100,9 @@ export type Thing = {
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
+/** L8: nearest first, ties by ref, so "by the X" names do not depend on the things list's order (a boot's full pass and
+ *  incremental passes built it differently: 472 built objects rewrote their `near` on every first boot after a copy). */
+const byDistanceThenRef = (a: { o: { ref: string }; d: number }, b: { o: { ref: string }; d: number }) => a.d - b.d || (a.o.ref < b.o.ref ? -1 : a.o.ref > b.o.ref ? 1 : 0);
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
 const ROOMS_WITHIN = 80;
 /** Upper-storey rooms are offered inside (or at the door of) their building, or to a Soul already upstairs (m). */
@@ -740,11 +743,11 @@ export class GodNav {
   }
   /** Named things within 15 m of a thing (its "by the X"), nearest first. */
   landmarks(t: Thing, n = 2): Thing[] {
-    return this.byVersion(`l|${t.ref}|${n}`, () => this.within(t.at, 15).filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d || (a.o.ref < b.o.ref ? -1 : 1)).slice(0, n).map((x) => x.o));
+    return this.byVersion(`l|${t.ref}|${n}`, () => this.within(t.at, 15).filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort(byDistanceThenRef).slice(0, n).map((x) => x.o));
   }
   /** Names of the named things within `within` m of a point (not `except`, not rooms), nearest first: "by the X". */
   namesNear(at: Vec2, except: string, n = 2, within = 12): string[] {
-    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.within(at, within).filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d || (a.o.ref < b.o.ref ? -1 : 1)).slice(0, n).map((x) => x.o.ref));
+    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.within(at, within).filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort(byDistanceThenRef).slice(0, n).map((x) => x.o.ref));
   }
   /** L1: the things (rooms included) that can lie within `r` m of a point by `distance`, in things() order — a superset
    *  (callers filter by distance as before), so "by the X" answers are unchanged. A grid of each thing's box (a path's
