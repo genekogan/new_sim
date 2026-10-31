@@ -60,6 +60,8 @@ const live = { tick: w.host.engine.world.tick, engine: w.host.engine.stateHash()
 w.host.stop();
 
 const b = new WorldHost(w.db, factory, (w.host as unknown as { seed: string }).seed, 1e9, w.host.worldId);
+// --after-replay N: the booted host snapshots on its first tick after a replay longer than N ticks (main.ts: 200)
+b.snapshotAfterReplayTicks = Number(arg('--after-replay', '0'));
 const prof = arg('--prof', '');   // a .cpuprofile path: profile the cold boot only
 const session = prof ? new Session() : null;
 if (session) { session.connect(); await session.post('Profiler.enable'); await session.post('Profiler.setSamplingInterval', { interval: 200 }); await session.post('Profiler.start'); }
