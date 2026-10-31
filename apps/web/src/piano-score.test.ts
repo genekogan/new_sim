@@ -21,7 +21,7 @@ test('drums: every hit is on the piano grid, the fill closes the phrase, sticks 
     assert.ok(hits.some((h) => h.kind === 'kick' && Math.abs(h.t) < 1e-9) && hits.some((h) => h.kind === 'crash' && Math.abs(h.t) < 1e-9), 'the phrase starts together');
     const toms = hits.filter((h) => h.kind === 'tom');
     assert.ok(toms.length && toms.every((h) => Math.round(h.t / STEP26) % 32 >= 28 && Math.floor(Math.round(h.t / STEP26) / 32) % 2 === 1), 'the fill ends every other phrase');
-    for (const h of hits.filter((x) => x.hand >= 0)) assert.ok(drumHands(seed, h.t)[h.hand].lift < 1e-6, 'the stick is down at its hit');
+    for (const h of hits.filter((x) => x.hand >= 0)) assert.ok(drumHands(seed, h.t)[h.hand as 0 | 1].lift < 1e-6, 'the stick is down at its hit');
     // and up between hits that are a beat or more apart
     const right = hits.filter((x) => x.hand === 1).map((x) => x.t);
     for (let i = 1; i < right.length; i++) if (right[i] - right[i - 1] >= 0.5) assert.ok(drumHands(seed, (right[i] + right[i - 1]) / 2)[1].lift > 0.99);
