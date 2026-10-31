@@ -48,14 +48,27 @@ unverified rather than passing.
 
 ## 5. Pull request
 
-Open a draft PR from the template: summary, tier, proof (links to clips and logs, not files in the tree), docs touched,
-changelog. Add a fragment in [`changes/`](../../changes/README.md) for anything users notice, or the `no-changelog`
-label. A change in behaviour updates its doc in the same PR.
+The issue's acceptance criteria are written before any code. The PR is the journal entry for the work. Open a draft
+from the template:
+- **Problem**, linking the issue.
+- **Acceptance**: every criterion from the issue, each marked met (with evidence), `unmet:` or `deferred: #n`.
+- **Proof**: clips, images and a `proof.json`, uploaded with `node tools/proof/upload.mjs`. Proof never goes in the tree.
+- **Self-audit**: commands run and their results, failed attempts kept, a side-effects check (for example, the
+  context a Soul sees for absent, distant and nearby objects), known limits.
+- **Docs touched**, and the **changelog**.
+
+`node tools/proof/acceptance.mjs check` validates the checklist and `proof.json` locally. The `journal` skill walks an
+agent through one milestone; the `epic` skill runs a multi-milestone tranche with review stops. Add a fragment in
+[`changes/`](../../changes/README.md) for anything users notice, or the `no-changelog` label. A change in behaviour
+updates its doc in the same PR.
 
 ## 6. Review
 
-CI runs the checks for the PR's paths (the required check is `ci-ok`); the `claude-review` workflow reviews every
-push, `@claude` answers follow-ups, and the author answers each comment with a fix or a reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
+CI runs the checks for the PR's paths. The required checks are `ci-ok`, `security`, `proof-ok` and the changelog
+`fragment`. The `proof-check` bot keeps one comment up to date with the tier, the proof that tier needs, and which
+acceptance boxes have evidence. The `claude-review` workflow reviews every push, including whether the evidence
+supports each acceptance claim. `@claude` answers follow-ups, and the author answers each comment with a fix or a
+reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
 
 ## 7. Merge
 

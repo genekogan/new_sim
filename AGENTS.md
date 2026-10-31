@@ -87,8 +87,10 @@ edge, god mode for world creators, and a vendored deterministic engine under `ma
 - "Done" means walked on the real URL with real input; a scripted e2e alone doesn't count. Visual evidence is uncut,
   real-speed video. [docs/process/](docs/process/agent-lifecycle.md)
 - Bug fixes need no approval. Destructive production deletes need the maintainer's explicit yes.
-- Repo skills in `.claude/skills/` (plain Markdown, readable by any agent): `triage`, `finish`, `proof`, `e2e`,
-  `sim-director`. Agent definitions in `.claude/agents/`: `lane`, `reviewer`.
+- Issues state the problem and acceptance criteria before work starts. The PR is the journal entry: acceptance with
+  evidence, proof, self-audit. [docs/process/agent-lifecycle.md](docs/process/agent-lifecycle.md#5-pull-request)
+- Repo skills in `.claude/skills/` (plain Markdown, readable by any agent): `journal`, `epic`, `triage`, `finish`,
+  `proof`, `e2e`, `sim-director`. Agent definitions in `.claude/agents/`: `lane`, `reviewer`.
 
 ## Release and operations
 
