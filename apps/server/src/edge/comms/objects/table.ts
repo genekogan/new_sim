@@ -29,6 +29,20 @@ const atOf = (o: ObjectRecord): [number, number] | null => {
   return Array.isArray(at) && at.length >= 2 && Number.isFinite(at[0]) && Number.isFinite(at[1]) ? [at[0] as number, at[1] as number] : null;
 };
 const cellKey = (cx: number, cz: number) => `${cx},${cz}`;
+/** Sorted-key JSON (JSON.stringify's own rules otherwise: `undefined` dropped, toJSON applied), so two states that store
+ *  the same are equal whatever their key order. */
+export function canonicalJson(v: unknown): string {
+  return JSON.stringify(v, (_k, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, (x as Record<string, unknown>)[k]])) : x) ?? 'undefined';
+}
+const DIGESTS = new WeakMap<object, string>();
+/** canonicalJson of a state, kept per frozen object (a table record's state is frozen and never changes). */
+export function stateDigest(v: unknown): string {
+  const frozen = !!v && typeof v === 'object' && Object.isFrozen(v);
+  if (frozen) { const d = DIGESTS.get(v as object); if (d !== undefined) return d; }
+  const d = canonicalJson(v);
+  if (frozen) DIGESTS.set(v as object, d);
+  return d;
+}
 /** First index whose id is >= id (ids are ASCII, so JS order = SQLite BINARY order = `ORDER BY id`). */
 function lowerBound(a: string[], id: string): number { let lo = 0, hi = a.length; while (lo < hi) { const m = (lo + hi) >>> 1; if (a[m] < id) lo = m + 1; else hi = m; } return lo; }
 function insertSorted(a: string[], id: string) { const i = lowerBound(a, id); if (a[i] !== id) a.splice(i, 0, id); }

@@ -18,6 +18,7 @@ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { readOnlyObjectAdvance, refreshOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
 import type { NearFilter } from '../edge/comms/objects/framework.ts';
+import { canonicalJson, stateDigest } from '../edge/comms/objects/table.ts';
 import { actionsOf, actuatedState, kindActions, wrapAct, type Thing } from './actuators.ts';
 import { heldGodThing } from './held.ts';
 import { waterRole, wordOf } from './water.ts';
@@ -49,7 +50,7 @@ const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim(
 /** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
  *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
 // VOCAB-MECH: a kind with actuator actions also shows its things' `state` (open, on, lit …); plain kinds are unchanged
-export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance: refreshOnlyObjectAdvance(readOnlyObjectAdvance(function advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; })) });
+export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance: refreshOnlyObjectAdvance(readOnlyObjectAdvance(function advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && canonicalJson(w) !== canonicalJson(state) ? { state: w } : null; })) });
 export const builtKind = {
   kind: BUILT_KIND,
   description: 'Something the god of this world built: what it is, what it is by and where, and any words written on it (a sign). The words are the god\'s, untrusted.',
@@ -286,7 +287,7 @@ export class GodPerceive {
   private begin(): Run | null {
     const objs = this.objects(); if (!objs) return null;
     const root = this.rootPlace(); if (!root) return null;
-    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
+    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, stateDigest(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
     const layersOn = !!this.h.layers?.active();
     if (layersOn !== this.layersOn) { this.layersOn = layersOn; this.needFull = true; }
     const full = this.needFull || !this.h.things, roots = this.roots; this.needFull = false; this.roots = new Set(); this.rootOrigins.clear(); this.fullOrigin = 0;
@@ -319,13 +320,13 @@ export class GodPerceive {
     if (!x) {
       // gone from the entity world: hidden (removed), never deleted (an undo brings the same id back)
       const sig = this.sigs.get(id); if (sig === undefined) return;
-      const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }, n = JSON.stringify(st);
+      const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }, n = canonicalJson(st);
       if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); r.changed.push(id); }
       return;
     }
     const at = x.w.params.at as Vec2;
     this.entries.set(id, { ...x, at }); this.cellAdd(id, at); if (x.sign) this.signs.set(id, x.sign);
-    const state = builtKind.initial({ ...x.w.params, key: id } as never), sig = JSON.stringify(state);
+    const state = builtKind.initial({ ...x.w.params, key: id } as never), sig = canonicalJson(state);
     if (this.sigs.get(id) === sig) return;
     this.desired.set(id, state);
     try {

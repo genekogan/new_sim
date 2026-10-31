@@ -6,7 +6,7 @@ import {EdgeError} from '../../contract.ts';
 import {bodyCapabilityProblem} from '../../body/actions.ts';
 import type {CommsCore} from '../core.ts';
 import {tx} from '../store.ts';
-import {objectTable} from './table.ts';
+import {canonicalJson, objectTable, stateDigest} from './table.ts';
 import type {ActionCtx, BodyRequest, CarrierView, FieldSpec, ObjectEvent, ObjectKind, ObjectRecord, ParamSpec, Refusal, TimeCtx} from './types.ts';
 
 const OBJECT_ID = /^[a-z0-9][a-z0-9._-]{0,99}$/;
@@ -124,6 +124,8 @@ export class Objects {
     const step = pre ?? kind?.advance?.(structuredClone(o.state), this.timeCtx());
     if (!kind || !step) return o;
     checkState(kind, step.state);
+    // L8 item 4: a step that changes nothing (same state, no events) is no write: no version, no `advance` log row.
+    if (!step.events?.length && canonicalJson(step.state) === stateDigest(o.state)) return o;
     const next = {...o, state: step.state, version: o.version + 1};
     if(persist){this.save(next); this.log(next, null, 'advance', {});this.emit(next, step.events ?? []);}
     return next;
@@ -147,8 +149,9 @@ export class Objects {
         if (advance && !withRefreshOnly && REFRESH_ONLY_ADVANCES.has(advance)) return o;
         const step = advance == null ? undefined : Reflect.apply(advance, kind, [owned && READ_ONLY_ADVANCES.has(advance) ? o.state : structuredClone(o.state), this.timeCtx()]);
         if (!kind || !step) return o;
-        wrote = true;
-        return tx(this.core.db, () => this.advanced(o, true, step));
+        const next = tx(this.core.db, () => this.advanced(o, true, step));
+        if (next !== o) wrote = true; // a no-op step wrote nothing and emitted nothing
+        return next;
       }
       if (!withRefreshOnly) { const advance = this.kinds.get(o.kind)?.advance; if (advance && REFRESH_ONLY_ADVANCES.has(advance)) return this.row(o.id) ?? o; }
       return tx(this.core.db, () => { const cur = this.row(o.id); return cur ? this.advanced(cur) : o; });
