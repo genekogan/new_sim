@@ -85,7 +85,14 @@ const SYNONYMS: Record<string, string[]> = {
 };
 /** VOCAB-MECH: everyday words for god things' actuator actions (only used when such an action is offered). */
 const ACT_ALIASES: Record<string, string> = {'turn-on': 'switch-on', 'turn-off': 'switch-off', shut: 'close', 'shut-off': 'switch-off', extinguish: 'put-out', 'blow-out': 'put-out', ignite: 'light', kindle: 'light', 'light-up': 'light', 'fill-up': 'fill', drain: 'empty'};
-export const tokens = (s: string) => s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
+// L3 (server reliability): a resolve tokenises every place's and offer's names on every call; the same few thousand names
+// repeat, so their tokens are kept (bounded; callers get their own copy, so an in-place sort never reaches the memo)
+const TOKEN_MEMO = new Map<string, string[]>(), TOKEN_MEMO_MAX = 50_000;
+export const tokens = (s: string): string[] => {
+  const hit = TOKEN_MEMO.get(s); if (hit) return hit.slice();
+  const t = s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
+  if (TOKEN_MEMO.size >= TOKEN_MEMO_MAX) TOKEN_MEMO.clear(); TOKEN_MEMO.set(s, t); return t.slice();
+};
 const norm = (s: string) => tokens(s).join(' ');
 // D3b (cloud fix-r3 basics-1 pip-010: "walk to the kitchen in eden-house-2" walked to eden-house-1/kitchen-chair-2, its
 // "chair-2" holding the 2): a number names the word right before it ("house 2", "house two"). A name that numbers that word
