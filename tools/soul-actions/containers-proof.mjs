@@ -10,6 +10,8 @@ const STEPS=JSON.parse(process.env.SOUL_CONTAINERS_STEPS??'null')??[
  {restart:true,hold:4000},{words:'open the drawer',hold:2500},{words:'take the bowl out of the chest',hold:2500},{words:'close the drawer',hold:3000}];
 const require=createRequire(new URL('../../mars/viewer/package.json',import.meta.url)),{chromium}=require('@playwright/test'),browser=await chromium.launch({channel:'chrome',headless:true,args:[]}),ctx=await browser.newContext({viewport:{width:1440,height:1080},recordVideo:{dir:out+'/raw',size:{width:1440,height:1080}}}),page=await ctx.newPage();
 const errors=[],samples=[],commands=[],events=[];page.on('pageerror',e=>errors.push(String(e)));let timer,busy=false,pass=false,ids={};
+// the frame stamp sits at y 64 (under the top bar): a recording can lay the page out ~90 px short at the bottom (take 2)
+const stamp=async()=>{await installFrameStamp(page);await page.evaluate(()=>{const c=[...document.querySelectorAll('canvas')].at(-1);c.style.bottom='auto';c.style.top='64px';});};
 const camera=async()=>{await page.evaluate(({eye,at})=>{const a=window.__simEntity;a.controls.target.set(...at);a.camera.position.set(...eye);a.camera.lookAt(a.controls.target);a.controls.update();},{eye:EYE,at:AT});};
 const sample=()=>page.evaluate((ids)=>{const api=window.__simEntity,f=api?.contactFrame?.();if(!f||!f.bones)return null;const bodies=[];for(const [id,e]of Object.entries(f.entities)){const b=f.bones[id];if(!b)continue;bodies.push({id,p:e.p,yaw:e.yaw,state:e.state,hands:e.hands,bones:b});}
  const m=api.layer.model,chest=m?.entities.get(ids.chest),bowl=ids.bowl&&m?.entities.get(ids.bowl);
@@ -22,11 +24,11 @@ const restart=async()=>{const w=JSON.parse(readFileSync(scene+'/world.json','utf
  const r=await run(process.execPath,['tools/soul-actions/start-containers.mjs'],{cwd:new URL('../..',import.meta.url).pathname,env:{...process.env,SOUL_CONTAINERS_SCENE:scene,SOUL_CONTAINERS_PORT:String(port)},timeout:240000});events.push({restart:'up',out:r.stdout.trim(),at:Date.now(),utc:new Date().toISOString()});
  // the open page reconnects on its own; wait for live ticks again (reload only if it never comes back, and say so)
  const t0=await page.evaluate(()=>window.__simEntity?.contactFrame?.()?.tick??0);let back=false;for(let i=0;i<120&&!back;i++){await page.waitForTimeout(500);const t=await page.evaluate(()=>window.__simEntity?.contactFrame?.()?.tick??0).catch(()=>0);back=t>t0+20||t<t0-5;}
- if(!back){events.push({reload:true,at:Date.now()});await page.reload();await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1,null,{timeout:180000});await page.waitForTimeout(2500);await installFrameStamp(page);await camera();}
+ if(!back){events.push({reload:true,at:Date.now()});await page.reload();await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1,null,{timeout:180000});await page.waitForTimeout(2500);await stamp();await camera();}
  events.push({restart:'client back',reloaded:!back,at:Date.now(),utc:new Date().toISOString()});};
 try{
  await page.goto(base+`/?eye=${EYE.join(',')}&at=${AT.join(',')}`);await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1,null,{timeout:180000});
- await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(2500);await installFrameStamp(page);await camera();
+ await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(2500);await stamp();await camera();
  ids=await page.evaluate(()=>Object.fromEntries([...window.__simEntity.layer.model.entities.values()].filter(e=>['chest','bowl','table','locker'].includes(e.name)).map(e=>[e.name,e.id])));
  writeFileSync(out+'/initial.yml',await page.locator('body').ariaSnapshot());await page.screenshot({path:out+'/00.png'});
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}catch{}finally{busy=false;}},50);

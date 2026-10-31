@@ -15,13 +15,16 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   plan(soul:EdgeSoul,target:string,action:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),body=d.body(soul.entityId);if(!e||!def||!body)return null;
    const wp=m.worldPose(e),me=body.pose.p,at:[number,number,number]=[wp.x,wp.y+1.04*wp.s,wp.z];
-   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number];
+   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number],face:[number,number]|undefined;
    if(def.tags.includes('hand-drawer')){
     // a drawer slides straight out of the front (+z): the hand takes its knob, the body stands half a metre in front
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;at?:number[];tint?:string}[]})?.shapes:undefined,knob=shapes?.find(s=>s.role==='drawer'&&s.tint==='brass'&&s.at);if(!knob?.at)return null;
     const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[kx,ky,kz]=knob.at.map(v=>v*wp.s),travel=DRAWER_TRAVEL*wp.s;
     params.slide={at:[wp.x+kx*c+kz*s,wp.y+ky,wp.z-kx*s+kz*c],dir:[s,c],travel,from:actuatedState(e,def).open===true?travel:0,to:action==='open'?travel:0,floorY:wp.y};
     root=slidePoint(params.slide,params.slide.from).root;
+    // entry 42 (take 2): arriving from the side (from a table, carrying a bowl) left the body 56° off the chest, and the
+    // pull's own turn ran during the reach (0.105 m per 50 ms): turn to the knob on arrival first, as M04 does for valves
+    face=[params.slide.at[0],params.slide.at[2]];
    }else if(def.components.opening||def.tags.includes('hand-cabinet')){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];size?:number[];tint?:string}[]})?.shapes:undefined;
     const leaf=shapes?.find(s=>s.role==='door'&&s.pivot),knob=shapes?.find(s=>s.role==='door'&&['brass','chrome'].includes(s.tint??''));if(!leaf?.pivot)return null;
@@ -35,7 +38,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    // entry 42: a body carrying something in the hand this would use operates with the other, free hand
    const busy=body.human?.hands,usual=actuatorHand(params.opening),other=usual==='left'?'right':'left';
    if(busy&&(busy.left||busy.right)&&!body.human?.handActuator&&!(busy[usual]&&busy[other]))params.hand=busy[usual]?other:usual;
-   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
+   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:{})};
   },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){

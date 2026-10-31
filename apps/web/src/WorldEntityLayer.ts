@@ -105,7 +105,7 @@ export class WorldEntityLayer {
   /** Recorded contact drives the leaf on the same depicted tick as the body,
    * including reach, swing and release. No wall-clock tween during native operation. */
   drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
-    this.movingBoxes.clear();
+    this.movingBoxes.clear();this.movingAt=this.now;
     for(const e of Object.values(entities)){
       const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m?.opening&&!m?.slide)continue;
       this.movingBoxes.add(m.target);
@@ -124,11 +124,19 @@ export class WorldEntityLayer {
         k.obj.updateMatrixWorld(true);
       }
     }
+    // entry 42: this runs after update(), which saw last frame's moving containers: a drawer whose hand just let go shows
+    // what is in it where it is now (shut: hidden; open: at its place), never one frame back at the open place
+    for(const [id,box] of this.keptIn){
+      if(this.movingBoxes.has(box))continue;const k=this.drawn.get(id);if(!k||k.removing||k.inst)continue;
+      const open=this.model?.entities.get(box)?.state?.open===true;
+      if(!open)k.obj.visible=false;else if(k.obj.position.distanceToSquared(k.to.p)>1e-8&&k.settled){k.obj.position.copy(k.to.p);k.obj.updateMatrixWorld(true);}
+    }
   }
   /** Entry 42: things kept inside a container (item id → container id), and the containers whose drawer or door a hand
    *  is moving this frame. Only stored things, never a scan of the world. */
   private keptIn=new Map<string,string>();
   private movingBoxes=new Set<string>();
+  private movingAt=-Infinity;
   /** Entry 42, for proofs: whether a stored thing is drawn now and where. */
   keptView(id:string){const d=this.drawn.get(id);return d?{box:this.keptIn.get(id)??null,visible:d.inst?(d.shown??true):d.obj.visible,p:d.obj.position.toArray()}:null;}
   get entityCount() { return this.model?.entities.size ?? 0; }
@@ -551,7 +559,7 @@ export class WorldEntityLayer {
   private interiorVisible(id: string, d: Drawn): boolean {
     if (!this.model) return true;
     // entry 42: a thing kept in a shut drawer or locker is not seen, unless a hand is opening or closing it right now
-    const box = this.keptIn.get(id); if (box && !this.movingBoxes.has(box) && this.model.entities.get(box)?.state?.open !== true) return false;
+    const box = this.keptIn.get(id); if (box && !(this.movingBoxes.has(box) && this.now - this.movingAt < 200) && this.model.entities.get(box)?.state?.open !== true) return false;
     // P1: which building (if any) holds a thing, and on which slot, is found once per world revision (seq + drawn count),
     // not by walking the parent chain of all ~4,800 things every frame; kept on the thing itself (no lookup per frame)
     const key = this.seq * 1_048_576 + this.drawn.size;
