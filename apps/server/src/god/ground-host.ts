@@ -81,6 +81,7 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 const centroid = (pts: [number, number][]) => { let x = 0, z = 0; for (const p of pts) { x += p[0]; z += p[1]; } return [x / pts.length, z / pts.length] as [number, number]; };
 
 /** Offer `walk:flag-<name>` and `swim:<water>` capabilities from the god world (chains any profile already installed). */
+const DEEP_MIDDLE = new Map<string, boolean>();
 export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: WorldHost) {
   const prev = ledger.worldProfile;
   ledger.worldProfile = (soul, caps, plans) => {
@@ -102,7 +103,9 @@ export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: Wo
       // an outline point can be many metres from the actual wetted shoreline.
       caps.push({ id, verb: 'swim', label: `Swim in ${named} (enter nearby reachable deep water)`, available: true, target: { id: w.id, kind: 'object' } });
       plans.set(id, { label: `Swim in ${named}`, steps: [{ verb: 'mars:swim_in', params: { water:w.id } }] });
-      const middle=field?.waterId?.(mid[0],mid[1])===w.id&&field.medium(mid[0],mid[1])===2&&(host.engine as unknown as {deepWaterTargetV1?:(x:number,z:number)=>boolean}).deepWaterTargetV1?.(mid[0],mid[1])===true;
+      // L3 item 4: whether a water's centre is deep is static ground: asked once per recipe and outline, not per menu build
+      const mkey=`${recipe}|${w.id}|${mid[0]},${mid[1]}`;let middle=DEEP_MIDDLE.get(mkey);
+      if(middle===undefined){middle=field?.waterId?.(mid[0],mid[1])===w.id&&field.medium(mid[0],mid[1])===2&&(host.engine as unknown as {deepWaterTargetV1?:(x:number,z:number)=>boolean}).deepWaterTargetV1?.(mid[0],mid[1])===true;DEEP_MIDDLE.set(mkey,middle);if(DEEP_MIDDLE.size>4096)DEEP_MIDDLE.delete(DEEP_MIDDLE.keys().next().value!);}
       caps.push({id:`${id}/middle`,verb:'swim',label:`Swim to the middle of ${named}`,available:middle,target:{id:w.id,kind:'object'},...(!middle?{blocked:{code:'swim.no-deep-middle',reason:'The centre point is not deep water in this body; choose its generic swim action.'}}:{})});
       if(middle)plans.set(`${id}/middle`,{label:`Swim to the middle of ${named}`,steps:[{verb:'mars:swim_in',params:{water:w.id,x:mid[0],z:mid[1]}}]});
     }

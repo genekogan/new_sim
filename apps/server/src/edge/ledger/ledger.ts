@@ -57,7 +57,7 @@ import {tx,afterCommit} from '../comms/store.ts';
 import {PlaceKnowledge} from '../perception/knowledge.ts';
 import {menuStats, countClear, cpuNow, MENU_ORACLE} from './menu-stats.ts';
 import {pageCapabilities, pageObjects, type LoadLevel, type Omitted, type Where} from './listing.ts';
-import {focusFor, wants, wantsPrefix, type MenuFocus} from './focus.ts';
+import {focusFor, focusSig, wants, wantsPrefix, type MenuFocus} from './focus.ts';
 import {BodyRule, BODY_PATH_SAMPLE_M, type BodyKnobs, type BodySoul, type Posture} from './body-rule.ts';
 
 type Resolved = {from: string; to: string; note: string};
@@ -681,13 +681,23 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** The offers a focus names, in the whole menu's order (`binds().caps.filter(wants)`; plans: at least theirs). */
   bindFocus(soul: EdgeSoul, focus: MenuFocus): {caps: EdgeCapability[]; plans: Plans} {
-    const only = (b: {caps: EdgeCapability[]; plans: Plans}) => ({caps: b.caps.filter(c => wants(focus, c.id, c.verb, c.target?.id)), plans: b.plans});
+    const only = (b: {caps: EdgeCapability[]; plans: Plans}) => {
+      const caps = b.caps.filter(c => wants(focus, c.id, c.verb, c.target?.id)), plans: Plans = new Map();
+      for (const c of caps) {const p = b.plans.get(c.id); if (p) plans.set(c.id, p);}
+      return {caps, plans};
+    };
     const tick = this.host.engine.world.tick, hit = this.capCache.get(soul.soulId);
     if (hit?.last?.tick === tick && hit.last.sig === this.sameTickSig()) {menuStats.one.sameTick++; return only(hit.last.value);}
     if (hit && hit.key === this.menuKey(soul, tick) && tick - hit.tick < MENU_MAX_AGE_TICKS && this.readsHold(soul, hit.reads)) {menuStats.one.kept++; return only(this.bindsTail(soul, only(hit.value), focus));}
+    // a focused build is kept like a whole menu (same key, same reads), per focus: `here` asks the same one every frame
+    const sig = focusSig(focus), mine = this.focusCache.get(soul.soulId), kept = mine?.get(sig), key = this.menuKey(soul, tick);
+    if (kept && kept.key === key && tick - kept.tick < MENU_MAX_AGE_TICKS && this.readsHold(soul, kept.reads)) {menuStats.one.keptFocus++; return only(this.bindsTail(soul, kept.value, focus));}
     menuStats.one.built++;
-    return only(this.bindsTail(soul, only(this.bindsCore(soul, focus)), focus));
+    const {core, reads} = this.recordReads(() => only(this.bindsCore(soul, focus)));
+    const m = mine ?? new Map(); m.set(sig, {tick, key, reads, value: core}); if (m.size > 8) m.delete(m.keys().next().value!); this.focusCache.set(soul.soulId, m);
+    return only(this.bindsTail(soul, core, focus));
   }
+  private focusCache = new Map<string, Map<string, {tick: number; key: string; reads: MenuReads; value: {caps: EdgeCapability[]; plans: Plans}}>>();
   /** Debug (EDGE_MENU_ORACLE=1, and tests): the difference between bindOne(id) and the whole menu's offer, or null. */
   bindOneOracleV1(soul: EdgeSoul, id: string, got = this.bindOneRaw(soul, id)): string | null {
     const full = this.bindsTail(soul, this.bindsCore(soul)), cap = full.caps.find(c => c.id === id), want = cap ? {cap, plan: full.plans.get(id)} : undefined;
@@ -797,6 +807,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** The menu before the tail (see binds): cached. */
   private bindsCore(soul: EdgeSoul, focus?: MenuFocus): {caps: EdgeCapability[]; plans: Plans} {
+    // L3 item 4: the whole build is one engine read pass (the planner syncs once; the passes inside reuse it)
+    const eng = this.host.engine as unknown as {readPassV1?: <T>(f: () => T) => T};
+    return eng.readPassV1 ? eng.readPassV1(() => this.bindsCoreIn(soul, focus)) : this.bindsCoreIn(soul, focus);
+  }
+  private bindsCoreIn(soul: EdgeSoul, focus?: MenuFocus): {caps: EdgeCapability[]; plans: Plans} {
     const m = this.mind(soul), read = readHumanCapabilitiesV1(this.host, m, {registeredActivitiesV1: true, deferRouteChecks: true, skipRegisteredCards: true});
     const caps: EdgeCapability[] = [], plans = new Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>();
     const secondsParam = {seconds: {type: 'integer', min: 1, max: 600, default: 60}};
@@ -938,9 +953,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   invalidateBodies(){this.dropMenus('invalidateBodies');}
   /** Every Soul's menu rebuilds on its next read (`site` names the cause, for menu-stats). */
-  private dropMenus(site: string) {countClear(site); this.menuGen++; this.capCache.clear();}
+  private dropMenus(site: string) {countClear(site); this.menuGen++; this.capCache.clear(); this.focusCache.clear();}
   /** One Soul's menu rebuilds on its next read. */
-  private dropMenu(site: string, soulId: string) {countClear(site, true); this.capCache.delete(soulId);}
+  private dropMenu(site: string, soulId: string) {countClear(site, true); this.capCache.delete(soulId); this.focusCache.delete(soulId);}
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
   bodyVerbProblem(soul:EdgeSoul,verb:string){return bodyVerbProblem(this.body(soul.entityId),verb);}
   /** Walks and ride boardings advertise `with` (quality cases 21/27: the invitation was there but undiscoverable). */

@@ -56,11 +56,12 @@ test('Eden 2026: bindOne equals the whole menu for every offered id (cold and ke
   assert.deepEqual(bad, [], 'kept-menu offers equal the fresh menu');
   // after walks: a walk and a gait elsewhere, then the sweep again where the Soul stands
   for (const verb of ['walk', 'jog']) {
+    const t0 = Date.now();
     const go = raw.binds(soul).caps.find(c => c.verb === verb && c.available && c.target?.kind === 'place');
     if (!go) continue;
     const r = await L.act(soul, {capability: go.id}); assert.equal(r.accepted, true, `${go.id}: ${JSON.stringify(r).slice(0, 200)}`);
-    for (let k = 0; k < 40 && L.openReceipts(soul.soulId).length; k++) await run(25);
-    sweep(L, soul, `after ${go.id}`);
+    for (let k = 0; k < 12 && L.openReceipts(soul.soulId).length; k++) await run(25);   // (mid-walk or arrived: either is a fresh place to check)
+    sweep(L, soul, `after ${go.id}`); t.diagnostic(`${go.id}: ${Date.now() - t0} ms`);
   }
 });
 

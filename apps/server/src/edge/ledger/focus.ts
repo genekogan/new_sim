@@ -21,6 +21,9 @@ export function wantsPrefix(f: MenuFocus | null | undefined, prefix: string, ver
   return false;
 }
 
+/** A focus as a cache key. */
+export function focusSig(f: MenuFocus): string {return `${[...f.ids].sort().join(',')}|${[...f.verbs].sort().join(',')}|${[...f.targets].sort().join(',')}|${f.here ? 1 : 0}`;}
+
 /** The offers `here` reads (L3 item 4): every `…:here` offer, invitations, every seat, and the offers whose target is one
  *  of `targets` (the places and things around the Soul, the places its exits lead to). */
 export function hereFocus(targets: Iterable<string>): MenuFocus {
@@ -34,7 +37,7 @@ export function focusFor(id: string): MenuFocus {
   const i = id.indexOf(':'), verb = i > 0 ? id.slice(0, i) : id, rest = i > 0 ? id.slice(i + 1) : '';
   const ids = new Set([id]), verbs = new Set<string>(), targets = new Set<string>();
   // a gait or a bicycle ride copies every walk whose target is that place (the world profile's walks too)
-  if ((verb === 'jog' || verb === 'run' || verb === 'cycle') && rest) targets.add(rest);
+  if ((verb === 'jog' || verb === 'run' || verb === 'cycle' || verb === 'stroll') && rest) targets.add(rest);
   // sit:here points at the nearest free seat that is here: every sit offer is read
   if (id === 'sit:here') verbs.add('sit');
   return {ids, verbs, targets};

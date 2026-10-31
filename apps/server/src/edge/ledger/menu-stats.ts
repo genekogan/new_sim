@@ -12,7 +12,7 @@ export const menuStats = {
   capClear: {} as Counts,   // site → global clears
   capDrop: {} as Counts,    // site → one Soul's entry dropped
   src: {hit: 0, miss: 0, cpuUs: 0} as Counts,
-  one: {n: 0, sameTick: 0, kept: 0, built: 0, oracleMiss: 0, cpuUs: 0} as Counts,   // L3 item 4: bindOne (one offer)
+  one: {n: 0, sameTick: 0, kept: 0, keptFocus: 0, built: 0, oracleMiss: 0, cpuUs: 0} as Counts,   // L3 item 4: bindOne (one offer)
   missBySoul: {} as Counts,   // soulId → menu rebuilds
 };
 export function countClear(site: string, one = false) {const m = one ? menuStats.capDrop : menuStats.capClear; m[site] = (m[site] ?? 0) + 1;}
