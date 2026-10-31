@@ -72,3 +72,25 @@ test('past the last sample a slowing body keeps slowing; a steady one keeps its 
   const steady = gaitSegments([{ track: track(0, 24, 1.2, 24), offset: 0 }], dt);
   assert.equal(walkWeightAt(steady, 24, dt), 1);
 });
+
+test('a stop inside a live window: standing from the arrival keyframe to the window end, no drop when the next window comes', () => {
+  // Entry 31 retest on M04: the recorder ends a stop's track at its arrival keyframe (a hold to the take's end writes no
+  // sample). Window [0, 20) holds a walk at 1.2 m/s easing to rest at tick 9; window [20, 40) starts with the held pose.
+  const A: PoseSample[] = [[0, 0, 0, 0, 0], [5, 300, 0, 0, 0], [7, 400, 0, 0, 0], [8, 430, 0, 0, 0], [9, 440, 0, 0, 0]];
+  const B: PoseSample[] = [[0, 440, 0, 0, 0]];
+  const alone = gaitSegments([{ track: A, offset: 0, end: 20 }], dt), both = gaitSegments([{ track: A, offset: 0, end: 20 }, { track: B, offset: 20, end: 20 }], dt);
+  let worst = 0, step = 0, prev = walkWeightAt(alone, 0, dt);
+  for (let t = 0; t <= 14; t += 0.25) {
+    const a = walkWeightAt(alone, t, dt), b = walkWeightAt(both, t, dt);
+    worst = Math.max(worst, Math.abs(a - b)); step = Math.max(step, Math.abs(a - prev)); prev = a;
+  }
+  assert.ok(worst < 1e-9, `the weight a client draws before the next window arrives equals the one after (${worst})`);
+  assert.ok(step <= (1.5 * 0.25 * dt) / WALK_EASE + 1e-9, `eased, not snapped: ${step} per quarter tick`);
+  // without the window end (the old reading) a stop whose last keyframes are one steady line held its share from the
+  // arrival on, until the next window came: the weight then fell by most of a stride in one frame
+  const flat: PoseSample[] = [[0, 0, 0, 0, 0], [9, 540, 0, 0, 0]], old = gaitSegments([{ track: flat, offset: 0 }], dt);
+  const fixed = gaitSegments([{ track: flat, offset: 0, end: 20 }], dt), next = gaitSegments([{ track: flat, offset: 0, end: 20 }, { track: [[0, 540, 0, 0, 0]], offset: 20, end: 20 }], dt);
+  let gap = 0, same = 0;
+  for (let t = 6; t <= 14; t += 0.25) { gap = Math.max(gap, Math.abs(walkWeightAt(old, t, dt) - walkWeightAt(next, t, dt))); same = Math.max(same, Math.abs(walkWeightAt(fixed, t, dt) - walkWeightAt(next, t, dt))); }
+  assert.ok(gap > 0.3 && same < 1e-9, `old reading off by ${gap}, now by ${same}`);
+});
