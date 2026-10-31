@@ -296,13 +296,20 @@ export async function run(a) {
 
     s = start(`Find ${SOUL.name} through Explore and follow them`);
     from = since();
+    const slow = a.timeoutSeconds * 1000;                                 // software GL can starve the page's main thread
     await page.getByRole('button', { name: /Explore/ }).click();
+    const explore = page.getByRole('dialog', { name: /Explore/ });
+    const search = explore.getByRole('searchbox', { name: /Search locations and Souls/ });
+    await search.waitFor({ state: 'visible', timeout: slow });
+    await search.click();
     await page.keyboard.type(SOUL.name, { delay: 60 });
-    await page.getByText(SOUL.name, { exact: true }).filter({ visible: true }).first().waitFor({ state: 'visible', timeout: 10_000 });
-    await page.keyboard.press('Enter');
-    await page.getByText(new RegExp(`Following\\s*${SOUL.name}`)).filter({ visible: true }).first().waitFor({ state: 'visible', timeout: 15_000 });
+    await waitFor(async () => (await search.inputValue()) === SOUL.name, slow, 'the Explore search to hold the typed name');
+    await explore.getByRole('region', { name: /Souls in/ }).getByText(SOUL.name, { exact: true }).first().waitFor({ state: 'visible', timeout: slow });
+    check(s, 'expect', true, `Explore lists ${SOUL.name} under "Souls in ${WORLD.name}"`);
+    await page.keyboard.press('Enter');                                   // picks the first result, as a click would
+    await page.getByText(new RegExp(`Following\\s*${SOUL.name}`)).filter({ visible: true }).first().waitFor({ state: 'visible', timeout: slow });
     check(s, 'expect', true, `the "Following ${SOUL.name}" chip shows`);
-    const framed = await waitFor(async () => { const p = await page.evaluate(SCENE_PROBE, entityId); const [x, y, z] = p.figure?.ndc ?? [9, 9, 9]; return Math.abs(x) < 0.9 && Math.abs(y) < 0.9 && z < 1 && p; }, 15_000, `${SOUL.name} in view`).catch(() => null);
+    const framed = await waitFor(async () => { const p = await page.evaluate(SCENE_PROBE, entityId); const [x, y, z] = p.figure?.ndc ?? [9, 9, 9]; return Math.abs(x) < 0.9 && Math.abs(y) < 0.9 && z < 1 && p; }, slow, `${SOUL.name} in view`).catch(() => null);
     check(s, 'expect', !!framed, framed ? `${SOUL.name} is in frame (screen position ${framed.figure.ndc.slice(0, 2).join(', ')})` : `${SOUL.name} never came into view`);
     await sleep(1500);
     await shot('3-person.png');
@@ -313,6 +320,10 @@ export async function run(a) {
     summary.status = e instanceof UsageError ? 'abort' : 'fail';
     summary.error = String(e?.message ?? e);
     if (!e.assertion) console.error(`[smoke] ${e instanceof UsageError ? 'precondition' : 'error'}: ${summary.error}`);
+    if (page && summary.status === 'fail') {
+      const p = join(shots, 'failure.png');
+      if (await page.screenshot({ path: p, timeout: 60_000 }).then(() => true, () => false)) summary.screenshots.push(rel(p));
+    }
   } finally {
     const video = page?.video?.();
     await teardown();
