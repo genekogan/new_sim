@@ -396,10 +396,16 @@ export class GodNav {
       const exclusions = this.h.outdoorRegionExclusions?.(t.ref);
       const valid = (g: {p: Vec2; level: number} | null) => !!g && (exclusions === undefined || g.level === 0 && inPoly(g.p[0], g.p[1], t.area!) && exclusions.every(poly => polyDist(poly, g.p) >= HUMAN_RADIUS + .07));
       const outdoorNear = (p: Vec2, ring: number) => {const g = near(p, 0, ring);return valid(g) ? g : null;};
-      goal = inPoly(me[0], me[1], t.area!) ? (outdoorNear(me, 8) ?? outdoorNear(me, 40)) : outdoorNear(t.at, 40);
-      goal ??= outdoorNear(nearestOn(t.area!, me, true).q, 16);
+      // `raw` is the WALK3 goal from the same standing searches without the outdoor-region rule (an area with no
+      // standing room inside, a dense forest or a lake, is reached at its edge or on the main ground beside it).
+      // Without exclusions it is the goal itself; with them it is the last resort below, never inside an interior.
+      const edge = nearestOn(t.area!, me, true).q, inside = inPoly(me[0], me[1], t.area!);
+      let raw = inside ? near(me, 0, 8) : near(t.at, 0, 40);
+      goal = valid(raw) ? raw : null;
+      if (inside && !goal) { const g = near(me, 0, 40); raw ??= g; goal = valid(g) ? g : null; }
+      if (!goal) { const g = near(edge, 0, 16); raw ??= g; goal = valid(g) ? g : null; }
       // its edge spot can be a pocket (a slope wood) while open main ground lies nearer its middle: try both
-      goal = toMain(goal, 80, nearestOn(t.area!, me, true).q, t.at);
+      goal = toMain(goal, 80, edge, t.at);
       if (!valid(goal)) goal = null;
       if (!goal && exclusions !== undefined) {
         // A clear room floor is not the outdoor area around it. Search a bounded
@@ -413,9 +419,13 @@ export class GodNav {
         for (const p of seeds) {
           if (!inPoly(p[0], p[1], t.area!) || !exclusions.every(poly => polyDist(poly, p) >= HUMAN_RADIUS + .07)) continue;
           if (++tried > 32) break;
-          const g = toMain(outdoorNear(p, 3), 80, nearestOn(t.area!, me, true).q, t.at);
+          const g = toMain(outdoorNear(p, 3), 80, edge, t.at);
           if (valid(g)) {goal = g;break;}
         }
+        // No clear standing room inside the area at all: keep its WALK3 edge goal when that lands in no interior, so
+        // the rule never turns a reachable forest or lake into a place with no walk (walk gate, release 404)
+        const legacy = goal ? null : toMain(raw, 80, edge, t.at);
+        if (legacy && legacy.level === 0 && exclusions.every(poly => polyDist(poly, legacy.p) >= HUMAN_RADIUS + .07)) goal = legacy;
       }
     } else if (t.kind === 'room') {
       // the room's reachable standing point, moved aside when another body already stands on it (two Souls told to go
