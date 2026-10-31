@@ -139,12 +139,12 @@ at the same tick and compares JSON; busy = `team/scratch/srv/split/busy.mjs`: th
 | | Result |
 |---|---|
 | Oracle, scattered Souls, 3 passes × 7 Souls (run1) | **21/21 identical** (here subset and caps subset) |
-| Oracle, 6 Souls converged on one place (`field`, run2) | **7/7 identical**, with 3–5 Souls in `near`, 16–30 things and 7–15 subset offers each (pass 2 in `run2/oracle-2.json`) |
+| Oracle, 6 Souls converged on one place (`field`, run2) | **7/7 identical**, with 3–5 Souls in `near`, 16–30 things and 7–15 subset offers each (two passes: 14/14) |
 | Worker answer CPU, `here` subset | 1.7–9 ms warm (13.5 ms max on the first pass) |
 | Worker answer CPU, `capabilities` subset | 0.4–2.2 ms |
-| Main thread, the full `hereFrame` for the same Souls (for scale; it includes the whole `binds()` menu of 8,961–9,609 offers) | 236–745 ms, and **11–12 s** for one Soul standing among many objects (`kindOf` calls `objects.all()` once per nearby object, here.ts 241; L3's 2b4f6e1aa fixes this on its branch) |
+| Main thread, the full `hereFrame` for the same Souls (for scale; it includes the whole `binds()` menu of 8,961–9,609 offers) | 214–745 ms, and **11–22 s** for one Soul standing among many objects (`kindOf` calls `objects.all()` once per nearby object, here.ts 241; L3's 2b4f6e1aa fixes this on its branch) |
 | **Busy-loop 2 s** on the tick thread, run1 (twice) | the worker gave 692 and 548 answers; wall **p50 1.8 ms, p99 8.6–9.6 ms, max 11.0–13.3 ms** (bar ≤ 20 ms); the tick stood still (1–2 distinct ticks seen); the world's own `/healthz` took 1.9–2.1 s |
-| Busy-loop 2 s, run2 (converged) | BUSY2_RESULT |
+| Busy-loop 2 s, run2 (converged) | 878 answers, wall **p50 1.2 ms, p99 5.3 ms, max 7.3 ms**; `/healthz` 2.1 s |
 
 So the transport, the indexes and the "answer while the engine thread is wedged" property all work, at a cost that
 fits easily. What the spike does **not** show is the rest of `binds()`: the (b)/(c) rows of §1.2 are exactly the part
