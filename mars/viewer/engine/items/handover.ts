@@ -17,7 +17,7 @@ import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { angleDelta, datan2, hypot, wrapAngle, type Vec3 } from '../core/math.ts';
 import { bodyFrame, carryHand, lerp3, restHand, sideOf, smooth, at, type Hand } from './body.ts';
-import { ITEM_REACH_SECONDS, ITEM_RECOVERY_SECONDS } from './presentation.ts';
+import { HANDOVER_SETTLE_SECONDS, ITEM_REACH_SECONDS, ITEM_RECOVERY_SECONDS } from './presentation.ts';
 import { graspPoint, heldYaw, inHand, isItem, poseAtHand, putInHand } from './model.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
@@ -54,7 +54,7 @@ const schema = z.object({
   waitSeconds: z.number().min(1).max(120).optional(),
 }).strict();
 export type HandOverParams = z.infer<typeof schema>;
-type Phase = 'face' | 'raise' | 'offering' | 'let-go' | 'lower' | 'recover' | 'wait' | 'reach' | 'contact' | 'withdraw' | 'cancel-withdraw' | 'done';
+type Phase = 'face' | 'raise' | 'offering' | 'let-go' | 'lower' | 'recover' | 'wait' | 'reach' | 'contact' | 'withdraw' | 'cancel-withdraw' | 'cancel-recover' | 'done';
 type Exec = {
   id: string; p: HandOverParams; hand: Hand; phase: Phase; t: number; waited: number;
   from?: Vec3; to?: Vec3;
@@ -144,6 +144,8 @@ export const handOver: ActionDef<HandOverParams, { hand: Hand }, Exec> = {
   start(rt, p, prog, id) {
     const a = rt.world.entities[p.actor];
     a.human!.task = id;
+    // a receiver lets an idle gesture go from the moment it agrees (fadeTick), before its hand moves at all
+    if (p.mode === 'receive') a.human!.itemTransferV1 = { item: p.item, hand: prog.hand, action: id, mode: 'take', startTick: rt.tick, hold: true, fadeTick: rt.tick };
     return { id, p: structuredClone(p), hand: prog.hand, phase: 'face', t: 0, waited: 0 };
   },
   step(rt, ex): StepResult {
@@ -165,7 +167,8 @@ export const handOver: ActionDef<HandOverParams, { hand: Hand }, Exec> = {
     // the moments after the change (let go, draw in, recover) finish as they are
     if (ex.p.mode === 'offer' && (ex.phase === 'raise' || ex.phase === 'offering')) { beginLower(rt, ex, a); return { ok: true, deferred: true }; }
     if (ex.p.mode === 'receive' && (ex.phase === 'reach' || ex.phase === 'contact') && it?.support?.kind === 'in-hand' && (it.support as { by: string }).by !== ex.p.actor) { beginCancelWithdraw(rt, ex, a); return { ok: true, deferred: true }; }
-    if (['lower', 'let-go', 'recover', 'withdraw', 'cancel-withdraw'].includes(ex.phase)) return { ok: true, deferred: true };
+    if (ex.p.mode === 'receive' && (ex.phase === 'face' || ex.phase === 'wait')) { beginCancelRecover(rt, ex, a); return { ok: true, deferred: true }; }
+    if (['lower', 'let-go', 'recover', 'withdraw', 'cancel-withdraw', 'cancel-recover'].includes(ex.phase)) return { ok: true, deferred: true };
     if (a.human.itemTransferV1?.action === ex.id) delete a.human.itemTransferV1;
     if (a.human.task === ex.id) { delete a.human.task; if (a.human.activity === 'walk') a.human.activity = 'idle'; delete a.human.speed; }
     if (!inHand(rt.world, ex.p.actor, ex.hand)) setHand(a, ex.hand, undefined);
@@ -179,6 +182,13 @@ function beginLower(rt: Runtime, ex: Exec, a: Entity) {
   ex.from = handNow(a, ex.hand); ex.to = carryHand(bodyFrame(a), ex.hand); ex.off0 = ex.off ?? [0, 0, 0];
   ex.phase = 'lower'; ex.t = 0; ex.outcome = 'kept';
   const tr = a.human!.itemTransferV1; if (tr?.action === ex.id && tr.holdTick === undefined) tr.holdTick = rt.tick;
+}
+/** A receiver ending before the change: idle gestures come back over the recovery, never all at once (the record's
+ *  fade would otherwise jump from 0 to full when it clears). */
+function beginCancelRecover(rt: Runtime, ex: Exec, a: Entity, error?: Diagnostic) {
+  if (error) ex.error = error;
+  ex.phase = 'cancel-recover'; ex.t = 0; a.human!.activity = 'idle'; setHand(a, ex.hand, undefined);
+  const tr = a.human!.itemTransferV1; if (tr?.action === ex.id) { if (tr.cancelTick === undefined) tr.cancelTick = rt.tick; tr.releaseTick = rt.tick; }
 }
 function beginCancelWithdraw(rt: Runtime, ex: Exec, a: Entity) {
   ex.from = handNow(a, ex.hand); ex.to = restHand(bodyFrame(a), ex.hand); ex.phase = 'cancel-withdraw'; ex.t = 0;
@@ -273,29 +283,36 @@ function stepReceive(rt: Runtime, ex: Exec, a: Entity, b: Entity | undefined, it
   if (ex.phase === 'cancel-withdraw') {
     ex.t++; h.activity = 'reach'; setHand(a, ex.hand, lerp3(ex.from!, ex.to!, smooth(ex.t / R)));
     if (ex.t < R) return { status: 'running', phase: 'cancel-withdraw' };
-    h.activity = 'idle';
+    beginCancelRecover(rt, ex, a); return { status: 'running', phase: 'cancel-recover' };
+  }
+  if (ex.phase === 'cancel-recover') {
+    ex.t++; h.activity = 'idle'; setHand(a, ex.hand, undefined);
+    if (ex.t < ticks(ITEM_RECOVERY_SECONDS)) return { status: 'running', phase: 'cancel-recover' };
     return { status: 'failed', diagnostic: ex.error ?? issue('withdrawn', 'The hand-over stopped before you took it.', [a.id, ex.p.item]) };
   }
   const offered = !!b?.human && !!it && it.support?.kind === 'in-hand' && (it.support as { by: string }).by === b.id;
   if (!offered) {
     if (ex.phase === 'reach' || ex.phase === 'contact') { ex.error = issue('withdrawn', `${ex.p.partner} is no longer holding it out.`, [a.id, ex.p.partner]); beginCancelWithdraw(rt, ex, a); return { status: 'running', phase: 'cancel-withdraw' }; }
-    return { status: 'failed', diagnostic: issue('not-offered', `${ex.p.partner} is not holding ${ex.p.item} out.`, [a.id, ex.p.partner]) };
+    beginCancelRecover(rt, ex, a, issue('not-offered', `${ex.p.partner} is not holding ${ex.p.item} out.`, [a.id, ex.p.partner])); return { status: 'running', phase: 'cancel-recover' };
   }
   if (ex.phase === 'face' || ex.phase === 'wait') {
     // turn to face the giver (never step: the giver came to stand here); wait for the item to be held out
     setHand(a, ex.hand, undefined);
     const want = headingTo(a, b!), near = apart(a, b!) <= NEAR;
     if (near) a.pose.yaw = turnToward(a.pose.yaw, want, TURN_RATE * DT);
-    const offer = near && Math.abs(angleDelta(a.pose.yaw, want)) <= 0.02 ? raisedOffer(rt, ex, b!, it!) : null;
+    // the hand moves only once an idle gesture has gone (HANDOVER_SETTLE_SECONDS from the acceptance)
+    const settled = rt.tick >= (h.itemTransferV1?.fadeTick ?? -Infinity) + ticks(HANDOVER_SETTLE_SECONDS);
+    const offer = near && settled && Math.abs(angleDelta(a.pose.yaw, want)) <= 0.02 ? raisedOffer(rt, ex, b!, it!) : null;
     ex.waited++;
     if (!offer) {
-      if (ex.waited * DT > (ex.p.waitSeconds ?? 30)) return { status: 'failed', diagnostic: issue('no-offer', `${ex.p.partner} did not hold it out.`, [a.id, ex.p.partner]) };
+      if (ex.waited * DT > (ex.p.waitSeconds ?? 30)) { beginCancelRecover(rt, ex, a, issue('no-offer', `${ex.p.partner} did not hold it out.`, [a.id, ex.p.partner])); return { status: 'running', phase: 'cancel-recover' }; }
       ex.phase = near ? 'face' : 'wait'; return { status: 'running', phase: ex.phase };
     }
     // the contact point: beside the giver's palm, the same distance the other side of the item's centre
     const target: Vec3 = [2 * offer.centre[0] - offer.palm[0], offer.palm[1], 2 * offer.centre[2] - offer.palm[2]].map((x) => Math.round(x * 1000) / 1000) as Vec3;
     ex.phase = 'reach'; ex.t = 0; ex.from = handNow(a, ex.hand); ex.to = target;
-    h.itemTransferV1 = { item: it!.id, hand: ex.hand, action: ex.id, mode: 'take', startTick: rt.tick, reachTick: rt.tick - 1, target, hold: true };
+    const fadeTick = h.itemTransferV1?.action === ex.id ? h.itemTransferV1.fadeTick : undefined;
+    h.itemTransferV1 = { item: it!.id, hand: ex.hand, action: ex.id, mode: 'take', startTick: rt.tick, reachTick: rt.tick - 1, target, hold: true, ...(fadeTick !== undefined ? { fadeTick } : {}) };
   }
   if (ex.phase === 'reach') {
     ex.t++; h.activity = 'reach'; setHand(a, ex.hand, lerp3(ex.from!, ex.to!, smooth(ex.t / R)));

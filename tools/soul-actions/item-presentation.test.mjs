@@ -1,4 +1,4 @@
-import test from'node:test';import assert from'node:assert/strict';import{itemPresentation,itemPostureK,ITEM_RECOVERY_SECONDS,ITEM_REACH_SECONDS}from'../../mars/viewer/engine/items/presentation.ts';
+import test from'node:test';import assert from'node:assert/strict';import{itemPresentation,itemPostureK,ITEM_RECOVERY_SECONDS,ITEM_REACH_SECONDS,HANDOVER_SETTLE_SECONDS}from'../../mars/viewer/engine/items/presentation.ts';
 test('native item reach/recovery blends are random-access and end exactly before the field clears',()=>{const p={item:'lamp',hand:'right',action:'a1',startTick:0,reachTick:10};const R=Math.round(ITEM_REACH_SECONDS/.05);assert.equal(itemPresentation(p,undefined,10,.05).weight,0);assert.equal(itemPresentation(p,undefined,10+R,.05).weight,1);assert.equal(itemPresentation(p,{right:'lamp'},12,.05).weight,1,'custody keeps full grip');const r={...p,releaseTick:40};assert.deepEqual(itemPresentation(r,undefined,40,.05),{weight:1,idleBlend:0,transfer:true},'released arm starts at the kept rest point');const end=itemPresentation(r,undefined,40+ITEM_RECOVERY_SECONDS/.05,.05);assert.equal(end.idleBlend,1);assert.equal(end.weight,0,'and has eased fully back to the clip when recovery ends');assert.deepEqual(itemPresentation(r,{right:'lamp'},40,.05),{weight:1,idleBlend:0,transfer:true});assert.equal(itemPresentation(undefined,undefined,100,.05),undefined,'old takes unchanged');assert.deepEqual(itemPresentation(undefined,{right:'lamp'},100,.05),{weight:1,idleBlend:0},'plain holding is not a transfer');});
 test('item posture hump: zero at reach start and withdraw end, full at the grasp, continuous on the hand clock',()=>{
  const dt=.05,R=Math.round(ITEM_REACH_SECONDS/dt),p={item:'lamp',hand:'right',action:'a1',startTick:0,reachTick:10,target:[1,.75,2]};
@@ -36,4 +36,11 @@ test('entry 41: a hand-over hold keeps the bend while the hand is held out and e
  assert.equal(itemPostureK(q,10+2*R+400,dt),0,'back to standing one reach after the hold ends');assert.ok(max<=.08,'no step '+max);
  const early={...p,holdTick:15};assert.ok(itemPostureK(early,15,dt)>0&&itemPostureK(early,15+R,dt)===0,'a hold ended mid-raise eases down from where it was');
  const old={item:'lamp',hand:'right',action:'a1',startTick:0,reachTick:10};assert.equal(itemPostureK(old,10+R+R/2,dt),1-(k=>k*k*(3-2*k))(.5),'records without hold: the old hump');
+});
+test('entry 41: a receiver lets an idle gesture go from fadeTick, before the reach, and gets it back after a cancel without a jump',()=>{
+ const dt=.05,S=Math.round(HANDOVER_SETTLE_SECONDS/dt),p={item:'lamp',hand:'left',action:'a2',mode:'take',startTick:0,hold:true,fadeTick:10};
+ assert.equal(itemPresentation(p,undefined,10,dt).idleBlend,1);assert.equal(itemPresentation(p,undefined,10+S,dt).idleBlend,0,'gone before the hand moves');assert.equal(itemPresentation(p,undefined,10+S,dt).weight,0);
+ const r={...p,reachTick:10+S+5,target:[0,1,0]};assert.equal(itemPresentation(r,undefined,10+S+20,dt).idleBlend,0,'and stays gone through the reach');
+ const c={...p,cancelTick:20,releaseTick:20};let prev=itemPresentation(p,undefined,19,dt).idleBlend,max=0;for(let t=20;t<=20+30;t++){const v=itemPresentation(c,undefined,t,dt).idleBlend;max=Math.max(max,Math.abs(v-prev));prev=v;}
+ assert.ok(max<.08,'cancelled during the settle: the gesture fades back, no jump '+max);assert.equal(itemPresentation(c,undefined,20+Math.round(1.2/dt),dt).idleBlend,1);
 });

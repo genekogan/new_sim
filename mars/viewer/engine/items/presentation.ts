@@ -16,7 +16,11 @@ export const ITEM_ARM_LEAD_SECONDS=.35;
  *  ('take') or a put; absent on older records. `cancelTick`: the tick a reach was interrupted (the hand withdraws). */
 /** `hold` (entry 41, a hand-over): the hand stays at `target` after the reach until `holdTick` (the change of holder, or
  *  a lowering), so the bend holds there too and eases back from `holdTick`. */
-export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number];hold?:true;holdTick?:number};
+/** `fadeTick` (entry 41, a receiver): idle gestures fade out over HANDOVER_SETTLE_SECONDS from this tick, before the reach
+ *  starts, instead of over the reach (take 2: a gesture still playing at 0.7 weight lifted the free hand 0.35 m mid-reach). */
+export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number];hold?:true;holdTick?:number;fadeTick?:number};
+/** A receiver lets its idle gesture go (folded arms open, a hand comes down from the hair) before reaching (s). */
+export const HANDOVER_SETTLE_SECONDS=1.4;
 /** `posture`: bend toward the fixed grasp point, scaled by `k` — smoothstep up over the reach and down over the
  *  withdraw, the same clock as the engine's hand lerp, so the torso can neither pop nor hop between solutions.
  *  `goal`: a pick-up's empty-handed reach, drawn instead of the engine hand point: from the drawn palm (clip and idle
@@ -40,11 +44,12 @@ export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:s
   const weight=transfer.reachTick===undefined?0:smooth((tick-transfer.reachTick)*dt/ITEM_REACH_SECONDS);
   return{weight:holding?1:weight,idleBlend:holding?0:1-weight,...posture};
  }
- if(transfer.reachTick===undefined&&transfer.releaseTick===undefined)return{weight:holding?1:0,idleBlend:holding?0:1,...posture};
+ const settle=transfer.fadeTick===undefined?undefined:1-smooth((tick-transfer.fadeTick)*dt/HANDOVER_SETTLE_SECONDS);
+ if(transfer.reachTick===undefined&&transfer.releaseTick===undefined)return{weight:holding?1:0,idleBlend:holding?0:settle??1,...posture};
  const s=transfer.reachTick===undefined?Infinity:(tick-transfer.reachTick)*dt;
  // Only a pick-up starts with free arms, so only it fades an idle gesture out (on through the grasp and the withdraw,
  // or an interrupted reach, on the reach-start clock).
- const pickUp=transfer.mode==='take',fade=pickUp?1-smooth(s/ITEM_GESTURE_FADE_SECONDS):0;
+ const pickUp=transfer.mode==='take',fade=pickUp?settle??1-smooth(s/ITEM_GESTURE_FADE_SECONDS):0;
  // An empty-handed pick-up reach draws the hand from where it is to the fixed grasp point on the reach clock. Blending
  // onto the moving engine hand (from the rest point by the hip) with the hand's own smoothstep drew
  // clip + (hand − clip)·s with hand = rest + (grasp − rest)·s: the palm lingered and then rushed (s² peaks 1.3× a
