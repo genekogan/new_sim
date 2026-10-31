@@ -1789,12 +1789,27 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // R2 stroll: where the Soul stands (its place path), so a stroll of that place can wander in place when its loop is closed
     return Object.assign(this.vocabularyOf(soul, caps), {here: this.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier').map(p => p.id)});
   }
-  private vocabularyOf(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {
-    const w = this.host.engine.world as NativeWorld, me = this.body(soul.entityId), all = [...this.places.byId.values()], root = all.find(p => p.parent === null);
+  /** L3 (b): the places a Soul's words can name (VocabPlace objects, never written after they are built, so the vocabulary's
+   *  per-place word cache holds), kept while the places, the god's world, the static world and what this Soul knows of
+   *  secret places do not change (with no secret place, one listing serves every Soul). */
+  private vocabPlaces(soul: EdgeSoul): {root: string[]; known: Place[]; withheld: string[]; places: VocabContext['places']} {
+    const marked = this.knowledge.marked().size, knowSig = marked ? `${soul.soulId}:${this.knowledge.version}:${this.knowledge.memory(soul.soulId).size}` : '*';
+    const key = `${this.staticVersion()}|${this.menuInputs()}|${knowSig}`, hit = this.vocabPlaceMemo.get(knowSig);
+    if (hit && hit.key === key) return hit.value;
+    const w = this.host.engine.world as NativeWorld, all = [...this.places.byId.values()], rootPlace = all.find(p => p.parent === null);
     const aliases = bootAliases(this);
     // knowledge/1: a secret place this Soul does not know is no name to resolve (nor a "contains it" fallback naming it)
-    const known: typeof all = [], withheld: string[] = [];
+    const known: Place[] = [], withheld: string[] = [];
     for (const p of all) if (p.parent !== null) {if (this.knowledge.knows(soul.soulId, p.id)) known.push(p); else withheld.push(tokens(p.name).join(' '), tokens(p.id).join(' '));}
+    const places = known.map(p => ({id: p.id, ref:p.ref, name: p.name, aliases: [...new Set([...(aliases[p.id] ?? []),...(p.aliases??[])])], genericAliases:p.genericAliases, center: centroid(p.polygon), polygon:p.polygon, level:p.level, parent: p.semanticParent === undefined ? p.parent : p.semanticParent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)}));
+    const value = {root: rootPlace ? [...tokens(rootPlace.id), ...tokens(rootPlace.name)] : [], known, withheld, places};
+    this.vocabPlaceMemo.set(knowSig, {key, value}); if (this.vocabPlaceMemo.size > 64) this.vocabPlaceMemo.delete(this.vocabPlaceMemo.keys().next().value!);
+    return value;
+  }
+  private vocabPlaceMemo = new Map<string, {key: string; value: {root: string[]; known: Place[]; withheld: string[]; places: VocabContext['places']}}>();
+  private vocabularyOf(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {
+    const w = this.host.engine.world as NativeWorld, me = this.body(soul.entityId);
+    const {root, known, withheld, places} = this.vocabPlaces(soul);
     // (L3 c: an object offer's place from what the providers built; every object's row is read only for one they did not)
     let objects: Map<string, {placeId: string}> | null = null;
     const objectPlace = (id: string) => this.objectPlaces.get(id) ?? (objects ??= new Map((this.comms?.objects.all() ?? []).map(o => [o.id, o]))).get(id)?.placeId;
@@ -1822,8 +1837,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (!set) {set = new Set(); for (const s of this.spots.spots) if (s.place && (s.activity === verb || s.also?.includes(verb))) for (let p: string | undefined = s.place, n = 0; p && n < 20; p = this.places.byId.get(p)?.parent ?? undefined, n++) set.add(p); spotPlaces.set(verb, set);}
       return set.has(placeId);
     };
-    return {caps, me: here, ...(me ? {yaw:me.pose.yaw} : {}), root: root ? [...tokens(root.id), ...tokens(root.name)] : [], elsewhere, hasSpot,
-      withheld, places: known.map(p => ({id: p.id, ref:p.ref, name: p.name, aliases: [...new Set([...(aliases[p.id] ?? []),...(p.aliases??[])])], genericAliases:p.genericAliases, center: centroid(p.polygon), polygon:p.polygon, level:p.level, parent: p.semanticParent === undefined ? p.parent : p.semanticParent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
+    return {caps, me: here, ...(me ? {yaw:me.pose.yaw} : {}), root, elsewhere, hasSpot, withheld: [...withheld], places: [...places],
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
         if (t.kind === 'spot') {
