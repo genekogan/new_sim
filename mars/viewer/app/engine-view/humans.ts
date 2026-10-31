@@ -142,9 +142,7 @@ type View = {
   since?: number;
   prevAct?: string;
   prevBase?: string;
-  /** Seconds since the body last did something other than stand (idle / reach); undefined: unknown (no ramp). */
   restAge?: number;
-  /** Replay: the absolute clock (s) at which the current rest began, carried across take windows. */
   restFrom?: number;
   partner?: string;
   partnerP?: THREE.Vector3;
@@ -227,7 +225,6 @@ export type SampledHuman = {
   activityAge?: number;
   prevActivity?: string;
   prevBaseActivity?: string;
-  /** Seconds the body has stood (idle / reach) since it last did anything else in this take; absent: unknown. */
   restAge?: number;
 };
 export type { Hands };
@@ -292,11 +289,9 @@ function nearest(list: [number, number, number][], x: number, z: number) {
 const baseOf = (act: string, base?: string) => { if (act === 'cycle') return 'sit'; const b = OVERLAYS.has(act) ? (base ?? 'idle') : act; return b === 'sit-ground' ? 'sit' : b; };
 /** Sitting on the ground (sit-ground, or an overlay layered on it): the seat is the grass. */
 const onGround = (act: string, base?: string) => act === 'sit-ground' || (base === 'sit-ground' && OVERLAYS.has(act));
-/** Idle variety layers fade in over this long (s) after the body comes to rest — the variant's own fade-in. */
-const IDLE_VARIETY_ONSET = 1.2;
-/** Standing activities the idle variety may play through (an opted-in item reach keeps its own handoff clock). */
-export const REST_ACTS = new Set(['idle', 'reach']);
 /** Idle variety: now and then (about 6 s in every 25, per person) the Idle_Neutral clip blends in. */
+const IDLE_VARIETY_ONSET = 1.2;
+export const REST_ACTS = new Set(['idle', 'reach']);
 function neutralWeight(id: string, t: number) { const ph = (hashId(id) % 997) / 997, u = ((t / 25 + ph) % 1) * 25; return u < 1 ? smooth(u) : u < 6 ? 1 : u < 7 ? 1 - smooth(u - 6) : 0; }
 const handList = (h: Hands): Vec3[] => [h.left, h.right].filter((q): q is Vec3 => !!q);
 const copyHands = (h?: Hands): Hands => ({ ...(h?.left ? { left: [...h.left] as Vec3 } : {}), ...(h?.right ? { right: [...h.right] as Vec3 } : {}) });
@@ -649,8 +644,6 @@ export class HumanViews {
       v.running = act === 'jog' || act === 'run' || (typeof f.speed === 'number' && f.speed > RUN_SPEED);
       v.speed = typeof f.speed === 'number' ? f.speed : 0;
       v.since = f.activityAge;
-      // A live client's take window slides every second and may drop the moment the body came to rest: carry the
-      // rest clock (absolute seconds) across windows instead of snapping the idle variety to full weight.
       if (f.restAge !== undefined) v.restFrom = t - f.restAge;
       else if (!REST_ACTS.has(act)) v.restFrom = t;
       v.restAge = v.restFrom !== undefined && t >= v.restFrom ? t - v.restFrom : undefined;
@@ -765,7 +758,8 @@ export class HumanViews {
     const idleFree = (v.activity === 'idle'||(!!v.itemPose&&v.activity==='reach')) && b.sitW === 0 && (!engineHands||(v.itemPose?.weight??1)<1) && freeBody && !lib.cur;
     const idleHandoff=v.itemPose?.idleBlend??(v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1);
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
-    // weight it crossed the arms in one frame whenever a walk ended inside a person's variety window.
+    // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
+    // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
     const restOnset = v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
     const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;

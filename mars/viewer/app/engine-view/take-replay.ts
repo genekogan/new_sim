@@ -274,8 +274,6 @@ export class TakePeople {
     for (let i = a.bt.length - 1; i >= 0; i--) if (a.bt[i] < a.t[k]) { b = a.bv[i]; break; }
     return { activityAge: (tick - a.t[k]) * this.take.dt, prevActivity: a.v[k - 1], ...(b ? { prevBaseActivity: b } : {}), ...this.restAge(a, k, tick) };
   }
-
-  /** Seconds standing (idle / reach) since the body last did anything else (idle variety onset); absent: unknown. */
   private restAge(a: { t: number[]; v: string[] }, k: number, tick: number): Pick<SampledHuman, 'restAge'> {
     if (!REST_ACTS.has(a.v[k])) return {};
     let i = k;
