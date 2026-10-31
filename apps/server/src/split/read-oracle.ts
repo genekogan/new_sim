@@ -89,14 +89,24 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     try {
       const x = l as unknown as {body(id: string): {pose: {p: number[]}; human?: {level?: number; activity?: string}} | undefined; placeLevel(n?: number): number; places: {byId: Map<string, {level?: number}>}};
       const b = x.body(s.entityId), lv = b?.human?.level, pl = x.placeLevel(lv), path = l.placePathOf(s.soulId).map(p => p.id);
-      return {p: b?.pose.p, level: lv, placeLevel: pl, activity: b?.human?.activity, path, places: x.places.byId.size, levels: path.map(id => x.places.byId.get(id)?.level ?? 0)};
+      const y = l as unknown as {carriersNative(): {id: string}[]; carrierView(id: string): unknown};
+      let rides: unknown; try {const cs = y.carriersNative(); rides = {ids: cs.map(c => c.id).slice(0, 3), view: (() => {try {return JSON.stringify(y.carrierView(cs[0]?.id ?? '')).slice(0, 300);} catch (e) {return 'throws ' + String(e).slice(0, 300);}})()};} catch (e) {rides = 'throws ' + String(e).slice(0, 300);}
+      return {p: b?.pose.p, level: lv, placeLevel: pl, activity: b?.human?.activity, path, places: x.places.byId.size, levels: path.map(id => x.places.byId.get(id)?.level ?? 0), rides};
     } catch (e) {return {error: String(e)};}
   };
   const facts = (l: EdgeLedger, ids: string[]) => ids.map(id => {const p = (l as unknown as {places: {byId: Map<string, {level?: number; carrier?: unknown; parent?: string | null; polygon?: number[][]}>}}).places.byId.get(id); return p ? {id, level: p.level, carrier: !!p.carrier, parent: p.parent, n: p.polygon?.length, poly: JSON.stringify(p.polygon).slice(0, 120)} : {id, missing: true};});
+  /** the whole menus' ids, both ways (dump only): what only one side offers */
+  const fullDiff = (s: EdgeSoul) => {
+    const ids = (l: EdgeLedger) => {try {return (l.capabilities(s) as {id: string; available?: boolean}[]).map(c => c.id + (c.available === false ? '!' : ''));} catch (e) {return [String(e)];}};
+    const a = ids(L), b = ids(RL), A = new Set(a), B = new Set(b);
+    return {live: a.length, replica: b.length, onlyLive: a.filter(x => !B.has(x)).slice(0, 12), onlyReplica: b.filter(x => !A.has(x)).slice(0, 12)};
+  };
   let next = 0;
   const round = () => {
     if (RW.R.pos.tick !== host.engine.world.tick) {skip('tick'); return;}
     if (RW.R.pos.logSeq !== host.seq) {skip('logSeq'); return;}
+    // the object table moves between deltas too (a layer step after the tick, an advance a listing wrote): the next delta brings it
+    {const g = (L.comms as unknown as {objects?: {generation?(): number}} | undefined)?.objects?.generation?.(); if (g !== undefined && g !== RW.R.objectGen) {skip('objectGen'); return;}}
     warm(); if (!RW.spatial) {skip('no-spatial'); return;}
     const all = souls(); if (!all.length) {skip('no-souls'); return;}
     const s = all[next++ % all.length]; S.rounds++;
@@ -116,7 +126,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
       // where the misses are: the first differing path of each, indices dropped (diagnosis)
       if (diffs.length) {const k = diffs[0].path.replace(/\[\d+\]/g, '[]').split('.').slice(0, 3).join('.'); T.paths[k] = (T.paths[k] ?? 0) + 1;}
       // SIM_READ_ORACLE_DUMP=<dir>: the first three unequal pairs per read, whole (diagnosis; lane only)
-      if (diffs.length && DUMP && S.rounds > DUMP_AFTER && (dumped[name] = (dumped[name] ?? 0) + 1) <= 3) {const dl = diag(L, s) as {path?: string[]}, ids = dl.path ?? []; writeFileSync(`${DUMP}/${name}-${dumped[name]}.json`, JSON.stringify({soulId: s.soulId, tick: RW.R.pos.tick, diag: {live: dl, replica: diag(RL, s), placesLive: facts(L, ids), placesReplica: facts(RL, ids)}, live: a, replica: b}));}
+      if (diffs.length && DUMP && S.rounds > DUMP_AFTER && (dumped[name] = (dumped[name] ?? 0) + 1) <= 3) {const dl = diag(L, s) as {path?: string[]}, ids = dl.path ?? []; writeFileSync(`${DUMP}/${name}-${dumped[name]}.json`, JSON.stringify({soulId: s.soulId, tick: RW.R.pos.tick, diag: {live: dl, replica: diag(RL, s), placesLive: facts(L, ids), placesReplica: facts(RL, ids), ...(name === 'capabilities' ? {full: fullDiff(s)} : {})}, live: a, replica: b}));}
       record(T, name, s.soulId, diffs, missed);
     }
     if (RW.verdicts.misses.size) {src.ask([...RW.verdicts.misses.values()] as never[]); RW.verdicts.misses.clear();}

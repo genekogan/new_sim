@@ -45,7 +45,9 @@ export class ReadOnlyHost {
   private mindsAt = -1; private mindsKey = '';
   private _minds = new Map<string, Mind>(); private _byEntity = new Map<string, Mind>();
   enqueue = mainOnly('host.enqueue'); enqueueChecked = mainOnly('host.enqueueChecked'); enqueueObjectDecision = mainOnly('host.enqueueObjectDecision');
-  quietBarrier = mainOnly('host.quietBarrier'); markSoulDirty = () => {/* a read never dirties a Soul */};
+  /** as world.ts: the world is in a quiet renewal (the replicated `living`) */
+  get quietBarrier() {return !!(this.living as {quiet?: unknown} | undefined)?.quiet;}
+  markSoulDirty = () => {/* a read never dirties a Soul */};
   ownLectureRosterV1 = mainOnly('host.ownLectureRosterV1');
   /** what the ledger would publish on a real host (D1 approach line, the body card): unused in a worker */
   approachV1?: unknown; publicBodyOf?: unknown; recoveryForEdge = false;
@@ -101,11 +103,26 @@ export function readLedger(host: ReadOnlyHost, placeData?: unknown, env: NodeJS.
   L.comms = comms as never;
   // as registerEdgeComms does on main: the object actions are offers (`object:<id>:<action>`)
   L.addCapabilityProvider((soul, only, places) => comms.objects.capabilities(soul, only, places));
+  // the body rule's view (observe self.body): main's rows, read-only; the rule itself (sweep, pokes, reflexes) is main's
+  if (env.SIM_BODY !== '0') {
+    const db = host.db.db as DatabaseSync; let q: ReturnType<DatabaseSync['prepare']> | null | undefined;
+    const view = (id: string) => {
+      if (q === undefined) try {q = db.prepare('SELECT state, doing, since FROM edge_body_v1 WHERE world_id=? AND soul_id=?');} catch {q = null;}
+      const r = q?.get(host.worldId, id) as {state: string; doing: string | null; since: number} | undefined;
+      return r ? {state: r.state, doing: r.doing, since: r.since} : null;
+    };
+    L.bodyRule = {view, reflexOwns: () => false, poke() {}, touch() {}, listen() {}, sweep() {}, restoreAsleep() {}} as never;
+  }
   // the god-fed reads, from what main's pump shipped (absent key = main has no such provider)
   const E = host.rw.ledgerEnv as {weather?: unknown; strikes?: Strike[] | null; spots?: unknown};
   L.weatherNow = (() => 'weather' in E ? E.weather ?? undefined : undefined) as never;
   L.lightningNear = (x: number, z: number) => 'strikes' in E ? lightningFrom(E.strikes ?? [], x, z, host.rw.R.pos.tick) : null;
   L.spotsProvider = () => (E.spots ?? null) as never;
+  // a ride's boarding check is the engine's (a punt's bank and water today): main's answer, as its ledger cached it
+  (L as unknown as {boardingIssue: (id: string, tick: number, route: string) => unknown}).boardingIssue = (id, _tick, route) => {
+    const w = (host.rw.ledgerEnv as {boarding?: Record<string, {route: string; issue: unknown}>}).boarding?.[id];
+    return w && w.route === route ? w.issue : null;
+  };
   return L;
 }
 

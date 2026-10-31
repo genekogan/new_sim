@@ -86,6 +86,9 @@ export class VerdictPump {
     if (L.spotsProvider) {const v = tryOr(() => L.spotsProvider!(), null) ?? null; if (all || v !== this.spotsRef) {this.spotsRef = v; out.spots = structuredClone(v);}}
     // the god bridge's physics facts (seat/bed/item/surface assets, levels): by hash, sent whole when it moved
     if (L.godPhysicsV1) {const h = tryOr(() => L.godPhysicsV1!.hash(), ''); if (all || h !== this.envKeys.physics) {this.envKeys.physics = h; out.physics = tryOr(() => L.godPhysicsV1!.read(), null);}}
+    // the rides' boarding checks (engine-private: a punt's bank and water today), as main's ledger last made them
+    const bc = (L as {boardingChecks?: Map<string, unknown>}).boardingChecks;
+    if (bc) {const j = JSON.stringify([...bc]); if (all || j !== this.envKeys.boarding) {this.envKeys.boarding = j; out.boarding = Object.fromEntries(JSON.parse(j));}}
     // the ground swim offers' recipe and deep-middle answers (main's engine answers each once per water)
     if (L.groundEnvV1) {const v = tryOr(() => L.groundEnvV1!(), null), j = JSON.stringify(v); if (all || j !== this.envKeys.ground) {this.envKeys.ground = j; out.ground = JSON.parse(j);}}
     return Object.keys(out).length ? out : undefined;

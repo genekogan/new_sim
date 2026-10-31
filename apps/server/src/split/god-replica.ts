@@ -31,7 +31,7 @@ export class GodReplica {
   private metaText = {ground: '', state: '', constants: ''};
   private editSeq = -1;
   private commitListeners: CommitListener[] = []; private buildListeners: ((e: BuildNotice) => void)[] = [];
-  readonly cost = {syncs: 0, refreshes: 0, refreshMs: 0, maxRefreshMs: 0, buildRefreshes: 0};
+  readonly cost = {syncs: 0, refreshes: 0, refreshMs: 0, maxRefreshMs: 0, buildRefreshes: 0, whole: 0, patched: 0, readMs: 0};
   bodies: Record<string, unknown> = {};
   layers?: unknown;
 
@@ -73,6 +73,32 @@ export class GodReplica {
     if (!first) for (const fn of this.buildListeners) {try {fn({kind: 'step', id: '', rev, now: this.now(), delta: {} as never} as BuildNotice);} catch {/* listeners never fail a read */}}
     return true;
   }
+  /** Entity rows changed and removed, in place: each entity (and every entity under it, before and after: a moved parent
+   *  moves its children's footprints) re-indexed. Same model as fromSnapshot over the same rows, without the whole build. */
+  private patch(upserts: Entity[], removes: string[]) {
+    const m = this.model, touched = new Set<string>();
+    const mark = (id: string) => {for (const x of m.entities.has(id) ? m.subtree(id) : [id]) touched.add(x);};
+    for (const id of removes) mark(id);
+    for (const e of upserts) mark(e.id);
+    for (const id of removes) m.delete(id);
+    for (const e of upserts) {
+      const old = m.entities.get(e.id);
+      if (!old) {m.insert(e); continue;}
+      if (old.in.parent !== e.in.parent) {m.children.get(old.in.parent)?.delete(e.id); const set = m.children.get(e.in.parent) ?? new Set<string>(); set.add(e.id); m.children.set(e.in.parent, set);}
+      if (old.name !== e.name || old.in.parent !== e.in.parent) {if (old.name && m.names.get(`${old.in.parent}/${old.name}`) === e.id) m.names.delete(`${old.in.parent}/${old.name}`); if (e.name) m.names.set(`${e.in.parent}/${e.name}`, e.id);}
+      m.entities.set(e.id, e);
+    }
+    (m as unknown as {slotMemo?: Map<unknown, unknown> | null}).slotMemo?.clear();
+    for (const e of upserts) mark(e.id);
+    m.readPass(() => {
+      for (const id of touched) {
+        m.unindex(id);
+        const e = m.entities.get(id), def = e && m.resolvedDef(e.def);
+        if (e && def && def.layer === 'solid') m.index(id, m.footprint(e, def));
+      }
+    });
+    this.cost.patched += touched.size;
+  }
   private refresh(first: boolean): boolean {
     const t0 = performance.now(), wid = this.opts.worldId, q = (s: string) => this.db.db.prepare(s);
     const metaRow = q('SELECT body FROM world_meta_v1 WHERE world_id = ?').get(wid) as {body: string} | undefined;
@@ -94,10 +120,18 @@ export class GodReplica {
       const d = JSON.parse(row.body) as StoredDef; allDefs.push(d); if (!this.defHashes.has(row.hash)) {this.defHashes.add(row.hash); defs.push(d);}
     }
     const ground = JSON.stringify(meta.ground ?? null), tiles = ground !== this.metaText.ground; this.metaText.ground = ground;
-    const next = WorldModel.fromSnapshot({constants: meta.constants, state: meta.state, seed: meta.seed, seq: meta.seq, editSeq: meta.editSeq, defs: allDefs, defRefs: meta.defRefs,
-      entities: [...this.rows.values()].map(x => x.e), ground: meta.ground} as never, this.assets.lookup, coreLibrary());
-    for (const k of Object.keys(this.model)) if (!(k in next)) delete (this.model as unknown as Record<string, unknown>)[k];
-    Object.assign(this.model, next);
+    const state = JSON.stringify(meta.state ?? null), constants = JSON.stringify([meta.constants ?? null, meta.defRefs ?? null, meta.seed]);
+    // rotation 4: a refresh that changed only entities (the engine's writebacks: most of them) patches the model in place;
+    // the ground, a def, the defs' refs, the constants or the world state moving rebuilds it whole (as main's boot loads it)
+    const whole = first || tiles || defs.length > 0 || state !== this.metaText.state || constants !== this.metaText.constants;
+    this.metaText.state = state; this.metaText.constants = constants;
+    if (whole) {
+      const next = WorldModel.fromSnapshot({constants: meta.constants, state: meta.state, seed: meta.seed, seq: meta.seq, editSeq: meta.editSeq, defs: allDefs, defRefs: meta.defRefs,
+        entities: [...this.rows.values()].map(x => x.e), ground: meta.ground} as never, this.assets.lookup, coreLibrary());
+      for (const k of Object.keys(this.model)) if (!(k in next)) delete (this.model as unknown as Record<string, unknown>)[k];
+      Object.assign(this.model, next);
+      this.cost.whole++;
+    } else {this.patch(upserts, removes); this.model.seq = meta.seq; this.model.editSeq = meta.editSeq;}
     this.owner = meta.owner; this.editSeq = meta.editSeq;
     const ms = performance.now() - t0; this.cost.refreshes++; this.cost.refreshMs += ms; this.cost.maxRefreshMs = Math.max(this.cost.maxRefreshMs, ms);
     if (first) return true;

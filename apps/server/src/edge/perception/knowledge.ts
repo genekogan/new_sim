@@ -182,7 +182,7 @@ export class PlaceKnowledge {
       const name = districtName && districtName !== d.name ? `${d.name} (${districtName})` : d.name;
       if (!mem.has(d.id)) return `${name} · ${dir}`;
       const been = [...mem].filter(([id, k]) => id !== d.id && k.how === 'visited' && this.L.places.byId.get(id) && this.within(this.L.places.byId.get(id)!, d.id))
-        .sort((a, b) => b[1].lastTick - a[1].lastTick).slice(0, 2).map(([id]) => this.L.places.byId.get(id)!.name);
+        .sort((a, b) => b[1].lastTick - a[1].lastTick || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).slice(0, 2).map(([id]) => this.L.places.byId.get(id)!.name);   // ties (a room and its house, one tick) in id order, not memory order
       return `${name} · ${dir} ${Math.round(m / 10) * 10}m${been.length ? ` · been: ${been.join(', ')}` : ' · been'}`;
     });
     return {...(summary ? {district: summary} : {}), far, ...(others.length > FAR_LISTED ? {farMore: others.length - FAR_LISTED} : {})};
