@@ -161,6 +161,17 @@ export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
 const PERCEIVE_SLICE_MS = Number(process.env.PERCEIVE_SLICE_MS ?? 8);
+/** LOAD-CONTRACT dial (L4): background perception cadence per load level. `sliceMs` = tick-thread budget per slice,
+ *  `settle` = least ticks between the starts of two background catch-ups (green 20 = the old fixed spacing). Black runs no background catch-up (a Soul's read
+ *  still catches up at once through perceive.ensure, and the boot pass still runs). The radius stays 30 m at every level:
+ *  it is here.ts's SIGHT_RADIUS (L3's menu-radius dial owns shrinking what a Soul sees). */
+export const PERCEIVE_DIAL = {
+  green: { sliceMs: PERCEIVE_SLICE_MS, settle: 20 },
+  amber: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 2), settle: 40 },
+  red: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 4), settle: 100 },
+  black: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 4), settle: Infinity },
+} as const;
+export type LoadLevel = keyof typeof PERCEIVE_DIAL;
 /** Build notices that change nothing a Soul perceives (no step label, no closure): they never start a catch-up. */
 const PERCEPTION_QUIET_BUILD = new Set<string>(['alive', 'claimed', 'released', 'taken']);
 const WRITE_BACK_SLICE_MS = 8;
@@ -241,7 +252,8 @@ export class EngineBridge {
     // L4 (audit #8): only notices that change what a build's things are seen as (started, a new step, paused/resumed,
     // done, abandoned, closure lifted, rewound) re-derive perception; the lead's `alive` heartbeat (sent on its ordinary
     // requests) and claim hand-offs change no step and no closure, and each one forced a whole pass over ~5,000 things.
-    this.god.onBuild((e) => { if (!PERCEPTION_QUIET_BUILD.has(e.kind) && this.layers.active()) this.notePerceive([], true); });
+    // L4 item 5: a build event moves only the layer tags of layered things under (or just out of) a closing site; was a whole pass
+    this.god.onBuild((e) => { if (!PERCEPTION_QUIET_BUILD.has(e.kind)) { const ids = this.layers.buildRetag(); if (ids.length) { this.perceive.noteRetag(ids); this.notePerceive([], false); } } });
     this.host.listeners.push({
       afterTick: (tick, context) => { try { this.afterTickWork(tick, context?.startedAtMs); } catch (error) { this.failProjection(error); throw error; } },
       onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
@@ -827,9 +839,14 @@ export class EngineBridge {
     this.perceive.note(ids, all, origin);
     if (this.perceiveFirst < 0) this.perceiveFirst = tick; this.perceiveLast = tick;
   }
+  private perceiveDial: (typeof PERCEIVE_DIAL)[LoadLevel] = PERCEIVE_DIAL.green;
+  /** LOAD-CONTRACT: the load monitor sets the level; only the perception cadence changes (PERCEIVE_DIAL). */
+  setLoadLevel(level: LoadLevel) { this.perceiveDial = PERCEIVE_DIAL[level] ?? PERCEIVE_DIAL.green; }
   private perceiveStep(tick: number) {
+    const dial = this.perceiveDial;
     if (!this.perceiveRunning) {
       if (!this.perceive.pending() || tick - this.perceiveStarted < 20) return;
+      if (this.perceive.stats.runs && tick - this.perceiveStarted < dial.settle) return;   // amber/red/black: catch-ups start further apart
       // boot: the first catch-up is a whole pass (~0.4 s at 4,900 entities). A served world runs it in slices too (lane P5):
       // at once it held a cold-booted world's first visitor. A Soul's read before it ends catches up at once (perceive.ensure).
       // A world stepped by hand (tests, tools) runs it at once, as before.
@@ -838,7 +855,7 @@ export class EngineBridge {
       this.perceiveRunning = true; this.perceiveStarted = tick; this.perceiveFirst = -1; this.catchUp = { slices: 0, maxMs: 0, t0: performance.now() };
     }
     const t0 = performance.now();
-    try { if (this.perceive.step(PERCEIVE_SLICE_MS)) this.perceiveRunning = false; }
+    try { if (this.perceive.step(dial.sliceMs)) this.perceiveRunning = false; }
     catch (e) { this.perceiveRunning = false; this.log(`perceive: ${(e as Error).message}`); }   // retried on the next catch-up, never every tick
     const c = this.catchUp, ms = performance.now() - t0; c.slices++; if (ms > c.maxMs) c.maxMs = ms;
     // a slice that ran long (one place or the named things re-derived at once) is worth a line in the world's log
@@ -1147,7 +1164,7 @@ export class EngineBridge {
           this.layerPlacesPending = null;
         } else {
           this.layerPlacesPending ??= day;
-          if (!this.places.syncStep(PERCEIVE_SLICE_MS)) return;
+          if (!this.places.syncStep(this.perceiveDial?.sliceMs ?? PERCEIVE_SLICE_MS)) return;
           // Keep deferral through both syncStep's final sync() and the calendar lookup:
           // an edit/minute boundary during the pass must not force another full derive.
           // The completed list has the existing deferred-place semantics. If the day

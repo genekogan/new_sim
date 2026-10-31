@@ -225,6 +225,14 @@ export class GodLayers {
 
   /** EVENTS: "Saturday market is on here now (3 market stalls and a banner set up, until 13:00)" (places.ts leads with it). */
   onNow(e: Entity): string { return this.sets.onNow(e, this.clock()); }
+  /** L4 item 5: the things whose layer tag a build event may have changed: layered things under a closing site now, or at
+   *  the last call (a closure that ended). Everything else's perceived object cannot move with a build event. */
+  buildRetag(): string[] {
+    const now = new Set<string>();
+    if (this.h.building) for (const e of this.m.entities.values()) if ((e.owner || e.access || e.price || e.schedule) && this.h.building(e.id)) now.add(e.id);
+    const out = new Set([...now, ...this.underBuild]); this.underBuild = now; return [...out];
+  }
+  private underBuild = new Set<string>();
   /** Today's place schedule slots for a thing (places.ts adds them to its place). */
   slotsFor(e: Entity, label: string) { const c = this.clock(); return e.schedule ? scheduleSlots(e.schedule, c?.weekday ?? 6, label) : []; }
   /** "open 07:00–15:00 (open now)". */
