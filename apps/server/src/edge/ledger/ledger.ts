@@ -274,6 +274,17 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  after the world's own authored spots. Unset on Eden/Mars/LM. Must return the same object while nothing changed. */
   spotsProvider?: () => SpotsData | null;
   private mergedSpots: {from: SpotsData; value: SpotsData} | null = null;
+  private spotsSeen: SpotsData | null = null; private spotsSeq = 0; private staticSeq = 0;
+  /** L3: the static world's version: the place index's writes, a new spots object (the provider returns the same object
+   *  while nothing changed), the engine's navigation epoch (moves with the static world only, not with paged windows)
+   *  and bumpStatic(). Caches of anything read from static geometry key on it. */
+  staticVersion(): string {
+    const s = this.spots; if (s !== this.spotsSeen) {this.spotsSeen = s; this.spotsSeq++;}
+    const nav = (this.host.engine as unknown as {navEpochV1?(): number}).navEpochV1?.() ?? 0;
+    return `${this.places.version}.${this.spotsSeq}.${nav}.${this.staticSeq}`;
+  }
+  /** Something static changed that the places, spots and navigation epoch do not show (a god layer switch…). */
+  bumpStatic() {this.staticSeq++;}
   get spots(): SpotsData {
     const extra = this.spotsProvider?.(); if (!extra) return this.baseSpots;
     if (this.mergedSpots?.from !== extra) {const b = this.baseSpots; this.mergedSpots = {from: extra, value: {contract: 'activity-spots/1', spots: [...b.spots, ...extra.spots], shelves: [...b.shelves, ...extra.shelves], interiors: b.interiors, solids: b.solids, rings: b.rings, platforms: b.platforms, ...(b.docks || extra.docks ? {docks: [...(b.docks ?? []), ...(extra.docks ?? [])]} : {}), ...(extra.nearest ? {nearest: extra.nearest} : {})}};}
@@ -314,7 +325,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     this.outcomes=new ActionOutcomes(db.db,host.worldId);
     this.syncCarrierPlaces();
     // together/1: gestures, invitations, follows and items (core-next4)
-    this.together = new Together({host, db, places: this.places, spots: () => this.spots,
+    this.together = new Together({host, db, places: this.places, spots: () => this.spots, staticVersion: () => this.staticVersion(),
       body: id => this.body(id), perceived: (id, r) => this.perceivedBodies(id, r), receipt: (sid, id) => this.receipt(sid, id),
       fail: (id, code, reason) => this.update(id, {phase: 'failed', code, reason}), complete: id => this.update(id, {phase: 'completed'}),
       running: (sid, id) => {const m = this.host.minds.get(sid), r = this.rows('receipt_id=?', id)[0]; return !!m && !!r?.program_id && this.host.engine.programOf(m.entityId) === r.program_id;},

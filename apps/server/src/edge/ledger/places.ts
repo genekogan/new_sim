@@ -92,8 +92,18 @@ export function derivePlaceData(world: NativeWorld): PlaceData {
   return {contract: 'place-data/1', world: 'derived', places: [root, ...regions.filter(r => r.id !== 'world').map(r => ({id: r.id, name: r.label ?? r.id, kind: r.kind === 'place' ? 'outdoor' : (r.kind ?? 'outdoor'), parent: 'world', polygon: r.polygon, level: r.level ?? 0, enclosed: false, capacity: null, starting: false}))]};
 }
 
+/** A Map that counts its writes (L3: the place index's version, so caches keyed on it see a moved or renamed place). */
+class VersionedMap<K, V> extends Map<K, V> {
+  version = 0;
+  override set(k: K, v: V) {this.version++; return super.set(k, v);}
+  override delete(k: K) {const had = super.delete(k); if (had) this.version++; return had;}
+  override clear() {this.version++; super.clear();}
+}
+
 export class PlaceIndex {
-  readonly byId = new Map<string, Place>();
+  readonly byId: Map<string, Place> = new VersionedMap<string, Place>();
+  /** Moves on every add, replace or removal of a place. */
+  get version(): number {return (this.byId as VersionedMap<string, Place>).version;}
   readonly occupierOf = new Map<string, {occ: Occupier; place: Place}>();
   readonly data: PlaceData;
   /** carrier/1: carrier entity id → its place (declared in the data, or derived by the ledger). */
