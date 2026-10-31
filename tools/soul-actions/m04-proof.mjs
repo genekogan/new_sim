@@ -16,7 +16,7 @@ function gesture(id,t){const h=hashId(id),out=[];
  {const ph=(h%997)/997,u=((t/25+ph)%1)*25;if(u>=1&&u<6)out.push({kind:'Idle_Neutral',left:6-u});}
  {const ph=((h>>>7)%991)/991,cyc=t/37+ph,u=(cyc%1)*37,clip=['Idle_LookAround_Loop','Idle_FoldArms_Loop'][(Math.floor(cyc)+h)%2];if(u>=1.2&&u<9)out.push({kind:clip,left:9-u});}
  return out.sort((a,b)=>b.left-a.left)[0]??null;}
-const sample=()=>page.evaluate(()=>{const api=window.__simEntity,f=api?.contactFrame();if(!f)return null;const bodies=[];for(const [id,e]of Object.entries(f.entities)){const b=f.bones?.[id];if(!b)continue;bodies.push({id,p:e.p,yaw:e.yaw,activity:e.activity,hands:e.hands,motion:e.state?.handActuator??null,bones:{activity:b.activity,walkW:b.walkW,hipY:b.hipY,feet:b.feet,head:b.head,pose:b.pose,variety:b.variety??null,arms:b.arms.map(a=>({side:a.side,palm:a.palm,target:a.target,err:a.err}))}});}let on=null;for(const e of api.layer.model.entities.values())if(e.name==='garden-tap')on=!!e.state.on;return {at:Date.now(),tick:f.tick,dt:f.dt,bodies,on};});
+const sample=()=>page.evaluate(()=>{const api=window.__simEntity,f=api?.contactFrame();if(!f)return null;const bodies=[];for(const [id,e]of Object.entries(f.entities)){const b=f.bones?.[id];if(!b)continue;bodies.push({id,p:e.p,yaw:e.yaw,activity:e.activity,hands:e.hands,frame:api.renderer?.info?.render?.frame??null,motion:e.state?.handActuator??null,bones:{activity:b.activity,walkW:b.walkW,hipY:b.hipY,feet:b.feet,head:b.head,pose:b.pose,variety:b.variety??null,arms:b.arms.map(a=>({side:a.side,palm:a.palm,target:a.target,err:a.err}))}});}let on=null;for(const e of api.layer.model.entities.values())if(e.name==='garden-tap')on=!!e.state.on;return {at:Date.now(),tick:f.tick,dt:f.dt,bodies,on};});
 const act=async(seat,words)=>{const start=Date.now(),tick=await page.evaluate(()=>window.__simEntity.depictedTick),r=await promisify(execFile)(process.execPath,['eden.mjs','act',words,'--wait','120','--json'],{cwd:scene+'/'+seat,timeout:180000}),result=JSON.parse(r.stdout);commands.push({seat,words,start,sentTick:tick,end:Date.now(),result});writeFileSync(out+'/commands.json',JSON.stringify(commands,null,2));assert.equal(result.accepted,true,JSON.stringify(result));assert.equal(result.receipt?.phase,'completed',JSON.stringify(result));return result;};
 const body=()=>samples.filter(Boolean).at(-1)?.bodies[0];
 /** Wait (≥ minMs) until the depicted body plays a hand gesture with ≥ 5 s left, at most maxMs; records what it waited for. */
@@ -28,11 +28,11 @@ try{
  writeFileSync(out+'/initial.yml',await page.locator('body').ariaSnapshot());
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}finally{busy=false;}},50);
  // the first walk starts out of a gesture too, when one is playing within 25 s
- await waitGesture('walk-start-1',3000,25000);
+ await waitGesture('walk-start-1',3000,40000);
  await act('ada','turn on the garden tap');
  await waitGesture('reach-out-of-gesture',3500,75000);
  await act('ada','turn off the garden tap');
- await waitGesture('walk-start-2',3500,45000);
+ await waitGesture('walk-start-2',3500,60000);
  await act('ada',process.env.SOUL_M04_WALK??'walk to the garden deck');
  await page.waitForTimeout(6000);
  assert.deepEqual(errors,[]);pass=true;
