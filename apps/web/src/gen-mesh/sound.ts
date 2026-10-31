@@ -128,7 +128,7 @@ function playJukeboxes(host: Host, x: number, y: number, z: number) {
 // Soul's clock) cross-fades through a burst of static and a sweeping whistle; power on crackles and fades in; power off is
 // silent within a tick. Radios are picked out of the emitter scan like jukeboxes; each tick reads only the known radios'
 // live `on` and `station` (a map lookup each), never a world scan.
-const RADIO_STATIC = 1.5, RADIO_AHEAD = 0.35, RADIO_LINGER_MS = 6000, radioDone = new Map<string, number>();
+const RADIO_STATIC = 2.2, RADIO_AHEAD = 0.35, RADIO_LINGER_MS = 6000, radioDone = new Map<string, number>();
 type RadioRt = { bus: GainNode; voice: AudioNode; hiss: GainNode; hissSrc: AudioBufferSourceNode; ch: Map<string, GainNode>; station: string; on: boolean; tunedAt: number; prev: string | null; quietSince: number; gain: number; tunes: number };
 const radios = new Map<string, RadioRt>();
 let radioIds = new Set<string>(), radioNear = false;
@@ -178,7 +178,7 @@ function radioEvent(c: AudioContext, out: AudioNode, at: number, n: RadioEvent) 
   else if (n.kind === 'bass') { tone(c, out, at, f(n.midi), f(n.midi), 0.42, n.vel * 0.5, 'triangle'); tone(c, out, at, f(n.midi) * 2, f(n.midi) * 2, 0.12, n.vel * 0.12, 'sawtooth'); }
   else if (n.kind === 'lead') { tone(c, out, at, f(n.midi), f(n.midi) * 0.997, 0.26, n.vel * 0.16, 'square'); tone(c, out, at, f(n.midi), f(n.midi), 0.3, n.vel * 0.2, 'triangle'); }
   else if (n.kind === 'kick') { tone(c, out, at, 150, 48, 0.16, n.vel * 0.55); }
-  else if (n.kind === 'snare') burst(c, out, at, 0.14, n.vel * 0.22, 1800);
+  else if (n.kind === 'snare') burst(c, out, at, 0.12, n.vel * 0.15, 1500, 'bandpass');   // a brushed snare, soft above 2 kHz
   else if (n.kind === 'hat') burst(c, out, at, 0.04, n.vel * 0.12, 6500);
   else if (n.kind === 'syl') voiced(c, out, at, n.f0, n.dur, n.vel * 0.5, n.vowel);
 }
