@@ -22,7 +22,9 @@ test('explicit body view equals rich native me across intent, pose, seat, fade a
  L.faded.add(s.soulId);assert.equal(compare().posture,'faded');L.faded.delete(s.soulId);
  delete b.human.activity;assert.equal(compare().actualActivity,null,'unknown native activity never becomes idle');
  L.openReceipts=originalOpen;engine.nativeSeatHoldsV1=originalSeats;
- delete engine.world.entities[s.entityId];assert.equal(compare().actualActivity,null);engine.world.entities[s.entityId]=b;
+ // Absent body: the explicit projection still answers. (The rich frame's offers need a body; it only answered here on
+ // R400 from a same-tick cached menu, which 402's keyed menu cache no longer reuses for a body that is gone.)
+ delete engine.world.entities[s.entityId];assert.equal(hereBodyFrame(L,s).me.actualActivity,null);engine.world.entities[s.entityId]=b;
 });
 
 test('body view keeps authenticated ownership and rate bucket, and skips rich planning paths',async t=>{
