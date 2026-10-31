@@ -109,10 +109,25 @@ export class Admission {
     let ranAt = 0, isDone = false;
     const job: Job = {key: r.key, god: r.god, route: r.route, arrival: now, deadline, closed: r.closed ?? (() => false), finished, finish,
       settle: v => { if (v === 'run') ranAt = this.now(); settle(v); }};
-    this.outstanding.add(r.key); this.queue.push(job); this.kick();
+    this.outstanding.add(r.key);
+    // fast path: nothing waiting, the dispatcher idle, frame credit left and nobody else in flight → run now, inline
+    // (no timer hop: the quiet case costs what it did before admission). Charged when it answers.
+    if (!this.queue.length && !this.draining && this.outstanding.size === 1 && this.level === 'green' && this.creditNow(now) > 0) {
+      settle('run'); ranAt = now;
+      return {turn, waitedMs: () => 0, done: () => { if (isDone) return; isDone = true; this.outstanding.delete(r.key); this.charge(r.key, r.god, r.route.id, this.now() - now, now); finish(); this.kick(); }};
+    }
+    this.queue.push(job); this.kick();
     return {turn, waitedMs: () => (ranAt || this.now()) - now, done: () => { if (isDone) return; isDone = true; this.outstanding.delete(r.key); finish(); this.kick(); }};
   }
 
+  private creditNow(now: number) { const budget = FRAME_BUDGET_MS[this.level]; this.credit = Math.min(budget, this.credit + (now - this.creditAt) * budget / FRAME_MS); this.creditAt = now; return this.credit; }
+  /** Debit a job's measured time: the world credit, the god/Souls shares, the principal's bucket, the route estimate. */
+  private charge(key: string, god: boolean, id: string, ms: number, startedAt: number) {
+    this.creditNow(startedAt); this.credit -= ms;
+    this.share.god = this.share.god * 0.95 + (god ? ms : 0); this.share.souls = this.share.souls * 0.95 + (god ? 0 : ms);
+    const b = this.bucket(key, god, startedAt + ms); b.tokens -= ms;
+    const e = this.est.get(id); this.est.set(id, e === undefined ? ms : e * 0.8 + ms * 0.2);
+  }
   /** §2b cool-down: over budget 3× (or 20 refusals for overlapping requests) in a minute → 60 s of slow-down.
    *  The god is never cooled (it is never starved; its share is the reserve). */
   private strike(key: string, god: boolean, kind: 'slow' | 'busy', now: number) {
@@ -165,18 +180,13 @@ export class Admission {
         let now = this.now();
         this.sweep(now);
         const budget = FRAME_BUDGET_MS[this.level];
-        this.credit = Math.min(budget, this.credit + (now - this.creditAt) * budget / FRAME_MS); this.creditAt = now;
-        if (this.credit <= 0) { this.later(budget > 0 ? Math.min(1000, -this.credit * FRAME_MS / budget + 1) : FRAME_MS); return; }
+        if (this.creditNow(now) <= 0) { this.later(budget > 0 ? Math.min(1000, -this.credit * FRAME_MS / budget + 1) : FRAME_MS); return; }
         const i = this.pick(now);
         if (i < 0) { this.later(FRAME_MS); return; }
         const [j] = this.queue.splice(i, 1);
         j.settle('run');
         await Promise.race([j.finished, this.o.yieldTurn ? this.o.yieldTurn() : new Promise<void>(r => setImmediate(r))]);
-        const ms = this.now() - now; now += ms;
-        this.credit -= ms;   // creditAt stays at the job start: the time it ran accrues at the budget rate
-        this.share.god = this.share.god * 0.95 + (j.god ? ms : 0); this.share.souls = this.share.souls * 0.95 + (j.god ? 0 : ms);
-        const b = this.bucket(j.key, j.god, now); b.tokens -= ms;
-        const e = this.est.get(j.route.id); this.est.set(j.route.id, e === undefined ? ms : e * 0.8 + ms * 0.2);
+        this.charge(j.key, j.god, j.route.id, this.now() - now, now);
       }
     } finally { this.draining = false; }
   }
@@ -227,8 +237,8 @@ export function admissionMiddleware(adm: Admission, level: () => Level, bearer: 
     if (line) { stamp(c, lv, token); c.header('Cache-Control', 'no-store'); c.header('Retry-After', String(Math.max(1, Math.min(line.eta_s, 60))));
       return c.json({contract: 'eden-edge/1', error: {code: 'world.crowded', message: crowdedNote(line), position: line.position, eta_s: line.eta_s}, world: worldBlock(lv, Math.max(1, Math.min(line.eta_s, 60)))}, 503); }
     if (c.req.method !== 'GET' && c.req.method !== 'HEAD') await c.req.text().catch(() => '');   // read the body before the turn: its I/O is not request CPU
-    const raw = c.req.raw, hint = Number(c.req.header('x-sim-timeout-ms'));
-    const t = adm.request({key: r.god ? 'god' : 'soul:' + token, god: r.god, route: r, hintMs: Number.isFinite(hint) ? hint : undefined, closed: () => raw.signal?.aborted === true});
+    const env = c.env as {incoming?: {destroyed?: boolean}; outgoing?: {destroyed?: boolean}} | undefined, hint = Number(c.req.header('x-sim-timeout-ms'));
+    const t = adm.request({key: r.god ? 'god' : 'soul:' + token, god: r.god, route: r, hintMs: Number.isFinite(hint) ? hint : undefined, closed: () => env?.incoming?.destroyed === true || env?.outgoing?.destroyed === true || (!env?.incoming && c.req.raw.signal?.aborted === true)});
     const refuse = (x: Refusal) => { c.header('Cache-Control', 'no-store'); c.header('Retry-After', String(x.retryAfterS)); stamp(c, lv, token);
       return c.json({contract: 'eden-edge/1', error: {code: x.code, message: x.message}, world: worldBlock(lv, x.retryAfterS)}, x.status); };
     if ('refusal' in t) return refuse(t.refusal);

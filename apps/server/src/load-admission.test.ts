@@ -50,10 +50,11 @@ test('one heavy request per Soul: the second concurrent one is refused soul.busy
 
 test('dispatch order: writes before reads, FIFO across Souls, the god served within its reserve', async () => {
   const f = fixture();
-  // everything queues first (the dispatcher starts on a timer)
+  // a request in flight (alone in a calm world it ran inline), so everything after it queues
+  const blocker = f.adm.request({key: 'X', god: false, route: route('GET', '/v1/edge/here')}) as {done: () => void};
   f.ask('A', route('GET', '/v1/edge/here')); f.ask('B', route('GET', '/v1/edge/observe')); f.ask('C', route('POST', '/v1/edge/act'));
   f.ask('god', route('POST', '/v1/god/act')); f.ask('D', route('POST', '/v1/edge/say'));
-  await tick(); await tick();
+  blocker.done(); await tick(); await tick();
   assert.deepEqual(f.ran, ['god:god:act', 'C:edge:act', 'D:edge:say', 'A:edge:here', 'B:edge:observe']);
 });
 
@@ -61,7 +62,7 @@ test('god reserve: under contention the god gets about a quarter of the request 
   const f = fixture(); let god = 0, souls = 0;
   for (let round = 0; round < 40; round++) {
     for (const k of ['A', 'B', 'C', 'D', 'god']) if (!f.adm.outstanding.has(k)) f.ask(k, route('POST', k === 'god' ? '/v1/god/act' : '/v1/edge/act'), 10);
-    f.advance(200); await tick();
+    await tick(); f.advance(200); await f.adm.drain();
   }
   for (const r of f.ran) if (r.startsWith('god:')) god++; else souls++;
   assert.ok(god >= 0.2 * (god + souls) && god <= 0.4 * (god + souls), `god ${god} souls ${souls}`);
