@@ -10,6 +10,7 @@ import type {EdgeLedger} from '../ledger/ledger.ts';
 import {stateOf} from '../ledger/ledger.ts';
 import type {EdgeCapability,EdgeSoul, PlaceRef} from '../contract.ts';
 import {centroid} from '../ledger/places.ts';
+import {hereFocus} from '../ledger/focus.ts';
 import {EARSHOT_RADIUS} from '../comms/speech.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {bearingOf, clearSight, compassOf, compassPoint, dist2, durationWord, facingPoint, headingOfYaw, round1, walkSeconds, type Solid} from './geometry.ts';
@@ -69,7 +70,7 @@ export class Perception {
   }
   private seatSlots(entity: string): number {const def = this.w.entities[entity]?.def; return Math.max(1, (CATALOG[def as string]?.slots ?? []).filter(x => x.kind === 'seat').length);}
   seats(radius = OBJECT_RADIUS): Located[] {
-    const out: Located[] = [], {caps} = this.L.coreA.binds(this.soul), taken = this.takenSeats();
+    const out: Located[] = [], {caps} = this.menu(), taken = this.takenSeats();
     for (const c of caps) {
       if (c.verb !== 'sit' || !c.target || c.id === 'sit:here') continue;
       const ent = (this.L.host.kernel.things[c.target.id]?.traits.entity as string | undefined) ?? c.target.id, e = this.w.entities[ent]; if (!e) continue;
@@ -80,8 +81,25 @@ export class Perception {
     return out.sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
   }
   /** Everything nearby with a position: seats, fires, activity spots, lasting objects, items lying around. */
-  things(radius = OBJECT_RADIUS): Located[] {
-    const out: Located[] = [...this.seats(radius)];
+  things(radius = OBJECT_RADIUS): Located[] {return [...this.seats(radius), ...this.unseated(radius)].filter(t => this.sameEnclosure(t.at) && this.sees(t.at)).sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));}
+  /** L3 item 4: the offers this frame reads, built once and only for what is around (EdgeLedger.bindFocus, never the
+   *  whole menu): every `…:here` offer, seats, invitations, and offers aimed at the places this Soul is in, the places
+   *  its exits lead to, the things within reach and the Souls within 8 m. */
+  private menuMemo: {caps: EdgeCapability[]; plans: ReturnType<EdgeLedger['bindFocus']>['plans']} | null = null;
+  menu(): {caps: EdgeCapability[]; plans: ReturnType<EdgeLedger['bindFocus']>['plans']} {
+    if (this.menuMemo) return this.menuMemo;
+    const targets = new Set(this.L.placePathOf(this.soul.soulId).map(p => p.id));
+    for (const id of exitCandidates(this.L, targets, this.pos)) targets.add(id);
+    let objects = false;
+    for (const t of this.unseated(OBJECT_RADIUS)) {targets.add(t.id); if (t.kind === 'object') objects = true;}
+    for (const o of this.souls(8)) targets.add(o.soulId);
+    const f = hereFocus(targets), b = this.L.bindFocus(this.soul, objects ? {...f, verbs: new Set([...f.verbs, 'object'])} : f);
+    return this.menuMemo = {caps: this.L.listed(b.caps), plans: b.plans};
+  }
+  private unseatedMemo = new Map<number, Located[]>();
+  private unseated(radius: number): Located[] {
+    const hit = this.unseatedMemo.get(radius); if (hit) return hit;
+    const out: Located[] = []; this.unseatedMemo.set(radius, out);
     for (const e of Object.values(this.w.entities)) {
       if (!isCampfire(e)) continue; const at: V2 = [e.pose.p[0], e.pose.p[2]], d = this.dist(at);
       if (d <= Math.max(radius, SIGHT_RADIUS)) out.push({kind: 'fire', id: e.id, name: e.label ?? 'campfire', at, entityId: e.id, distance: d});
@@ -110,7 +128,7 @@ export class Perception {
       if (i.state !== 'placed' || !Array.isArray(i.at)) continue; const at = i.at as V2, d = this.dist(at);
       if (d <= radius) out.push({kind: 'item', id: i.id, name: i.name, at, distance: d});
     }
-    return out.filter(t => this.sameEnclosure(t.at) && this.sees(t.at)).sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
+    return out;   // (unfiltered: things() filters and sorts with the seats; the menu's targets may be a superset)
   }
   /** A thing, Soul or place named by id or plain words, as this Soul can perceive it (places: anywhere). */
   locate(ref: string, opts: {places?: boolean; souls?: boolean; things?: boolean} = {}): Located | null {
@@ -210,6 +228,15 @@ export function compactDoHere(caps:readonly EdgeCapability[],localTargets:Readon
  return {doHere:selected,doHereCoverage:{localOffers:eligible.length,listed:selected.length,omitted:eligible.length-selected.length,byteBudget,complete:eligible.length===selected.length,fullCapabilities:'/v1/edge/capabilities'}};
 }
 
+/** L3 item 4: the places an exit may lead to (as the exits below choose them: a place's centroid within 150 m, not one
+ *  this Soul is in, not a sleeping mat): the targets of the walks `here` reads. */
+function exitCandidates(ledger: EdgeLedger, inside: ReadonlySet<string>, pos: V2 | null): string[] {
+  if (!pos) return [];
+  const out: string[] = [];
+  for (const p of ledger.places.byId.values()) if (!inside.has(p.id) && !/(^|-)mat-\d+$/.test(p.id) && p.polygon.length && dist2(pos, centroid(p.polygon)) <= 150) out.push(p.id);
+  return out;
+}
+
 /** The `here` frame (EDGE-CONTRACT-v1 §8.1). Target ≤ ~600 tokens. */
 export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:boolean}={}) {
   const P = new Perception(ledger, soul), tick = P.tick, me = P.me(), b = me.body, host = ledger.host;
@@ -257,12 +284,12 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
       return {...(mine ? {id: t.id} : {}), members: heard.map(id => id === soul.soulId ? 'you' : host.minds.get(id)?.name ?? 'someone'), ...(t.members.length > heard.length ? {others: t.members.length - heard.length} : {}), public: false};});
   // exits: walks to nearby places (not the ones I am in), nearest first
   const inside = new Set(ledger.placePathOf(soul.soulId).map(p => p.id));
-  const exits = P.pos ? ledger.capabilities(soul).filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place' && !inside.has(c.target.id) && !/(^|-)mat-\d+$/.test(c.target.id))
+  const exits = P.pos ? P.menu().caps.filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place' && !inside.has(c.target.id) && !/(^|-)mat-\d+$/.test(c.target.id))
     .map(c => {const p = ledger.places.byId.get(c.target!.id), at = p ? centroid(p.polygon) : null; return at ? {c, p: p!, at, d: dist2(P.pos!, at)} : null;})
     .filter((x): x is NonNullable<typeof x> => !!x && x.d <= 150).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id)).slice(0, LIMITS.exits)
     .map(x => {const base = {to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id};
       // RT: an exit the body cannot walk from here says so (no eta), instead of an eta for a walk that is refused
-      const problem = ledger.routeProblem(soul, x.c.id);
+      const problem = ledger.routeProblem(soul, x.c.id, P.menu().plans);   // (the exit's plan from this frame's menu)
       return problem ? {...base, reachable: false, why: problem.code} : {...base, eta: '~' + durationWord(walkSeconds(x.d * 1.25))};}) : [];
   const where=whereLine([...ledger.places.byId.values()].filter(p=>ledger.knowledge.knows(soul.soulId,p.id)),ledger.placePathOf(soul.soulId).map(p=>p.id),P.pos);
   const frame = {
@@ -280,5 +307,5 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   };
   if(!options.doHere)return frame;
   const baseBytes=Buffer.byteLength(JSON.stringify(frame)),budget=Math.max(0,Math.min(1800,2600-baseBytes-240));
-  return {...frame,...compactDoHere(ledger.capabilities(soul),new Set([...ledger.placePathOf(soul.soulId).map(p=>p.id),...objects.map(o=>o.id),...near.filter(n=>n.dist<=8).map(n=>n.id)]),budget)};
+  return {...frame,...compactDoHere(P.menu().caps,new Set([...ledger.placePathOf(soul.soulId).map(p=>p.id),...objects.map(o=>o.id),...near.filter(n=>n.dist<=8).map(n=>n.id)]),budget)};
 }

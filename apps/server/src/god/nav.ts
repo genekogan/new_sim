@@ -15,6 +15,7 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import { humanTitle, meaningParts } from './meaning.ts';
 import { isShut } from './doors.ts';
+import type { MenuFocus } from '../edge/ledger/focus.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -330,7 +331,9 @@ export class GodNav {
     // a Soul-dependent goal (the shore nearest me, the nearest point of a road) is never cached
     // MARSLIVED: a room's goal is refined live round whoever already stands there (roomGoal itself is cached per version)
     const mine = t.kind === 'water' || t.kind === 'room' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1 || t.level > 0;
-    const key = `${t.ref}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
+    // (L3: `except` too: the goal is a free standing point away from other bodies, so one Soul's cached goal could be the
+    // very spot another Soul stands on, and which one a listing got depended on who asked first in the last 50 ticks)
+    const key = `${t.ref}|${except ?? ''}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
     const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
     const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
     // WALK3: a ground goal off the main walkable ground (a fenced court, a dense wood, a mountain band, a hill) moves to the
@@ -415,6 +418,7 @@ export class GodNav {
       if (!inner) this.blocked.set(t.ref, `The interior of ${t.ref} is not reachable right now; its entrance or the route inside is blocked.`);
       else this.blocked.delete(t.ref);
     }
+    if (this.goals.size > 50_000) this.goals.clear();   // per Soul and per position: bounded
     this.goals.set(key, { tick, key, goal });
     return goal;
   }
@@ -482,7 +486,7 @@ export class GodNav {
   // ------------------------------------------------------------------ capabilities
 
   /** `walk:<path>` for the nearest named things and the rooms of near buildings (plus any this Soul asked for). */
-  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans) {
+  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, focus?: MenuFocus | null) {
     const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
@@ -512,7 +516,16 @@ export class GodNav {
       const inside = d <= UPPER_ROOMS_WITHIN || myLevel !== 0 || rooms.some((r) => r.level === 0 && !!r.poly && inPoly(here[0], here[1], r.poly));
       for (const rt of rooms) if (rt.level === 0 || (rt.rise ?? 0) < LOW_RISE_M || inside) pick.push({ t: rt, d: this.distance(rt, here) });
     }
-    for (const { t, d } of pick) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
+    for (const { t, d } of pick) if (this.wantsThing(focus, t)) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
+  }
+  /** L3 item 4: whether a focused build (EdgeLedger.bindOne) needs this thing's offers (walk, sit, hang out, stroll). */
+  private wantsThing(f: MenuFocus | null | undefined, t: Thing): boolean {
+    if (!f) return true;
+    if (['walk:', 'sit:', 'hang-out:', 'stroll:'].some((v) => f.ids.has(v + t.ref))) return true;
+    if (f.verbs.has('walk') || f.verbs.has('hang-out') || f.verbs.has('stroll') || (f.verbs.has('sit') && !!t.semanticPart?.seat)) return true;
+    if (!f.targets.size) return false;
+    if (f.targets.has(t.id) || (!!t.semanticPart?.entity && f.targets.has(t.semanticPart.entity))) return true;
+    const place = this.h.placeOf?.(t.ref); return !!place && f.targets.has(place);
   }
 
   /** A walk to one named place the listing leaves out for distance (the far big top, asked for by name): the same

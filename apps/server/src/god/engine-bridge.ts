@@ -43,6 +43,7 @@ import type { ApplyContext, WalkoutPrep } from './god.ts';
 import type { BuildNotice } from './builds.ts';
 import { arrivalNote } from '../arrival-placement.ts';
 import { seatTopsOf } from './use-check.ts';
+import { wants, type MenuFocus } from '../edge/ledger/focus.ts';
 /** arrival-search/1: the upserts whose geometry (def, place, size, shape, params) differs from the before-model. */
 const titleOf = (e: Entity): string | undefined => (e as Entity & {about?: {title?: string}}).about?.title;
 const geometryOf = (e: Entity) => JSON.stringify([e.def, e.in, e.p, e.r, e.s, e.shape, e.anchor, e.params, e.seed]);
@@ -267,6 +268,8 @@ export class EngineBridge {
       };
     };
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
+    // L3 (server reliability): kept Soul menus read god state the ledger does not version (ownership, construction sites)
+    (this.edge as { addMenuInput?(f: () => string): void }).addMenuInput?.(() => `${this.version}|${this.god.builds.closingSites().map((x) => x.id).join(',')}`);
     this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
@@ -1631,7 +1634,9 @@ export class EngineBridge {
     if (eng.readPassV1) eng.readPassV1(list); else list();
   }
   private listCapabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
-    try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
+    // L3 item 4: a focused build (EdgeLedger.bindOne) offers only the walks the focus names
+    const focus = (this.edge as { menuFocusV1?(): MenuFocus | null } | undefined)?.menuFocusV1?.() ?? null;
+    try { this.nav.capabilities(soul, caps, plans, focus); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
     releaseBigScratch();   // L1: room-reach searches inside a multi-storey house share one ~110 MB workspace; not kept after
     try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
@@ -1725,7 +1730,7 @@ export class EngineBridge {
     const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
     for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
-    this.sitHere(caps, plans, here, soul.entityId);
+    if (wants(focus, 'sit:here')) this.sitHere(caps, plans, here, soul.entityId);
     this.fireLit(caps);
     try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
   }

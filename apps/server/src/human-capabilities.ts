@@ -10,10 +10,14 @@ export type HumanBindingV1={id:string;goal:HumanGoalV1['goal'];targetId?:string;
 export type HumanRegistryReadV1={view:HumanCapabilityRegistryV1;bindings:Map<string,HumanBindingV1>};
 const key=(goal:string,ref:string)=>goal+':'+ref;
 /** Read-only actor-specific physical bindings. Kernel anchors alone do not invent native actions. */
+// L3 item 4: the engine's verb names, read once per engine and rules version (describeVerbs renders every verb's JSON
+// schema: ~4 ms on each menu build, for a set of names that never changes while the rules do not)
+const VERBS=new WeakMap<object,{rules:string;verbs:Set<string>}>();
+function engineVerbs(engine:WorldHost['engine']):Set<string>{const hit=VERBS.get(engine);if(hit&&hit.rules===engine.rulesVersion)return hit.verbs;const verbs=new Set(engine.describeVerbs().map(v=>v.verb));VERBS.set(engine,{rules:engine.rulesVersion,verbs});return verbs;}
 export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{registeredActivitiesV1?:boolean;deferRouteChecks?:boolean;skipRegisteredCards?:boolean}):HumanRegistryReadV1 {
  const read=()=>{
   const w=host.engine.world as NativeWorld,body=w.entities[m.entityId],bindings=new Map<string,HumanBindingV1>();if(!body?.human)throw Error('human-capabilities.body-unavailable');
-  const verbs=new Set(host.engine.describeVerbs().map(v=>v.verb)),humanoid=!body.body||body.body.family==='humanoid';
+  const verbs=engineVerbs(host.engine),humanoid=!body.body||body.body.family==='humanoid';
   // A seated body leaves its seat through the ordinary native stand step, never a forced pose.
   const seatedNow=humanoid&&body.human.activity==='sit'&&verbs.has('stand');
   const add=(goal:HumanGoalV1['goal'],id:string,label:string,targetId:string|undefined,steps:Program['steps'],approachLen:number,green=false)=>{
