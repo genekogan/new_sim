@@ -27,6 +27,8 @@ export const FINE_LRU = 24;
  *  a smaller LRU misses on every pass (engine P4). */
 export const FINE_LRU_PAGED = 24;   // L1: was 48 (E-life: a nearby sweep read ~37 tiles); point reads off the windows no longer
                                     // build tiles (clearTester), so a listing builds ~20; 24 keeps them (2.9 MB each, -69 MB)
+/** levelOver: floor keys memoised per scene before the memo starts over. */
+const LEVEL_KEYS_MAX = 512;
 /** Paged: bytes of upper-floor grids kept over windows (GroundNav.floorsOver); a 2-tile window's floor is ~7 MB. */
 export const FLOORS_OVER_BYTES = 64 * 1024 * 1024;   // E-life (memory): was 192 MB; Eden 2026 used 105 MB after one resident
 /** L1: point reads off the windows classify cells in blocks of this many cells a side (680-cell apron'd tile rasters = 10 × 10
@@ -171,6 +173,8 @@ export class GroundNav {
    */
   private floorsOver = new Map<string, { g: LevelGrid | undefined; bytes: number }>();
   private floorsOverBytes = 0;
+  /** levelOver: floor keys per scene and `rect|level` (null = no floor of that level reaches the rect). */
+  private levelKeys = new WeakMap<SpatialScene, Map<string, string | null>>();
   /** This nav and a serial per floor it built, naming memoised floors (gridContentKeys): a kept floor keeps its name. */
   private readonly serial = ++navSerials;
   private floorsGen = 0;
@@ -520,16 +524,26 @@ export class GroundNav {
    *  level 0 composed from tiles; an upper level only when a surface of it reaches the rect, memoised (floorOver). */
   levelOver(r: TileRect, id: number, scene: SpatialScene): LevelGrid | undefined {
     if (id === 0) return this.compose(r, scene.obstacles);
-    const b = rectBounds(r);
-    if (!scene.surfaces.some((s) => s.level === id && touches(s.obb, b))) return undefined;
+    // B-facade: the floor's key per (scene, rect, level), memoised: a tile-reading replica's ring search asks the same few
+    // tiles again and again, and the key scans every surface and obstacle (a scene's lists are never mutated)
+    let m = this.levelKeys.get(scene);
+    if (!m || m.size > LEVEL_KEYS_MAX) this.levelKeys.set(scene, (m = new Map()));
+    const rk = `${r.join(',')}|${id}`;
+    let key = m.get(rk);
+    if (key === undefined) {
+      const b = rectBounds(r);
+      key = scene.surfaces.some((s) => s.level === id && touches(s.obb, b)) ? floorKey(scene, scene.levels.filter((l) => l.id === id), id, b, this.cell) : null;
+      m.set(rk, key);
+    }
+    if (key === null) return undefined;
     this.stats.levelBuilds++;
-    return this.floorOver(r, scene, id);
+    return this.floorOver(r, scene, id, key);
   }
 
   /** Paged: one upper level over a tile rect, as buildGrids builds it among the window's floors (each level is rasterised
    *  on its own; buildGridsOverFloors only crops to its floors, bit-identical), memoised (floorsOver). */
-  private floorOver(r: TileRect, scene: SpatialScene, id: number): LevelGrid | undefined {
-    const same = scene.levels.filter((l) => l.id === id), bounds = rectBounds(r), key = floorKey(scene, same, id, bounds, this.cell), hit = this.floorsOver.get(key);
+  private floorOver(r: TileRect, scene: SpatialScene, id: number, known?: string): LevelGrid | undefined {
+    const same = scene.levels.filter((l) => l.id === id), bounds = rectBounds(r), key = known ?? floorKey(scene, same, id, bounds, this.cell), hit = this.floorsOver.get(key);
     if (hit) { this.floorsOver.delete(key); this.floorsOver.set(key, hit); this.stats.floorHits++; return hit.g; }
     this.stats.floorBuilds++;
     const g = buildGridsOverFloors({ ...scene, bounds, levels: same }, this.cell).levels.get(id);

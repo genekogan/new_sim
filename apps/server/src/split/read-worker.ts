@@ -82,7 +82,22 @@ function apply2(d: WorldDelta): boolean {
   const t0 = performance.now(); RL!.replicaSync(RW!.R.faded, RW!.R.static?.places); c2.syncMs += performance.now() - t0;
   if (!ready2) warm2();
   else if (RW!.cost.spatialBuilds + RW!.cost.spatialRebuilds !== before && RW!.spatial) {if (!relabel) {relabel = {since: performance.now(), rebuilds: RW!.cost.spatialRebuilds}; setImmediate(relabelSlice);}}
+  if (!bgQueued) {bgQueued = true; setImmediate(background);}
   return true;
+}
+/** B-facade (b): the warm-up a read would otherwise do, after each delta and outside any read: the god layer brought to
+ *  main's last commit (its place index derives at god edits and at each 1,200-tick boundary), connectivity labels after
+ *  main's windows move (a slice per delta; a read finishes what is left). Its thread CPU is counted apart (`bg`). */
+let bgQueued = false;
+const BG_SLICE_MS = 8;
+const bg = {runs: 0, cpuMs: 0, maxCpuMs: 0};
+function background() {
+  bgQueued = false;
+  if (!RW || !RL || !RH || !ready2 || relabel) return;
+  const c = cpuMs();
+  try {R2!.readBridgeSync(RH, RL); RW.spatial?.warmSliceV1(BG_SLICE_MS);}
+  catch (e) {console.error('[read-worker] background', wd.index, e instanceof Error ? (e.stack ?? e.message).split('\n').slice(0, 3).join(' | ') : e);}
+  const ms = cpuMs() - c; bg.runs++; bg.cpuMs += ms; bg.maxCpuMs = Math.max(bg.maxCpuMs, ms);
 }
 /** After a read: the verdicts it missed, to main's pump (answered with the next delta). */
 function askMisses() {
@@ -183,7 +198,7 @@ function health(res: ServerResponse) {
   const mainGen = lag[0];
   const tick = tickNow();
   send(res, tick >= 0 ? 200 : 503, {ok: tick >= 0, worker: wd.index, gen, lagGens: Math.max(0, mainGen - gen), tick, subset: wd.mode === 1, mode: wd.mode, served: cost.served, forwarded: cost.forwarded,
-    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, cpuMs: Math.round(c2.cpuMs), verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null, god: RL ? R2.readBridgeCost(RL) : null}} : {})});
+    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, cpuMs: Math.round(c2.cpuMs), threadCpuMs: Math.round(cpuMs()), bg: {...bg, cpuMs: Math.round(bg.cpuMs)}, ingest: {deltas: cost.deltas, cpuMs: Math.round(cost.ingestCpuMs), maxCpuMs: Math.round(cost.maxIngestCpuMs)}, verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null, god: RL ? R2.readBridgeCost(RL) : null}} : {})});
 }
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-length', 'upgrade', 'expect']);
 /** Ask the main thread (through Admission) and relay its answer. */

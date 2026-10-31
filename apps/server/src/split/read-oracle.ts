@@ -58,7 +58,7 @@ import type {DeltaTap, StreamMessage} from './delta.ts';
 
 export type ReadName = 'here' | 'observe' | 'capabilities' | 'resolve' | 'around';
 export const READS: readonly ReadName[] = ['here', 'observe', 'capabilities', 'resolve', 'around'];
-export type Soak = {startedAt: number; rounds: number; /** thread CPU ms of the replica's per-round god-layer sync */ syncCpuMs: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number; paths: Record<string, number>; lateDelta?: number}>; replica: unknown};
+export type Soak = {startedAt: number; rounds: number; /** thread CPU ms of the replica's per-round god-layer sync */ syncCpuMs: number; /** thread CPU ms of the after-delta warm-up (as a worker's background) */ bgCpuMs: number; bgRuns: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number; paths: Record<string, number>; lateDelta?: number}>; replica: unknown};
 
 const cpu = () => {const u = threadCpuUsage(); return (u.user + u.system) / 1000;};
 export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {tap: DeltaTap; init: () => unknown; ask: (m: never[]) => void}, dbPath: string, o: {everyMs?: number; log?: (s: string) => void; logEveryMs?: number} = {}) {
@@ -71,12 +71,15 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
   let warmMs = 0, warmed: unknown = null;
   /** as a worker does before 'ready': label connectivity outside any read (again after a rebuild) */
   const warm = () => {if (RW.spatial && warmed !== RW.spatial) {warmMs += RW.spatial.warmLabelsV1(); warmed = RW.spatial;}};
-  const S: Soak = {startedAt: Date.now(), rounds: 0, syncCpuMs: 0, skipped: {}, replica: null,
+  let bgQueued = false;
+  const S: Soak = {startedAt: Date.now(), rounds: 0, syncCpuMs: 0, bgCpuMs: 0, bgRuns: 0, skipped: {}, replica: null,
     reads: Object.fromEntries(READS.map(r => [r, {...tally(), mainOnly: {}, liveMs: 0, replicaMs: 0, paths: {}}])) as Soak['reads']};
   const skip = (why: string) => {S.skipped[why] = (S.skipped[why] ?? 0) + 1;};
   src.tap.subscribe((m: StreamMessage) => {
     if ('t' in m || !RW.apply(structuredClone(m) as never)) {RW.init(structuredClone(src.init()) as never); skip('reinit');}
     RL.replicaSync(RW.R.faded, RW.R.static?.places);
+    // as a worker does after each delta (read-worker.ts background): the god layer and a connectivity slice, outside reads
+    if (!bgQueued) {bgQueued = true; setImmediate(() => {bgQueued = false; if (!RW.spatial || warmed !== RW.spatial) return; const c = cpu(); try {readBridgeSync(H, RL); RW.spatial.warmSliceV1(8);} catch {} S.bgCpuMs += cpu() - c; S.bgRuns++;});}
   });
   const souls = () => [...host.minds.values()].filter(m => m.owner && m.owner !== 'system' && !m.native && host.engine.world.entities[m.entityId]).map(m => ({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}) as EdgeSoul);
   const ask: Record<ReadName, (L: EdgeLedger, s: EdgeSoul, i: number) => unknown> = {
@@ -142,7 +145,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     RL.knowledge.outbox.length = 0;
   };
   const iv = setInterval(() => {try {round();} catch (e) {skip('error'); console.error('[read-oracle]', e instanceof Error ? e.stack?.split('\n').slice(0, 3).join(' | ') : e);}}, o.everyMs ?? 1000); iv.unref();
-  const summary = () => ({...S, syncCpuMs: Math.round(S.syncCpuMs), warmMs: Math.round(warmMs), replica: RW.cost, god: readBridgeCost(RL), verdicts: {hits: RW.verdicts.hits, misses: RW.verdicts.missCount},
+  const summary = () => ({...S, syncCpuMs: Math.round(S.syncCpuMs), bgCpuMs: Math.round(S.bgCpuMs), warmMs: Math.round(warmMs), replica: RW.cost, god: readBridgeCost(RL), verdicts: {hits: RW.verdicts.hits, misses: RW.verdicts.missCount},
     reads: Object.fromEntries(READS.map(r => {const T = S.reads[r]; return [r, {...T, liveMs: Math.round(T.liveMs), replicaMs: Math.round(T.replicaMs)}];}))});
   const lg = setInterval(() => (o.log ?? console.log)('[read-oracle] ' + JSON.stringify(summary())), o.logEveryMs ?? 60_000); lg.unref();
   return {summary, stop: () => {clearInterval(iv); clearInterval(lg); H.close();}};
