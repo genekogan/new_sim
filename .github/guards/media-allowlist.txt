@@ -22,3 +22,4 @@ tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/shots/wid
 apps/server/test/fixtures/old-world-takes/eden.jsonl.br
 apps/server/test/fixtures/old-world-takes/littlemartians.jsonl.br
 apps/server/test/fixtures/old-world-takes/mars.jsonl.br
+apps/server/test/fixtures/sample-texture.jpg

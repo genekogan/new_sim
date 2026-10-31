@@ -182,8 +182,8 @@ test('frozen actual inside-cue and silence publication binds source/era/body cap
   assert.equal(inside.next.cue.pieceId,'zoning-board');assert.equal(inside.next.cue.observation.situation,'gathering');assert.equal(inside.next.cue.observation.largestCommonTargetMembers,2);
   assert.equal(inside.next.cue.observation.rulesVersion,inside.rulesVersion);assert.equal(inside.next.cue.observation.tick,2564);
   const gap=f.journeys[1].history.at(-1);assert.equal(gap.cue,null);assert.equal(gap.anchor,null);assert.equal(gap.phase,null);
-  // This immutable recording was made at e113, not at every later transport edit.
+  // This immutable recording was made at 8748afe (e1139e8 before the public-history rewrite), not at every later transport edit.
   // Current execution is qualified separately; do not relabel its frozen source.
   for(const [path,sha] of Object.entries(f.producer))assert.equal(createHash('sha256').update(execFileSync('git',
-    ['show',`e1139e864479404e3c8cffedd977c63009afdd61:${path}`],{cwd:new URL('../../../',import.meta.url)})).digest('hex'),sha);
+    ['show',`8748afe468211a59598822e92ae15ac37f9e9547:${path}`],{cwd:new URL('../../../',import.meta.url)})).digest('hex'),sha);
 });
