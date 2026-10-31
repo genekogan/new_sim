@@ -198,3 +198,45 @@ test('watchdog ports across a handover: an adopted world keeps its port, held fr
   p.kids.delete('ho');
   await p.closeAll();
 });
+
+test('(d) the proxy: Soul calls to a booting world are answered 503 world.starting at once; red sheds C2; a restart ramps C1/C2 back in', async () => {
+  const { openLauncher } = await import('./launcher.mjs');
+  const dir = mkdtempSync(join(tmpdir(), 'l1-guard-d-'));
+  const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
+  const webDir = join(dir, 'web'); mkdirSync(webDir); writeFileSync(join(webDir, 'index.html'), '<!doctype html>');
+  const command = (w, port) => ({ cmd: process.execPath, args: [fake], env: { ...process.env, WORLD_KEY: w.slug, PORT: String(port), DATA_DIR: w.dataDir, FAKE_BOOT_MS: '2500' } });
+  const P = 5110, base = `http://127.0.0.1:${P}`;
+  const L = await openLauncher({ port: P, range: [5107, 5108], dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, log: () => {}, prewarm: false, publicOrigin: 'http://sim.test', devAuth: true, guard: { ...FAST, bootStallMs: 60_000, silentBootStallMs: 60_000 } });
+  const soul = (i, path = '/v1/edge/here', method = 'GET') => { const t0 = performance.now(); return fetch(`${base}/w/edgey/${path.replace(/^\//, '')}`, { method, headers: { authorization: `Bearer sim_s_soul${i}_secret`, 'x-forwarded-for': `198.51.100.${i % 250}` } }).then(async (r) => ({ status: r.status, ms: performance.now() - t0, retry: r.headers.get('retry-after'), body: await r.json().catch(() => null) })); };
+  try {
+    await Promise.all(Array.from({ length: 100 }, () => fetch(`${base}/__sim/healthz`).then((r) => r.arrayBuffer())));   // 100 open keep-alive connections: the timing is the launcher's, not connection setup
+    const made = fetch(`${base}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Edgey' }) }); made.catch(() => {});   // (an assertion below closes the launcher under it)
+    await until(() => L.pool.status('edgey').status === 'starting', 2000, 'booting');
+    const rs = [];   // 100 calls in 10 waves of 10 at once (one test process cannot time 100 at once without measuring itself)
+    for (let w = 0; w < 10; w++) rs.push(...await Promise.all(Array.from({ length: 10 }, (_, i) => soul(w * 10 + i))));
+    const worst = Math.max(...rs.map((r) => r.ms));
+    assert.ok(rs.every((r) => r.status === 503 && r.body?.code === 'world.starting' && r.retry === '5'), JSON.stringify(rs.find((r) => r.body?.code !== 'world.starting')));
+    assert.ok(worst < 50, `slowest answer ${worst.toFixed(1)} ms`);
+    assert.equal(L.pool.status('edgey').status, 'starting', 'all answered while it was still booting');
+    console.log(`# (d) 100 Soul calls during a boot: all 503 world.starting + Retry-After 5, median ${rs.map((r) => r.ms).sort((a, b) => a - b)[50].toFixed(1)} ms, slowest ${worst.toFixed(1)} ms`);
+    assert.equal((await made).status, 201);
+    assert.equal((await soul(1)).status, 404, 'served by the world once it is up (the fake has no such route)');
+    // red: C2 personal reads shed at the proxy, acts (C1) still go to the world
+    await fetch(`${base}/w/edgey/level?l=red`); await fetch(`${base}/w/edgey/healthz`);   // the next answer carries X-Sim-Load: red
+    const shed = await soul(2);
+    assert.equal(shed.status, 503); assert.equal(shed.body.code, 'world.busy'); assert.match(shed.body.message, /very busy \(red\)/); assert.equal(shed.retry, '2');
+    assert.equal((await soul(3, '/v1/edge/act', 'POST')).status, 404, 'C1 is not shed at red');
+    await fetch(`${base}/w/edgey/level?l=green`); await fetch(`${base}/w/edgey/healthz`);
+    assert.equal((await soul(4)).status, 404, 'green again: served');
+    // a crash and restart: for 60 s only a growing share of Souls get C1/C2 in, each Soul consistently
+    await fetch(`${base}/w/edgey/crash`);
+    await until(() => L.pool.status('edgey').status === 'running' && L.pool.status('edgey').rampFrom, 10_000, 'restarted');
+    const ramp = await Promise.all(Array.from({ length: 20 }, (_, i) => soul(100 + i)));
+    const refused = ramp.filter((r) => r.body?.code === 'world.busy' && /just restarted/.test(r.body.message));
+    assert.ok(refused.length >= 8 && refused.length <= 19, `${refused.length} of 20 Souls refused at the start of the ramp`);
+    assert.ok(refused.every((r) => Number(r.retry) >= 1 && Number(r.retry) <= 60));
+    const again = await Promise.all(Array.from({ length: 20 }, (_, i) => soul(100 + i)));
+    assert.deepEqual(again.map((r) => r.body?.code === 'world.busy' && /just restarted/.test(r.body.message)), ramp.map((r) => refused.includes(r)), 'the same Souls are refused again');
+    console.log(`# (d) ramp: ${refused.length}/20 Souls refused right after a restart`);
+  } finally { await L.close(); }
+});

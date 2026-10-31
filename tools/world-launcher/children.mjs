@@ -251,7 +251,7 @@ export class ChildPool {
     return { status: k.frozen || (k.asleep && k.status === 'stopped') ? 'asleep' : k.status, ...(k.frozen ? { frozen: true } : {}), port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit,
       ...(k.restartsBy ? { restartsByReason: { ...k.restartsBy } } : {}), ...(k.lastBootMs != null ? { lastBootMs: k.lastBootMs } : {}), ...(k.healthPort ? { healthPort: k.healthPort } : k.noHealthPort ? { watchdog: 'none: live.json + main /healthz' } : {}), ...(k.held ? { held: { ...k.held } } : {}), ...(k.wedging ? { wedging: { ...k.wedging } } : {}),
       ...(k.boot && (k.status === 'starting' || k.status === 'handover') ? { boot: { ...k.boot } } : {}), ...(k.nextTryAt && k.status === 'restarting' ? { nextTryAt: k.nextTryAt } : {}),
-      ...(k.live ? { level: k.live.level ?? null } : {}) };
+      ...(k.live ? { level: k.live.level ?? null } : {}), ...(k.rampFrom && k.status === 'running' ? { rampFrom: k.rampFrom } : {}) };
   }
   /** Ports held by live or (re)starting children; a sleeping world's old port is free for anyone. */
   usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).flatMap((k) => [k.port, k.healthPort]).filter(Boolean)); }
@@ -388,6 +388,7 @@ export class ChildPool {
         const r = await fetch(health, { signal: AbortSignal.timeout(1500) });
         if (r.ok) {
           k.status = 'running'; k.upSince = Date.now(); k.lastBootMs = k.upSince - t0; k.boot = null; k.health = { fails: 0, okAt: k.upSince };
+          k.rampFrom = k.restartBoot ? k.upSince : null; k.restartBoot = false;   // after a restart: the proxy's admission ramp
           if (k.lastBootMs > g.bootSlowMs) this.log(`world ${k.slug} booted in ${Math.round(k.lastBootMs / 1000)} s`);
           this.o.onChange?.(k.slug); return port;
         }
@@ -439,7 +440,7 @@ export class ChildPool {
     k.timer = setTimeout(() => {
       k.timer = null;
       if (this.closing || k.stopped || this.fenced) { this.settlePending(k, Object.assign(new Error(`world ${k.slug} was stopped`), { code: 'stopping' })); return; }
-      k.ready = this.boot(k).finally(() => { k.ready = null; });
+      k.restartBoot = true; k.ready = this.boot(k).finally(() => { k.ready = null; });
       k.ready.catch((e) => { k.lastError = e.message; if (!this.closing && !k.stopped && !this.fenced) this.scheduleRestart(k, e.code === 'capacity' ? 'capacity' : e.reason ?? 'boot'); });
       this.settlePending(k, k.ready);
     }, wait);
