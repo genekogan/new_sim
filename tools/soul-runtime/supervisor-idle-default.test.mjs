@@ -5,13 +5,14 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {openJournal} from './journal.mjs';
-import {runSupervisor,AMBIENT_WAKE_MS} from './supervisor.mjs';
+import {runSupervisor,AMBIENT_WAKE_MS,AMBIENT_SETTLE_MS} from './supervisor.mjs';
 import {abortableSleep} from './receiver.mjs';
 
 const origin=Date.parse('2026-10-30T12:00:00.000Z');
 const flush=async()=>{for(let i=0;i<20;i++)await new Promise(setImmediate);};
 const wait=(args={})=>({plan:'Preserve the original open task while waiting for observations',call:{type:'wait',command:'wait',arguments:JSON.stringify(args)},wakeAt:null});
 const ambient=(id,speaker='s_native_speaker')=>({id,kind:'speech.ambient',raw:'speech',salience:1,about:{soulId:speaker},data:{from:{soulId:speaker},text:'An ordinary native public remark.'}});
+const presence=(id,kind,soulId)=>({id,kind,raw:kind==='arrive.here'?'arrival':'departure',salience:1,about:{soulId,name:'Observed peer'},data:{placeId:'p_place',soul:{soulId,name:'Observed peer'},untrusted:true},text:'Observed peer '+(kind==='arrive.here'?'arrived':'left')});
 class Host extends EventEmitter{
  constructor(journal){super();this.journal=journal;this.threadId='exact-durable-thread';this.calls=[];this.beginScopes=[];this.steers=[];this.interrupts=[];this.connections=[];this.activeTurnId=null;}
  async connect(options){this.connections.push(options);}
@@ -39,8 +40,8 @@ test('a fresh journal persists nearby attention before inference and wakes an id
  const f=fixture(t);
  try{
   assert.deepEqual(f.initial,{revision:0,value:null,at:null});await flush();assert.equal(f.host.calls.length,1);f.host.finish(wait());await flush();assert.equal(f.journal.control.checkpoint().value.lastCall.type,'wait');
-  f.ingest(ambient('native-public'));t.mock.timers.tick(AMBIENT_WAKE_MS-1);await flush();assert.equal(f.host.calls.length,1,'native ambient remains batched, never an immediate model poll');
-  t.mock.timers.tick(101);await flush();assert.equal(f.host.calls.length,2,'a fresh idle controller should hear native public speech without a model-authored subscription');
+  f.ingest(ambient('native-public'));t.mock.timers.tick(AMBIENT_SETTLE_MS-1);await flush();assert.equal(f.host.calls.length,1,'the first ambient after silence settles briefly so a burst coalesces');
+  t.mock.timers.tick(101);await flush();assert.equal(f.host.calls.length,2,'a fresh idle controller should hear native public speech without a model-authored subscription');assert.ok(Date.now()-origin<=500,'the first ambient after silence is delivered promptly');
   assert.equal(f.host.beginScopes[0],'nearby','the default must be durable before the first inference starts');assert.equal(f.host.calls[0].listenTo,'nearby');assert.equal(f.host.calls[1].listenTo,'nearby');assert.ok(f.host.calls[1].pending.some(x=>x.event.id==='native-public'));assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);assert.equal(f.journal.pending().length,1,'waking does not incorporate or acknowledge speech');assert.deepEqual(f.commands,[['read','observe']]);
  }finally{await f.cleanup();}
 });
@@ -83,10 +84,11 @@ test('fresh nearby attention survives an idle checkpoint and reopening the same 
  }finally{await f.cleanup();}
 });
 test('a saved deadline wakes before the fresh nearby ambient batch',async t=>{
- const f=fixture(t),wakeAt=new Date(origin+1000).toISOString();
+ const f=fixture(t);
  try{
-  await flush();f.host.finish({...wait(),wakeAt});await flush();assert.equal(f.journal.control.checkpoint().value.wakeAt,wakeAt);f.ingest(ambient('before-deadline'));
-  t.mock.timers.tick(999);await flush();assert.equal(f.host.calls.length,1);t.mock.timers.tick(101);await flush();assert.equal(f.host.calls.length,2);assert.ok(Date.now()<origin+AMBIENT_WAKE_MS);assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);assert.equal(f.host.calls[1].listenTo,'nearby');assert.ok(f.host.calls[1].pending.some(x=>x.event.id==='before-deadline'));assert.equal(f.journal.control.checkpoint().value.wakeAt,wakeAt);assert.equal(f.host.steers.length,0);assert.deepEqual(f.commands,[['read','observe']]);
+  await flush();f.host.finish(wait());await flush();f.ingest(ambient('first'));t.mock.timers.tick(AMBIENT_SETTLE_MS+100);await flush();assert.equal(f.host.calls.length,2);
+  const start=Date.now(),wakeAt=new Date(start+1000).toISOString();f.host.finish({...wait(),wakeAt});await flush();assert.equal(f.journal.control.checkpoint().value.wakeAt,wakeAt);f.ingest(ambient('before-deadline'));
+  t.mock.timers.tick(999);await flush();assert.equal(f.host.calls.length,2,'a second ambient within the cadence waits for its batch');t.mock.timers.tick(101);await flush();assert.equal(f.host.calls.length,3);assert.ok(Date.now()<start+AMBIENT_WAKE_MS);assert.equal(f.host.calls[2].scheduledWakeAt,wakeAt);assert.equal(f.host.calls[2].listenTo,'nearby');assert.ok(f.host.calls[2].pending.some(x=>x.event.id==='before-deadline'));assert.equal(f.journal.control.checkpoint().value.wakeAt,wakeAt);assert.equal(f.host.steers.length,0);assert.deepEqual(f.commands,[['read','observe']]);
  }finally{await f.cleanup();}
 });
 test('explicit local mute preserves an outstanding deadline without polling',async t=>{
@@ -94,5 +96,34 @@ test('explicit local mute preserves an outstanding deadline without polling',asy
  try{
   await flush();f.host.finish({...wait(),call:{type:'listen',command:'listen',arguments:'{"listenTo":[]}'},wakeAt});await flush();assert.equal(f.host.calls.length,2);assert.deepEqual(f.host.calls[1].listenTo,[]);assert.equal(f.host.calls[1].scheduledWakeAt,wakeAt);f.host.finish(wait());await flush();assert.equal(f.journal.control.checkpoint().value.wakeAt,wakeAt);
   f.ingest(ambient('muted-before-deadline'));t.mock.timers.tick(1999);await flush();assert.equal(f.host.calls.length,2);t.mock.timers.tick(101);await flush();assert.equal(f.host.calls.length,3);assert.deepEqual(f.host.calls[2].listenTo,[]);assert.equal(f.host.calls[2].scheduledWakeAt,wakeAt);assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);assert.deepEqual(f.commands,[['read','observe']]);
+ }finally{await f.cleanup();}
+});
+test('ambient bursts: the first after silence is prompt, later ones within the cadence are batched together',async t=>{
+ const f=fixture(t);
+ try{
+  await flush();f.host.finish(wait());await flush();f.ingest(ambient('first'));t.mock.timers.tick(AMBIENT_SETTLE_MS+100);await flush();assert.equal(f.host.calls.length,2);const delivered=f.journal.control.checkpoint().value.lastAmbientDeliveryAt;assert.ok(delivered-origin<=500);
+  f.host.finish(wait());await flush();f.ingest(ambient('second'));t.mock.timers.tick(100);await flush();f.ingest(ambient('third'));
+  t.mock.timers.tick(delivered+AMBIENT_WAKE_MS-Date.now()-1);await flush();assert.equal(f.host.calls.length,2,'successive ambient deliveries keep the cadence cap');
+  t.mock.timers.tick(101);await flush();t.mock.timers.tick(100);await flush();assert.equal(f.host.calls.length,3);assert.deepEqual(f.host.calls[2].pending.filter(x=>x.event.kind==='speech.ambient').map(x=>x.event.id),['second','third']);assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);
+ }finally{await f.cleanup();}
+});
+const far=new Date(origin+3600000).toISOString();
+for(const kind of ['arrive.here','leave.here'])for(const scope of ['nearby',['s_peer'],[]])test(kind+' about a peer wakes an idle far-deadline wait only when attended ('+JSON.stringify(scope)+')',async t=>{
+ const f=fixture(t),attended=scope==='nearby'||scope.includes('s_peer');
+ try{
+  await flush();f.host.finish({...wait({listenTo:scope}),wakeAt:far});await flush();assert.deepEqual(f.journal.control.checkpoint().value.listenTo,scope);
+  if(Array.isArray(scope)&&scope.length){f.ingest(presence('unattended',kind,'s_other'));t.mock.timers.tick(AMBIENT_WAKE_MS*2);await flush();assert.equal(f.host.calls.length,1,'presence of an unattended Soul stays priority 0');}
+  f.ingest(presence('peer',kind,'s_peer'));t.mock.timers.tick(AMBIENT_SETTLE_MS+100);await flush();t.mock.timers.tick(100);await flush();
+  assert.equal(f.host.calls.length,attended?2:1);assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);
+  if(attended){assert.ok(f.host.calls[1].pending.some(x=>x.event.id==='peer'));assert.equal(f.host.calls[1].scheduledWakeAt,far);assert.ok(Number.isFinite(f.journal.control.checkpoint().value.lastAmbientDeliveryAt));}
+  else{t.mock.timers.tick(AMBIENT_WAKE_MS*2);await flush();assert.equal(f.host.calls.length,1);assert.equal(f.journal.pending().length,1);}
+  assert.deepEqual(f.commands,[['read','observe']]);
+ }finally{await f.cleanup();}
+});
+test('attended presence never steers or interrupts an active turn and is delivered after it ends',async t=>{
+ const f=fixture(t);
+ try{
+  await flush();f.ingest(presence('during-active','arrive.here','s_peer'));t.mock.timers.tick(AMBIENT_WAKE_MS*2);await flush();assert.equal(f.host.calls.length,1);assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);
+  f.host.finish({...wait(),wakeAt:far});await flush();t.mock.timers.tick(AMBIENT_SETTLE_MS+100);await flush();t.mock.timers.tick(100);await flush();assert.equal(f.host.calls.length,2);assert.ok(f.host.calls[1].pending.some(x=>x.event.id==='during-active'));assert.equal(f.host.steers.length,0);assert.equal(f.host.interrupts.length,0);
  }finally{await f.cleanup();}
 });

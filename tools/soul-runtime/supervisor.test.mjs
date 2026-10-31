@@ -184,6 +184,16 @@ test('listening matches exact native ambient speaker identities without inferrin
  const event=ambient('c_1'),fact={source:'world',event};assert.equal(attentionPriority(fact,['s_presenter']),1);assert.equal(attentionPriority(fact,[]),0);assert.equal(attentionPriority(fact,['s_other']),0);assert.equal(attentionPriority(fact,'nearby'),1);
  assert.equal(attentionPriority({source:'world',event:{...event,raw:'receipt'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{...event,data:{from:{soulId:'s_other'},text:'s_presenter'}}},['s_presenter']),0);assert.equal(attentionPriority({source:'world',event:{...event,kind:'world.narration'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{id:'direct',salience:3}},[]),3);assert.equal(attentionPriority({source:'owner',event:{id:'m1',salience:0}},[]),4);
 });
+test('native arrival/departure of an attended Soul is ambient priority; unattended presence and closures stay quiet',()=>{
+ const presence=(kind,soulId='s_presenter')=>({id:'p_1',kind,raw:kind==='arrive.here'?'arrival':'departure',salience:1,about:{soulId,name:'Observed participant'},data:{placeId:'p_place',soul:{soulId,name:'Observed participant'},untrusted:true},text:'Observed participant moved'});
+ for(const kind of ['arrive.here','leave.here']){
+  const event=presence(kind),fact={source:'world',event};
+  assert.equal(attentionPriority(fact,'nearby'),1);assert.equal(attentionPriority(fact,['s_presenter']),1);assert.equal(attentionPriority(fact,[]),0);assert.equal(attentionPriority(fact,['s_other']),0);assert.equal(attentionPriority(fact),0);
+  assert.equal(attentionPriority({source:'world',event:{...event,raw:'speech'}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{...event,about:undefined}},'nearby'),0);assert.equal(attentionPriority({source:'world',event:{...event,data:{...event.data,soul:{soulId:'s_other'}}}},['s_presenter']),0);assert.equal(attentionPriority({source:'owner',event},[]),4);
+ }
+ assert.equal(attentionPriority({source:'world',event:{id:'c',kind:'conversation.closed',raw:'conversation.closed',salience:1,data:{conversation:'cv_1',reason:'ended'}}},'nearby'),0);
+ assert.equal(attentionPriority({source:'world',event:{id:'r',kind:'receipt.started',raw:'receipt',salience:1,about:{soulId:'s_presenter'}}},'nearby'),0);
+});
 test('saved mute remains quiet and is delivered with the next urgent owner prompt',async t=>{
  const f=setup(t),owner=f.journal.control.claim('setup');f.journal.control.save(owner,0,{listenTo:[]});f.journal.control.release(owner);
  const states=[],running=runSupervisor({...f,signal:f.stop.signal,onState:s=>states.push(s),ambientWakeMs:30});

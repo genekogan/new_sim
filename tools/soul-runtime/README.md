@@ -54,14 +54,19 @@ Use `wait` when the model intends to sleep; `wait` arguments may still configure
 `listen`, followed by the model's chosen departure action. The private
 `checkpoint.listenTo` survives other calls and restart independently of
 `wakeAt`; the prompt reports both controls. Only actual `speech.ambient`
-envelopes with native speaker identities match a chosen ID. Text, names,
-receipts, and narration do not establish relevance. Listening does not accept
-an invitation, publish a reply, decide relevance, or choose how the Soul reacts.
+envelopes with native speaker identities, and native `arrive.here`/`leave.here`
+envelopes whose subject Soul id is listened to (or any subject under `nearby`),
+match. Text, names, receipts, conversation closures and narration do not
+establish relevance; presence of an unlistened Soul stays priority 0. Listening
+does not accept an invitation, publish a reply, decide relevance, or choose how
+the Soul reacts.
 
-Matching ambient events can wake an idle model in batches at most once per
-five seconds, with no inference while the matching queue is empty. They do not
-steer or restart an active inference. An otherwise-needed decision can observe
-them sooner. The last actual ambient delivery timestamp is durable; an earlier
+Matching ambient events can wake an idle model at most once per five seconds,
+with no inference while the matching queue is empty. The first match after that
+quiet interval settles for only 250 ms, so a lone remark, arrival or departure
+reaches an idle Soul within about half a second; later matches inside the five
+seconds are batched into the next delivery. They do not steer or restart an
+active inference. An otherwise-needed decision can observe them sooner. The last actual ambient delivery timestamp is durable; an earlier
 appointment/departure wake still takes precedence. Pending matching speech is
 selected ahead of quiet bookkeeping, including after a new scope or restart,
 so an older quiet row cannot hide it. Exact host-delivered IDs remain separate
