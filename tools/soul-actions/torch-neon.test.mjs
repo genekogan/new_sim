@@ -37,7 +37,7 @@ test('torches and a neon sign by hand: words, contact, refusal, interruption, pe
  // authoring: the words are bounded (32 characters)
  const tooLong=god.act({ops:[{op:'place',def:'core/neon-sign@1',name:'long',p:[60,60],state:{text:'x'.repeat(33)}}]});assert.equal(tooLong.accepted,false,'33 characters refused');
  const body=()=>f.host.engine.world.entities[soul.entityId],[ax,az]=[body().pose.p[0],body().pose.p[2]];
- const nearOps={ops:[{op:'place',def:'core/standing-torch@1',name:'torch',p:[ax+1.6,az+1.2]},{op:'place',def:'core/wall-torch@1',name:'wall-torch',p:[ax-1.8,az+1.6]},
+ const nearOps={ops:[{op:'place',def:'core/standing-torch@1',name:'torch',p:[ax+1.6,az+1.2]},{op:'place',def:'core/garden-wall@1',name:'back-wall',shape:{path:[[ax-3.6,az+1.9],[ax-0.4,az+1.9]]},params:{height:2.2,thickness:0.35}},{op:'place',def:'core/wall-torch@1',name:'wall-torch',p:[ax-1.8,az+1.6],r:Math.PI},
   {op:'place',def:'core/neon-sign@1',name:'neon',p:[ax+0.4,az+3.0],r:Math.PI,state:{text:'Night\u0007 Garden\nopen\nlate'}},{op:'place',def:'core/neon-sign@1',name:'neon-6m',p:[ax-6.2,az+0.5],state:{on:true,text:'Six metres'}}]};const placed=god.act(nearOps);assert.equal(placed.accepted,true,JSON.stringify(placed).slice(0,900));
  await tick(45);
  const near=await here();if(out)writeFileSync(`${out}/here-near.json`,JSON.stringify(near,null,1));const state=n=>god.model.get(n).state,id=n=>god.model.get(n).id;
@@ -64,10 +64,12 @@ test('torches and a neon sign by hand: words, contact, refusal, interruption, pe
   const r=await act(words);assert.match(r.receipt.capability,new RegExp(`object:${id(name)}:${cap}$`),words+' resolved to '+r.receipt.capability);
   assert.notEqual(state(name).on,want,'admission changes nothing remotely');const x=await finish(r,name,want);
   assert.equal(x.phase,'completed',JSON.stringify(edge.receipt(soul.soulId,r.receipt.id)).slice(0,400));assert.ok(x.contact,'actual hand contact ran');assert.equal(x.early,false,'nothing changes before contact');assert.equal(state(name).on,want);
-  const p=body().pose.p;x.handHeight=+x.hand[1].toFixed(3);x.standFromHand=+Math.hypot(p[0]-x.hand[0],p[2]-x.hand[2]).toFixed(2);results[`${Object.keys(results).length+1}:${words}`]=x;
+  const p=body().pose.p;x.stand=[+p[0].toFixed(2),+p[2].toFixed(2)];x.handHeight=+x.hand[1].toFixed(3);x.standFromHand=+Math.hypot(p[0]-x.hand[0],p[2]-x.hand[2]).toFixed(2);results[`${Object.keys(results).length+1}:${words}`]=x;
   assert.equal(body().human?.handActuator,undefined);
  }
  for(const x of Object.values(results))assert.ok(x.handHeight>=1.15&&x.handHeight<=1.6,'hand at a natural standing height: '+x.handHeight);
+ // the wall torch is reached from in front, never from beside it against the wall (stand points clear of the wall)
+ for(const k of ['2:light the wall torch','6:put out the wall torch']){const x=results[k];assert.ok(x.stand[1]<x.hand[2]-0.3,k+' stands in front of the wall torch: '+JSON.stringify(x.stand));assert.ok(f.host.engine.clearanceAtV1(x.stand[0],x.stand[1])>=0.28,k+' clear of the wall');}
  for(const [n,a,b] of [['torch','light','put-out'],['wall-torch','light','put-out'],['neon','switch-on','switch-off']])assert.ok(contact(n,a)&&contact(n,b),n+' is a hand contact');
  const lit=await here();assert.deepEqual(lit.objects.find(o=>o.id===id('neon')&&o.state)?.state,{on:true});
  const restored=WorldModel.fromSnapshot(JSON.parse(JSON.stringify(god.model.snapshot())),undefined,god.model.library);assert.equal(restored.get('torch').state.on,true);assert.equal(restored.get('wall-torch').state.on,false);assert.equal(restored.get('neon').state.on,true);
@@ -75,6 +77,6 @@ test('torches and a neon sign by hand: words, contact, refusal, interruption, pe
  for(const ref of ['core/candle@1','core/campfire@1'])assert.ok(!contact(ref,'light')&&!contact(ref,'put-out'),ref+' keeps its remote toggle');
  const report={status:'pass',hereBytes:{absent:JSON.stringify(absent).length,distant100Each:JSON.stringify(far).length,nearby:JSON.stringify(near).length,nearbyMinusAbsent:JSON.stringify(near).length-JSON.stringify(absent).length,wordsField:JSON.stringify(sign.words).length},
   rows:{torch:rowOf('torch'),neon:sign},results,
-  checks:['plain words resolve to the hand offers','"light the torch" with two torches in reach asks which (both offered)','putting out an unlit torch and switching off a dark sign refused','interruption before contact keeps the torch out','standing torch, wall torch and neon sign via the same hand contact, on/off/on','hand height 1.15–1.6 m at every contact','nothing changes before contact','snapshot persistence','100 distant of each (300, all lit, signs with words): +0 bytes, no offers, no words','33-character text refused at authoring; control characters removed; a third line dropped','words only within the nearby rule (none at 6 m), attributed and untrusted, never in offers','frozen v1 candle/campfire unchanged','zero native violations']};
+  checks:['plain words resolve to the hand offers','"light the torch" with two torches in reach asks which (both offered)','putting out an unlit torch and switching off a dark sign refused','interruption before contact keeps the torch out','standing torch, wall torch and neon sign via the same hand contact, on/off/on','hand height 1.15–1.6 m at every contact','the wall torch reached from in front, clear of its wall','nothing changes before contact','snapshot persistence','100 distant of each (300, all lit, signs with words): +0 bytes, no offers, no words','33-character text refused at authoring; control characters removed; a third line dropped','words only within the nearby rule (none at 6 m), attributed and untrusted, never in offers','frozen v1 candle/campfire unchanged','zero native violations']};
  if(out)writeFileSync(`${out}/summary.json`,JSON.stringify(report,null,2));console.log(JSON.stringify(report));
 });

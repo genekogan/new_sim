@@ -12,7 +12,7 @@ const NEON_WORDS = 34;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true };
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
-export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
+export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;clearance?:(x:number,z:number,level?:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;record:(soul:EdgeSoul,id:string,action:string)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
  const binding=(id:string)=>{const m=d.model(),e=m.entities.get(id);return e?createHash('sha256').update(JSON.stringify([e,m.worldPose(e),m.resolvedDef(e.def)?.hash])).digest('hex'):null;};
  return {
   plan(soul:EdgeSoul,target:string,action:string){
@@ -34,9 +34,11 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];
     if(valve?.at){
      // Stand beside the valve, clear of the thing's own footprint (a basin, a tray) by a body radius: of eight
-     // directions around the valve, the one nearest the Soul's approach whose stand point is outside.
+     // directions around the valve, the one nearest the Soul's approach whose stand point is outside. Entry 33: and clear
+     // of the world's other obstacles (a wall behind a wall torch), so the body never walks into one to reach a valve.
      const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[hx,,hz]=def.size.box.map(v=>v*wp.s/2),outside=(p:number[])=>{const lx=(p[0]-wp.x)*c-(p[2]-wp.z)*s,lz=(p[0]-wp.x)*s+(p[2]-wp.z)*c;return Math.abs(lx)>hx+HUMAN_RADIUS||Math.abs(lz)>hz+HUMAN_RADIUS;};
-     const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).sort((p,q)=>p[3]-q[3])[0];
+     const clear=(p:number[])=>!d.clearance||d.clearance(p[0],p[2],d.levelAt?.(p[0],p[2],wp.y)??0)>=HUMAN_RADIUS+.04;
+     const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).filter(clear).sort((p,q)=>p[3]-q[3])[0];
      if(best)root=[best[0],best[1],best[2]];
     }}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};

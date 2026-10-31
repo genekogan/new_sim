@@ -210,6 +210,7 @@ export class EngineBridge {
       };
     };
     if(this.edge)this.edge.contactActuator=createContactActuatorService({model:()=>this.god.model,levelAt:(x,z,y)=>this.levelAt(x,z,y),
+      clearance:(x,z,level)=>(this.host.engine as unknown as {clearanceAtV1?:(x:number,z:number,level?:number)=>number}).clearanceAtV1?.(x,z,level)??Infinity,
       body:id=>this.host.engine.world.entities[id] as never,access:(id,soul)=>this.layers.refusal(id,soul),
       record:(soul,id,action)=>{const r=this.edge!.comms?.objects.act?.(id,soul,{action,params:{}}) as {accepted?:boolean}|undefined;if(!r?.accepted)throw Error('switch.object-record-refused');},
       commit:(ops,note,done)=>this.god.engineAct(ops,note,done)});
