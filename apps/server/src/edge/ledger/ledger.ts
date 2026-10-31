@@ -1194,8 +1194,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  A warm asked for while one runs (a punt rewarm during the boot's) starts when that one ends: two never interleave
    *  their slices over the same caches, and reads wait for the last. */
   warmForServing(o: {sliceMs?: number; pre?: (soul: EdgeSoul) => Generator<void, void, void>; stop?: () => boolean; turn?: () => Promise<void>} = {}): Promise<ServingWarm> {
-    const prev = this.servingGate, run = prev ? prev.then(() => this.runServingWarm(o)) : this.runServingWarm(o), gate: Promise<void> = run.then(() => {});
-    this.servingGate = gate; void gate.then(() => { if (this.servingGate === gate) this.servingGate = null; });
+    const prev = this.servingGate; let gate: Promise<void> | null = null;
+    const run = (async () => { if (prev) await prev; try { return await this.runServingWarm(o); } finally { if (this.servingGate === gate) this.servingGate = null; } })();
+    this.servingGate = gate = run.then(() => {});
     return run;
   }
   /** While a serving warm runs: a promise that settles when it ends, or after `ceilingMs` (then the read builds what it

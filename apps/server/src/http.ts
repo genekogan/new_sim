@@ -13,7 +13,7 @@ import type {LoadMonitor} from './load/monitor.ts';
 export const bodyCeiling=(path:string)=>/\/v1\/(?:edge\/body\/uploads|art\/media)$/.test(path)?17*1024*1024:1024*1024;
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { decodeJwt } from 'jose';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { adminSchema, commandSchema, inviteSchema, ownerLifecycleCapabilitySchema, pairApproveSchema, pairExchangeSchema, pairPollSchema, pairStartSchema, publicEvent, setIntentSchema,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1 } from '@sim/protocol';
@@ -67,6 +67,12 @@ export function servingRead(method: string, path: string, view?: string): boolea
   if (method === 'GET') return (path === '/v1/edge/here' && view !== 'body') || path === '/v1/edge/observe' || path === '/v1/edge/capabilities' || path === '/v1/edge/around';
   return method === 'POST' && path === '/v1/edge/resolve';
 }
+/** Continuity (warm after listen): a listing read waits for a running serving warm (EdgeLedger.whenServing, which has a
+ *  ceiling) before it goes on. Mounted BEFORE admission, so the wait is never a request in flight (no soul.busy for it)
+ *  nor billed as the request's own time; nothing to wait for: no extra turn. */
+export function servingWait(whenServing: () => Promise<void> | null): MiddlewareHandler {
+  return async (c, next) => { const w = servingRead(c.req.method, c.req.path, c.req.query('view')) ? whenServing() : null; if (w) await w; return next(); };
+}
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2; edge?:EdgeLedger; god?: GodMode; contextReady?:()=>boolean; contextWait?:(signal:AbortSignal)=>Promise<void>; contextLevelAt?:(x:number,z:number,y:number)=>number; load?:{admission?:Admission;monitor:LoadMonitor;crowded?:(soulId:string)=>{position:number;eta_s:number}|null} };
 
 export function buildApp(d: Deps) {
@@ -91,9 +97,8 @@ export function buildApp(d: Deps) {
   // their own budget-sized limit. 1 MB is ~15x the largest normal JSON body; uploads (16 MB) get 16 MB + 1 MB.
   app.use('*',async(c,next)=>c.req.method==='GET'||c.req.method==='HEAD'||/\/v1\/god\//.test(c.req.path)?next():bodyLimit({maxSize:bodyCeiling(c.req.path),onError:(c)=>{refusals.note('size','too-large',`${c.req.method} ${c.req.path}`);return c.json({ok:false,code:'too-large',message:'request body is too large'},413);}})(c,next));
   // Continuity (warm after listen): right after a restart the menus' caches are built in slices (EdgeLedger.warmForServing);
-  // a listing read waits for that (with a ceiling) instead of building them cold in its own turn. It waits BEFORE admission,
-  // so the wait is never billed as the request's own time; nothing to wait for: no extra turn.
-  if (d.edge) { const edge = d.edge; app.use('/v1/edge/*', async (c, next) => { const w = servingRead(c.req.method, c.req.path, c.req.query('view')) ? edge.whenServing() : null; if (w) await w; return next(); }); }
+  // a listing read waits for that (with a ceiling) instead of building them cold in its own turn. Keep it BEFORE admission.
+  if (d.edge) { const edge = d.edge; app.use('/v1/edge/*', servingWait(() => edge.whenServing())); }
   // srv-load (LOAD-CONTRACT §2): heavy Soul/god requests queue for the admission dispatcher; edge answers carry X-Sim-Load
   if (d.load?.admission) { const load = d.load, admission = d.load.admission; app.use('*', admissionMiddleware(admission, () => load.monitor.level, bearer, t => d.souls.soulFromToken(t)?.owner,
     load.crowded ? t => { const id = d.souls.soulFromToken(t)?.id; return id ? load.crowded!(id) : null; } : undefined)); }
