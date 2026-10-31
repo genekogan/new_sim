@@ -16,21 +16,16 @@ import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPolicy, tierFor } from '../../tools/proof/tier.mjs';
+import { APPROVED_LABEL, maintainerApproved } from '../../tools/proof/gate.mjs';
 
-export const READY = 'merge:ready', REBASE = 'needs:rebase', APPROVED_LABEL = 'approved:maintainer';
+// The maintainer gate itself is tools/proof/gate.mjs, enforced by the required `proof-ok` check; the train uses the same
+// rule only to leave unapproved T3-T4 PRs queued instead of waiting on a check that will fail.
+export { APPROVED_LABEL, maintainerApproved };
+
+export const READY = 'merge:ready', REBASE = 'needs:rebase';
 export const DEFAULT_CHECKS = ['ci-ok', 'gitleaks', 'path-guard', 'scrub-guard', 'fragment', 'proof-ok'];
 const AWAITING = '<!-- merge-train:awaiting-approval -->';
 const rank = t => ['T0', 'T1', 'T2', 'T3', 'T4'].indexOf(t);
-
-/** The maintainer has signed off: their latest decisive review is an approval, or they added `approved:maintainer`
- * themselves (GitHub does not let an author approve their own PR). */
-export function maintainerApproved({ reviews = [], events = [], labels = [], maintainer }) {
-  const decisive = reviews.filter(r => r?.user?.login === maintainer && ['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED'].includes(r.state));
-  if (decisive.at(-1)?.state === 'APPROVED') return true;
-  if (!labels.includes(APPROVED_LABEL)) return false;
-  const added = [...events].reverse().find(e => e?.event === 'labeled' && e.label?.name === APPROVED_LABEL);
-  return added?.actor?.login === maintainer;
-}
 
 /** Why a ready PR cannot go now, or null when it can. */
 export function blocker({ pr, tier, approved, defaultBranch }) {
@@ -111,12 +106,19 @@ export function next({ repo, maintainer, api = { gh, ghAll, comment } }) {
 
 export async function wait({ repo, sha, required, timeoutMin = 60, pollSec = 20, api = { ghAll, gh }, sleep = ms => new Promise(r => setTimeout(r, ms)), now = Date.now }) {
   const deadline = now() + timeoutMin * 60_000;
-  let s;
+  let s, failedBefore = null;
   for (;;) {
     const runs = api.ghAll(`repos/${repo}/commits/${sha}/check-runs?per_page=100`).flatMap(p => p.check_runs ?? p);
     const statuses = api.ghAll(`repos/${repo}/commits/${sha}/statuses?per_page=100`);
     s = summarizeChecks({ runs, statuses, required });
-    if (s.state !== 'pending') return { result: s.state, ...s };
+    if (s.state === 'pass') return { result: 'pass', ...s };
+    // A failure counts once it is seen on two polls in a row: an approval re-runs `proof-ok` (proof-check.yml) at the
+    // moment it kicks the train, so the first poll can still see the failed run from before the approval.
+    if (s.state === 'fail') {
+      const key = s.failed.join('|');
+      if (failedBefore === key) return { result: 'fail', ...s };
+      failedBefore = key;
+    } else failedBefore = null;
     if (now() >= deadline) return { result: 'timeout', ...s };
     await sleep(pollSec * 1000);
   }
