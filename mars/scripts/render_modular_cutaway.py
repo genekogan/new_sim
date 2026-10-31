@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,math,json
 from mathutils import Vector
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene
+O=media('reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene
 for o in s.objects:
  if o.get('layer') in ['Roofs and upper floors','Walls and screens','Aerial reference']:o.hide_render=True
 s.render.resolution_x=1600;s.render.resolution_y=1200;s.cycles.samples=8

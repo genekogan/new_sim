@@ -21,6 +21,6 @@ d.execute("UPDATE souls SET description = '', owner = 'fixture', token_hash = NU
 d.commit(); d.execute('PRAGMA journal_mode=DELETE'); d.execute('VACUUM'); d.close()
 raw = open(dst, 'rb').read()
 with open(out + '.part', 'wb') as f: f.write(gzip.compress(raw, 9, mtime=0))
-os.replace(out + '.part', out); shutil.move(tmp, os.path.expanduser('~/.Trash/eden-cleanup-20261020/') + os.path.basename(tmp))
+os.replace(out + '.part', out); shutil.rmtree(tmp, ignore_errors=True)
 b = open(out, 'rb').read()
 print(json.dumps({'src': src, 'out': out, 'snapshotTick': top, 'emptied': gone, 'dbBytes': len(raw), 'bytes': len(b), 'sha256': hashlib.sha256(b).hexdigest()}))

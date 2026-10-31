@@ -2,15 +2,15 @@
 // never edits; this module is the only writer (specs/<id>.md + specs/index.json). Nothing here is implemented.
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { callModel as realCall, lastJson } from '../lib/claude-p.mjs';
 import { readJson, writeJson } from '../lib/jsonl.mjs';
 import { run as runProc } from '../lib/proc.mjs';
 import { providerPolicy } from '../lib/provider-policy.mjs';
 import { loadRun, projectEvidence } from './run.mjs';
 import { runOracles } from './oracles.mjs';
+import { REPO_ROOT } from '../../lib/paths.mjs';
 
-export const DEFAULT_SERVER_ROOT = join(homedir(), 'Eden/sim-wt/soul3-integration');
+export const DEFAULT_SERVER_ROOT = process.env.PLAYTEST_SERVER_ROOT ?? REPO_ROOT;
 export const HEADER = 'DRAFT — NOT IMPLEMENTED';
 export const AREAS = ['server', 'client CLI', 'skill text', 'world content', 'engine rule', 'UI'];
 

@@ -148,7 +148,7 @@ test('contending Chrome lease callers still have exactly one winner', async t =>
 });
 
 // R2F: one slot made a release walk's look wait 701 s behind other lanes. The team's slot scheme
-// (<team>/ops/chrome-lease.mjs): slot 0 is the old directory, slot i is `<dir>.<i>`, CHROME_LEASE_SLOTS (3).
+// (any machine-wide CHROME_LEASE_MODULE lease): slot 0 is the old directory, slot i is `<dir>.<i>`, CHROME_LEASE_SLOTS (3).
 test('slot directories and count follow the team scheme; a bad CHROME_LEASE_SLOTS keeps three', () => {
   assert.deepEqual(chromeSlotDirs('/tmp/eden-chrome-lease', 3), ['/tmp/eden-chrome-lease', '/tmp/eden-chrome-lease.1', '/tmp/eden-chrome-lease.2']);
   assert.deepEqual(chromeSlotDirs(), ['/tmp/eden-chrome-lease', '/tmp/eden-chrome-lease.1', '/tmp/eden-chrome-lease.2'].slice(0, chromeSlotCount()));

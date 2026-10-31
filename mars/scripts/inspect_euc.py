@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy, pathlib, math
 from mathutils import Vector
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
-p=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/research/appearance/euc')
+p=media('reconstruction/2026-campus/modular/research/appearance/euc')
 for i,n in enumerate(['Pièce1.STL','Pièce2x2.STL','Pièce3.STL','Pièce4x2.STL']):
  bpy.ops.wm.stl_import(filepath=str(p/n));o=bpy.context.object
  vs=[v.co for v in o.data.vertices];c=Vector([(min(v[a] for v in vs)+max(v[a] for v in vs))/2 for a in range(3)])

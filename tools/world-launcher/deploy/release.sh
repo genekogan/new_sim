@@ -4,8 +4,8 @@
 #   tools/world-launcher/deploy/release.sh [staging|production] [--no-activate] [--restart|--reload]   (--restart: no handover;
 #   --reload: hand over even when this release changes keeper.mjs; the running keeper stays until the next restart)
 #   tools/world-launcher/deploy/release.sh --local <dir>     assemble only (Option A: run it on the laptop)
-#   tools/world-launcher/deploy/release.sh legacy [--no-activate|--local <dir>]   the original worlds at the site root (old-worlds/
-#        README.md): web built for / (no prefix), build we-<sha12>-root, uploaded to /srv/sim-old/releases/ (never pruned by
+#   tools/world-launcher/deploy/release.sh legacy [--no-activate|--local <dir>]   the original worlds at the site root:
+#        web built for / (no prefix), build we-<sha12>-root, uploaded to /srv/sim-old/releases/ (never pruned by
 #        a /worlds release); activation is the kit's (cutover.sh), so legacy is never activated from here
 # Run from a clean worktree. The release: `git archive HEAD` (committed files only, so no .env, data or keys),
 # the web app built with --base /worlds/ (every URL under the launcher's prefix), the Mars web assets the worlds

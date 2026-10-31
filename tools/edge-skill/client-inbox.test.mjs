@@ -6,6 +6,7 @@ import { clientListen, clientAck, clientResult, noticeOwnerInbox, noticeInboxHea
 import { listen, ack, here } from './eden-agent.mjs';
 import { clientHelp } from './client-help.mjs';
 import { readClientStream } from './client-stream.mjs';
+import { tmpdir } from 'node:os';
 
 const latest = (id, state = 'delivered') => ({ id, text: 'Please visit the library.', state, sentAt: 1, deliveredAt: 2 });
 const envelope = message => ({ inbox: { connected: true, lastSeenAt: 2, latest: message } });
@@ -84,7 +85,7 @@ test('Soul inbox fails clearly on unavailable or unauthorized servers', async ()
 });
 
 test('Soul CLI dispatch uses its own authenticated inbox and surfaces piggyback delivery without extra calls', async t => {
-  const scratch = '<team>/scratch/inbox'; mkdirSync(scratch, { recursive: true });
+  const scratch = tmpdir(); mkdirSync(scratch, { recursive: true });
   const dir = mkdtempSync(join(scratch, 'soul-cli-')), cwd = process.cwd(), fetcher = globalThis.fetch, error = console.error, calls = [], notices = [];
   process.chdir(dir);
   writeFileSync('.eden-agent.json', JSON.stringify({ world: 'https://inbox.invalid/w/test', soul: 'synthetic-soul', token: 'synthetic-inbox-fixture', mode: 'edge' }));
@@ -160,7 +161,7 @@ test('LISTEN-LEAK: a superseded listen prints one line and ends (exit 0), never 
 
 test('LISTEN-LEAK: a second listen in the same folder supersedes the first, also while the first backs off from an outage', async () => {
   const { folderListenClaim, SUPERSEDED } = await import('./client-inbox.mjs');
-  const scratch = '<team>/scratch/inbox'; mkdirSync(scratch, { recursive: true });
+  const scratch = tmpdir(); mkdirSync(scratch, { recursive: true });
   const file = join(mkdtempSync(join(scratch, 'listen-claim-')), '.eden-listen');
   let second, sleeps = 0;
   const first = clientListen([], { claim: () => folderListenClaim(file), call: async () => ({ status: 502, data: {} }),

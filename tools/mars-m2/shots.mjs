@@ -18,7 +18,7 @@ mkdirSync(out, { recursive: true });
 /** parent-local point -> world (three.js yaw about +y) */
 export const toWorld = (pt, { p, r }) => { const c = Math.cos(r), s = Math.sin(r); return [p[0] + pt[0] * c + pt[2] * s, (p.length === 3 ? p[1] : 0) + pt[1], p[p.length - 1] - pt[0] * s + pt[2] * c]; };
 const { chromium } = createRequire(`${ROOT}/mars/viewer/package.json`)('@playwright/test');
-const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
 const release = await chromeLease('n3-mars-lm', { waitMs: 45 * 60000 });
 let browser;
 try {

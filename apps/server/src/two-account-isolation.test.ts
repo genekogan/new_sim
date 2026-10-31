@@ -17,6 +17,7 @@ import type {Hub} from './hub.ts';
 import {Souls} from './souls.ts';
 import {WorldHost} from './world.ts';
 import {GodMode} from './god/god.ts';
+import {tmpdir} from 'node:os';
 
 const factory = await marsFactory({...GREEN_FIELD_WORLD, safeCrewRemoval: true});
 const privateText = 'SYNTHETIC_ALICE_PRIVATE_INTENT';
@@ -65,7 +66,7 @@ async function cli(file: string, cwd: string, args: string[]) {
 }
 
 test('two dev-auth accounts cannot control, read private state, rename, delete or pair the other account’s residents/world', {timeout: 60000}, async t => {
-  const scratch = process.env.SAFETY_ISOLATION_TMP ?? '<team>/scratch/safety/isolation'; mkdirSync(scratch, {recursive: true});
+  const scratch = process.env.SAFETY_ISOLATION_TMP ?? tmpdir(); mkdirSync(scratch, {recursive: true});
   const root = mkdtempSync(join(scratch, 'sim-two-account-'));
   const a = await world(t, root, 'safety-alice', 5880, 'dev:alice');
   const b = await world(t, root, 'safety-bob', 5881, 'dev:bob');

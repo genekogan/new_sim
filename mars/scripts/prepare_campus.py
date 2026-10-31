@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 import pathlib,json,subprocess,concurrent.futures,shutil
 from PIL import Image
-ROOT=pathlib.Path('~/Mars');OUT=ROOT/'docs/media/reconstruction/2026-campus'; dest=OUT/'frames/campus-march19';dest.mkdir(exist_ok=True)
+ROOT=mars_root();OUT=ROOT/'docs/media/reconstruction/2026-campus'; dest=OUT/'frames/campus-march19';dest.mkdir(exist_ok=True)
 selection={'DJI_0002.MP4':[(0,192,2),(350,398,2),(422,508,2)],'DJI_0014.MP4':[(0,70,2),(78,106,2),(296,345,2)]}
 rows=[]
 for name,ranges in selection.items():

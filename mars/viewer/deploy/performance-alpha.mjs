@@ -52,7 +52,7 @@ async function execute() {
     'Public HTTPS origin required',
   );
   assert(
-    ['sim.mars.college', 'mars-campus-2026.<workers-subdomain>.workers.dev'].includes(
+    ['sim.mars.college', process.env.MARS_CAMPUS_PREVIEW_HOST].filter(Boolean).includes(
       base.hostname,
     ),
     'Unrecognized publication origin',

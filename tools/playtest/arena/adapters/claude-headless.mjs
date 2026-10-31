@@ -81,7 +81,7 @@ export function renderChat(stream) {
 export async function turn({ cwd, sessionId, resume = false, model = 'haiku', effort = null, text, allowedTools = DEFAULT_ALLOWED, maxWallSec = 240, resultGraceMs = 3000 }) {
   const effortOk = effort ? await supportsEffort() : false;
   const args = buildArgs({ sessionId, resume, model, effort, text, allowedTools, effortOk });
-  // CLAUDE_CODE_DISABLE_CLAUDE_MDS: a seat must not load the user's or ~/Eden's CLAUDE.md (--setting-sources does not stop it).
+  // CLAUDE_CODE_DISABLE_CLAUDE_MDS: a seat must not load the user's or a parent folder's CLAUDE.md (--setting-sources does not stop it).
   const env = { ...process.env, CLAUDE_CODE_DISABLE_CLAUDE_MDS: '1' }; delete env.CLAUDECODE; delete env.CLAUDE_CODE_ENTRYPOINT;
   const stream = [{ type: 'harness_user', text, _rx: Date.now() }];
   // `claude -p` does not exit while the agent's own background Bash tasks (its `listen`) run: the turn is over at the final

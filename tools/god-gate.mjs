@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 // Focused authoring gate. No services, browser, network, paid models or monorepo suite.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const preferred = '~/.nvm/versions/node/v22.20.0/bin/node';
-// Explicit override is useful for diagnosing a broken installed Node; the default always uses 22.20 if present.
-const node = process.env.GOD_GATE_NODE || (existsSync(preferred) ? preferred : 'node');
+// Explicit override is useful for diagnosing a broken installed Node; the default is the Node running this gate
+// (package.json engines sets the supported version).
+const node = process.env.GOD_GATE_NODE || process.execPath;
 const dir = mkdtempSync(join(tmpdir(), 'god-gate-'));
 const files = (path, suffix) => readdirSync(join(root, path)).filter(f => f.endsWith(suffix)).sort().map(f => `${path}/${f}`);
 const test = paths => ['--test', '--test-reporter=tap', '--test-concurrency=1', ...paths];

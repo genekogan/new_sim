@@ -35,7 +35,7 @@ genesis.batches.push({ note: 's3 additions: a wood, a windy knoll with flags, a 
 ] });
 const genesisFile = resolve(out, 'genesis.json'); writeFileSync(genesisFile, JSON.stringify(genesis, null, 1));
 
-const marsWeb = resolve('<repo>/.lane/mars-web');
+const marsWeb = resolve(root, '.lane/mars-web');
 const env = { ...process.env, ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', TYPESAFE_API_KEY: '', WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), HOST: '127.0.0.1', DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', EDGE_FADING: '1', DATA_DIR: resolve(out, 'data'), PUBLIC_URL: `http://127.0.0.1:${port}`, GENESIS_FILE: genesisFile, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), ...(web ? { WEB_DIR: resolve(web) } : {}) };
 let server = null, serverLog = '';
 const stop = () => { try { server?.kill(); } catch { /* gone */ } };
@@ -95,7 +95,7 @@ try {
   for (let i = 0; i < 3000; i++) { try { if ((await fetch(`${base}/healthz`)).ok) break; } catch { /* booting */ } await sleep(100); }
   log(`server ${(await fetch(`${base}/healthz`)).status}`);
   const chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium;
-  const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+  const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
   const release = await chromeLease('s3-camera');
   try {
     const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--autoplay-policy=user-gesture-required'] });

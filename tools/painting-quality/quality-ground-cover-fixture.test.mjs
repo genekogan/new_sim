@@ -91,8 +91,10 @@ test('interrupted alignment response restores the original media through the ord
   assert.deepEqual(owner.edits.map(row => row.ops[0].state), [{ media: '' }, { media }]);
 });
 
-test('retained camera/build receipt and both PNGs enforce fixed pins and receipt pins', () => {
-  const root = '<team>/scratch/t4/world-context-views/linux-preflight-v1';
+// The retained linux-preflight-v1 receipt and PNGs are not in the repo; point QUALITY_PREFLIGHT_DIR at a copy to run this.
+const preflightRoot = process.env.QUALITY_PREFLIGHT_DIR;
+test('retained camera/build receipt and both PNGs enforce fixed pins and receipt pins', { skip: !preflightRoot && 'set QUALITY_PREFLIGHT_DIR' }, () => {
+  const root = preflightRoot;
   const bytes = readFileSync(root + '/receipt.json'), before = qualityBeforeReceipt(bytes, expected);
   assert.throws(() => qualityBeforeReceipt(Buffer.from(bytes.toString().replace(before.source, 'f'.repeat(40))), expected), /identity/);
   for (const role of ['a', 'b']) {

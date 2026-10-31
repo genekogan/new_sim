@@ -14,11 +14,12 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { openSync } from 'node:fs';
-import { chromeLease } from '<team>/ops/chrome-lease.mjs';
+import { scratchDir } from '../lib/paths.mjs';
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith('--') ? [a.slice(2), all[i + 1] && !all[i + 1].startsWith('--') ? all[i + 1] : true] : null)).filter(Boolean));
-const out = resolve(args.out ?? '<team>/scratch/creatures/proof');
+const out = resolve(args.out ?? scratchDir('creatures/proof'));
 const port = Number(args.port ?? 6051), slug = 'creatures-proof';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });

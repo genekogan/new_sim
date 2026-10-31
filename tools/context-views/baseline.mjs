@@ -17,6 +17,7 @@ import {createFixtureSessions} from './fixture-session.mjs';
 import {runPhotographerQualification} from './photographer-runner.mjs';
 import {runLifecycleRemainder} from './lifecycle-remainder.mjs';
 import {runUiLifecycleProof} from './ui-lifecycle-runner.mjs';
+import { measureSlot } from '../lib/paths.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..'),launchedAt=Date.now();
 const photographer=process.env.CONTEXT_PHOTOGRAPHER==='1';
 const uiRemainderOnly=process.env.CONTEXT_UI_REMAINDER_ONLY==='1';
@@ -33,7 +34,7 @@ const deadline=process.env.CONTEXT_DEADLINE?Date.parse(process.env.CONTEXT_DEADL
 const hardStop=new AbortController(),hardTimer=setTimeout(()=>hardStop.abort(new Error('absolute measurement deadline')),Math.max(1,deadline-Date.now()));
 const boundedFetch=(url,options={})=>globalThis.fetch(url,{...options,signal:options.signal?AbortSignal.any([options.signal,hardStop.signal]):hardStop.signal});
 const setPhase=value=>{phase=value;(report.phases??=[]).push({phase,at:Date.now()});save();};
-const slot='<team>/lanes/MEASURE.slot',claim=`${new Date().toISOString()} context-views ${treatment?'candidate':'baseline'} pid=${process.pid} until${new Date(deadline).toISOString()}`;
+const slot = measureSlot(),claim=`${new Date().toISOString()} context-views ${treatment?'candidate':'baseline'} pid=${process.pid} until${new Date(deadline).toISOString()}`;
 report.workDeadline=new Date(deadline).toISOString();report.cleanupDeadline=new Date(deadline+5000).toISOString();report.startedAt=new Date().toISOString();report.runnerPid=process.pid;report.ambient={load:loadavg(),freeMb:freemem()/1048576,reclaimableGb:freeMemGb()};
 const request=async(path,body,auth=token)=>{if(Date.now()>=deadline)throw Error('measurement deadline');const r=await boundedFetch(base+path,{method:body===undefined?'GET':'POST',headers:{...(auth?{authorization:`Bearer ${auth}`}:{ }),'content-type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)}),signal:AbortSignal.timeout(Math.max(1,Math.min(65000,deadline-Date.now())))});if(!r.ok)throw Error(`${path} HTTP ${r.status}: ${(await r.text()).slice(0,400)}`);return r;};
 

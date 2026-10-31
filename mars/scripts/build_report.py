@@ -1,5 +1,6 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,shutil,markdown
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=b/'deliverable';source=(b/'validation/REPORT.template.md').read_text();ci=json.load(open(out/'chiba_mesh.json'));wi=json.load(open(out/'campus_mesh.json'))
+b=media('reconstruction/2026-campus');out=b/'deliverable';source=(b/'validation/REPORT.template.md').read_text();ci=json.load(open(out/'chiba_mesh.json'));wi=json.load(open(out/'campus_mesh.json'))
 subs={'CHIBA_TRIANGLES':f"{ci['triangles']:,}",'CAMPUS_TRIANGLES':f"{wi['triangles']:,}",'REFINEMENT_RESULT':f"The selected browser files come from `{ci['source']}` (Chiba) and `{wi['source']}` (campus). Raw output retained 479,470 Chiba triangles and 915,062 campus triangles before cropping. The final campus crop contains 807,618 triangles. The raw models preserve slightly finer surface detail, while thin-structure failures remain visible. Chiba uses one 8192-square texture; campus uses two. No geometry decimation was applied to the final raw-detail meshes apart from the documented campus boundary crop.",'CAMPUS_VALIDATION':'The wider native reconstruction registered 251 of 254 input photographs. A separate sparse-camera check and withheld-view evaluation are recorded alongside the image evidence.','RAW_COMPARISON':''}
 p=b/'validation/holdout-campus/results.json'
 if p.exists():

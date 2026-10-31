@@ -13,9 +13,9 @@
 //    (mars/viewer/app/engine-view/content/assets/*) maps to a row — an unmapped item fails;
 //  - every `core/<x>@1` ref and generator id a row names exists in the library (CORE_KIT) or the
 //    generator registry — a row that claims "composable" with a missing def fails.
-// --write regenerates the matrix block in docs/god/PARITY.md (between the matrix markers);
+// --write regenerates the matrix block (between the matrix markers) in PARITY_DOC, default .local/god/PARITY.md;
 // --check exits 1 if anything is unmapped or a named ref is missing.
-import { readFileSync, readdirSync, writeFileSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, existsSync, statSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -317,7 +317,8 @@ for (const [s, items] of Object.entries(appendix)) {
 md += '</details>\n<!-- matrix:end -->';
 
 if (process.argv.includes('--write')) {
-  const doc = resolve(root, 'docs/god/PARITY.md');
+  const doc = resolve(process.env.PARITY_DOC ?? resolve(root, '.local/god/PARITY.md'));
+  mkdirSync(dirname(doc), { recursive: true });
   const cur = existsSync(doc) ? readFileSync(doc, 'utf8') : '';
   const next = cur.includes('<!-- matrix:begin') ? cur.replace(/<!-- matrix:begin[\s\S]*?<!-- matrix:end -->/, md) : `${cur}\n${md}\n`;
   writeFileSync(doc, next);

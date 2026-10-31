@@ -3,7 +3,9 @@
 import {createRequire} from 'node:module';
 import {existsSync} from 'node:fs';
 import {resolve,dirname,join,basename} from 'node:path';
-const PMWEB='<worktrees>/pm-preview/apps/web',PMSRC=PMWEB+'/src',[ov,out]=process.argv.slice(2).map(p=>resolve(p));
+import {fileURLToPath} from 'node:url';
+// PM_WEB_DIR: the installed web tree to overlay (default: this checkout's apps/web).
+const PMWEB=resolve(process.env.PM_WEB_DIR??fileURLToPath(new URL('..',import.meta.url))),PMSRC=PMWEB+'/src',[ov,out]=process.argv.slice(2).map(p=>resolve(p));
 const require=createRequire(PMWEB+'/package.json'),{build}=await import(require.resolve('vite'));
 const overlay={name:'app-overlay',enforce:'pre',
  async resolveId(src,importer){

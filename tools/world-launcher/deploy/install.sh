@@ -42,7 +42,7 @@ install -d -o simworlds -g simworlds -m 750 /srv/sim-worlds-backups
 
 install -m 644 "$UNIT_SRC" /etc/systemd/system/sim-worlds@.service
 # Memory budget per stage: written once, never overwritten (release.sh runs this on every release; an operator's raise,
-# e.g. production 8G/9G on 2026-10-17, must survive it). legacy = the three original worlds (old-worlds/README.md).
+# e.g. production 8G/9G on 2026-10-17, must survive it). legacy = the three original worlds.
 mem() { local d=/etc/systemd/system/sim-worlds@$1.service.d; install -d "$d"; [ -f "$d/10-memory.conf" ] || printf '[Service]\nMemoryHigh=%s\nMemoryMax=%s\n' "$2" "$3" > "$d/10-memory.conf"; }
 mem staging 2500M 3G; mem production 8G 9G
 install -m 644 "$HERE/sim-worlds-backup@.service" /etc/systemd/system/sim-worlds-backup@.service

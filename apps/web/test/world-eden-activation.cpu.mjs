@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {edenExpansionCapture} from '../src/WorldEdenActivation.ts';
-const raw=JSON.parse(readFileSync('<team>/proofs/core-east-lecture-20261006/scene.json','utf8'));
+// Input: a retained core-east-lecture scene.json (not in the repo; eden-lecture-native.test.ts exports one with CORE_LECTURE_EXPORT_DIR).
+if(!process.env.CORE_LECTURE_SCENE){console.log('skip: set CORE_LECTURE_SCENE to a core-east-lecture scene.json');process.exit(0);}
+const raw=JSON.parse(readFileSync(process.env.CORE_LECTURE_SCENE,'utf8'));
 // Pure consumer gate only. The mounted caller's WorldSceneHistory verifies the
 // full capture hash/selected world before supplying these detached values.
 const info={scene:raw.scene,ground:raw.ground,shore:{metadata:raw.shore,profile:'connected-commons-shore/1'}};

@@ -16,7 +16,7 @@ export async function lease(label) {
 
 /** Playwright's chromium: this checkout's mars/viewer, else the canonical checkout's, else SHIP_PLAYWRIGHT_FROM. */
 export function chromium() {
-  const bases = [process.env.SHIP_PLAYWRIGHT_FROM, resolve(ROOT, 'mars/viewer'), '<repo>/mars/viewer'].filter(Boolean);
+  const bases = [process.env.SHIP_PLAYWRIGHT_FROM, resolve(ROOT, 'mars/viewer')].filter(Boolean);
   for (const b of bases) { try { return createRequire(resolve(b, 'package.json'))('@playwright/test').chromium; } catch { /* next */ } }
   throw Error(`no @playwright/test under ${bases.join(', ')} (pnpm install in mars/viewer, or set SHIP_PLAYWRIGHT_FROM)`);
 }

@@ -4,10 +4,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { holder } from './locks.mjs';
 import { KEEPER, WARM, lookRoute, startWarm, treeRssMb, warmEnabled, warmStatus } from './warm.mjs';
+import { tmpdir } from 'node:os';
 
 const W = 'http://127.0.0.1:1/w';
 function folder(t, state = { world: W, token: 'synthetic-g1-token' }) {
-  const scratch = '<team>/scratch/g1/tests';
+  const scratch = tmpdir();
   mkdirSync(scratch, { recursive: true });
   const dir = mkdtempSync(join(scratch, 'warm-')), cwd = process.cwd();
   process.chdir(dir);

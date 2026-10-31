@@ -28,22 +28,14 @@ def scrub(value):
 # `*` = within one path segment); a whole asset namespace that the app loads by
 # convention (engine/**) must be a glob, not a per-file list, so new files ship
 # without edits here. deploy/prepare-allowlist.test.mjs scans app/ and engine/ for
-# /engine|modular|browser|data|history|2020|models/ URL literals and fails if one is not
+# /engine|modular|browser|data|models/ URL literals (the Mars archive photos under /history and /2020 are not
+# distributed, so they are never staged) and fails if one is not
 # covered by `python3 deploy/prepare.py --list`.
 GLOBS = [
     'engine/**',
     'modular/references/**', 'modular/textures/**', 'modular/environment/**',
-    '2020/screens/*.webp',
-    'history/**/*.webp', 'history/**/*.json', 'history/**/*.html',
 ]
 FILES = {
-    'history': ['2025/c538-freeside-source.jpg', '2025/c509-roof-source.jpg',
-        '2023/review5-rear-c6656-t80.jpg', '2024/review5-north-access-c42733.jpg'],
-    '2020': ['evidence/site-march4.webp', 'evidence/forest-march9.webp',
-        'evidence/portal-march17.webp', 'evidence/forest-march30.webp',
-        'evidence/portal-depth-march9.webp', 'evidence/climbing-wall-2020.webp',
-        'evidence/rv-ring-march9.webp', 'evidence/front-alignment-march17.webp',
-        'evidence/side-stairs-march17.webp', 'evidence/portal-screens-2020.webp'],
     'browser': ['campus.glb'],
     # Only the selected workstation and its attribution; never publish the model archive.
     'models': ['retro-computer-monitor.glb', 'retro-computer-monitor.credit.json'],
@@ -94,24 +86,6 @@ def resolve():
         raise SystemExit(f'allowlisted files missing from public/: {missing}')
     return sorted(paths)
 
-# Gene's questions page (deploy/questions-html.mjs writes docs/engineering/questions/index.html): served at
-# /questions/ as index.html plus exactly the files it references (captures, photos, diagrams), nothing else
-# from that folder (tools/, the engineer Markdown's older PNGs). deploy/questions-html.test.mjs checks the list.
-QUESTIONS = ROOT.parent / 'docs/engineering/questions'
-
-def questions():
-    """Paths relative to docs/engineering/questions/ that the release stages under /questions/."""
-    html = (QUESTIONS / 'index.html').read_text()
-    refs = {m for m in re.findall(r'(?:src|href)="([^"#?]+)"', html) if not re.match(r'[a-z]+:|/', m)}
-    missing = sorted(r for r in refs if not (QUESTIONS / r).is_file())
-    if missing:
-        raise SystemExit(f'questions/index.html references missing files: {missing}')
-    return ['index.html'] + sorted(refs)
-
-if '--questions' in sys.argv:
-    print(json.dumps(questions()))
-    raise SystemExit(0)
-
 if '--list' in sys.argv:
     print(json.dumps({'globs': GLOBS, 'files': resolve()}))
     raise SystemExit(0)
@@ -147,14 +121,6 @@ for rel in resolve():
     records.append({'path': f'/{namespace}/{name}', 'bytes': len(payload),
         'sha256': hashlib.sha256(payload).hexdigest(),
         'storage': 'r2' if len(payload) > LIMIT else 'static'})
-
-for rel in questions():
-    payload = (QUESTIONS / rel).read_bytes()
-    target = PUBLIC / 'questions' / rel
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(payload)
-    records.append({'path': f'/questions/{rel}', 'bytes': len(payload),
-        'sha256': hashlib.sha256(payload).hexdigest(), 'storage': 'static'})
 
 shutil.copy2(ROOT / 'public/favicon.svg', PUBLIC / 'favicon.svg')
 shutil.copy2(ROOT / 'public/simulation-agent-guide.md', PUBLIC / 'simulation-agent-guide.md')

@@ -9,19 +9,20 @@
 //
 //   node tools/edge-skill/knowledge-e2e.mjs [--port 6100] [--keep]
 //
-// Report under <team>/scratch/knowledge/e2e/<stamp>/ (report.json, every CLI read under reads/).
+// Report under .local/knowledge/e2e/<stamp>/ (report.json, every CLI read under reads/).
 // Stops only the world process it started itself.
 import { spawn, execFile } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from '../lib/paths.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
 const port = Number(args.port ?? 6100), slug = 'knowledge';
 if (port < 6100 || port > 6109) throw new Error('lane knowledge uses ports 6100-6109 only');
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-const out = resolve(process.env.KNOWLEDGE_E2E_OUT ?? '<team>/scratch/knowledge/e2e', stamp);
+const out = resolve(process.env.KNOWLEDGE_E2E_OUT ?? scratchDir('knowledge/e2e'), stamp);
 mkdirSync(resolve(out, 'reads'), { recursive: true });
 const base = `http://127.0.0.1:${port}/w/${slug}`;
 const report = { port, startedAt: new Date().toISOString(), steps: [], failures: [], sizes: {} };

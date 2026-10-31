@@ -6,7 +6,7 @@
 //
 // 1. Reads the authored layout from git objects at LM_MAP_COMMIT (world-layout.json, scene.json, places.v1.json,
 //    native-place-aliases.json, the scan-district manifests, characters/manifest.json, world.json); never the lm-map
-//    worktree, never ~/Dev/littlemartians.
+//    worktree, never a local Little Martians checkout.
 // 2. Makes the three gallery panels (the landscape's embedded images on a basalt frame) and the arch footprints of
 //    Minarete and the Celadon beacon (the measured 2 m ground passages, as lm/map's native obstacles had them).
 // 3. Boots a fresh dev world (own data and asset dir), mints a god token and imports every GLB through the god

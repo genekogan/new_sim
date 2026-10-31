@@ -42,14 +42,6 @@ import {
   cameraPose,
   type SimSnapshot,
 } from '../../simulation/shared';
-type Ref = {
-  id: string;
-  title: string;
-  caption: string;
-  url: string;
-  source_path: string;
-  camera?: { position: [number, number, number]; target: [number, number, number]; fov: number };
-};
 type Part = {
   id: string;
   assembly_id: string;
@@ -98,7 +90,7 @@ type Api = {
   select: (id: string) => void;
   focus: (id?: string) => void;
   view: (v: string) => void;
-  referenceView: (camera: NonNullable<Ref['camera']>) => void;
+  referenceView: (camera: { position: [number, number, number]; target: [number, number, number]; fov: number }) => void;
   cut: (v: string) => void;
   surface: (v: string) => void;
   mode: (v: string) => void;
@@ -213,8 +205,6 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
     api = useRef<Api | null>(null),
     file = useRef<HTMLInputElement>(null);
   const [manifest, setManifest] = useState<Manifest | null>(null),
-    [refs, setRefs] = useState<Ref[]>([]),
-    [photo, setPhoto] = useState<Ref | null>(null),
     [status, setStatus] = useState('Loading campus components…'),
     [error, setError] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
@@ -228,14 +218,6 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
     [edits, setEdits] = useState(0);
   useEffect(() => {
     document.title = `Mars ${year} · Campus studio`;
-    const abort = new AbortController();
-    fetch(`/history/${year}/references.json`, {signal: abort.signal})
-      .then(r => { if (!r.ok) throw Error('Photo references unavailable'); return r.json(); })
-      .then(r => setRefs(r as Ref[]))
-      .catch((e) => {
-        if (!abort.signal.aborted) setError(e.message);
-      });
-    return () => abort.abort();
   }, [year]);
   useEffect(() => {
     if (!mount.current) return;
@@ -551,12 +533,10 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
         setManifest(sceneManifest(root, year));
         root.traverse(remember);
         batches = createRenderBatches(scene, root);
-        if (year !== 2027) {
-          life = createCampusLife(scene, root, setError, additions, year === 2020 ? 2 : year === 2021 ? 3 : 6);
-          life.setEnabled(lifeEnabled);
-        }
+        life = createCampusLife(scene, root, setError, additions, year === 2020 ? 2 : year === 2021 ? 3 : 6);
+        life.setEnabled(lifeEnabled);
         display();
-        focus(year === 2027 ? root : objects.get('chiba') || null);
+        focus(objects.get('chiba') || null);
         setStatus('');
       })
       .catch((e) => {
@@ -834,7 +814,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
           orbit.update();
           return;
         }
-        focus(year === 2027 ? root : objects.get('chiba') || null);
+        focus(objects.get('chiba') || null);
       },
       referenceView: (pose) => {
         followRider = false;
@@ -1335,7 +1315,6 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
       <main className="studio studio-presentation">
         <section className="studio-stage studio-presentation-stage" aria-label="Mars campus">
           <div className="studio-viewport" ref={mount} />
-          {year === 2027 && <aside style={{position: 'absolute', bottom: 52, left: 16, maxWidth: 480, background: '#26362dec', color: '#f0f0df', padding: 12, borderRadius: 6, zIndex: 4}}>2027 · resident concept draft. Raw open structures; fitted scale and unassigned kitchens. Drainage shown as a cutaway proposal. <a href="/studio/2027" style={{color: '#fff'}}>Open draft editor</a></aside>}
           <PresentationControls
             year={year} walking={walking} cycle={cycle} hour={hour}
             rooms={Object.entries(rooms).map(([id, pose]) => ({ id, label: pose.label }))}
@@ -1376,9 +1355,9 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
           </div>
         </a>
         <div className="studio-tabs">
-          <label className="year-picker">Year <select aria-label="Campus year" value={year} onChange={e => { location.href = Number(e.target.value) === 2026 ? '/studio' : `/studio/${e.target.value}`; }}>{YEARS.map(y => <option key={y} value={y}>{y}{y === 2020 ? ' · Brahman' : y === 2027 ? ' · draft' : ''}</option>)}</select></label>
+          <label className="year-picker">Year <select aria-label="Campus year" value={year} onChange={e => { location.href = Number(e.target.value) === 2026 ? '/studio' : `/studio/${e.target.value}`; }}>{YEARS.map(y => <option key={y} value={y}>{y}{y === 2020 ? ' · Brahman' : ''}</option>)}</select></label>
           <BuildPicker host={() => api.current?.take ?? null} year={year} />
-          <button onClick={() => year === 2027 ? api.current?.focus('draft-site') : api.current?.view('chiba')}>{year === 2027 ? 'Courtyard' : year === 2020 ? 'Portal' : year === 2022 ? 'Ba Sing Se' : 'Chiba'}</button>
+          <button onClick={() => api.current?.view('chiba')}>{year === 2020 ? 'Portal' : year === 2022 ? 'Ba Sing Se' : 'Chiba'}</button>
           <button onClick={() => api.current?.view('campus')}>
             Whole campus
           </button>
@@ -1393,7 +1372,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
           id="studio-controls"
           className={`studio-sidebar ${panelOpen ? 'panel-open' : ''}`}
         >
-          <div className="studio-kicker">{year} {year === 2027 ? 'PROPOSED · CONCEPT DRAFT' : 'REPLICA · WORKING MODEL'}</div>
+          <div className="studio-kicker">{year} REPLICA · WORKING MODEL</div>
           <h1>Built from parts.</h1>
           <p className="studio-intro">
             {historyNotes[year]}
@@ -1518,7 +1497,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
               component is selected.
             </p>
           </details>
-          {year !== 2027 && <SimulationPanel
+          <SimulationPanel
             year={year}
             onConnection={(v) => {
               setConnected(v);
@@ -1529,7 +1508,7 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
               api.current?.simulation(s);
             }}
             onFollow={(v) => api.current?.followCamera(v)}
-          />}
+          />
           <div className="panel-tabs">
             {['assemblies', 'parts', 'library'].map((p) => (
               <button
@@ -1647,9 +1626,6 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
             >
               People, textures & sources ↗
             </a>
-            <a href={`/history/README.html#year-${year}`} target="_blank" rel="noreferrer">
-              Evidence & accuracy notes ↗
-            </a>
           </div>
           <input
             ref={file}
@@ -1673,7 +1649,6 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
         </aside>
         <section className="studio-stage">
           <div className="studio-viewport" ref={mount} />
-          {year === 2027 && <aside style={{position: 'absolute', bottom: 52, left: 16, maxWidth: 480, background: '#26362dec', color: '#f0f0df', padding: 12, borderRadius: 6, zIndex: 4}}>2027 · resident concept draft. Raw open structures; fitted scale and unassigned kitchens. Drainage shown as a cutaway proposal. <a href="/studio/2027" style={{color: '#fff'}}>Open draft editor</a></aside>}
           <div className="stage-top">
             <div className="stage-selectors">
               {year===2026 && <label>
@@ -1876,40 +1851,15 @@ export default function Studio({ year = 2026, presentation = false }: { year?: n
             </aside>
           )}
         </section>
-        {photo && (
-          <aside className="studio-photo">
-            <button onClick={() => setPhoto(null)}>Close reference ×</button>
-            <img src={photo.url} alt={photo.title} />
-            <h2>{photo.title}</h2>
-            <p>{photo.caption}</p>
-            {photo.camera && <button onClick={() => api.current?.referenceView(photo.camera!)}>Use approximate reference angle</button>}
-            <details>
-              <summary>Source provenance</summary>
-              <code>{photo.source_path}</code>
-            </details>
-          </aside>
-        )}
       </div>
       <footer className="studio-evidence">
         <div>
-          <b>Photo evidence · aerials & rooms</b>
+          <b>Campus components</b>
           <span>
             {manifest
               ? `${manifest.instances.filter((p) => p.kind !== 'reference').length.toLocaleString()} editable pieces · ${manifest.definitions.length.toLocaleString()} definitions`
               : 'Preparing component index'}
           </span>
-        </div>
-        <div className="evidence-frames">
-          {refs.map((r) => (
-            <button
-              key={r.id}
-              className={photo?.id === r.id ? 'active' : ''}
-              onClick={() => setPhoto(r)}
-            >
-              <img src={r.url} alt="" />
-              <span>{r.title}</span>
-            </button>
-          ))}
         </div>
       </footer>
     </main>

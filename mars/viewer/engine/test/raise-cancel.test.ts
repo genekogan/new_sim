@@ -196,7 +196,7 @@ test('raise cancel (LM-036): lowering snapshots restore tick-exactly and normal 
 
 
 test('raise cancel (LM-036): normal world, event and take outcomes match the pre-change action for every catalog frame and crew size', async () => {
-  const expected = JSON.parse(readFileSync(new URL('../../../docs/engineering/briefs/raise-cancel.normal-baseline.json', import.meta.url), 'utf8'));
+  const expected = JSON.parse(readFileSync(new URL('./fixtures/raise-cancel.normal-baseline.json', import.meta.url), 'utf8'));
   let maxFrames = 0, maxBytes = 0;
   const observed: typeof raiseUpright = { ...raiseUpright, step(rt, ex, dt) {
     const result = raiseUpright.step(rt, ex, dt);

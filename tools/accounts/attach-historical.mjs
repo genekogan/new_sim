@@ -16,10 +16,18 @@ const check = (condition, message) => { if (!condition) throw Error(message); };
 const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const text = value => typeof value === 'string' && value.length > 0 && value.length < 512 && !value.includes('\0');
 
-export function validateManifest(m) {
+// The one account this operator migration may attach to: ATTACH_EXPECTED_EMAIL (required, never a default), which the
+// reviewed manifest's expectedEmail and the provider's verified email must both match.
+export function expectedAccountEmail(env = process.env) {
+  const email = env.ATTACH_EXPECTED_EMAIL?.trim().toLowerCase();
+  check(email && /^[^@\s]+@[^@\s]+$/.test(email), 'Set ATTACH_EXPECTED_EMAIL to the account email this migration is for');
+  return email;
+}
+
+export function validateManifest(m, env = process.env) {
   check(m?.contract === 'sim-reviewed-historical-attachment/1', 'Unsupported manifest');
   check(text(m.reviewedBy) && digest(m.reviewEvidenceSHA256), 'Review evidence and reviewer required');
-  check(m.expectedEmail === '1335251+genekogan@users.noreply.github.com', 'This migration is restricted to the requested Gene account');
+  check(m.expectedEmail === expectedAccountEmail(env), 'This migration is restricted to the account in ATTACH_EXPECTED_EMAIL');
   check(text(m.issuer) && new URL(m.issuer).protocol === 'https:' && new URL(m.issuer).origin === m.issuer, 'Exact HTTPS issuer required');
   check(/^user_[A-Za-z0-9]{1,128}$/.test(m.subject) && /^acct_[A-Za-z0-9-]+$/.test(m.accountId), 'Pin verified subject and existing registry account ID');
   check(text(m.registryPath) && isAbsolute(m.registryPath), 'Pin the absolute registry path');

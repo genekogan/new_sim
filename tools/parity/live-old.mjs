@@ -4,7 +4,7 @@
 import {createRequire} from 'node:module';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {chromeLease} from '<team>/ops/chrome-lease.mjs';
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
 const root=resolve(new URL('../..',import.meta.url).pathname);
 const [world,visualJson,outDir,probe]=process.argv.slice(2);
 let visual;

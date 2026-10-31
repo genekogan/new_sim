@@ -8,15 +8,18 @@
 //     (apps/web/src/WorldBackdropDequantize.ts) so static batching still merges the campus.
 //   - textures re-encoded as WebP (EXT_texture_webp, quality 88, same pixel size; larger than 2048 px is capped).
 //   - meshopt compression with filters (EXT_meshopt_compression, level high).
-// Tools (pinned in the worktree's pnpm store): @gltf-transform 4.5.1, meshoptimizer 1.3.0, sharp 0.35.4.
+// Tools (from the workspace's pnpm store): @gltf-transform 4.5.1, meshoptimizer 1.3.0, sharp 0.35.4.
+import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
-const P = '<worktrees>/blobs/node_modules/.pnpm';
-const { NodeIO } = await import(`${P}/@gltf-transform+core@4.5.1/node_modules/@gltf-transform/core/dist/index.js`);
-const { ALL_EXTENSIONS } = await import(`${P}/@gltf-transform+extensions@4.5.1/node_modules/@gltf-transform/extensions/dist/index.js`);
-const F = await import(`${P}/@gltf-transform+functions@4.5.1_@types+node@22.20.4/node_modules/@gltf-transform/functions/dist/index.js`);
-const { MeshoptDecoder, MeshoptEncoder } = await import(`${P}/meshoptimizer@1.3.0/node_modules/meshoptimizer/index.js`);
-const sharp = (await import(`${P}/sharp@0.35.4_@types+node@22.20.4/node_modules/sharp/dist/index.mjs`)).default;
+// Resolved through the workspace: the server depends on @gltf-transform, which brings extensions, meshoptimizer and sharp.
+const serverRequire = createRequire(new URL('../../apps/server/package.json', import.meta.url));
+const fnRequire = createRequire(serverRequire.resolve('@gltf-transform/functions'));
+const { NodeIO } = fnRequire('@gltf-transform/core');
+const { ALL_EXTENSIONS } = fnRequire('@gltf-transform/extensions');
+const F = fnRequire('@gltf-transform/functions');
+const { MeshoptDecoder, MeshoptEncoder } = fnRequire('meshoptimizer');
+const sharp = fnRequire('sharp');
 
 const [inPath, outPath] = process.argv.slice(2);
 await MeshoptDecoder.ready; await MeshoptEncoder.ready;

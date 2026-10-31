@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, mkdirSync, rmSync, readFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { hashOf } from '../../packages/engine-contract/src/hash.ts';
@@ -10,13 +11,13 @@ import { attachHistorical, verifyClerkIdentity, validateManifest, sha } from './
 const require=createRequire(new URL('../../apps/server/package.json',import.meta.url));
 const { generateKeyPair, SignJWT }=await import(pathToFileURL(require.resolve('jose')).href);
 const {privateKey,publicKey}=await generateKeyPair('RS256');
+process.env.ATTACH_EXPECTED_EMAIL='owner@example.test';
 function fixture(t) {
-  assert.ok(process.env.SAFETY_SCRATCH,'Set SAFETY_SCRATCH to an isolated lane scratch directory');
-  mkdirSync(process.env.SAFETY_SCRATCH,{recursive:true});
-  const dir=realpathSync(mkdtempSync(join(process.env.SAFETY_SCRATCH,'safety-attach-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const scratch=process.env.SAFETY_SCRATCH??tmpdir();mkdirSync(scratch,{recursive:true});
+  const dir=realpathSync(mkdtempSync(join(scratch,'safety-attach-')));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const path=join(dir,'world.sqlite'),registryPath=join(dir,'accounts.sqlite'),db=new DatabaseSync(path),registry=new DatabaseSync(registryPath);
   registry.exec('CREATE TABLE provider_accounts_v1(account_id TEXT,issuer TEXT,subject TEXT)');
-  registry.prepare('INSERT INTO provider_accounts_v1 VALUES(?,?,?)').run('acct_fixture','https://clerk.example.test','user_gene');registry.close();
+  registry.prepare('INSERT INTO provider_accounts_v1 VALUES(?,?,?)').run('acct_fixture','https://clerk.example.test','user_owner');registry.close();
   db.exec(`CREATE TABLE worlds(id TEXT); INSERT INTO worlds VALUES('fixture-world');
     CREATE TABLE souls(id TEXT,world_id TEXT,entity_id TEXT,owner TEXT,native INTEGER,retired_at INTEGER,token_hash TEXT);
     CREATE TABLE events(world_id TEXT,seq INTEGER,tick INTEGER,kind TEXT,author TEXT,payload TEXT,at INTEGER);
@@ -29,7 +30,7 @@ function fixture(t) {
   db.prepare('INSERT INTO souls VALUES(?,?,?,?,?,?,?)').run('s_0123456789','fixture-world','h_0123456789',owner,0,null,'synthetic-valid-token-hash');
   db.prepare('INSERT INTO events VALUES(?,?,?,?,?,?,?)').run('fixture-world',birth.seq,birth.tick,birth.kind,birth.author,JSON.stringify(birth.payload),birth.at);
   db.prepare('INSERT INTO account_legacy_authority_v1 VALUES(?,?,?,NULL)').run('fixture-world','s_0123456789',owner);
-  const m={contract:'sim-reviewed-historical-attachment/1',reviewedBy:'fixture-reviewer',reviewEvidenceSHA256:'b'.repeat(64),expectedEmail:'1335251+genekogan@users.noreply.github.com',issuer:'https://clerk.example.test',subject:'user_gene',accountId:'acct_fixture',registryPath,authorizedParty:'https://sim.example.test',worlds:[{worldId:'fixture-world',dbPath:path,entries:[{approved:true,soulId:'s_0123456789',entityId:'h_0123456789',birthSeq:1,birthHash:hashOf(birth),recordedOwnerSHA256:sha(owner),retired:false,evidenceSHA256:'c'.repeat(64)}]}]};
+  const m={contract:'sim-reviewed-historical-attachment/1',reviewedBy:'fixture-reviewer',reviewEvidenceSHA256:'b'.repeat(64),expectedEmail:'owner@example.test',issuer:'https://clerk.example.test',subject:'user_owner',accountId:'acct_fixture',registryPath,authorizedParty:'https://sim.example.test',worlds:[{worldId:'fixture-world',dbPath:path,entries:[{approved:true,soulId:'s_0123456789',entityId:'h_0123456789',birthSeq:1,birthHash:hashOf(birth),recordedOwnerSHA256:sha(owner),retired:false,evidenceSHA256:'c'.repeat(64)}]}]};
   const protectedTables=['souls','events','account_legacy_authority_v1','account_agent_grants_v1'];
   const snapshot=()=>Object.fromEntries(protectedTables.map(table=>[table,db.prepare('SELECT * FROM '+table).all()]));
   t.after(()=>db.close());return {m,db,path,registryPath,snapshot};
@@ -55,7 +56,7 @@ test('caller identity, wrong signed subject, unverified/mismatching provider ema
 test('no email/provider merging or binding allocation; empty manifest cannot activate',async t=>{
   const f=fixture(t),p=await proof(f.m),registry=new DatabaseSync(f.registryPath);registry.prepare('UPDATE provider_accounts_v1 SET account_id=?').run('acct_other');registry.close();
   assert.throws(()=>attachHistorical(f.m,{registryPath:f.registryPath,proof:p,apply:true}),/binding differs/);
-  assert.throws(()=>validateManifest({...f.m,worlds:[]}),/No approved entries/);assert.throws(()=>validateManifest({...f.m,expectedEmail:'other@example.test'}),/restricted/);
+  assert.throws(()=>validateManifest({...f.m,worlds:[]}),/No approved entries/);assert.throws(()=>validateManifest({...f.m,expectedEmail:'other@example.test'}),/restricted/);assert.throws(()=>validateManifest(f.m,{}),/Set ATTACH_EXPECTED_EMAIL/);
 });
 test('birth, native status, owner, membership and revoked legacy authority fail closed without changing data',async t=>{
   for (const mutation of ["UPDATE events SET payload='{}'","UPDATE souls SET native=1","UPDATE souls SET owner='somebody-else'","UPDATE account_legacy_authority_v1 SET revoked_at=1234","INSERT INTO account_soul_memberships_v1 VALUES('fixture-world','s_0123456789','acct_other','different','different',0,NULL)"]) {

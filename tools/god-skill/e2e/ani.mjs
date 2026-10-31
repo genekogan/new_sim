@@ -55,7 +55,7 @@ async function step(name, fn, expect) {
 const save = () => writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));
 
 let browser = null, release = () => {};
-const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../lib/chrome-lease.mjs');
 try {
   await step('the world comes up', async () => { for (let i = 0; i < 3000; i++) { try { if ((await fetch(`${base}/healthz`)).ok) return true; } catch { } await sleep(100); } return false; }, (x) => x);
   await step('mint a god token', async () => { const r = await api('/v1/god/mint', { as: 'admin', body: { label: 'ani-e2e' } }); godToken = r.data.token; return !!godToken; }, (x) => x);

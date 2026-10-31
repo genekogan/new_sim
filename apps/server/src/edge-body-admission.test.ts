@@ -12,7 +12,7 @@ test('BODY admission: embedded image completeness, dimensions, count and byte bu
  code(()=>admitBodyGLB(textured(png(2049,1)),RIGID_MANIFEST),'body.image-too-large');
  code(()=>admitBodyGLB(textured(image,9),RIGID_MANIFEST),'body.too-complex');
  code(()=>admitBodyGLB(textured(Buffer.alloc(BODY_LIMITS.imageBytes+1)),RIGID_MANIFEST),'body.image-too-large');
- const jpeg=readFileSync(new URL('../../../mars/viewer/public/history/2026/review-20260929/mimos-sign.jpg',import.meta.url));assert.equal(admitBodyGLB(textured(jpeg,1,'image/jpeg'),RIGID_MANIFEST).images,1);
+ const jpeg=readFileSync(new URL('../test/fixtures/sample-texture.jpg', import.meta.url));assert.equal(admitBodyGLB(textured(jpeg,1,'image/jpeg'),RIGID_MANIFEST).images,1);
  code(()=>admitBodyGLB(textured(jpeg.subarray(0,-2),1,'image/jpeg'),RIGID_MANIFEST),'body.image-invalid');
 });
 

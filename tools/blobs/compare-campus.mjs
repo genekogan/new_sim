@@ -5,12 +5,13 @@
 //   node tools/blobs/compare-campus.mjs <original.glb> <candidate.glb> <outDir> [port 5930]
 import { createServer } from 'node:http';
 import { readFileSync, mkdirSync, writeFileSync, statSync } from 'node:fs';
-import { resolve, extname } from 'node:path';
+import { resolve, extname, dirname } from 'node:path';
+import { createRequire } from 'node:module';
 import { findPlaywright } from '../god-skill/lib/look.mjs';
 import { chromeLease } from '../god-skill/lib/chrome-lease.mjs';
 const [orig, cand, outArg, portArg] = process.argv.slice(2);
 const out = resolve(outArg); mkdirSync(out, { recursive: true }); const port = Number(portArg || 5930);
-const THREE_DIR = '<worktrees>/blobs/node_modules/.pnpm/three@0.185.1/node_modules/three';
+const THREE_DIR = resolve(dirname(createRequire(new URL('../../apps/server/package.json', import.meta.url)).resolve('three')), '..'); // the workspace's three
 const PAGE = `<!doctype html><html><head><style>html,body{margin:0;background:#cfc6b8}canvas{display:block}</style>
 <script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script></head><body>
 <script type="module">

@@ -1,8 +1,9 @@
 import { writeFileSync } from 'node:fs';
-import { boot, addSoul, follow, stop } from './lib.mjs';
+import { boot, addSoul, follow, stop, MARS_TWO_TEMPLATE } from './lib.mjs';
+import { scratchDir } from '../../lib/paths.mjs';
 const b = process.argv[2], port = Number(process.argv[3]);
-const tpl = b === '90' ? '<worktrees>/lane-mars/worlds/templates/mars-two.json' : `<team>/scratch/mars/mars-two-${b}.json`;
-const out = `<team>/scratch/mars/rot/walk-${b}`;
+const tpl = b === '90' ? MARS_TWO_TEMPLATE : scratchDir(`mars/mars-two-${b}.json`);
+const out = scratchDir(`mars/rot/walk-${b}`);
 const ctx = await boot({ port, template: tpl, out });
 const res = { bearing: Number(b), steps: [] };
 try {

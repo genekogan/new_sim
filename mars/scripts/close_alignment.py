@@ -1,5 +1,6 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,json
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=b/'modular/research'
+b=media('reconstruction/2026-campus');out=b/'modular/research'
 for kind,path,center,scale in [('cad-close',out/'cad-reference.blend',(177,66),42),('orbit-close',b/'models/orbit-raw/campus.blend',(0,0),1.6)]:
  bpy.ops.wm.open_mainfile(filepath=str(path));scene=bpy.context.scene
  for mat in bpy.data.materials:

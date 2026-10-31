@@ -5,10 +5,11 @@ import {mkdtempSync, mkdirSync, rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {WorldModel} from '@sim/world-compiler';
+import {tmpdir} from 'node:os';
 const {build} = createRequire(new URL('../../../mars/viewer/package.json', import.meta.url))('esbuild');
 
 test('ghost previews require the caller’s authenticated loader and cannot repaint after ownership clears', async t => {
-  const scratch = process.env.SAFETY_ISOLATION_TMP ?? '<team>/scratch/safety/isolation';
+  const scratch = process.env.SAFETY_ISOLATION_TMP ?? tmpdir();
   mkdirSync(scratch, {recursive: true}); const dir = mkdtempSync(join(scratch, 'ghost-loader-'));
   t.after(() => rmSync(dir, {recursive: true, force: true}));
   const outfile = join(dir, 'ghost.mjs');

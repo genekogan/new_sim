@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 """Convert CC0 Quaternius character templates into reusable, posed static meshes."""
 import bpy,pathlib
 from mathutils import Vector
-B=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular')
+B=media('reconstruction/2026-campus/modular')
 R=B/'research/appearance';O=B/'deliverable'
 for name,file in [('person_casual','Casual_2.blend'),('person_punk','Punk.blend'),('person_woman','Woman_Casual.blend')]:
  bpy.ops.wm.open_mainfile(filepath=str(R/file));s=bpy.context.scene

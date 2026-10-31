@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,json
 from mathutils import Vector
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;m=json.load(open(O/'components.json'));kept=[];removed=[]
+O=media('reconstruction/2026-campus/modular/deliverable');bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;m=json.load(open(O/'components.json'));kept=[];removed=[]
 for o in s.objects:
  if o.type!='MESH' or not o.get('component_id'):continue
  changed=False;roof=False

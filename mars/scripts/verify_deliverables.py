@@ -1,5 +1,6 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,struct,numpy as np,urllib.request
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=b/'deliverable';results=[];manifest=json.load(open(out/'manifest.json'))
+b=media('reconstruction/2026-campus');out=b/'deliverable';results=[];manifest=json.load(open(out/'manifest.json'))
 for m in manifest['models']:
  p=out/(m['id']+'.glb');blob=p.read_bytes();magic,version,length=struct.unpack_from('<4sII',blob);n,typ=struct.unpack_from('<II',blob,12);d=json.loads(blob[20:20+n]);assert magic==b'glTF' and version==2 and length==len(blob);tris=sum(d['accessors'][prim['indices']]['count']//3 for mesh in d['meshes'] for prim in mesh['primitives']);assert tris==m['triangles'];assert all('uri' not in im for im in d.get('images',[]));assert (out/(m['id']+'.blend')).stat().st_size>10000
  for v in m['views']:

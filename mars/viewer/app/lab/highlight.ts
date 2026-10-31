@@ -1,4 +1,4 @@
-// Question captures (docs/engineering/questions/): outline + label entities by id, drawn on top of
+// Review captures: outline + label entities by id, drawn on top of
 // everything (depthTest off) so objects under a roof still show. Renderer-only; reads world / scene data.
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';

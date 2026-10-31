@@ -45,13 +45,15 @@ const RAW_FLOOR = 0.53;
 // - the donor glazing transparent_panel-0067's sliver north of the outdoor gap, which crossed shower bay 1's doorway, removed;
 // - Mimos floor's continuous dark ground mat (Gene: "Mimos floor, with flooring throughout"), N −1.85…0.75, E 0…3.66;
 // - Chiba's solar panels near-black glass as the 2026 drone shows them (solar2's navy cells read pale grey under the sky).
-const PLYWOOD_JPG = '<mars-campus-repo>/viewer/public/modular/textures/kitchen-plywood-sample.jpg';   // read-only
+// MARS_CAMPUS_REPO: the Mars campus-2026-reconstruction checkout (read-only, not in the repo); its extras are skipped when unset.
+const CAMPUS_REPO = process.env.MARS_CAMPUS_REPO || null;
+const PLYWOOD_JPG = CAMPUS_REPO && join(CAMPUS_REPO, 'viewer/public/modular/textures/kitchen-plywood-sample.jpg');   // read-only
 const lin = (hex) => [0, 2, 4].map((i) => Math.pow(parseInt(hex.slice(1 + i, 3 + i), 16) / 255, 2.2));
 function parityFixes(doc) {
   const root = doc.getRoot(), nodes = root.listNodes(), kind = (n) => n.getExtras()?.kind ?? '';
   // showers: one plywood material for walls, piers, headers, slabs and roofs (kit.ts Kit.mat)
   const showerMats = new Set(nodes.filter((n) => n.getMesh() && /^Shower /.test(kind(n))).flatMap((n) => n.getMesh().listPrimitives().map((p) => p.getMaterial())));
-  if (existsSync(PLYWOOD_JPG) && showerMats.size) {
+  if (PLYWOOD_JPG && existsSync(PLYWOOD_JPG) && showerMats.size) {
     const tex = doc.createTexture('kitchen-plywood-sample').setImage(readFileSync(PLYWOOD_JPG)).setMimeType('image/jpeg').setURI('kitchen-plywood-sample.jpg');
     for (const m of showerMats) m.setBaseColorTexture(tex).setBaseColorFactor([...lin('#ead8b7'), 1]).setRoughnessFactor(0.86).setMetallicFactor(0);
   } else console.warn('parity: no plywood texture source; showers stay plain');
@@ -133,7 +135,8 @@ function clusters(list, tol = 0.02, key = () => '', oriented = false) {
 const boxOf = (rs) => ({ n0: Math.min(...rs.map((r) => r.n0)), n1: Math.max(...rs.map((r) => r.n1)), e0: Math.min(...rs.map((r) => r.e0)), e1: Math.max(...rs.map((r) => r.e1)), y0: Math.min(...rs.map((r) => r.y0)), y1: Math.max(...rs.map((r) => r.y1)) });
 
 // The 29 numbered objects (handover) → their stable component ids and names
-const REF = JSON.parse(readFileSync('<team>/pm-integration/mars-handover-20261010/MIMOS-ASSET-PLACE-REFERENCES.json', 'utf8'));
+if (!process.env.MARS_TWO_PLACE_REFS) throw new Error('set MARS_TWO_PLACE_REFS to the Mars handover MIMOS-ASSET-PLACE-REFERENCES.json (not in the repo)');
+const REF = JSON.parse(readFileSync(process.env.MARS_TWO_PLACE_REFS, 'utf8'));
 const NUMBERED = new Map(REF.numberedObjects.map((o) => [o.componentId, o]));
 const NUMBER_NAMES = { 1: 'coffee-counter', 2: 'tea-table', 3: 'study-table', 4: 'study-chair', 5: 'study-chair', 6: 'study-chair', 7: 'study-chair', 8: 'papasan', 9: 'tea-stool', 10: 'tea-stool', 11: 'tea-stool', 12: 'red-sofa', 13: 'honey-sofa', 14: 'cream-recliner', 15: 'prep-table', 16: 'sink', 17: 'sink', 18: 'commercial-fridge', 19: 'chest-freezer', 20: 'bus-seat', 21: 'bus-seat', 22: 'bus-seat', 23: 'bus-seat', 24: 'bus-seat', 25: 'bus-seat', 26: 'diner-table', 27: 'diner-table', 28: 'diner-table', 29: 'white-fridge' };
 
@@ -354,7 +357,7 @@ console.log(`furniture/items: ${nFurn} placed, ${kinds.size} kinds`);
 // 1b. FURN: things sim.mars.college shows that V3 lost or never cut out.
 // - The old kitchen's rice cooker and two-tier water urn (the sim.mars.college kitchen, the raw 2026 campus CAD). Gene's
 //   kitchen correction rebuilt the counters and left them out; they go back on the corrected west perimeter counter.
-const RAW_GLB = '<mars-campus-repo>/viewer/public/browser/campus.glb';   // sha 675f4beb… (read-only)
+const RAW_GLB = CAMPUS_REPO && join(CAMPUS_REPO, 'viewer/public/browser/campus.glb');   // sha 675f4beb… (read-only)
 const RAW_SOURCE = 'raw Mars 2026 campus CAD (campus.glb sha 675f4beb…, ~/Mars campus-2026-reconstruction), the sim.mars.college kitchen';
 async function extraPiece(dname, d, get) {
   // rebuild from the source when it is here; else keep the bytes already built (the raw CAD is not in the repo)
@@ -369,7 +372,7 @@ async function extraPiece(dname, d, get) {
 }
 {
   let raw = null;
-  if (existsSync(RAW_GLB)) {
+  if (RAW_GLB && existsSync(RAW_GLB)) {
     const mo = await import(join(ROOT, 'node_modules/.pnpm/meshoptimizer@1.3.0/node_modules/meshoptimizer/index.js')); await mo.MeshoptDecoder.ready;
     const io = new core.NodeIO().registerExtensions(ext.ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': mo.MeshoptDecoder });
     raw = { doc: await io.read(RAW_GLB) };

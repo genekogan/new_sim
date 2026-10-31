@@ -3,11 +3,12 @@ import {createRequire} from 'node:module';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {chromeLease} from '../../../tools/god-skill/lib/chrome-lease.mjs';
 import assert from 'node:assert/strict';
+import { scratchDir } from '../../../tools/lib/paths.mjs';
 const root=new URL('../../../',import.meta.url).pathname;
 const {chromium}=createRequire(root+'mars/viewer/package.json')('@playwright/test');
 const origin=process.env.POLISH_CANDIDATE??'http://127.0.0.1:5971';
 const url=new URL(origin);assert.equal(url.hostname,'127.0.0.1');assert.ok(+url.port>=5970&&+url.port<=5979);
-const out=process.env.POLISH_OUT??'<team>/scratch/polish/layout-final';mkdirSync(out,{recursive:true});
+const out=process.env.POLISH_OUT??scratchDir('polish/layout-final');mkdirSync(out,{recursive:true});
 const report={status:'running',views:[]},release=await chromeLease('polish');let browser;
 try{
  browser=await chromium.launch({channel:'chrome',headless:true,args:['--ignore-gpu-blocklist']});

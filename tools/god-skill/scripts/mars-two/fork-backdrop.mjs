@@ -22,9 +22,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const SRC = resolve(arg('--src', '<worktrees>/mars-src-fix'));
+const need = (k, what) => { const v = arg(k); if (!v) throw new Error(`pass ${k} <${what}>`); return v; };
+const SRC = resolve(need('--src', 'the corrected Mars source checkout (mars-src-fix)'));
 const VIEWER = join(SRC, 'viewer');
-const CAMPUS = resolve(arg('--campus', '<team>/pm-integration/release-assets-20261008/mars-static/browser/campus.glb'));
+const CAMPUS = resolve(need('--campus', "release 43's browser/campus.glb"));
 const RAW_SHA = '675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4';   // release 43's campus.glb
 const OUT = resolve(arg('--out', join(ROOT, '.lane/fork-backdrop')));
 fs.mkdirSync(OUT, { recursive: true });

@@ -1,5 +1,5 @@
 // The original worlds at the site root (launcher --old-worlds-root, stage `legacy`): where root paths go, and the
-// old->new redirect switch (deploy/old-worlds/README.md, lane L2 2026-10-17).
+// old->new redirect switch (lane L2 2026-10-17).
 //
 // <data>/redirects.json (absent = off), re-read when its mtime changes, so the operator flips it without a restart:
 //   { "enabled": false,

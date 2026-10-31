@@ -1,6 +1,6 @@
 // Screenshots of the summary page: node shoot.mjs <page.html> <outDir>  (viewport tops at 1280 light, 400 light/dark)
 import { createRequire } from 'node:module';
-const { chromium } = createRequire('<repo>/mars/viewer/package.json')('@playwright/test');
+const { chromium } = createRequire(new URL('../../../../../mars/viewer/package.json', import.meta.url))('@playwright/test');
 const [page, outDir] = process.argv.slice(2);
 const b = await chromium.launch();
 for (const [w, scheme] of [[1280, 'light'], [400, 'light'], [400, 'dark']]) {

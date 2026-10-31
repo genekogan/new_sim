@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,sys,json,pathlib,math
 from mathutils import Matrix,Vector
-args=sys.argv[sys.argv.index('--')+1:];folder=pathlib.Path(args[0]).resolve();BASE=pathlib.Path('<mars-media>/reconstruction/2026-campus');kind=args[1] if len(args)>1 else 'orbit';out=BASE/'validation'/folder.name;out.mkdir(exist_ok=True)
+args=sys.argv[sys.argv.index('--')+1:];folder=pathlib.Path(args[0]).resolve();BASE=media('reconstruction/2026-campus');kind=args[1] if len(args)>1 else 'orbit';out=BASE/'validation'/folder.name;out.mkdir(exist_ok=True)
 bpy.ops.wm.open_mainfile(filepath=str(BASE/'deliverable/campus.blend' if kind=='campus' else folder/'campus.blend'))
 # Blender Z-up to native Apple/glTF Y-up inverse conversion for cameras.
 G=Matrix(((1,0,0),(0,0,-1),(0,1,0)))

@@ -1,7 +1,6 @@
 // Provision a local dev world from a server root (the SOUL3 integration worktree) and describe it in world.json.
 // DESIGN §4.1. Only world.kind "dev" is supported at this stage; fork/template-eden2/live are refused.
 import { spawn } from 'node:child_process';
-import { homedir } from 'node:os';
 import { openSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { mkdirSync, existsSync } from 'node:fs';
@@ -48,13 +47,12 @@ async function served(base, path) {
   } catch (e) { return { ok: false, error: String(e?.message ?? e) }; }
 }
 
-/** Asset overlay for MARS_WEB_DIR, first that has modular/humanoid/kit.json: $PLAYTEST_MARS_WEB, the laptop overlay
- *  (<team>/playtest/mars-web: the root worlds' immutable asset dir plus the humanoid kit mirrored from production),
- *  <serverRoot>/../mars-web (built from production URLs by arena/assets-overlay.mjs; the cloud runner's layout), then the
+/** Asset overlay for MARS_WEB_DIR, first that has modular/humanoid/kit.json: $PLAYTEST_MARS_WEB (a local overlay, e.g.
+ *  the root worlds' immutable asset dir plus the humanoid kit mirrored from production), <serverRoot>/../mars-web (built from production URLs by arena/assets-overlay.mjs; the cloud runner's layout), then the
  *  server root's .lane/mars-web. Without an overlay the server proxies /modular and /browser to sim.mars.college. */
-export function marsWebDir(serverRoot, { env = process.env, home = homedir(), exists = existsSync } = {}) {
+export function marsWebDir(serverRoot, { env = process.env, exists = existsSync } = {}) {
   const root = resolve(serverRoot);
-  const cands = [env.PLAYTEST_MARS_WEB, join(home, 'Eden/team/playtest/mars-web'), join(root, '../mars-web')].filter(Boolean);
+  const cands = [env.PLAYTEST_MARS_WEB, join(root, '../mars-web')].filter(Boolean);
   return cands.find((d) => exists(join(d, 'modular/humanoid/kit.json'))) ?? join(root, '.lane/mars-web');
 }
 

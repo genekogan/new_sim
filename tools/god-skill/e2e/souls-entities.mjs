@@ -86,7 +86,7 @@ const observe = async () => (await api('/v1/edge/observe', { as: 'soul' })).data
 let chromium = null;
 try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
 let browser = null, page = null, releaseChrome = null;
-const lease = async () => { if (releaseChrome) return; try { const lib = [resolve(root, 'tools/god-skill/lib/chrome-lease.mjs'), '<worktrees>/root-world-engine/tools/god-skill/lib/chrome-lease.mjs'].find((f) => existsSync(f)); const { chromeLease } = await import(lib); releaseChrome = await chromeLease('L9-entities'); } catch { releaseChrome = () => {}; } };
+const lease = async () => { if (releaseChrome) return; try { const lib = [resolve(root, 'tools/god-skill/lib/chrome-lease.mjs')].find((f) => existsSync(f)); const { chromeLease } = await import(lib); releaseChrome = await chromeLease('L9-entities'); } catch { releaseChrome = () => {}; } };
 async function closeBrowser() { if (browser) await browser.close().catch(() => { }); browser = null; page = null; releaseChrome?.(); releaseChrome = null; }
 async function shot(name, { eye, at, wait: ms = 5000, hideRoofs = true } = {}) {
   if (!chromium) return;

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import {readFile,writeFile} from 'node:fs/promises';import {createHash} from 'node:crypto';
-const base=process.env.SITE_BASE||'https://mars-campus-2026.<workers-subdomain>.workers.dev';const url=base+'/browser/campus.glb';
+const base=process.env.SITE_BASE||'https://sim.mars.college';const url=base+'/browser/campus.glb';
 const original=await readFile('public/browser/campus.glb'),compressed=await readFile('public/browser/campus.glb.br');
 const r=await fetch(url,{headers:{'Accept-Encoding':'br'}});assert.equal(r.status,200);assert.equal(r.headers.get('content-encoding'),'br');assert.equal(Number(r.headers.get('content-length')),compressed.length);
 const hash=createHash('sha256');let decoded=0;for await(const chunk of r.body){hash.update(chunk);decoded+=chunk.length;}assert.equal(decoded,original.length);assert.equal(hash.digest('hex'),createHash('sha256').update(original).digest('hex'));

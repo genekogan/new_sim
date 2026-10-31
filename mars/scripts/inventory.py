@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 import json,subprocess,pathlib,concurrent.futures
 from PIL import Image,ImageDraw
-ROOT=pathlib.Path('~/Mars'); OUT=ROOT/'docs/media/reconstruction/2026-campus'
+ROOT=mars_root(); OUT=ROOT/'docs/media/reconstruction/2026-campus'
 rows=json.loads((OUT/'inventory/catalog_candidates.json').read_text())
 def inspect(pair):
  i,r=pair; p=ROOT/r['rel_path']; d={'id':f'v{i:03d}','path':r['rel_path'],'bytes':r['bytes'],'caption':r['caption']}

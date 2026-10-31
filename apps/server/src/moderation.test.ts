@@ -18,7 +18,7 @@ import { classify, heuristicClassifier, noopClassifier, setUploadClassifier, ski
 import { ModerationStore, targetSha } from './moderation/store.ts';
 import { mountModeration, withoutHidden } from './moderation/routes.ts';
 
-const JPEG = readFileSync(new URL('../../../mars/viewer/public/history/2026/review-20260929/mimos-sign.jpg', import.meta.url));
+const JPEG = readFileSync(new URL('../test/fixtures/sample-texture.jpg', import.meta.url));
 const ASSETS = assetPolicy({ tris: 80_000, bytes: 3_000_000, texPx: 2048 });
 const code = (f: () => unknown, c: string) => assert.throws(f, (e: unknown) => e instanceof UploadRejected && e.code === c, c);
 const has = (b: Uint8Array, s: string) => Buffer.from(b).includes(Buffer.from(s, 'latin1'));

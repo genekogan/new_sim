@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json
 from PIL import Image,ImageOps,ImageDraw
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/research');allrows=[]
+b=media('reconstruction/2026-campus/modular/research');allrows=[]
 for name in ['main-room','kitchen','mimos','upstairs']:
  p=b/(name+'.json')
  if not p.exists():continue

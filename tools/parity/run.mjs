@@ -3,16 +3,17 @@
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openWorldServer } from '../core/multiworld/world-server.mjs';
 import { startWorld } from '../god-skill/dev-world.mjs';
 import { envClockConfig } from '../../apps/server/src/god/world-clock.ts';
+import { scratchDir } from '../lib/paths.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const args=process.argv.slice(2),flag=(key,def)=>args.includes(key)?args[args.indexOf(key)+1]:def;
 const world=flag('--world','mars');if(!['mars','littlemartians'].includes(world))throw Error('--world mars|littlemartians');
-const out=resolve(flag('--out',`<team>/scratch/parity/${world}`));
-if(!out.startsWith('<team>/scratch/parity/'))throw Error('output must live in lane parity scratch');
+const out=resolve(flag('--out',scratchDir(`parity/${world}`)));
+if(!out.startsWith(scratchDir('parity')+sep))throw Error('output must live in the parity scratch dir (SIM_SCRATCH or .local)');
 if(existsSync(resolve(out,'old-data/sim.db'))||existsSync(resolve(out,'candidate-data/sim.db')))throw Error('Fixture data already exists; select a new output path for a fresh run');
 const df=execFileSync('df',['-k','/System/Volumes/Data'],{encoding:'utf8'}).trim().split('\n').at(-1).split(/\s+/);
 if(Number(df[3])*1024<15*1024**3)throw Error('under 15 GB free; parity stopped');
@@ -58,6 +59,8 @@ try{
     sourceCommit:execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
     provenance:{liveSourceAndHistory:false,source:'old repo fixture + candidate repo genesis; no production database, roster or accepted history copied'}};
   const cfg=resolve(out,'config.json');writeFileSync(cfg,JSON.stringify(config,null,2));
-  evaluator=spawn('python3',['<team>/ops/with-heavy-slot.py','--owner','parity','--purpose',`${world}-comparison`,'--timeout','1800','--',process.execPath,resolve(root,'tools/parity/compare.mjs'),cfg],{cwd:root,stdio:'inherit'});
+  // SIM_HEAVY_SLOT: an optional machine-wide heavy-work lock wrapper (python3 <it> --owner … -- <cmd>); unset runs directly.
+  const compareCmd=[process.execPath,resolve(root,'tools/parity/compare.mjs'),cfg],heavy=process.env.SIM_HEAVY_SLOT;
+  evaluator=heavy?spawn('python3',[heavy,'--owner','parity','--purpose',`${world}-comparison`,'--timeout','1800','--',...compareCmd],{cwd:root,stdio:'inherit'}):spawn(compareCmd[0],compareCmd.slice(1),{cwd:root,stdio:'inherit'});
   process.exitCode=await new Promise(r=>evaluator.once('exit',r));
 }finally{await cleanup();}

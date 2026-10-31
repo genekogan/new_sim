@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,json,math,shutil,collections
 import numpy as np
 from mathutils import Matrix,Vector
-B=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular');O=B/'deliverable';T=O/'textures';bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene
+B=media('reconstruction/2026-campus/modular');O=B/'deliverable';T=O/'textures';bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene
 if not (O/'mars-2026-modular-cad.blend').exists():shutil.copy2(O/'mars-2026-modular.blend',O/'mars-2026-modular-cad.blend')
 manifest=json.load(open(O/'components.json'));records={r['id']:r for r in manifest['instances']};byid={o.get('component_id'):o for o in s.objects if o.get('component_id')};roots={o.get('assembly_id'):o for o in s.objects if o.get('assembly_id') and not o.get('layer') and not o.get('component_id')}
 # Exclude nearby vehicles from the movable Chiba building assembly.

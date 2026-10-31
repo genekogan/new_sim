@@ -10,7 +10,7 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="$(mkdir -p "${1:?usage: v7-walks.sh <outDir>}" && cd "$1" && pwd)"
-export CHROME_LEASE_MODULE=<team>/ops/chrome-lease.mjs
+# CHROME_LEASE_MODULE (optional, inherited): a machine-wide Chrome lease; the walks default to the repo's lease lib.
 export WALK_BUILDS='{"head":5870}' OLD_WORLDS_OUT="$OUT/old-worlds"
 MARS_WEB_SRC="$ROOT/.lane/mars-web"; MARS_WEB="$OUT/mars-web"; PIDS=()
 cleanup() { for p in "${PIDS[@]:-}"; do [ -n "$p" ] && kill "$p" 2>/dev/null; done; }
@@ -25,7 +25,8 @@ mkdir -p "$MARS_WEB" || exit 1
 SRC_REAL="$(cd "$MARS_WEB_SRC" && pwd -P)"; for e in "$SRC_REAL"/*; do ln -sfn "$e" "$MARS_WEB/${e##*/}"; done
 ln -sfn "$ROOT/mars/viewer/public/modular" "$MARS_WEB/modular"
 [ -f "$MARS_WEB/modular/humanoid/kit.json" ] && [ -f "$MARS_WEB/modular/environment/clips-ual.glb" ] || { echo "no humanoid kit / character wire files in $MARS_WEB/modular"; exit 1; }
-heavy() { python3 <team>/ops/with-heavy-slot.py --owner gate --purpose "$1" --timeout 1800 -- "${@:2}"; }
+# SIM_HEAVY_SLOT (optional): a machine-wide heavy-work lock wrapper; unset runs each step directly.
+heavy() { if [ -n "${SIM_HEAVY_SLOT:-}" ]; then python3 "$SIM_HEAVY_SLOT" --owner gate --purpose "$1" --timeout 1800 -- "${@:2}"; else "${@:2}"; fi; }
 if [ -n "${SIM_PREBUILT_WEB_ROOT:-}" ]; then
   SHA="$(git rev-parse HEAD)"; BUILD="we-${SHA:0:12}"
   # Validate the exact release source/flags and every file hash before browser qualification.

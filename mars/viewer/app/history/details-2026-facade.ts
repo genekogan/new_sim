@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {Kit,layers} from './kit';
+import {photoTexture} from './archive-photos';
 
 /** Source facade correction: original GLB immutable; IDs retained. Native upper
  * mural UVs and south access/doorway evidence: review-20260929/FACADE.md. */
@@ -21,7 +22,7 @@ function correctWestFace(wall:T.Mesh,chiba:T.Object3D){
  const uv=geometry.getAttribute('uv')?.clone()??new T.BufferAttribute(new Float32Array(position.count*2),2);
  geometry.setAttribute('uv',uv);
  const originalMaterials=Array.isArray(wall.material)?wall.material:[wall.material];
- const texture=new T.TextureLoader().load('/history/2026/review-20260929/chiba-west-upper-wall.webp');texture.colorSpace=T.SRGBColorSpace;texture.userData.source='DJI_0029.MP4 t23.00 four-corner upper-wall rectification';
+ const texture=photoTexture('/history/2026/review-20260929/chiba-west-upper-wall.webp');texture.colorSpace=T.SRGBColorSpace;texture.userData.source='DJI_0029.MP4 t23.00 four-corner upper-wall rectification';
  const material=new T.MeshStandardMaterial({map:texture,roughness:.94});material.name='2026 west upper wall · native t23 photograph';
  const newIndex=originalMaterials.length,groups=geometry.groups.map(g=>({...g}));geometry.clearGroups();
  const point=(i:number)=>new T.Vector3().fromBufferAttribute(position,i).applyMatrix4(toChiba);
@@ -112,7 +113,7 @@ function addSouthAccess(chiba:T.Object3D){
  k.finalize();chiba.add(g);chiba.updateMatrixWorld(true);
  // c50158 upper abstract belongs above the doorway; the original donor
  // mapping incorrectly repeats the lower pixel motif in this upper band.
- const upperTexture=new T.TextureLoader().load('/history/2026/accuracy/stair-upper-abstract-native.webp');upperTexture.colorSpace=T.SRGBColorSpace;upperTexture.userData.source='c50158 DSCF0968-A6131 native crop598,193–1148,370 on1920px derivative; no people/door/pixel motif';
+ const upperTexture=photoTexture('/history/2026/accuracy/stair-upper-abstract-native.webp');upperTexture.colorSpace=T.SRGBColorSpace;upperTexture.userData.source='c50158 DSCF0968-A6131 native crop598,193–1148,370 on1920px derivative; no people/door/pixel motif';
  const upperMaterial=new T.MeshStandardMaterial({map:upperTexture,roughness:.94,side:T.DoubleSide});upperMaterial.name='c50158 native upper black abstract on plywood';
  for(const panel of panels)panel.traverse(o=>{const mesh=o as T.Mesh;if(!mesh.isMesh)return;const toG=g.matrixWorld.clone().invert().multiply(mesh.matrixWorld),geo=splitUpperPaintBand(mesh.geometry,toG),pos=geo.getAttribute('position'),uv=geo.getAttribute('uv')?.clone()??new T.BufferAttribute(new Float32Array(pos.count*2),2);geo.setAttribute('uv',uv);const oldGroups=geo.groups.map(q=>({...q})),materials=Array.isArray(mesh.material)?mesh.material:[mesh.material],newIndex=materials.length;geo.clearGroups();let count=0;
   for(let i=0;i<pos.count;i+=3){const points=[0,1,2].map(j=>new T.Vector3().fromBufferAttribute(pos,i+j).applyMatrix4(toG)),center=points[0].clone().add(points[1]).add(points[2]).divideScalar(3),normal=points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0])).normalize(),selected=center.y>5.30&&Math.abs(normal.z)>.9&&center.z>-.13&&center.z<.05;const old=oldGroups.find(q=>i>=q.start&&i<q.start+q.count)?.materialIndex??0;if(selected){for(let j=0;j<3;j++)uv.setXY(i+j,points[j].x/2.431,(points[j].y-5.30)/.8585);count++;}geo.addGroup(i,3,selected?newIndex:old);}
@@ -120,6 +121,6 @@ function addSouthAccess(chiba:T.Object3D){
  });
  // The next upper panel0693 wrongly repeats the lower white pixel motif.
  // Native50158 shows unpainted plywood here; lower native motif remains.
- const plywoodTexture=new T.TextureLoader().load('/history/2026/accuracy/stair-upper-native-plywood.webp');plywoodTexture.colorSpace=T.SRGBColorSpace;plywoodTexture.wrapS=plywoodTexture.wrapT=T.RepeatWrapping;plywoodTexture.userData.source='c50158 native person-free plywood crop1190,215–1300,415 at1920px';const plywoodMaterial=new T.MeshStandardMaterial({map:plywoodTexture,roughness:.94,side:T.DoubleSide});plywoodMaterial.name='c50158 plain upper plywood above lower pixel bank';
+ const plywoodTexture=photoTexture('/history/2026/accuracy/stair-upper-native-plywood.webp');plywoodTexture.colorSpace=T.SRGBColorSpace;plywoodTexture.wrapS=plywoodTexture.wrapT=T.RepeatWrapping;plywoodTexture.userData.source='c50158 native person-free plywood crop1190,215–1300,415 at1920px';const plywoodMaterial=new T.MeshStandardMaterial({map:plywoodTexture,roughness:.94,side:T.DoubleSide});plywoodMaterial.name='c50158 plain upper plywood above lower pixel bank';
  chiba.traverse(o=>{if(o.userData.component_id!=='wood_component-0693')return;o.traverse(child=>{const mesh=child as T.Mesh;if(!mesh.isMesh)return;const geo=mesh.geometry.index?mesh.geometry.toNonIndexed():mesh.geometry.clone(),pos=geo.getAttribute('position'),uv=geo.getAttribute('uv')?.clone()??new T.BufferAttribute(new Float32Array(pos.count*2),2),toG=g.matrixWorld.clone().invert().multiply(mesh.matrixWorld),old=geo.groups.map(q=>({...q})),mats=Array.isArray(mesh.material)?mesh.material:[mesh.material];geo.setAttribute('uv',uv);geo.clearGroups();let count=0;for(let i=0;i<pos.count;i+=3){const ps=[0,1,2].map(j=>new T.Vector3().fromBufferAttribute(pos,i+j).applyMatrix4(toG)),normal=ps[1].clone().sub(ps[0]).cross(ps[2].clone().sub(ps[0])).normalize(),selected=Math.abs(normal.z)>.9;for(let j=0;selected&&j<3;j++)uv.setXY(i+j,(ps[j].x-2.43)/.55,(ps[j].y-4.93)/1.0);geo.addGroup(i,3,selected?mats.length:old.find(q=>i>=q.start&&i<q.start+q.count)?.materialIndex??0);if(selected)count++;}uv.needsUpdate=true;mesh.geometry=geo;mesh.material=[...mats,plywoodMaterial];mesh.userData.nativeSouthPlainUpperPaint={source:50158,triangles:count,sourceCorrection:'duplicate upper pixel motif replaced by native plywood; original lower motif retained'};});});return g;
 }

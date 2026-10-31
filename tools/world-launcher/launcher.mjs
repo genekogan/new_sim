@@ -48,7 +48,7 @@
 // (their API, WebSocket, skill and CLI URLs carry the prefix) and the web build must be made with
 // `vite build --base <base>/` plus apps/web/src/base-path.ts (tools/world-launcher/deploy/release.sh does both).
 //
-// --old-worlds-root (stage `legacy`, deploy/old-worlds/README.md): the three original worlds at the site root, moved off
+// --old-worlds-root (stage `legacy`): the three original worlds at the site root, moved off
 // the laptop. No --base; only the forks eden/mars/littlemartians (op register-fork), served at /w/<key> exactly where the
 // laptop served them, and the root web build's "Sim" world list at /. Nothing new is created here (new worlds live under
 // /worlds). Root paths a world page asks for go where the laptop proxy sent them (tools/core/multiworld/proxy.mjs

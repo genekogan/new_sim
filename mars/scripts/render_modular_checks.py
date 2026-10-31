@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,json,pathlib,math,numpy as np
 from mathutils import Matrix,Vector,Quaternion
-B=pathlib.Path('<mars-media>/reconstruction/2026-campus');O=B/'modular/deliverable';bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;fit=json.load(open(B/'modular/research/chiba-local-alignment.json'));R=Matrix.Identity(3)
+B=media('reconstruction/2026-campus');O=B/'modular/deliverable';bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene;fit=json.load(open(B/'modular/research/chiba-local-alignment.json'));R=Matrix.Identity(3)
 for i in range(2):
  for j in range(2):R[i][j]=fit['rotation'][i][j]
 G=Matrix(((1,0,0),(0,0,-1),(0,1,0)));t=Vector((fit['translation'][0]-177,fit['translation'][1]-66,0));scale=fit['scale'];m=json.load(open(B/'deliverable/manifest.json'));views=m['models'][0]['views'];camera=s.camera;camera.data.type='PERSP';camera.data.sensor_fit='VERTICAL';camera.data.sensor_height=24;s.render.resolution_x=1280;s.render.resolution_y=720;s.cycles.samples=8;s.render.film_transparent=False;s.world.color=(.45,.45,.42);rows=[]

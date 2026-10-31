@@ -1,5 +1,6 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,numpy as np
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus');out={}
+b=media('reconstruction/2026-campus');out={}
 for kind in ['orbit','campus']:
  p=b/f'validation/holdout-{kind}/results.json'
  if not p.exists():continue

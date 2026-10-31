@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { scratchDir } from '../../lib/paths.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -18,7 +19,7 @@ const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../lib/
 const { chromium } = createRequire(`${root}/mars/viewer/package.json`)('@playwright/test');
 const port = Number(args.port ?? 6790), range = typeof args.range === 'string' ? args.range : '6791-6795';
 const origin = `http://127.0.0.1:${port}`, BASE = '/worlds';
-const out = resolve(typeof args.out === 'string' ? args.out : '<team>/scratch/link/card-shots');
+const out = resolve(typeof args.out === 'string' ? args.out : scratchDir('link/card-shots'));
 mkdirSync(out, { recursive: true });
 if (typeof args.web !== 'string') { console.error('--web <vite build --base /worlds/> is required'); process.exit(2); }
 const CLI = resolve(root, 'tools/edge-skill/eden-agent.mjs');

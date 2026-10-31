@@ -1,5 +1,6 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 import pathlib,json,pycolmap,sys
-ROOT=pathlib.Path('~/Mars'); BASE=ROOT/'docs/media/reconstruction/2026-campus'
+ROOT=mars_root(); BASE=ROOT/'docs/media/reconstruction/2026-campus'
 images=BASE/'frames/orbit-march23'; out=BASE/'models/sfm-orbit';out.mkdir(exist_ok=True);db=out/'database.db'
 ex=pycolmap.FeatureExtractionOptions();ex.max_image_size=2400;ex.num_threads=4;ex.sift.max_num_features=10000
 reader=pycolmap.ImageReaderOptions();reader.camera_model='SIMPLE_RADIAL'

@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import type { Entity, PaintState } from '../../engine/world/types.ts';
 import { faceOf } from '../../engine/work/paint.ts';
+import { isArchivePhoto } from '../history/archive-photos.ts';
 
 const OFF = 0.003; // m off the face
 const STRIPE = 0.02; // m: texture stripe height
@@ -33,7 +34,7 @@ export function paintTexturePath(name: string): string | null {
     if (!warned.has(name)) { warned.add(name); console.warn(`[paint] unknown texture "${name}"; using hashed colour and stripe`); }
     return null;
   }
-  return path;
+  return isArchivePhoto(path) ? null : path; // archive photos are not distributed: hashed colour and stripe
 }
 function acquireImage(path: string): SharedImage {
   let shared = loaded.get(path);

@@ -1,5 +1,6 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,json,pathlib,collections,numpy as np
-p=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/research');bpy.ops.wm.open_mainfile(filepath=str(p/'cad-reference.blend'))
+p=media('reconstruction/2026-campus/modular/research');bpy.ops.wm.open_mainfile(filepath=str(p/'cad-reference.blend'))
 rows=[]
 for m in bpy.data.materials:
  if not m.use_nodes:continue

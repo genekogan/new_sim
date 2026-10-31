@@ -59,9 +59,9 @@ export function PresentationControls({
             value={year}
             onChange={(event) => onYear(Number(event.target.value))}
           >
-            {[2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027].map((value) => (
+            {[2020, 2021, 2022, 2023, 2024, 2025, 2026].map((value) => (
               <option key={value} value={value}>
-                {value}{value === 2027 ? ' · draft' : ''}
+                {value}
               </option>
             ))}
           </select>

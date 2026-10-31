@@ -11,7 +11,7 @@ for (const path of [
   '/studio/',
   '/studio/2020',
   '/studio/2020/',
-  ...[2021,2022,2023,2024,2025,2026,2027].flatMap(y => [`/studio/${y}`, `/studio/${y}/`]),
+  ...[2021,2022,2023,2024,2025,2026].flatMap(y => [`/studio/${y}`, `/studio/${y}/`]),
   '/simulation-guide',
   '/simulation-guide/',
 ]) {
@@ -25,12 +25,6 @@ for (const path of [
     const a = await fetch(base + match[1], { method: 'HEAD' });
     assert.equal(a.status, 200, match[1]);
   }
-}
-{ // Gene's questions page (deploy/prepare.py → /questions/)
-  const q = await fetch(base + '/questions/');
-  assert.equal(q.status, 200, '/questions/');
-  assert.match(await q.text(), /<title>Questions for Gene<\/title>/);
-  assert.equal((await fetch(base + '/questions', { redirect: 'manual' })).status, 301);
 }
 assert.equal((await fetch(base + '/not-a-campus-route')).status, 404);
 assert.equal((await fetch(base + '/api/simulation/state')).status, 401);

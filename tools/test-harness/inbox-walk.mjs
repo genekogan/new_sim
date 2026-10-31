@@ -10,9 +10,10 @@ import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {startWorld} from '../god-skill/dev-world.mjs';
 import {chromeLease} from '../god-skill/lib/chrome-lease.mjs';
+import { scratchDir } from '../lib/paths.mjs';
 
 const root = resolve(new URL('../..', import.meta.url).pathname);
-const out = resolve(process.argv[2] ?? '<team>/scratch/inbox/browser');
+const out = resolve(process.argv[2] ?? scratchDir('inbox/browser'));
 const port = Number(process.argv[3] ?? 5960);
 if (!Number.isInteger(port) || port < 5960 || port > 5968) throw Error('This lane owns ports 5960–5969 only');
 mkdirSync(out, {recursive: true});

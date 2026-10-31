@@ -14,7 +14,7 @@ const base = flag('base'), out = flag('out'), dprs = flag('dpr', '1,2').split(',
 assert(base && out && picks.length, '--base --out --pick');
 mkdirSync(out, { recursive: true });
 const { chromium } = createRequire(`${ROOT}/mars/viewer/package.json`)('@playwright/test');
-const { chromeLease } = await import('<team>/ops/chrome-lease.mjs');
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
 const release = await chromeLease('n3-explore', { waitMs: 45 * 60000 });
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

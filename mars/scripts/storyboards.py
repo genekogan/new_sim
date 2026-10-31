@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import mars_root  # noqa: E402
 import json,subprocess,pathlib,concurrent.futures,math
 from PIL import Image,ImageDraw
-ROOT=pathlib.Path('~/Mars'); OUT=ROOT/'docs/media/reconstruction/2026-campus'
+ROOT=mars_root(); OUT=ROOT/'docs/media/reconstruction/2026-campus'
 rows=json.loads((OUT/'inventory/probed.json').read_text())
 rows=[r for r in rows if 'duration' in r and ('/drone/2026/' in r['path'] or '/gandala/DJI_' in r['path'])]
 def make(r):

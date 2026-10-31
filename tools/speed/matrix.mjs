@@ -5,8 +5,9 @@ import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scratchDir } from '../lib/paths.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const [phase='after', output=(process.env.SPEED_SCRATCH??'<team>/scratch/speed')+'/'+phase] = process.argv.slice(2);
+const [phase='after', output=(process.env.SPEED_SCRATCH??scratchDir('speed'))+'/'+phase] = process.argv.slice(2);
 const [P0,P1]=(process.env.SPEED_PORTS??'5890,5891').split(',').map(Number);
 if(phase==='all') { for(const part of ['before','after','phone']) { const r=spawnSync(process.execPath,[fileURLToPath(import.meta.url),part,resolve(output,part)],{cwd:root,stdio:'inherit'}); if(r.status!==0)process.exit(r.status??1); } process.exit(0); }
 if (!['before','after','phone-before','phone'].includes(phase)) throw new Error('phase: all|before|after|phone-before|phone');

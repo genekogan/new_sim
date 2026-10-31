@@ -1,6 +1,7 @@
 // Pick clear ground for the field and water patch items in a fresh local Mars (template, bearing 90). Pure local reads.
-import { boot, stop } from './lib.mjs';
-const ctx = await boot({ port: 5869, template: '<worktrees>/lane-mars/worlds/templates/mars-two.json', out: '<team>/scratch/mars/rot/spots' });
+import { boot, stop, MARS_TWO_TEMPLATE } from './lib.mjs';
+import { scratchDir } from '../../lib/paths.mjs';
+const ctx = await boot({ port: 5869, template: MARS_TWO_TEMPLATE, out: scratchDir('mars/rot/spots') });
 try {
   const snap = await ctx.api('/v1/world/snapshot', { as: 'public' });
   const fs = snap.entities.find((e) => e.name === 'freeside'); console.log('freeside', fs.p, fs.r);

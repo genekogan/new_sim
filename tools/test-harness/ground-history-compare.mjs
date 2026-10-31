@@ -2,13 +2,14 @@
 // No ports, services, credentials, models or production data. Generates its own
 // tiny histories, then boots independent copies under both explicit readers.
 // node tools/test-harness/ground-history-compare.mjs --baseline /tree/main \
-//   --candidate /tree/candidate --out <team>/scratch/engine/history-<id>
+//   --candidate /tree/candidate --out .local/engine/history-<id>
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { scratchDir } from '../lib/paths.mjs';
 
 const self = fileURLToPath(import.meta.url);
 const usage = 'Required: --baseline <absolute tree> --candidate <absolute tree> --out <fresh absolute scratch dir>';
@@ -21,8 +22,8 @@ for (let i = 2; i < process.argv.length; i += 2) {
 for (const key of ['--baseline', '--candidate', '--out']) assert.ok(args[key] && isAbsolute(args[key]), usage);
 const baseline = realpathSync(args['--baseline']), candidate = realpathSync(args['--candidate']), out = resolve(args['--out']);
 for (const tree of [baseline, candidate]) assert.ok(statSync(join(tree, 'packages/engine-mars/src/engine.ts')).isFile(), 'explicit source tree required');
-const scratch = '<team>/scratch/engine';
-assert.ok(out.startsWith(scratch + sep), 'output must be a new directory inside team/scratch/engine');
+const scratch = scratchDir('engine');
+assert.ok(out.startsWith(scratch + sep), 'output must be a new directory inside the engine scratch dir (SIM_SCRATCH or .local)');
 // Resolve the existing ancestor as well: a scratch symlink must not escape.
 let ancestor = dirname(out);
 while (!existsSync(ancestor)) ancestor = dirname(ancestor);

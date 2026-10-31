@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,json
 from mathutils import Vector
-b=pathlib.Path('<mars-media>/reconstruction/2026-campus');out=b/'modular/research'
+b=media('reconstruction/2026-campus');out=b/'modular/research'
 for kind,path,center,scale in [('cad',out/'cad-reference.blend',(142,105),320),('scan',b/'models/campus-raw/campus.blend',(0,0),600)]:
  bpy.ops.wm.open_mainfile(filepath=str(path));scene=bpy.context.scene
  if kind=='cad':

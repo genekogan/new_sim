@@ -1,7 +1,8 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import bpy,pathlib,json,math
 import numpy as np
 from mathutils import Vector
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable');R=O.parent/'research/silhouettes'
+O=media('reconstruction/2026-campus/modular/deliverable');R=O.parent/'research/silhouettes'
 bpy.ops.wm.open_mainfile(filepath=str(O/'mars-2026-modular.blend'));s=bpy.context.scene
 rows=json.load(open(R/'candidates.json'));chosen=[];seen=set()
 for row in rows:

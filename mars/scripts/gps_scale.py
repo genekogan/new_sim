@@ -1,6 +1,7 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 import pathlib,json,numpy as np,sys
 from align_cameras import similarity
-BASE=pathlib.Path('<mars-media>/reconstruction/2026-campus');name=sys.argv[1] if len(sys.argv)>1 else 'campus-v1';folder=BASE/'models'/name
+BASE=media('reconstruction/2026-campus');name=sys.argv[1] if len(sys.argv)>1 else 'campus-v1';folder=BASE/'models'/name
 frames={r['file']:r for r in json.load(open(BASE/'inventory/campus-march19-frames.json'))};poses=json.load(open(folder/'poses.json'));selected=[(p,frames[p['file']]) for p in poses if p['file'] in frames and 'gps' in frames[p['file']]]
 x=np.array([p['translation'] for p,f in selected]);gps=np.array([f['gps'] for p,f in selected]);ref=gps.mean(0);y=np.column_stack(((gps[:,1]-ref[1])*111320*np.cos(np.deg2rad(ref[0])),gps[:,2]-ref[2],-(gps[:,0]-ref[0])*111132))
 s,R,t=similarity(x,y);res=np.linalg.norm(s*x@R.T+t-y,axis=1);loo=[]

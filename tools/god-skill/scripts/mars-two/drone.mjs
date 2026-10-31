@@ -16,8 +16,9 @@ import { join } from 'node:path';
 import { ROOT, sharp } from './v3.mjs';
 import { HOME_WORLD } from './frame.mjs';
 import { chromeLease } from '../../lib/chrome-lease.mjs';
+import { scratchDir } from '../../../lib/paths.mjs';
 
-const LANES = '<team>/lanes';
+const LANES = scratchDir('mars-two');
 const FRAMES = join(LANES, 'marsland-frames');
 const W = 1600, H = 900, F = (H / 2) / Math.tan((45 / 2) * Math.PI / 180);   // focal length (px) of the viewer's camera
 const tel = readFileSync(join(FRAMES, 'telemetry.csv'), 'utf8').trim().split('\n').slice(1).map((l) => l.split(',').map(Number));

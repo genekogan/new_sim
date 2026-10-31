@@ -4,7 +4,7 @@
 // what the frame may show (job.show) and the page hides every other Soul body.
 //
 // Env: EDGE_EYES_URL (viewer URL, e.g. http://127.0.0.1:4970/w/eden/), EDGE_EYES_GPU=auto|metal|gl|swiftshader,
-// EDGE_EYES_PLAYWRIGHT (a package.json whose node_modules has @playwright/test; default <repo>/mars/viewer),
+// EDGE_EYES_PLAYWRIGHT (a package.json whose node_modules has @playwright/test; default: this checkout's mars/viewer),
 // PLAYWRIGHT_BROWSERS_PATH, EDGE_EYES_RELOAD_HOURS (default 6), EDGE_EYES_HEADLESS_SHELL=1 (old headless shell),
 // EDGE_EYES_NICE (default 10), EDGE_EYES_CPUS (taskset CPU list), EDGE_EYES_CHROME_ARGS (extra --switches).
 import {createRequire} from 'node:module';

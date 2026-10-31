@@ -11,8 +11,9 @@ import { computeMetrics, readLedger } from './metrics.mjs';
 import { loadSpecs } from './report.mjs';
 import { buildStory } from './story.mjs'; // story (worker S)
 import { renderStoryHtml } from './story-html.mjs'; // story (worker S)
+import { scratchDir } from '../../lib/paths.mjs';
 
-export const DEFAULT_RUNS_ROOT = '<team>/playtest/runs';
+export const DEFAULT_RUNS_ROOT = process.env.PLAYTEST_RUNS_ROOT ?? scratchDir('playtest/runs');
 const PHYS = new Set(['inside-solid', 'no-progress', 'stuck-receipt']);
 
 // ---------- small helpers

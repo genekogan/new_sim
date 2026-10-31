@@ -74,7 +74,7 @@ spawn(process.execPath,['-e',code],{detached:true,stdio:'ignore'});setInterval((
     // temporary repository. Never replace git or bypass hooks for this fixture.
     execFileSync('git', ['init', '--quiet'], { cwd: repository });
     execFileSync('git', ['add', 'viewer'], { cwd: repository });
-    execFileSync('git', ['-c', 'user.name=genekogan', '-c', 'user.email=1335251+genekogan@users.noreply.github.com', 'commit', '--quiet', '-m', 'Gate interruption fixture', '-m', 'Co-Authored-By: Codex <noreply@openai.com>'], { cwd: repository });
+    execFileSync('git', ['-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Gate interruption fixture', '-m', 'Co-Authored-By: Codex <noreply@openai.com>'], { cwd: repository });
     gate = spawn(process.execPath, ['deploy/gate.mjs'], { cwd: dir, stdio: 'ignore' });
     const closed = new Promise((resolve) => gate.once('close', (code) => resolve(code)));
     let pid;

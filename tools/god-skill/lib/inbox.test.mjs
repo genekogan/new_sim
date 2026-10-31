@@ -8,11 +8,12 @@ import { COMMANDS, CLI_SHAPE, checkArgs, parseFlags } from '../cli.mjs';
 import { noticeOwnerInbox, noticeInboxHeader } from './inbox-notice.mjs';
 import { remoteLook } from './remote-look.mjs';
 import { follow } from './mirror.mjs';
+import { tmpdir } from 'node:os';
 
 const latest = (id, state = 'delivered') => ({ id, text: 'Please make a quiet garden.', state, sentAt: 1, deliveredAt: 2 });
 const envelope = message => ({ inbox: { connected: true, lastSeenAt: 2, latest: message } });
 function fixture(t, responses) {
-  const scratch = '<team>/scratch/inbox';
+  const scratch = tmpdir();
   mkdirSync(scratch, { recursive: true });
   const dir = mkdtempSync(join(scratch, 'god-cli-')), cwd = process.cwd(), fetcher = globalThis.fetch, error = console.error, calls = [], notices = [];
   process.chdir(dir);

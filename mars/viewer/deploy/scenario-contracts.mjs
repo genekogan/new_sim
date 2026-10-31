@@ -1,10 +1,10 @@
-// SCENARIO_COVERAGE.json is authoritative. Keep only useful contract text in the UI,
+// scenario-coverage.json (beside this file) is authoritative. Keep only useful contract text in the UI,
 // never the large historical proof registry or local capture paths.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 export const inventoryUrl = new URL(
-  '../../docs/engineering/SCENARIO_COVERAGE.json',
+  './scenario-coverage.json',
   import.meta.url,
 );
 export const outputUrl = new URL(
@@ -47,7 +47,7 @@ export function generatedContracts(inventory) {
     ];
   });
   return (
-    '// Generated from docs/engineering/SCENARIO_COVERAGE.json.\n' +
+    '// Generated from deploy/scenario-coverage.json.\n' +
     '// Run node deploy/scenario-contracts.mjs; engine tests check exact parity.\n' +
     'export const LAB_SCENARIO_GROUPS = ' +
     JSON.stringify(inventory.discoveryGroups, null, 2) +

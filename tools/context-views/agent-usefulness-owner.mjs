@@ -14,6 +14,7 @@ import { freeMemGb } from '../playtest/lib/platform.mjs';
 import { decodeContextPng } from '../../apps/server/src/god/context-sheet.ts';
 import { runAgentUsefulness } from './agent-usefulness.mjs';
 import { USEFULNESS_PROTOCOL as P, redact } from './agent-usefulness-protocol.mjs';
+import { measureSlot } from '../lib/paths.mjs';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const args = process.argv.slice(2);
@@ -34,7 +35,7 @@ if (report.sourceReceipt.sha256 !== pins.sourceSha256 || report.sourceReceipt.he
 mkdirSync(out);
 const save = () => writeFileSync(resolve(out, 'owner.json'), JSON.stringify(redact(report), null, 2));
 const setPhase = phase => { report.phases.push({ phase, at: Date.now() }); save(); };
-const slot = '<team>/lanes/MEASURE.slot';
+const slot = measureSlot();
 const claim = `${new Date().toISOString()} context-usefulness pid=${process.pid} until${new Date(outerDeadline).toISOString()}`;
 let release, claimed = false, fixtureEntered = false;
 const priorEnv = Object.fromEntries(['WEB_DIR', 'EDGE_CONTROLLER_CLI_FILE', 'EDGE_SKILL_FILE', 'PATH'].map(key => [key, process.env[key]]));

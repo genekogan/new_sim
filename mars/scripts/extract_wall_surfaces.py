@@ -1,3 +1,4 @@
+import os,sys;sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));from _paths import media  # noqa: E402
 """Reproject only scanned triangles close to the four CAD wall planes.
 
 Foreground vehicles are excluded geometrically. Transparent gaps are retained;
@@ -6,7 +7,7 @@ they represent missing evidence, not inferred paint.
 import bpy, bmesh, json, pathlib
 from mathutils import Matrix, Vector
 
-O=pathlib.Path('<mars-media>/reconstruction/2026-campus/modular/deliverable')
+O=media('reconstruction/2026-campus/modular/deliverable')
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(O/'chiba-photo-reference.glb'))
 s=bpy.context.scene

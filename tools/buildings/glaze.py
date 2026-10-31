@@ -13,7 +13,9 @@ import os
 import bpy
 import numpy as np
 
-SRC = os.environ.get('LM_3D', '<lm-3d-models>')
+SRC = os.environ.get('LM_3D')  # the Little Martians 3d-models archive (not in the repo)
+if not SRC:
+    raise SystemExit('set LM_3D to the Little Martians 3d-models archive')
 
 SOURCES = {
     # name: (colour atlas, normal atlas) relative to the 3d-models root

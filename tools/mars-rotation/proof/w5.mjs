@@ -1,5 +1,6 @@
-import { boot, addSoul, follow, cliAct, stop } from './lib.mjs';
-const ctx = await boot({ port: 5869, template: '<worktrees>/lane-mars/worlds/templates/mars-two.json', out: '<team>/scratch/mars/rot/w5' });
+import { boot, addSoul, follow, cliAct, stop, MARS_TWO_TEMPLATE } from './lib.mjs';
+import { scratchDir } from '../../lib/paths.mjs';
+const ctx = await boot({ port: 5869, template: MARS_TWO_TEMPLATE, out: scratchDir('mars/rot/w5') });
 try {
  const r = await ctx.api('/v1/god/act', { body: { note: 'provisioning probe', ops: [
   { op: 'place', def: 'core/water-tank@1', name: 'tank', p: [10, -5] },

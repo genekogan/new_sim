@@ -7,10 +7,11 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdirSync, writeFileSync} from 'node:fs';
+import { scratchDir } from '../../../tools/lib/paths.mjs';
 const ROOT = new URL('../../../', import.meta.url).pathname;
 const base = process.env.HUMANOID_LAB ?? 'http://127.0.0.1:4985';
 assert.ok([4985, 4988, 4989].includes(Number(new URL(base).port)), 'lane L10 ports only');
-const outArg = process.argv.indexOf('--out'), out = outArg > 0 ? process.argv[outArg + 1] : '<team>/lanes/humanoid-shots';
+const outArg = process.argv.indexOf('--out'), out = outArg > 0 ? process.argv[outArg + 1] : scratchDir('humanoid-shots');
 mkdirSync(out, {recursive: true});
 const {chromium} = createRequire(ROOT + 'mars/viewer/package.json')('@playwright/test');
 const {chromeLease} = await import(ROOT + 'tools/god-skill/lib/chrome-lease.mjs');

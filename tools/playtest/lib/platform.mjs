@@ -5,20 +5,21 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { REPO_ROOT } from '../../lib/paths.mjs';
 
-export const LAPTOP_VIEWER_PKG = join(homedir(), 'Eden/sim/mars/viewer/package.json');
+export const CHECKOUT_VIEWER_PKG = join(REPO_ROOT, 'mars/viewer/package.json');
 const which = (cmd) => { try { return execFileSync('sh', ['-c', `command -v ${cmd}`], { encoding: 'utf8' }).trim() || null; } catch { return null; } };
 const npmRootGlobal = () => { try { return execFileSync('npm', ['root', '-g'], { encoding: 'utf8', timeout: 15000 }).trim() || null; } catch { return null; } };
 
 /** Where to look for Playwright, in order: the global `playwright` (cloud: browsers pre-installed for that version),
- *  then the server root's mars/viewer, then the laptop viewer. → [{from, kind:'global'|'pkg', name, dir|pkg}] */
+ *  then the server root's mars/viewer, then this checkout's viewer. → [{from, kind:'global'|'pkg', name, dir|pkg}] */
 export function playwrightCandidates({ serverRoot = null, env = process.env, globalRoot = undefined } = {}) {
   const out = [];
   if (env.PLAYTEST_PLAYWRIGHT_PKG) out.push({ from: 'PLAYTEST_PLAYWRIGHT_PKG', kind: 'pkg', pkg: env.PLAYTEST_PLAYWRIGHT_PKG });
   const dirs = [...(env.NODE_PATH ?? '').split(':').filter(Boolean), globalRoot === undefined ? npmRootGlobal() : globalRoot, '/usr/lib/node_modules', '/usr/local/lib/node_modules', process.cwd()].filter(Boolean);
   for (const dir of [...new Set(dirs)]) out.push({ from: `global ${dir}`, kind: 'global', dir });
   if (serverRoot) out.push({ from: 'server root mars/viewer', kind: 'pkg', pkg: join(serverRoot, 'mars/viewer/package.json') });
-  out.push({ from: 'laptop viewer', kind: 'pkg', pkg: LAPTOP_VIEWER_PKG });
+  out.push({ from: 'checkout viewer', kind: 'pkg', pkg: CHECKOUT_VIEWER_PKG });
   return out;
 }
 

@@ -7,8 +7,8 @@
 // --raw blocks the fork's corrected campus (mars-fork.ts) so the page falls back to the raw campus (the "before").
 import { createRequire } from 'node:module';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { chromeLease } from '<worktrees>/root-world-engine/tools/god-skill/lib/chrome-lease.mjs';
-const { chromium } = createRequire('<worktrees>/root-world-engine/mars/viewer/package.json')('@playwright/test');
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../../lib/chrome-lease.mjs');
+const { chromium } = createRequire(new URL('../../../../mars/viewer/package.json', import.meta.url))('@playwright/test');
 const args = process.argv.slice(2), flag = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args.splice(i, 2)[1] : d; };
 const bool = (k) => { const i = args.indexOf(`--${k}`); if (i >= 0) { args.splice(i, 1); return true; } return false; };
 const dayFrom = Number(flag('day-from', 9)), dayTo = Number(flag('day-to', 15)), dayWaitMin = Number(flag('day-wait', 0)), dpr = Number(flag('dpr', 1)), tag = flag('tag', 'fork'), only = flag('only', null), settle = Number(flag('settle', 9000)), raw = bool('raw'), set = flag('set', 'build'), W = Number(flag('w', set === 'build' ? 1352 : 1600)), H = Number(flag('h', set === 'build' ? 780 : 900));

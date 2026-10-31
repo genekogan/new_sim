@@ -9,22 +9,10 @@ import { keepCameraAboveGround } from '../studio/camera-ground';
 import { createBrahman2020Scene, type SiteFeature } from './scene';
 import './style.css';
 
-const EVIDENCE = [
-  { image: '/2020/evidence/site-march4.webp', title: 'March 4 • site-wide aerial', source: 'media/drone/2020/drone_raw/DJI_0079.JPG', description: 'Overall relationships among the decks, container, Forest site, sphere, camp, and boundary.' },
-  { image: '/2020/evidence/portal-depth-march9.webp', title: 'March 9 • Portal from above', source: 'media/drone/2020/drone_raw/DJI_0094.MP4 · 193s', description: 'Three bays across and two bays deep. This rainy-day view includes temporary blue tarps omitted from the model.' },
-  { image: '/2020/evidence/side-stairs-march17.webp', title: 'March 17 • side-bay stair tiers', source: 'media/drone/2020/drone_edits/flythrough_03.17_2.mp4 · 9s', description: 'The two outer bays rise in broad steps toward the rear; the central passage stays open.' },
-  { image: '/2020/evidence/portal-screens-2020.webp', title: '2020 • Portal display content', source: 'media/highlights/Brahman 2020/Brahman Documentation/Mars Portal/IMG_6831.HEIC', description: 'Three photographed rows show landscapes, color tests, and generative imagery, sampled on the modeled screens.' },
-  { image: '/2020/evidence/climbing-wall-2020.webp', title: '2020 • climbing wall close-up', source: 'media/history/resident_blog_2020/assets/img/bbd/5-5.jpg', description: 'Plywood climbing panels are attached flush to the Portal’s exterior rack frame.' },
-  { image: '/2020/evidence/rv-ring-march9.webp', title: 'March 9 • separate RV camp', source: 'media/drone/2020/drone_raw/DJI_0094.MP4 · 375s', description: 'Trailers and RVs form a small, loose ring outside the public campus tire boundary.' },
-  { image: '/2020/evidence/forest-march9.webp', title: 'March 9 • Forest rack grid', source: 'media/drone/2020/drone_raw/DJI_0094.MP4', description: 'Open black upright frames with red horizontal beams, built as a separate installation.' },
-  { image: '/2020/evidence/portal-march17.webp', title: 'March 17 • Portal and canopy', source: 'media/drone/2020/drone_edits/flythrough_03.17_2.mp4', description: 'Screen-lined racks, magenta mural on the solar container, and white tarp workshop.' },
-  { image: '/2020/evidence/front-alignment-march17.webp', title: 'March 17 • frontage alignment', source: 'media/drone/2020/drone_edits/flythrough_03.17_2.mp4 · 7s', description: 'Portal frontage, container mural end, and the low sloping awning appear in one view.' },
-  { image: '/2020/evidence/forest-march30.webp', title: 'March 30 • Forest lighting', source: 'media/drone/2020/drone_raw/DJI_0104.MP4', description: 'Night footage confirms installed horizontal lights late in the season.' },
-];
 const FEATURES = ['portal', 'container', 'canopy', 'forest', 'geodesic', 'mcda', 'trees', 'tent'];
 const LABELS: Record<string, string> = {
   portal: 'Portal / climbing decks', container: 'Solar mural container', canopy: 'Canopy workshop',
-  forest: 'The Forest', geodesic: 'Geodesic sphere', mcda: 'MCDA', trees: 'Desert trees', tent: 'Camp tent',
+  forest: 'The Forest', geodesic: 'Geodesic sphere', mcda: 'MCDA', trees: 'Sophia’s trees', tent: 'Camp tent',
 };
 type ViewerApi = {
   focus: (id: string) => void;
@@ -48,7 +36,6 @@ export default function Brahman2020() {
   const [mode, setMode] = useState('inspect');
   const [cut, setCut] = useState('complete');
   const [surface, setSurface] = useState('source');
-  const [evidence, setEvidence] = useState(0);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
   useEffect(() => {
@@ -245,7 +232,7 @@ export default function Brahman2020() {
       forest: ['The Forest', 'high', 'March 9 and 30 drone footage'],
       geodesic: ['Geodesic sphere', 'high', 'March 4 aerial'],
       mcda: ['MCDA plywood shack', 'low', 'Ground photos and March 18 dusk footage; approximate position beside the Forest'],
-      trees: ['desert tree row', 'medium', 'March 19–20 ground photographs; exact parcel position uncertain'],
+      trees: ['Sophia’s tree row', 'medium', 'March 19–20 ground photographs; exact parcel position uncertain'],
       tent: ['Conical camp tent', 'medium', 'March 4 aerial'],
     };
     if (!data[id]) return undefined;
@@ -288,7 +275,6 @@ export default function Brahman2020() {
           <button onClick={() => api.current?.reset()}>Reset layout</button>
         </div>
         <div className="brahman-hud">{walking ? 'WASD move · Arrows turn / look · Space jump · Shift sprint · Esc exit' : 'Drag orbit · Wheel zoom · Click a structure'}</div>
-        <div className="brahman-source"><button onClick={() => setEvidence((evidence + EVIDENCE.length - 1) % EVIDENCE.length)} aria-label="Previous evidence">‹</button><img src={EVIDENCE[evidence].image} alt={EVIDENCE[evidence].title}/><div><b>{EVIDENCE[evidence].title}</b><span>{EVIDENCE[evidence].description}</span><small>{EVIDENCE[evidence].source}</small></div><button onClick={() => setEvidence((evidence + 1) % EVIDENCE.length)} aria-label="Next evidence">›</button></div>
         {error && <div className="brahman-error" role="alert">{error}</div>}
       </section>
     </div>

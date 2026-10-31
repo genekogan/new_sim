@@ -1,7 +1,7 @@
 // A fork of an old world (eden, mars, littlemartians) as a world-launcher child (lane FORKS, 2026-10-11).
 // The old worlds keep main's (e8) path: the same entry points as the laptop writers (tools/core/edge-server.mjs for
 // Eden, tools/core/multiworld/world-server.mjs for Mars/LM) and the same option mapping as Codex's runner
-// (successor-world-run.mjs; eden2 copy tools/world-launcher/deploy/old-worlds/run-world.mjs), but served under the
+// (successor-world-run.mjs), but served under the
 // launcher's base (<base>/w/<key>) on a launcher child port, from this release's code, with the launcher's build id.
 //
 //   node --experimental-transform-types [--env-file=<clerk.env>] tools/world-launcher/fork-world.mjs <fork.json>

@@ -16,7 +16,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { findPlaywright } from '../god-skill/lib/look.mjs';
-import { chromeLease } from '<team>/ops/chrome-lease.mjs';
+const { chromeLease } = await import(process.env.CHROME_LEASE_MODULE ?? '../god-skill/lib/chrome-lease.mjs');
 
 const require = createRequire(import.meta.url);
 const args = process.argv.slice(2);
