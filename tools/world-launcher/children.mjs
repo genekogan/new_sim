@@ -1,12 +1,14 @@
 // World processes behind the launcher: one `apps/server/src/main.ts` per world on
 // a free port from a private range, edge minds (no server thinking), dev auth, its own data dir.
-// Crashed children restart with exponential backoff; a stop is final.
+// Crashed and wedged children restart with full-jitter backoff, held after too many failures; a stop is final.
+// Lane L1 (LOAD-CONTRACT §4): running worlds are watched (guard()), boots are judged by progress, not a deadline.
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
 import { SLUG_RE } from './registry.mjs';
+import { GUARD, bootMark, jitterMs, liveWedge, readLive } from './guard.mjs';
 const STRIP_HOOK = 'apps/server/src/strip-cache.mjs'; // lane BOOT2 (defaultCommand)
 
 /** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
@@ -15,7 +17,10 @@ export const STANDBY_MARK = '[standby] ready';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** `p`, or undefined after `ms` (the timer does not outlive it). */
 const within = (p, ms) => { let t; return Promise.race([p, new Promise((r) => { t = setTimeout(r, ms); })]).finally(() => clearTimeout(t)); };
-export const backoffMs = (n) => Math.min(30_000, 500 * 2 ** Math.max(0, n));
+/** Restart wait after the n-th failure in a row: full jitter, 1 s base, 5 min cap (guard.mjs). */
+/** The exit code of a world that asks to be restarted (apps/server main.ts: black for 60 s, snapshot saved): no backoff. */
+export const PLANNED_EXIT = 75;
+export const backoffMs = (n, random = Math.random, g = GUARD) => jitterMs(n, g, random);
 
 /** True when nothing listens on 127.0.0.1:port (we can bind it ourselves). */
 export function portFree(port) {
@@ -39,6 +44,7 @@ export class ChildPool {
    * stopGraceMs: how long stop() waits after SIGTERM before SIGKILL (10 s; tests shorten it).
    * sleepMs (lane P3): freezeIdle() freezes a world nobody asked anything for that long (see there); 0/absent: never.
    * exitMs (lane SLEEP): releaseIdle() lets a world frozen that long more exit, giving its memory back (see there).
+   * guard (lane L1): overrides of guard.mjs GUARD (tests); random: the backoff's jitter source (tests).
    */
   constructor(o) {
     this.o = o;
@@ -47,6 +53,8 @@ export class ChildPool {
     /** Handed over to a newer launcher (keeper.mjs): no world of this pool may start or restart again. */
     this.fenced = false;
     this.gate = null; this.inflight = new Map();   // boot promise -> its kid
+    this.g = { ...GUARD, ...(o.guard ?? {}) }; this.random = o.random ?? Math.random; this.guardTimer = null;
+    this.log = o.log ?? (() => {});
     mkdirSync(o.logDir, { recursive: true });
   }
 
@@ -102,6 +110,7 @@ export class ChildPool {
   /** Start the world's next process in standby (SIM_STANDBY=1, apps/server/src/standby.ts) on its current port, which
    *  is free again once the previous process is released; resolves when it reports its code loaded. */
   async standby(k, timeoutMs = 60_000) {
+    k.healthPort = await this.pickHealthPort(k, k.port);
     const t0 = Date.now(), run = this.launch(k, k.port, { SIM_STANDBY: '1' }, { rotate: false });
     await new Promise((yes, no) => {
       let buf = '';
@@ -227,7 +236,7 @@ export class ChildPool {
   /** Wake a frozen world (SIGCONT); it counts as just used unless `use` is false (a passive read: it may sleep again soon). */
   thaw(k, { use = true } = {}) {
     if (!k?.frozen) return;
-    k.frozen = false; k.frozenAt = null; if (use) k.lastUsed = Date.now();
+    k.frozen = false; k.frozenAt = null; k.thawedAt = Date.now(); if (use) k.lastUsed = Date.now();
     try { k.child?.kill('SIGCONT'); } catch { /* gone */ }
     this.o.onChange?.(k.slug);
   }
@@ -235,10 +244,22 @@ export class ChildPool {
   status(slug) {
     const k = this.kids.get(slug);
     if (!k) return { status: 'stopped' };
-    return { status: k.frozen || (k.asleep && k.status === 'stopped') ? 'asleep' : k.status, ...(k.frozen ? { frozen: true } : {}), port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
+    return { status: k.frozen || (k.asleep && k.status === 'stopped') ? 'asleep' : k.status, ...(k.frozen ? { frozen: true } : {}), port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit,
+      ...(k.restartsBy ? { restartsByReason: { ...k.restartsBy } } : {}), ...(k.lastBootMs != null ? { lastBootMs: k.lastBootMs } : {}), ...(k.healthPort ? { healthPort: k.healthPort } : {}), ...(k.held ? { held: { ...k.held } } : {}), ...(k.wedging ? { wedging: { ...k.wedging } } : {}),
+      ...(k.boot && (k.status === 'starting' || k.status === 'handover') ? { boot: { ...k.boot } } : {}), ...(k.nextTryAt && k.status === 'restarting' ? { nextTryAt: k.nextTryAt } : {}),
+      ...(k.live ? { level: k.live.level ?? null } : {}) };
   }
   /** Ports held by live or (re)starting children; a sleeping world's old port is free for anyone. */
-  usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).map((k) => k.port).filter(Boolean)); }
+  usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).flatMap((k) => [k.port, k.healthPort]).filter(Boolean)); }
+  /** The world's watchdog port (SIM_HEALTH_PORT, LOAD-CONTRACT §4; healthPorts option): a second port from the range,
+   *  searched from its top so it does not take the port a world prefers; none free: the world runs without one. */
+  async pickHealthPort(k, mainPort) {
+    if (!this.o.healthPorts) return null;
+    const [lo, hi] = this.o.range, used = this.usedPorts(k.slug);
+    const prefer = k.healthPort && k.healthPort !== mainPort && !used.has(k.healthPort) ? [k.healthPort] : [];
+    for (const p of [...prefer, ...Array.from({ length: hi - lo + 1 }, (_, i) => hi - i)]) if (p !== mainPort && !used.has(p) && await portFree(p)) return p;
+    return null;
+  }
   async pickPort(prefer, self) {
     const [lo, hi] = this.o.range, used = this.usedPorts(self);
     if (prefer && prefer >= lo && prefer <= hi && !used.has(prefer) && await portFree(prefer)) return prefer;
@@ -256,16 +277,35 @@ export class ChildPool {
     if (k && !passive) k.lastUsed = Date.now();
     if (k?.frozen) this.thaw(k, { use: !passive });
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
-    if (k?.ready) return k.ready;
+    // held (lane L1 breaker): too many failures in a row; nothing restarts it but an operator's resume()
+    if (k?.held) { const e = new Error(`world ${world.slug} is resting after ${k.held.failures} failures in ${Math.round(this.g.breakerWindowMs / 60_000)} min (last: ${k.held.reason}); an operator resumes it`); e.code = 'held'; return Promise.reject(e); }
+    if (k?.ready) return this.waitFor(k.ready, timeoutMs, world.slug);
     // adopted but its handover failed: the previous launcher may still hold its database, so it is never started here
     if (k?.adopted) { const e = new Error(`world ${world.slug} could not be taken over from the previous launcher${k.lastError ? `: ${k.lastError}` : ''}`); e.code = 'handover-failed'; return Promise.reject(e); }
     k = k ?? { slug: world.slug, world, restarts: 0, crashes: 0, status: 'starting', port: null, child: null, upSince: null, lastExit: null, ready: null, stopped: false, lastUsed: Date.now() };
     k.world = world; k.stopped = false; k.abandoned = false;
-    if (k.timer) { clearTimeout(k.timer); k.timer = null; }  // someone is waiting: restart now, not after the backoff
     this.kids.set(world.slug, k);
+    // restarting after failures in a row: the visitor waits for the scheduled try, so traffic cannot defeat the backoff;
+    // after a single crash someone waiting restarts it now, as before
+    if (k.timer && k.crashes > 1) return this.waitFor(k.pending.p, timeoutMs, world.slug);
+    if (k.timer) { clearTimeout(k.timer); k.timer = null; }
     k.ready = this.boot(k, timeoutMs).finally(() => { k.ready = null; });
-    return k.ready;
+    // a boot a visitor started fails: not retried here (the next visit tries again), but it counts toward the breaker,
+    // so a world that cannot boot is held instead of booted by every visit
+    k.ready.catch((e) => { if (!['capacity', 'handed-over', 'stopping'].includes(e.code) && !k.stopped && !this.closing && !this.fenced) this.noteFailure(k, e.reason ?? 'boot'); });
+    this.settlePending(k, k.ready);
+    return this.waitFor(k.ready, timeoutMs, world.slug);
   }
+  /** The caller's own wait for a boot (ensure's timeoutMs): past it the caller is refused (code 'starting'), and the boot
+   *  itself goes on, judged by its progress (healthy()). */
+  waitFor(p, ms, slug) {
+    if (!(ms > 0) || !Number.isFinite(ms)) return p;
+    let t;
+    const late = new Promise((_, no) => { t = setTimeout(() => { const e = new Error(`world ${slug} is still starting after ${Math.round(ms / 1000)} s`); e.code = 'starting'; no(e); }, ms); t.unref?.(); });
+    return Promise.race([p, late]).finally(() => clearTimeout(t));
+  }
+  /** Callers waiting on a scheduled restart get that boot (or its refusal). */
+  settlePending(k, v) { const w = k.pending; if (!w) return; k.pending = null; w.resolve(v instanceof Error ? Promise.reject(v) : v); }
 
   /** Live (or booting) children other than `except`. */
   running(except) { return [...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).length; }
@@ -302,7 +342,7 @@ export class ChildPool {
       if (!(await this.evictIdle(k.slug))) throw e;
       for (let i = 0; ; i++) { try { port = await this.pickPort(k.port ?? k.world.port, k.slug); break; } catch (again) { if (i >= 50) throw again; await sleep(100); } }  // the sleeper's socket takes a moment to close
     }
-    k.port = port; k.asleep = false;
+    k.port = port; k.asleep = false; k.healthPort = await this.pickHealthPort(k, port);
     if (k.abandoned) { k.status = 'failed'; this.o.onChange?.(k.slug); throw new Error(`world ${k.slug}: boot abandoned for a handover`); }
     const run = this.launch(k, port);
     this.attach(k, run);
@@ -316,55 +356,198 @@ export class ChildPool {
     if (rotate) rotateLog(logFile);
     const log = createWriteStream(logFile, { flags: 'a' });
     log.write(`\n--- ${new Date().toISOString()} start ${k.slug} on :${port} (restart ${k.restarts})${extraEnv.SIM_STANDBY ? ' standby' : ''}\n`);
-    const child = spawn(cmd, args, { cwd: this.o.root, env: { ...env, ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(cmd, args, { cwd: this.o.root, env: { ...env, ...(k.healthPort ? { SIM_HEALTH_PORT: String(k.healthPort) } : {}), ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
     const run = { child, port, script: args.find((a) => !a.startsWith('-')) ?? args[0], exited: false };
     child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
+    // a boot's progress, when the world writes no live.json: its output (healthy())
+    const out = () => { run.lastOutputAt = Date.now(); }; child.stdout.on('data', out); child.stderr.on('data', out);
     child.once('exit', (code, signal) => { run.exited = true; log.end(`--- exit ${code ?? signal}\n`); this.onExit(k, child, code, signal); });
     child.once('error', (e) => { log.write(`--- spawn error ${e.message}\n`); });
     return run;
   }
   /** The process becomes this world's child (crash restarts, stop, pid file). */
   attach(k, run) { k.child = run.child; k.script = run.script; this.savePids(); }
-  /** Resolve with the port once the world answers /healthz; a process that exits or never answers fails the boot. */
-  async healthy(k, run, timeoutMs) {
-    const { child, port } = run;
+  /** Resolve with the port once the world answers /healthz; a process that exits fails the boot. There is no deadline
+   *  (lane L1, LOAD-CONTRACT §4): a boot is killed only when its progress has not moved for bootStallMs: live.json's boot
+   *  stage/tick when the world writes one, else its output or its 503 body (then silentBootStallMs). A slow replay that
+   *  keeps moving lives; each kill used to throw its progress away (10-24: 8 SIGKILLs in a row). */
+  async healthy(k, run) {
+    const { child, port } = run, g = this.g;
     const health = `http://127.0.0.1:${port}${(this.o.healthPath ?? ((s) => `/w/${s}/healthz`))(k.slug)}`;
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline && !run.exited && !k.stopped) {
-      try { const r = await fetch(health, { signal: AbortSignal.timeout(1500) }); if (r.ok) { k.status = 'running'; k.upSince = Date.now(); this.o.onChange?.(k.slug); return port; } } catch { /* booting */ }
-      await sleep(25);   // (P5: was 150 ms, ~75 ms of a visitor's wait for a cold world; a refused connect costs ~nothing)
+    const liveFile = k.world?.dataDir ? join(k.world.dataDir, 'live.json') : null;
+    const t0 = Date.now(); let mark = null, movedAt = t0, sawLive = false;
+    k.boot = { since: t0, movedAt: t0, stage: null, tick: null, target: null };
+    while (!run.exited && !k.stopped) {
+      let body = null;
+      try {
+        const r = await fetch(health, { signal: AbortSignal.timeout(1500) });
+        if (r.ok) {
+          k.status = 'running'; k.upSince = Date.now(); k.lastBootMs = k.upSince - t0; k.boot = null; k.health = { fails: 0, okAt: k.upSince };
+          if (k.lastBootMs > g.bootSlowMs) this.log(`world ${k.slug} booted in ${Math.round(k.lastBootMs / 1000)} s`);
+          this.o.onChange?.(k.slug); return port;
+        }
+        body = r.status === 503 ? (await r.text()).slice(0, 256) : null;
+      } catch { /* booting */ }
+      const live = liveFile ? readLive(liveFile, child.pid) : null, now = Date.now();
+      if (live) sawLive = true;
+      const m = bootMark(live, run.lastOutputAt, body);
+      if (m !== mark) { mark = m; movedAt = now; }
+      k.boot = { since: t0, movedAt, stage: live?.boot?.stage ?? live?.phase ?? null, tick: live?.boot?.tick ?? null, target: live?.boot?.target ?? null };
+      if (now - movedAt > (sawLive ? g.bootStallMs : g.silentBootStallMs)) break;
+      await sleep(now - t0 < 5_000 ? 25 : 250);   // (P5: 25 ms while a visitor may be waiting on a fast boot)
     }
+    const stalled = !run.exited && !k.stopped, since = Math.round((Date.now() - k.boot.movedAt) / 1000);
     if (!run.exited) child.kill('SIGKILL');
-    k.status = 'failed'; this.o.onChange?.(k.slug);
-    throw new Error(run.exited ? `world ${k.slug} exited while booting (see ${join(this.o.logDir, k.slug + '.log')})` : `world ${k.slug} did not answer /healthz within ${timeoutMs / 1000}s`);
+    k.status = 'failed'; k.boot = null; this.o.onChange?.(k.slug);
+    const e = new Error(run.exited ? `world ${k.slug} exited while booting (see ${join(this.o.logDir, k.slug + '.log')})` : stalled ? `world ${k.slug} boot made no progress for ${since} s (killed ${Math.round((Date.now() - t0) / 1000)} s into it)` : `world ${k.slug}: boot stopped`);
+    e.reason = stalled ? 'boot-stalled' : 'boot';
+    if (stalled) this.log(e.message);
+    throw e;
   }
 
   onExit(k, child, code, signal) {
     if (k.child !== child) return;
-    k.child = null; k.frozen = false; k.lastExit = { code, signal, at: Date.now() }; this.savePids();
+    const wedged = k.wedging; k.wedging = null;
+    k.child = null; k.frozen = false; k.lastExit = { code, signal, at: Date.now(), ...(wedged ? { reason: `wedged: ${wedged.reason}` } : {}) }; this.savePids();
     if (this.closing || k.stopped || this.fenced) { k.status = 'stopped'; this.o.onChange?.(k.slug); return; }
     if (k.status === 'starting') return;  // boot() reports it (to ensure()'s caller, or to the restart loop)
-    this.scheduleRestart(k);
+    // exit 75 (LOAD-CONTRACT §4): the world asked for a planned restart (black too long; its snapshot is saved): at once
+    const planned = !wedged && code === PLANNED_EXIT;
+    this.log(`world ${k.slug} exited (${code ?? signal})${wedged ? ` after it was found wedged: ${wedged.reason}` : planned ? ': a planned restart' : ''}`);
+    this.scheduleRestart(k, wedged ? 'wedged' : planned ? 'planned' : 'exit');
   }
-  /** A crash after a good run: restart with backoff (the count resets after a minute of health). */
-  scheduleRestart(k) {
-    if (k.upSince && Date.now() - k.upSince > 60_000) k.crashes = 0;
-    const wait = backoffMs(k.crashes++);
-    k.status = 'restarting'; k.restarts++; k.upSince = null; k.nextTryAt = Date.now() + wait; this.o.onChange?.(k.slug);
+  /** A crash, a wedge or a failed restart (lane L1): restart after a full-jitter backoff (1 s base, 5 min cap; the count
+   *  resets after 10 min healthy). breakerN failures within breakerWindowMs: held, no more restarts until resume().
+   *  A refusal for capacity (no memory or slot) is retried the same way but is not the world's failure. */
+  scheduleRestart(k, reason = 'exit') {
+    const g = this.g, now = Date.now();
+    if (k.upSince && now - k.upSince > g.resetAfterMs) k.crashes = 0;
+    k.upSince = null;
+    if (reason === 'wedged') k.lastWedge = { at: now, reason: k.lastExit?.reason ?? 'wedged' };
+    if (reason !== 'capacity' && reason !== 'planned' && this.noteFailure(k, reason)) return;
+    const wait = reason === 'planned' ? 0 : backoffMs(k.crashes++, this.random, g);
+    k.restartsBy = { ...(k.restartsBy ?? {}), [reason]: (k.restartsBy?.[reason] ?? 0) + 1 };
+    k.status = 'restarting'; k.restarts++; k.nextTryAt = now + wait; this.o.onChange?.(k.slug);
+    this.log(`world ${k.slug} restarts in ${(wait / 1000).toFixed(1)} s (${reason}; failure ${k.failures?.length ?? 0} of ${g.breakerN} in ${Math.round(g.breakerWindowMs / 60_000)} min)`);
+    if (!k.pending) { let resolve; const p = new Promise((r) => { resolve = r; }); p.catch(() => {}); k.pending = { p, resolve }; }
+    if (k.timer) clearTimeout(k.timer);
     k.timer = setTimeout(() => {
       k.timer = null;
-      if (this.closing || k.stopped || this.fenced) return;
-      k.ready = this.boot(k, 90_000).finally(() => { k.ready = null; });
-      k.ready.catch((e) => { k.lastError = e.message; if (!this.closing && !k.stopped) this.scheduleRestart(k); });
+      if (this.closing || k.stopped || this.fenced) { this.settlePending(k, Object.assign(new Error(`world ${k.slug} was stopped`), { code: 'stopping' })); return; }
+      k.ready = this.boot(k).finally(() => { k.ready = null; });
+      k.ready.catch((e) => { k.lastError = e.message; if (!this.closing && !k.stopped && !this.fenced) this.scheduleRestart(k, e.code === 'capacity' ? 'capacity' : e.reason ?? 'boot'); });
+      this.settlePending(k, k.ready);
     }, wait);
+  }
+  /** One failure (crash, failed boot, wedge) into the breaker's window; true when it tripped (the world is now held). */
+  noteFailure(k, reason) {
+    const g = this.g, now = Date.now();
+    k.failures = [...(k.failures ?? []).filter((t) => now - t < g.breakerWindowMs), now];
+    if (k.failures.length < g.breakerN) return false;
+    this.hold(k, reason); return true;
+  }
+  /** The breaker (lane L1): no more restarts; host-health shows it; resume() (op resume-world, the health page) ends it. */
+  hold(k, reason) {
+    if (k.timer) { clearTimeout(k.timer); k.timer = null; }
+    k.held = { at: Date.now(), reason, failures: k.failures?.length ?? 0 };
+    k.status = 'held'; k.nextTryAt = null; this.o.onChange?.(k.slug);
+    const e = new Error(`world ${k.slug} is resting after ${k.held.failures} failures (last: ${reason})`); e.code = 'held';
+    this.settlePending(k, e);
+    this.log(`world ${k.slug} held: ${k.held.failures} failures in ${Math.round(this.g.breakerWindowMs / 60_000)} min (last: ${reason}); no more restarts until an operator resumes it`);
+  }
+  /** End a hold: the failure count starts again; the next request (or the caller's ensure) boots it. */
+  resume(slug) {
+    const k = this.kids.get(slug);
+    if (!k?.held) return false;
+    this.log(`world ${slug} resumed (was held since ${new Date(k.held.at).toISOString()}: ${k.held.reason})`);
+    k.held = null; k.failures = []; k.crashes = 0; k.status = 'stopped'; this.o.onChange?.(slug);
+    return true;
+  }
+
+  // ---------- the guard over running worlds (lane L1, LOAD-CONTRACT §4)
+  /** Look at every running world every pollMs (the launcher starts this; tests may call guard() themselves). */
+  startGuard() { if (this.guardTimer) return; this.guardTimer = setInterval(() => { void this.guard(); }, this.g.pollMs); this.guardTimer.unref?.(); }
+  stopGuard() { if (this.guardTimer) clearInterval(this.guardTimer); this.guardTimer = null; }
+  async guard() {
+    if (this.closing || this.fenced || this.gate) return;   // (a handover being prepared owns the processes)
+    await Promise.all([...this.kids.values()].map((k) => this.look(k)));
+  }
+  /** One look at a running world: /healthz answered at all within timeoutMs (any status: it is not stuck), and its
+   *  live.json when it writes one. failures looks in a row, or a stale live.json: wedged. */
+  async look(k) {
+    const c = k.child, g = this.g;
+    if (!c || k.status !== 'running' || k.frozen || k.adopted || k.ready || k.stopped || k.stopping || k.wedging || k.looking) return;
+    k.looking = true;
+    try {
+      const { ok, why: said } = await this.ask(k);
+      if (k.child !== c || k.status !== 'running' || k.frozen || k.stopped || k.stopping || this.closing || this.fenced || this.gate) return;   // changed meanwhile
+      const now = Date.now(), h = k.health ?? (k.health = { fails: 0, okAt: null });
+      if (ok) { h.fails = 0; h.okAt = now; } else h.fails++;
+      k.live = k.world?.dataDir ? readLive(join(k.world.dataDir, 'live.json'), c.pid) : null;
+      if (said) h.said = said; else if (ok) h.said = null;
+      const why = this.liveWhy(k, now) ?? (h.fails >= g.failures ? `${h.said ?? '/healthz unanswered'} ${h.fails} times in a row` : null);
+      if (why) void this.wedge(k, why);
+    } finally { k.looking = false; }
+  }
+  /** Is the world stuck? Its watchdog thread's /healthz (SIM_HEALTH_PORT) when it has one: 200 = fine, 503 while serving
+   *  = the main thread is stuck (it answers from another thread), no answer = the whole process is. Refused there (a
+   *  release without the watchdog, or SIM_WATCHDOG=0): the main /healthz, where any answer at all counts as alive. */
+  async ask(k) {
+    const g = this.g;
+    if (k.healthPort) {
+      try {
+        const r = await fetch(`http://127.0.0.1:${k.healthPort}/healthz`, { signal: AbortSignal.timeout(g.timeoutMs) });
+        const b = await r.json().catch(() => null);
+        if (r.ok || (b?.phase && b.phase !== 'serving')) return { ok: true };   // (stopping, or a boot phase: not judged here)
+        return { ok: false, why: `watchdog: main thread stuck ${Math.round((b?.loop?.lastTurnAgeMs ?? 0) / 1000)} s` };
+      } catch (e) {
+        if (e?.cause?.code !== 'ECONNREFUSED') return { ok: false, why: 'watchdog unanswered' };
+      }
+    }
+    try { const r = await fetch(`http://127.0.0.1:${k.port}${(this.o.healthPath ?? ((s) => `/w/${s}/healthz`))(k.slug)}`, { signal: AbortSignal.timeout(g.timeoutMs) }); await r.arrayBuffer().catch(() => {}); return { ok: true }; }
+    catch { return { ok: false, why: '/healthz unanswered' }; }
+  }
+  /** live.json's verdict, once the world has been up (or awake again after a freeze) long enough to have written one. */
+  liveWhy(k, now = Date.now()) {
+    if (!k.live || now - Math.max(k.upSince ?? 0, k.thawedAt ?? 0) < this.g.liveStaleMs) return null;
+    return liveWedge(k.live, now, this.g);
+  }
+  /** Wedged: SIGUSR2 (the world's diagnostic report; it may ignore it), then SIGTERM, then SIGKILL; onExit restarts it. */
+  async wedge(k, why) {
+    const c = k.child, g = this.g;
+    if (!c || k.wedging) return;
+    k.wedging = { reason: why, at: Date.now() }; this.o.onChange?.(k.slug);
+    this.log(`world ${k.slug} wedged (${why}): SIGUSR2, SIGTERM after ${g.usr2WaitMs / 1000} s, SIGKILL ${g.termGraceMs / 1000} s later`);
+    const exited = () => c.exitCode !== null || c.signalCode !== null;
+    const exit = exited() ? Promise.resolve() : new Promise((r) => c.once('exit', r));
+    try { c.kill('SIGUSR2'); } catch { /* gone */ }
+    await within(exit, g.usr2WaitMs);
+    if (!exited()) { this.log(`world ${k.slug} still running after SIGUSR2: SIGTERM`); try { c.kill('SIGTERM'); } catch { /* gone */ } await within(exit, g.termGraceMs); }
+    if (!exited()) { this.log(`world ${k.slug} still running after SIGTERM: SIGKILL`); try { c.kill('SIGKILL'); } catch { /* gone */ } }
+  }
+  /** What host-health and /__sim/healthz show (LOAD-CONTRACT §4): wedged, held, crashloop, bootSlow. */
+  problems(now = Date.now()) {
+    const g = this.g, out = [], s = (ms) => `${Math.round(ms / 1000)} s`;
+    for (const k of this.kids.values()) {
+      const recent = (k.failures ?? []).filter((t) => now - t < g.breakerWindowMs).length;
+      if (k.held) out.push({ slug: k.slug, code: 'held', text: `${k.slug} held since ${new Date(k.held.at).toISOString()} after ${k.held.failures} failures (last: ${k.held.reason}); resume: op.mjs resume-world --slug ${k.slug}` });
+      else if (recent >= g.crashloopN) out.push({ slug: k.slug, code: 'crashloop', text: `${k.slug} failed ${recent} times in ${Math.round(g.breakerWindowMs / 60_000)} min (${k.status})` });
+      const suspect = k.status === 'running' && !k.frozen && ((k.health?.fails ?? 0) >= g.suspectFailures ? `${k.health.said ?? '/healthz unanswered'} (${k.health.fails} looks in a row)` : this.liveWhy(k, now));
+      if (k.wedging) out.push({ slug: k.slug, code: 'wedged', text: `${k.slug} wedged (${k.wedging.reason}) ${s(now - k.wedging.at)} ago; being restarted` });
+      else if (suspect) out.push({ slug: k.slug, code: 'wedged', text: `${k.slug} not answering: ${suspect}` });
+      else if (k.lastWedge && now - k.lastWedge.at < g.wedgeShownMs) out.push({ slug: k.slug, code: 'wedged', text: `${k.slug} was wedged ${s(now - k.lastWedge.at)} ago (${k.lastWedge.reason}); restarted` });
+      if (k.status === 'starting' && k.boot && now - k.boot.since > g.bootSlowMs) out.push({ slug: k.slug, code: 'bootSlow', text: `${k.slug} booting for ${s(now - k.boot.since)}${k.boot.stage ? ` (${k.boot.stage}${k.boot.tick != null ? ` ${k.boot.tick}${k.boot.target ? `/${k.boot.target}` : ''}` : ''})` : ''}; last progress ${s(now - k.boot.movedAt)} ago` });
+    }
+    return out;
   }
 
   async stop(slug) {
     const k = this.kids.get(slug); if (!k) return;
     if (k.adopted) return;   // the previous launcher's child: only it stops it (handover release)
     if (k.stopping) return k.stopping;
-    k.stopped = true; if (k.timer) clearTimeout(k.timer);
-    const c = k.child; if (!c) { k.status = 'stopped'; return; }
+    k.stopped = true; if (k.timer) { clearTimeout(k.timer); k.timer = null; }
+    this.settlePending(k, Object.assign(new Error(`world ${slug} was stopped`), { code: 'stopping' }));
+    const c = k.child; if (!c) { if (!k.held) k.status = 'stopped'; return; }
     k.stopping = this.stopChild(k, c).finally(() => { k.stopping = null; });
     return k.stopping;
   }
@@ -378,7 +561,7 @@ export class ChildPool {
     if (!exited()) { c.kill('SIGKILL'); await within(exit, 5_000); }
     k.status = 'stopped';
   }
-  async closeAll() { this.closing = true; await Promise.all([...this.kids.keys()].map((s) => this.stop(s))); }
+  async closeAll() { this.closing = true; this.stopGuard(); await Promise.all([...this.kids.keys()].map((s) => this.stop(s))); }
 }
 
 export const EYES_ENV = ['EDGE_EYES', 'EDGE_EYES_GPU', 'EDGE_EYES_SOUL_SECONDS', 'EDGE_EYES_GLOBAL_PER_MINUTE', 'EDGE_EYES_TIMEOUT_SECONDS', 'EDGE_EYES_RELOAD_HOURS', 'EDGE_EYES_NICE', 'EDGE_EYES_CPUS', 'EDGE_EYES_CHROME_ARGS', 'PLAYWRIGHT_BROWSERS_PATH', 'SIM_RENDER_LOCK_DIR', 'GOD_LOOK_CHROME', 'EDEN_GOD_GL'];

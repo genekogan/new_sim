@@ -52,7 +52,7 @@ test('templates: empty first, hello hamlet next, broken files skipped', () => {
   const t = listTemplates(templatesDir).map((x) => x.id);
   assert.deepEqual(t, ['empty', 'hello-hamlet', 'island']);
   assert.deepEqual(listTemplates(templatesDir, { all: true }).map((x) => x.id), ['empty', 'hello-hamlet', 'island', 'retired'], 'a hidden template is still found for worlds made from it');
-  assert.equal(backoffMs(0), 500); assert.equal(backoffMs(3), 4000); assert.equal(backoffMs(20), 30000);
+  assert.equal(backoffMs(0, () => 0.5), 500); assert.equal(backoffMs(3, () => 0.5), 4000); assert.equal(backoffMs(20, () => 0.5), 150_000);   // full jitter (lane L1): uniform under min(5 min, 1 s * 2^n)
 });
 test('homepage and assets come from the web build', async () => {
   const r = await api('/'); assert.equal(r.status, 200); assert.match(await r.text(), /<title>Sim/);

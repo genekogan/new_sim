@@ -47,6 +47,7 @@ const usage = () => {
     + '       op.mjs set-unlisted --port <launcher port> [--base /worlds] --slug <slug> --unlisted true|false\n'
     + '       op.mjs set-limits --port <launcher port> [--base /worlds] --slug <slug> --limits \'{"worldBudgetRps":20,"ipListen":null}\'\n'
     + '       op.mjs set-heap --port <launcher port> [--base /worlds] --slug <slug> --mb <256-8192|default>\n'
+    + '       op.mjs resume-world --port <launcher port> [--base /worlds] --slug <slug>   (a world held after 5 failures in 30 min)\n'
     + '       op.mjs archive-world --port <launcher port> [--base /worlds] --slug <slug> [--reason <text>]\n'
     + '       op.mjs restore-world --port <launcher port> [--base /worlds] --id <archive id>\n'
     + '       op.mjs list-archive --port <launcher port> [--base /worlds]\n'
@@ -83,6 +84,9 @@ if (cmd === 'create-world') {
 } else if (cmd === 'set-heap') {
   if (!flag('port') || !flag('slug') || !flag('mb')) usage();
   body = { slug: flag('slug'), worldHeapMb: flag('mb') === 'default' ? null : Number(flag('mb')) };
+} else if (cmd === 'resume-world') {
+  if (!flag('port') || !flag('slug')) usage();
+  body = { slug: flag('slug') };
 } else if (cmd === 'archive-world') {
   if (!flag('port') || !flag('slug')) usage();
   body = { slug: flag('slug'), ...(flag('reason') ? { reason: flag('reason') } : {}) };
