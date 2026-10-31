@@ -75,14 +75,20 @@ edge, god mode for world creators, and a vendored deterministic engine under `ma
 
 ## Agent lifecycle
 
-- Work starts from an issue; one branch or worktree per piece of work; small, reviewed pull requests. Proof goes in
-  the PR, not the tree: no status, brief, prompt or report files.
+- Work starts from an issue you claim (assign + `agent:claimed`); one branch `agent/<issue>-<slug>` and worktree per
+  issue; small PRs; unfinished work behind a flag. Proof goes in the PR, not the tree: no status, brief, prompt or
+  report files. No scheduled agents: the maintainer starts them and gives go-aheads.
+- Never edit shared append-only files: changelog fragments go in `changes/`, conformance changes in a new supplement,
+  generated output is built in CI, baselines are regenerated in their own commit.
+- Ready PRs get `merge:ready`; the merge train rebases, re-tests and merges (T0–T2 on green, T3–T4 after the
+  maintainer). [docs/process/agent-workflow.md](docs/process/agent-workflow.md)
 - Each PR names its proof tier ([PROOF-POLICY.yml](docs/process/PROOF-POLICY.yml); `node tools/proof/tier.mjs`) and
   adds a changelog fragment in [`changes/`](changes/README.md) unless it is labelled `no-changelog`.
 - "Done" means walked on the real URL with real input; a scripted e2e alone doesn't count. Visual evidence is uncut,
   real-speed video. [docs/process/](docs/process/agent-lifecycle.md)
 - Bug fixes need no approval. Destructive production deletes need the maintainer's explicit yes.
-- Repo skills: `.claude/skills/` (plain Markdown, readable by any agent). Agent definitions: `.claude/agents/`.
+- Repo skills in `.claude/skills/` (plain Markdown, readable by any agent): `triage`, `finish`, `proof`, `e2e`,
+  `sim-director`. Agent definitions in `.claude/agents/`: `lane`, `reviewer`.
 
 ## Release and operations
 

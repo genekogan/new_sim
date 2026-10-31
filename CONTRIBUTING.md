@@ -16,18 +16,32 @@ Details, environment variables and running other worlds: [docs/development.md](d
 ## The flow
 
 1. **Start from an issue.** Use the bug or feature template. For anything large, agree the approach in the issue
-   before writing code.
-2. **Branch** from `main`. One branch per issue; keep the change small and focused.
+   before writing code. Claim it before you start: assign it and add the `agent:claimed` label.
+2. **Branch** from `main` as `agent/<issue>-<slug>` (people may use any name). One branch per issue; keep the change
+   small and focused, and put unfinished work behind a flag that defaults to off.
 3. **Change and test.** Add or update tests with the code. Update the doc that describes any behaviour you change.
 4. **Prove it at your tier.** `node tools/proof/tier.mjs` prints your change's proof tier from
    [docs/process/PROOF-POLICY.yml](docs/process/PROOF-POLICY.yml). Visible changes need an uncut, real-speed clip of
    the changed journey on a fake-mind world; Soul, navigation and engine changes need a scenario playtest. See
    [docs/process/agent-lifecycle.md](docs/process/agent-lifecycle.md).
 5. **Add a changelog fragment** in `changes/` if people using Sim will notice the change: one line, written for them.
-   The format is in [changes/README.md](changes/README.md). Otherwise ask for the `no-changelog` label.
+   The format is in [changes/README.md](changes/README.md). Otherwise ask for the `no-changelog` label. Never edit
+   `CHANGELOG.md`; the release compiles it.
 6. **Open a pull request** from the template. Put proof (clips, logs) in the PR, never in the tree.
-7. **Review.** CI and a reviewer agent run on every push; answer each comment with a fix or a reason. The maintainer
-   reviews T3 changes and above.
+7. **Checks and review.** On every push these workflows run:
+   - `ci`: the checks your paths need; its `ci-ok` job is the one required check;
+   - `security`: gitleaks, the path guard (no databases, `.env`, agent or god files, or unlisted binaries) and the
+     scrub guard (no home paths, private hosts, IPs or personal emails in added lines);
+   - `changelog`: a valid fragment in `changes/` or the `no-changelog` label;
+   - `claude-review`: an automated review against [AGENTS.md](AGENTS.md) and the proof policy.
+
+   Answer each review comment with a fix or a reason. Mention `@claude` in a comment to ask follow-ups or have it push
+   a fix (the `claude` workflow).
+8. **Merge.** Label the PR `merge:ready`. The merge train rebases it onto `main`, re-tests and merges: T0–T2
+   automatically once green, T3 and above after the maintainer approves. If it can't rebase cleanly it labels the PR
+   `needs:rebase`. Details: [docs/process/agent-workflow.md](docs/process/agent-workflow.md).
+
+Releases are cut by the maintainer with the `release` workflow ([docs/release.md](docs/release.md)).
 
 ## Checks to run
 
@@ -45,8 +59,9 @@ What each check means and when to run it: [docs/testing.md](docs/testing.md). Do
 
 ## Baselines and pins
 
-A walk or bundle baseline update, or a conformance supplement, goes in its own commit with the reason in the message.
-Never edit an older conformance supplement. Reviewers read the numbers.
+A walk or bundle baseline update, or a conformance supplement, goes in its own commit with the reason in the message,
+regenerated after rebasing onto `main`. Add a new conformance supplement for your change; never edit an older one.
+Don't commit generated output that CI builds. Reviewers read the numbers.
 
 ## Commits
 

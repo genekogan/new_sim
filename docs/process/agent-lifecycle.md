@@ -15,9 +15,10 @@ Plans, briefs and status notes live in the issue and its comments, never in the 
 
 ## 2. Branch
 
-One branch, or one worktree, per issue. Keep the change small enough to review in one sitting; split a large piece of
-work into issues that each merge on their own. Several agents can work in parallel when their changes don't overlap;
-one coordinator decides the order of merges when they do.
+Claim the issue first (assign it and add `agent:claimed`), then work on one branch, `agent/<issue>-<slug>`, in its
+own worktree. Keep the change small enough to review in one sitting; split a large piece of work into issues that each
+merge on their own, and put unfinished work behind a flag that defaults to off. How many agents share the repository
+without coordinating: [agent workflow](agent-workflow.md).
 
 Keep the agent's context small: read with search and line ranges, run focused commands, and summarise large outputs in
 a file under `.local/` instead of pasting them. Start a fresh session rather than letting one grow without bound.
@@ -53,12 +54,14 @@ label. A change in behaviour updates its doc in the same PR.
 
 ## 6. Review
 
-CI runs the checks for the PR's paths; a reviewer agent reviews every push, and the author answers each comment with a
-fix or a reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
+CI runs the checks for the PR's paths (the required check is `ci-ok`); the `claude-review` workflow reviews every
+push, `@claude` answers follow-ups, and the author answers each comment with a fix or a reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
 
 ## 7. Merge
 
-Squash-merge to `main` once required checks pass. `main` is always releasable.
+Label the PR `merge:ready`. The merge train rebases it onto `main`, re-runs the required checks and merges: T0–T2
+automatically on green, T3–T4 after the maintainer approves. A conflict it cannot resolve gets `needs:rebase`. See
+[the merge train](agent-workflow.md#the-merge-train). `main` is always releasable.
 
 ## 8. Release
 

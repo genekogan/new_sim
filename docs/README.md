@@ -18,7 +18,8 @@ The code is the authority. When a doc and the code disagree, the code wins: fix 
 | run a playtest or direct a cast | [playtests](testing/playtests.md), [swarm director](testing/swarm-director.md) |
 | ship a release | [release](release.md) |
 | operate the production host | [operations](operations.md) |
-| take an issue to a merged PR as an agent | [agent lifecycle](process/agent-lifecycle.md) |
+| take an issue to a merged PR as an agent | [agent lifecycle](process/agent-lifecycle.md), [agent workflow](process/agent-workflow.md) |
+| know what a Mars building or place is | [Mars campus](mars/campus.md) |
 
 ## Contents
 
@@ -38,7 +39,7 @@ The code is the authority. When a doc and the code disagree, the code wins: fix 
   - [operations/](operations/): [runbook](operations/runbook.md), [disaster recovery](operations/disaster-recovery.md),
     [CDN](operations/cdn.md), [auth](operations/auth.md), [analytics](operations/analytics.md)
 - [process/](process/): how work gets done
-  - [agent lifecycle](process/agent-lifecycle.md), [review](process/review.md),
+  - [agent lifecycle](process/agent-lifecycle.md), [agent workflow](process/agent-workflow.md), [review](process/review.md),
     [playtest method](process/playtest-method.md), [Modal policy](process/modal-policy.md),
     [lessons](process/lessons.md), [PROOF-POLICY.yml](process/PROOF-POLICY.yml)
 - [design/vision.md](design/vision.md): where Sim is heading
