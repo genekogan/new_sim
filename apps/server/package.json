@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=../../.env src/main.ts",
     "start": "node src/main.ts",
+    "pretest": "node ../../tools/assets/pull.mjs --check --quiet --set runtime",
     "test": "node --test --test-concurrency=1 src/*.test.ts",
     "test:replay": "node --test src/replay.test.ts"
   },

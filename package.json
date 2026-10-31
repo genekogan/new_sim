@@ -7,8 +7,10 @@
   },
   "packageManager": "pnpm@10.27.0",
   "scripts": {
+    "predev": "node tools/assets/pull.mjs --check --quiet --set web,runtime || echo 'warning: media missing, run pnpm assets:pull'",
     "dev": "pnpm -r --parallel --filter ./apps/* dev",
     "build": "pnpm --filter @sim/web build",
+    "pretest": "node tools/assets/pull.mjs --check --quiet --set web,runtime",
     "test": "pnpm -r --filter '!mars-campus-viewer' test && pnpm test:mars",
     "test:replay": "pnpm --filter @sim/server test:replay",
     "start": "node --experimental-strip-types apps/server/src/main.ts",
@@ -16,7 +18,9 @@
     "check": "pnpm typecheck && pnpm test",
     "test:mars": "pnpm --filter mars-campus-viewer test:engine",
     "test:mars:release": "pnpm --filter mars-campus-viewer gate",
-    "test:client": "node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs"
+    "test:client": "node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs",
+    "assets:pull": "node tools/assets/pull.mjs",
+    "assets:check": "node tools/assets/pull.mjs --check"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
