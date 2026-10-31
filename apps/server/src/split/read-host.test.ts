@@ -90,7 +90,8 @@ test('read worker mode 2: here, observe, capabilities (incl. ?all=1) and view?al
       await until(() => p.lagGens() === 0);
       const {r, j} = await get(route), m = live();
       assert.equal(r.headers.get('x-sim-read'), 'worker', `${what} ${route}`);
-      assert.ok(Number(r.headers.get('x-sim-read-cpu-ms')) > 0, `${what} ${route}: served by the worker's read code (${JSON.stringify(j).slice(0, 300)})`);
+      // the header is set only when the worker's read code served it; a cheap cached page can round to 0 ms on a fast box (the Modal gate)
+      assert.ok(r.headers.get('x-sim-read-cpu-ms') !== null && Number(r.headers.get('x-sim-read-cpu-ms')) >= 0, `${what} ${route}: served by the worker's read code (${JSON.stringify(j).slice(0, 300)})`);
       if (route === 'observe') {delete (j as {at?: unknown}).at; delete (m as {at?: unknown}).at;}   // the wall clock of each call
       assert.deepEqual(diffFields(m, j), [], `${what} ${route}`);
     }

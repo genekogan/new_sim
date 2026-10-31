@@ -15,7 +15,9 @@ export function knownIds(ledger: EdgeLedger, caps: EdgeCapability[]): Set<string
   for (const c of caps) {out.add(c.id.slice(c.id.indexOf(':') + 1)); if (c.target) out.add(c.target.id); if (c.object) out.add(c.object);}
   for (const id of ledger.places.byId.keys()) out.add(id);
   for (const m of ledger.host.minds.values()) out.add(m.soulId);
-  for (const id of Object.keys((ledger.mw.world as NativeWorld).entities)) out.add(id);
+  // the read worker's ledger reads through its MenuWorld facade (`mw`); a bare host (tests mock only `host.engine`) reads the engine
+  const world = ((ledger as {mw?: {world: unknown}}).mw?.world ?? ledger.host.engine.world) as NativeWorld;
+  for (const id of Object.keys(world.entities)) out.add(id);
   for (const s of ledger.spots.spots) out.add(s.id);
   try {for (const o of ledger.comms?.objects.all() ?? []) out.add(o.id);} catch {/* objects optional */}
   try {for (const i of ledger.together.publicItems()) out.add(i.id);} catch {/* items optional */}
