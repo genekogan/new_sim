@@ -73,7 +73,10 @@ export class Objects {
   ofKind(kind: string): ObjectRecord[] { return this.table.ofKind(kind) as ObjectRecord[]; }
   /** The object table's generation: moves on every change (L9 Stage B: `table.snapshot()` / `table.changes(gen)`). */
   generation(): number { return this.table.generation; }
-  /** L3 seam: the write-version of the objects near a point (table.ts `generationNear`). */
+  /** L3 seam: the write-version of the objects near a point (table.ts `generationNear`). NOT a cache key for object offers:
+   *  it moves only once an advance is written, and time-driven advances (a calendar item starting, a ride's phase) are
+   *  written by fresh() when something lists them, so a key on it would keep an offer past its moment. No menu keys on it:
+   *  object offers are rebuilt every tick in the ledger's `bindsTail` (whole, kept, words and focused menus alike). */
   generationNear(at: readonly [number, number], radius: number): number { return this.table.generationNear(at, radius); }
   /** L9 Stage B: the table's snapshot and its ordered delta stream (see table.ts). */
   objectTable() { return this.table; }
