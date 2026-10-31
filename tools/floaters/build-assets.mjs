@@ -2,7 +2,7 @@
 /**
  * build-assets.mjs — the Little Martians floater models for worlds/littlemartians/characters/.
  *
- * Reads the Little Martians 3D archive (<lm-3d-models>) READ-ONLY and writes only
+ * Reads the Little Martians 3D archive (--archive / LM_3D) READ-ONLY and writes only
  * under this worktree:
  *   worlds/littlemartians/characters/<id>.glb        the seven floaters (six scanned Little Martians + Nyx)
  *   worlds/littlemartians/characters/kin/<id>.glb    a small subset of background ceramic-head kin

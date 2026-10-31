@@ -38,7 +38,7 @@ function deepFreeze<T>(v: T): T {
 
 // ---------------------------------------------------------------- humanoids unchanged
 
-// The same scenario run against the original Mars engine (~/Mars/…/viewer/engine, read-only, before the
+// The same scenario run against the original Mars engine (the campus repo's viewer/engine, read-only, before the
 // fork added Entity.body) produced exactly these hashes: a walk up stairs-a to the deck and back down,
 // and a two-person conversation, 918 ticks, no violations.
 const PRE_FORK = { tick: 918, world: 'bfc3c1beaaf487ecd3c797adc9f998b38f54fb02b7628dba9dcc47b4ad013a13', physical: '213060af79e9ee12842d3a389e0ed80674e79d214404d4e412ee9ffef90ecd9b' };

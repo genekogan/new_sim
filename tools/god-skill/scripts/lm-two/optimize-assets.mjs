@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // littlemartians-two: the Arium-era Little Martians art, made fit for the god import path (lane LM, 2026-10-11).
 //
-// Source: the authored LM map on branch lm/map (worktree <worktrees>/lm-map), pinned at LM_MAP_COMMIT (953613972438, the LM-22 world); read
-// through git objects only (never the worktree, never ~/Dev/littlemartians). Its `scene.json` lists the three
+// Source: the authored LM map on branch lm/map (an lm-map worktree), pinned at LM_MAP_COMMIT (953613972438, the LM-22 world); read
+// through git objects only (never the worktree, never a local Little Martians checkout). Its `scene.json` lists the three
 // original Vanessa scans (Madmaraca, Minarete, Celadon tower) and the 96 scan-court exhibits; `landscape.glb` holds
 // the three gallery images.
 //

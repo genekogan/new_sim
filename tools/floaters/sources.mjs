@@ -1,5 +1,5 @@
 // Source list for build-assets.mjs: which archive models become floaters / kin, their facing offsets
-// and their lore. Lore is condensed from ~/Dev/littlemartians/wiki/02-pantheon.md (read-only); facing
+// and their lore. Lore is condensed from the Little Martians wiki (02-pantheon.md, read-only); facing
 // offsets come from the ORIENT map in 3d-models/flock.html unless noted.
 
 export const LICENSE = {
