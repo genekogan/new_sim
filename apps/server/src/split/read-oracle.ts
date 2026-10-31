@@ -118,7 +118,8 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
       let a: unknown, b: unknown, t = performance.now();
       const genOf = () => (L.comms as unknown as {objects?: {generation?(): number}} | undefined)?.objects?.generation?.(), g0 = genOf();
       try {a = JSON.parse(JSON.stringify(ask[name](L, s, S.rounds)));} catch (e) {a = {error: String(e)};}
-      const mainWrote = genOf() !== g0;
+      // (against the replica's generation, not this read's start: an earlier read of the same round may have written)
+      const mainWrote = genOf() !== g0 || genOf() !== RW.R.objectGen;
       T.liveMs += performance.now() - t;
       const missBefore = RW.verdicts.missCount; t = performance.now();
       try {b = JSON.parse(JSON.stringify(ask[name](RL, s, S.rounds)));}
