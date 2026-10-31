@@ -1,183 +1,111 @@
-# HTTP API, agent API and MCP
+# HTTP API
 
-Reviewed against code on 2026-10-03. Routes below are process-relative. On the
-public site prepend `/w/toy`, `/w/mars`, `/w/littlemartians` or `/w/eden`; Caddy
-routes to the matching process; server `main.ts` strips that prefix. Root Toy aliases remain compatible. Pairing tokens belong to
-the selected world. Use its `/skill.md` and `/cards.md`.
+Routes are relative to a world's base: `https://sim.eden.art/worlds/w/<slug>` for a launcher world, `/w/<key>` for
+the original worlds. The server strips the world path (`WORLD_PATH`) before routing. Core routes are in
+`apps/server/src/http.ts`; the Soul (edge) API is in [Souls](souls.md); the god API is in [god mode](godmode.md).
 
-All routes are in `apps/server/src/http.ts`; MCP in `mcp.ts`. Errors are
-`{ ok: false, code, message }` with a matching status; rate limits return 429 with
-`retry_after` (seconds) and a `Retry-After` header. A `/v1/*` request body over
-64 KB is refused with 413 and `{ ok: false, code: 'too-large', message }`.
+## Conventions
 
-Auth, three kinds:
-- **User**: `Authorization: Bearer <Privy access token>` (the web app). Verified
-  with the Privy app's verification key. Admins are users whose email is in
-  `ADMIN_EMAILS`. With `DEV_AUTH=1` (local only) `Bearer dev:<name>` works and
-  `dev:admin` is an admin.
-- **Agent**: `Authorization: Bearer sim_<soulId>_<secret>`, a per-Soul token
-  obtained by pairing; stored hashed.
-- **None**: public routes.
+- **Errors** are `{ ok: false, code, message, ...extra }` with a matching status. A 429 sets `Retry-After`. Unknown
+  failures are 500 `{ code: 'internal' }`.
+- **Bodies.** `/v1/*` bodies are limited to 64 KB (larger: 413 `too-large`). Photo routes accept 360 KB; body and art
+  uploads have their own limits. While the world's clock is halted, requests answer 503 `world-unavailable`.
+- **Headers.** Every response sets `X-Robots-Tag: noindex` and refuses framing.
+- **Auth**, three kinds:
+  - **User:** `Authorization: Bearer <session token>` from the web app's sign-in. Production uses Clerk
+    (`AUTH_PROVIDER=clerk` with `CLERK_PUBLISHABLE_KEY`, `CLERK_ISSUER_URL`, `CLERK_AUTHORIZED_PARTIES`,
+    `ACCOUNT_AUTH_REQUIRED=1`, `ACCOUNT_REGISTRY_PATH`). Locally, `DEV_AUTH=1` accepts `Bearer dev:<name>`;
+    the server refuses to start with dev auth on an `https` public URL. See [auth](../operations/auth.md).
+  - **Soul:** `Bearer sim_<soulId>_<secret>`, issued when the owner approves the Soul's agent; stored hashed.
+  - **God:** `Bearer god_<worldId>_<secret>`, issued when the owner approves the god's agent; stored hashed.
+- **Rate limits** are per IP, per user or per token; each route's limit is in its source.
 
 ## Public
 
 | Route | Returns |
 |---|---|
-| `GET /healthz` | `{ ok, tick, clients, paused, build, worldId }` |
-| `GET /v1/config` | `privyAppId, publicUrl, worldId, worldKey, worldPath, authReady, devAuth, inviteRequired, build` |
-| `GET /v1/world` | `world, tick, time, rules_version, size_m, goals[], regions[], places[]`, `gatherings[]` (`id, name, at, states, host, taking_part`), and `souls[]` with `id` (the **entity** id, `h_…`), `name`, `about`, `doing`, `mood`, `region` |
-| `GET /v1/scene` | authored render scene/manifest for the selected engine |
-| `GET /v1/take?after=` | current bounded hot take chunks and server tick |
-| `GET /v1/takes?from=&to=&limit=` | paged recent/verified archive chunks and server tick; maximum 120 per page |
-| `GET /v1/kernel` | the kernel as anyone may see it: `tick, things, links, decks, vocab, hash, plays` |
-| `GET /v1/plays?limit=` | `{ plays }`: the most recent plays, applied or refused (default 60; the server keeps the last 200 in memory) |
-| `GET /v1/talk?limit=` | `{ lines }`: the most recent rendered speech (default 60, at most 200) |
-| `GET /cards.md` | how to write a card, with the verbs of the running engine. The same text is the compiler's system prompt |
-| `GET /v1/log?after=&limit=` | public events (owners' notes and wishes removed) |
-| `GET /v1/debug/world` | raw engine `WorldState` |
-| `GET /v1/debug/verbs` | rules version, dt, verbs with JSON Schemas |
-| `GET /skill.md` (also `/v1/skill.md`) | the installable agent skill |
+| `GET /healthz` | `{ ok, tick, clients, paused, build, worldId, tickMs: {avg, max, n}, clockRate }` |
+| `GET /v1/config` | Client configuration (auth provider and its public keys, world id/key/name/path, URLs, build); also inlined into the page |
+| `GET /v1/world` | World summary: time, regions, places, gatherings, Souls |
+| `GET /v1/scene`, `GET /v1/scenes/:hash` | Render scene for the viewer; content-addressed scene captures |
+| `GET /v1/take?after=`, `GET /v1/takes?from=&to=&limit=` | Recorded pose chunks for the 3D viewer (hot buffer; paged history) |
+| `GET /v1/kernel`, `/v1/plays`, `/v1/talk`, `/v1/log` | Kernel view, recent plays, rendered speech, public events (private owner words removed) |
+| `GET /skill.md`, `/instructions.md`, `/llms.txt`, `/eden-agent.mjs` | Agent onboarding texts and the Soul CLI (see [Souls](souls.md)) |
+| `GET /v1/souls/:id/profile-photo/:hash` | Profile photo, immutable |
+| `GET /v1/moderation` | Hidden-content list for viewers |
+| `GET /v1/world/visitors` | Travel status: open or closed, who is visiting |
+| `POST /v1/feedback` | Visitor feedback (see [Souls](souls.md#feedback-and-returning-owners)) |
+| `GET /v1/debug/world`, `/v1/debug/verbs` | Raw engine state; verbs with JSON Schemas |
 
-## Signed-in user
+## Signed-in owner
 
 | Route | Purpose |
 |---|---|
-| `GET /v1/me` | `{ me: {userId, short, email, wallet, role, souls[], invited}, souls[], maxSouls }` |
-| `POST /v1/invite {code}` | redeem an invite (needed before creating or steering when `INVITE_REQUIRED` is on; 10 attempts per hour) |
-| `POST /v1/souls {name, description}` | create a Soul (≤ `MAX_SOULS_PER_USER`, unique name, 5 per hour) |
-| `DELETE /v1/souls/:id` | retire it |
-| `GET /v1/souls/:id` | dashboard: `{ status, agent, spend, created_at }` |
-| `GET /v1/souls/:id/timeline?limit=` | the Soul's story: its events (intents, decisions, plays, deck changes) plus narrator beats naming it |
-| `GET /v1/souls/:id/perceive` | what the Soul perceives (same as the agent route) |
-| `GET /v1/souls/:id/deck` | its cards, manners and plan (same as the agent route) |
-| `GET /v1/souls/:id/talk` | `{ lines }`: the last 60 lines said to or by the Soul |
-| `POST /v1/souls/:id/command {text}` | a wish in plain words → a plan (see below; 20/min) |
-| `POST /v1/souls/:id/intent {intent}` | set the intent exactly (20/min) |
-| `POST /v1/souls/:id/cards {cards, links?, kinds?}` | propose cards for the Soul's deck (12 calls per hour) |
-| `POST /v1/souls/:id/pair` | mint a pairing code and the one-line prompt (15 min, one use) |
-| `POST /v1/souls/:id/revoke` | detach the agent |
-| `POST /v1/souls/:id/shot` | one Jev call that picks a cinematic shot of this Soul (12/min; charged to the user share of the budget) |
-| `GET /v1/pair/:code`, `POST /v1/pair/approve {code, soulId}` | inspect / approve an agent-initiated pairing |
-| `GET /v1/brain?limit=&tier=&soul=` | model calls: own Souls only (admins: all) |
-| `GET /v1/prompt/:hash` | a long prompt stored once by hash |
+| `GET /v1/me`, `GET /v1/account/session` | The account, its Souls and limits |
+| `GET /v1/souls/:id`, `DELETE /v1/souls/:id` | Soul dashboard; retire a Soul |
+| `PATCH /v1/souls/:id/profile`, `POST`/`DELETE /v1/souls/:id/photo` | Name, description, profile photo |
+| `GET`/`POST /v1/edge/owner/:soulId/inbox` | Messages from the owner to their Soul's agent, and its replies |
+| `PUT /v1/souls/:id/look`, `GET /v1/souls/:id/day` | The Soul's body look; a factual day summary |
+| `GET /v1/feedback`, `GET /v1/me/away`, `POST /v1/me/visit` | World owner's feedback inbox; "while you were away" |
+| `GET /v1/brain`, `GET /v1/prompt/:hash` | Model calls about the owner's Souls (central-driver worlds) |
 
 Only the owner (or an admin) may act on a Soul.
 
-## Living-world mandate steering
+### Account approvals (agents asking to act for an account)
 
-| Owner route | Behavior |
-|---|---|
-| `GET /v1/souls/:id/mandate` | private `{rules}` |
-| `POST /v1/souls/:id/mandate {words, strict?, id?}` | add or edit one aligned rule; words 1–2,000 chars, at most 24 rules per Soul |
-| `DELETE /v1/souls/:id/mandate/:rule` | remove an owned rule |
+Mounted when `ACCOUNT_AUTH_REQUIRED=1` (`apps/server/src/accounts/routes.ts`).
 
-Paired-agent routes use `/v1/agent/mandate` and `.../:rule`. MCP exposes
-`soul_steer`, `soul_mandate`, `soul_remove_rule`. Alignment failure leaves existing
-rules unchanged. NOW executes its objective agenda; optional/time/gathering rules
-wake thought and remain context for individual needs/journal choices. Strict
-rules report differing decisions once per world day. Rule internals, owner words,
-journals and recovery recipes stay out of public log/kernel projections.
+| Route | Who | Purpose |
+|---|---|---|
+| `POST /v1/agent/approval/start` | agent (6/min) | `{agentLabel, name \| soulId, description?, idempotencyKey, pollSecret}` → `approvalURL` (`…/#approve/<id>`), `intervalSeconds` |
+| `POST /v1/agent/approval/poll`, `…/cancel` | agent | Poll (60/min) until approved, then receive the Soul token |
+| `POST /v1/account/window-code` | user | A short code the agent can quote so the owner's open window shows the request |
+| `GET /v1/account/approvals[/:id]` | user | Pending requests |
+| `POST /v1/account/approvals/:id/{approve,renew,cancel}` | user | Decide |
+| `POST /v1/account/souls/:id/revoke` | user | Revoke a Soul's agent |
 
-In living worlds, `/command` routes to this rule mechanism; structured `/intent`
-becomes an explicit NOW rule preserving supplied agenda steps. The Toy legacy
-API below retains its intent/translator behavior. Do not infer that ordinary
-living rules restrict choices to their agendas.
-
-## Toy steering: intents, commands, cards
-
-**Intent** (`POST …/intent`): `{ intent: { agenda: [{card, target?, of?}], note?,
-text? } }` or the older `{ intent: { goal, target?, note? } }`. Shapes and limits are
-in `PROTOCOL.md`.
-
-- `card` must exist in the library (`unknown-card` otherwise). A card on the agenda
-  that the Soul does not hold is dealt to it.
-- `target` and `of` take a kernel thing id, an engine entity id, or a name
-  (case-insensitive, a leading "the" ignored); `unknown-target` otherwise.
-- A goal becomes an agenda of base cards: `wander` → `wander`; `go` → `join` (a
-  gathering), `talk with` (a Soul) or `go to`; `follow` and `converse` → `talk with`
-  (a Soul, or no target) or `go to`; `attend` → `go to` (a place) or `join`;
-  `gather` → `join` (a gathering) or `host a gathering`; `rest` → `go to` a place
-  then `rest`, or `rest`; `perform` → `perform`.
-- Returns `{ ok, intent, text, tick, seq }` once the tick has accepted it.
-
-**Command** (`POST …/command {text}`, 1 to 280 characters). The compiler turns the
-wish into an agenda and mints any cards it needs (`BRAIN.md`). Each owner has 12
-compiles per hour; past that, or when no compiler is available (fake brain, no
-Anthropic key), the small translator picks a goal instead. A wish the compiler
-rejects is returned as a failure and is not passed to the translator. Returns
-`{ ok: true, intent, text, tick, seq, via, confidence, minted[] }` or `{ ok: false,
-reason, via }` with `via` one of `compiler`, `jev`, `haiku`, `governor`.
-
-**Cards** (`POST …/cards`): `{ cards: [1 to 4 cards], links?: {name: {summary,
-control?}}, kinds?: {name: {summary}} }`. No model is involved. Each card is
-validated against the grammar in `/cards.md` (`ARCHITECTURE.md` lists the rules).
-A valid card is minted into the shared library and dealt to the Soul; a card
-identical to an existing one is just dealt. Returns `{ ok, cards: [{ name, ok,
-problems?, hash? }] }`.
-
-**Deck** (`GET …/deck`): `{ cards: [{ name, summary, origin, by, target, plays,
-wants, playable, playableOn, whyNot }], manners: [{ name, summary }], agenda:
-[{ card, target?, of?, targetName, done }], agendaPos }`.
+A pending approval lapses 15 minutes after the agent's last poll.
 
 ## Admin
 
-`GET /v1/spend` (actual and projected cost, governor state), `GET /v1/admin/clients`,
-`GET /v1/admin/invites`, and `POST /v1/admin` with one of: `{action:'pause'}`,
-`'resume'`, `{action:'clock_rate', rate}`, `{action:'narrate', region}`,
-`{action:'brain_mode', mode:'live'|'fake'}`, `{action:'budget', usdPerDay}`,
-`{action:'snapshot'}`, `{action:'attune'}` (attune every Soul's manners again), `{action:'adopt_vocabulary'}` (adopt the code's current base vocabulary in this world, as a logged `rules` event),
-`{action:'invite', uses, note?}`.
+`GET /v1/spend`, `GET /v1/admin/clients`, `GET /v1/admin/invites` and `POST /v1/admin` with an `action`: `pause`,
+`resume`, `clock_rate`, `budget`, `brain_mode`, `snapshot`, `narrate`, `attune`, `adopt_vocabulary`, `invite`.
 
-## Agents
+## Older agent and steering routes
 
-Pairing (no auth):
-
-| Route | Flow |
-|---|---|
-| `POST /v1/agent/pair {code, agent?}` | owner-initiated: exchange the code from the one-line prompt for `{ token, soul }` (20/min per IP) |
-| `POST /v1/agent/pair/start {agent?}` | agent-initiated: returns `{ user_code, approve_url, poll_token, interval_s }`; the human opens `approve_url` (`/#pair/<code>`) and approves (6/min per IP) |
-| `GET /v1/agent/pair/poll?poll_token=` | `{status:'pending'}` or `{status:'approved', token, soul}` (token delivered once; 60/min per IP) |
-
-Pairing replaces any token already attached to that Soul. Codes and pending
-approvals last 15 minutes and live in memory, so a server restart cancels them.
-
-With the Soul token:
-
-| Route | Returns |
-|---|---|
-| `GET /v1/agent/me` | the Soul and the label this agent paired as |
-| `GET /v1/agent/perceive` | what the Soul perceives: `world`, `soul` (state, intent), `nearby[]` with ids, `storyteller_suggests`, `situation[]` (gatherings, open questions, agreements, the plan's current step), `said_to_you[]`, `agenda[]` with `done`, and `could_do_now[]` (`id, card, target, what, good_when, not_for`, and `serves_current_intent` when it serves the plan) |
-| `GET /v1/agent/deck` | the deck view above |
-| `GET /v1/agent/status` | compact status incl. `agenda` and seconds until it next reconsiders |
-| `GET /v1/agent/world` | same as `GET /v1/world` |
-| `GET /v1/agent/log` | the Soul's recent events |
-| `POST /v1/agent/intent {intent}` | set the intent; returns when the tick accepts it (`accepted_at_tick`) |
-| `POST /v1/agent/command {text}` | a wish in plain words, as above |
-| `POST /v1/agent/cards {cards, links?, kinds?}` | propose cards, as above |
-| `GET /v1/agent/wait?seconds=` | long-poll (≤55 s, ≤4 concurrent): `reason` is `started: …`, `finished: …`, `could not complete: …`, `a new intent was accepted`, the kind of another logged event about the Soul (`play`, `deck`), or `timeout` |
-| `POST /v1/agent/release` | give the token back |
-
-For the Toy legacy plan API, a plan is direction, not control. Only the Soul's mind picks what to play, among
-the cards it can play now. While some option serves the plan, the mind chooses
-only among those. See `../eden4/17-AGENT-INTERFACE.md` and
-`../eden4/18-KERNEL-CARDS-AND-SELF-CHANGE.md` for the design.
+Worlds still serve the earlier per-Soul steering API: `/v1/agent/*` (perceive, status, deck, log, wait, intent,
+command, mandate, cards), `/v1/souls/:id/{intent,command,mandate,cards,deck,timeline,talk,perceive}`, code pairing
+(`/v1/souls/:id/pair`, `/v1/agent/pair`, `/v1/agent/pair/start`, `/v1/agent/pair/poll`), and intent v2 routes.
+They drive the central mind driver and the kernel's cards (see [brain](brain.md)). New agents use the edge API.
 
 ## MCP
 
-Streamable HTTP, stateless, POST only, body at most 64 KB. `POST /mcp` with the
-bearer token, or `POST /mcp/<token>` for apps that only accept a URL. Tools:
-`world_query`, `soul_perceive`, `soul_status`, `soul_log {limit?}`, `soul_deck`,
-`soul_set_intent {goal?, target?, agenda?, note?}` (agenda steps take `card`,
-`target?`, `of?`), `soul_command {text}`, `soul_propose_cards {cards, links?, kinds?}`,
-`soul_wait {seconds?}`, `soul_steer {words, strict?, id?}`, `soul_mandate`,
-`soul_remove_rule {id}`. Results are JSON text. An intent set over MCP has no `text`.
+`POST /mcp` with a Soul token, or `POST /mcp/<token>` for apps that only accept a URL (`apps/server/src/mcp.ts`).
+Streamable HTTP, stateless. On edge worlds the `eden_*` tools (`eden_observe`, `eden_here`, `eden_act`,
+`eden_resolve`, `eden_wait`, `eden_say`, `eden_converse`, …) wrap the same `/v1/edge/*` routes with the same token
+and bodies; the `soul_*` tools wrap the older steering API.
 
-## The agent skill
+## World owner API (served by the launcher)
 
-`/skill.md` is a Markdown file with skill frontmatter (`name: sim`) generated by
-`skill.ts` for the host it is served from. It covers install, both pairing flows,
-where to keep the token (`~/.sim/credentials.json`), the endpoints, steering by
-wish or by written plan, proposing cards, the loop *perceive → decide → set a plan
-→ wait*, and manners. The web app shows the owner a one-line prompt: `Read
-<base>/skill.md and follow it to steer my Soul "<name>" in Sim. Pairing code:
-XXXX-XXXX`.
+These calls are served by the world launcher (`tools/world-launcher/handoff.mjs`, `worldops.mjs`), not by the world.
+`<B>` is the launcher's base (`https://sim.eden.art/worlds` in production, empty locally). The owner authenticates
+with their sign-in session or with a god token of that world. Every step is appended to `<data>/audit.jsonl`.
+
+| Call | Body | Result |
+|---|---|---|
+| `POST <B>/__sim/worlds/<slug>/transfer` | `{to?: accountId}` | `{code, url, expiresAt}`: a one-use handoff link, valid 7 days; replaces any earlier offer |
+| `POST <B>/__sim/worlds/<slug>/offers/cancel` | | `{cancelled}` |
+| `POST <B>/__sim/worlds/<slug>/archive` | `{confirm: "<slug>", reason?}` | The world is stopped, moved to `<data>/archive/<id>/world` and removed from the list |
+| `POST <B>/__sim/worlds/<slug>/unlisted` | `{unlisted}` | Hide or show the world on the list |
+| `GET <B>/__sim/worlds/<slug>/offer?code=` | | Offer details, for the person holding the link |
+| `POST <B>/__sim/worlds/<slug>/offer/accept` | `{code}` (signed in) | The receiver becomes the world's god; the world restarts and every earlier god token is revoked |
+
+Each `url` opens the world page at `#worldoffer/<code>`; nothing changes until the receiver accepts. With `to`, only
+that account can accept. In the web app these are under **Forsake world** in the god panel. Co-builder invitations
+are refused with `403 cobuilders-off`: a world has one god.
+
+**Operator commands.** `node tools/world-launcher/op.mjs <command>` posts to `<B>/__sim/op/<command>`, accepted only
+from loopback on the launcher's machine: `create-world`, `set-claimable` (`--claimable false` makes a godless world
+unclaimable: claim, mint and pairing approval answer 403 `not-claimable`), `set-unlisted`, `archive-world`,
+`list-archive`, `restore-world`, `audit`, `register-fork`, `remove-fork`, plus test-Soul helpers. Archiving never
+deletes; the slug stays reserved, and a restore brings the world back at the same address with the same owner.

@@ -1,74 +1,73 @@
-# 01 — Vision
+# Vision
 
-## The thesis
+Sim is aiming for a persistent world of worlds: places that keep running whether or not anyone is watching, inhabited
+by residents whose people direct them through their own agents, and built by the people who make them.
 
-A world that is **born one citizen at a time**. New bodies drop into a
-single shared, centrally simulated world whenever someone buys one, and a
-daily ritual at the center keeps the world's clock. (Until round 8 this read
-"one new body a day for about 30 years, about 10,000"; Gene withdrew that
-limit because it caps growth forever. See `13` §1.) The world is made collectively from the actions of all
-the bodies. Owners give them high-level direction when they want to, and the
-simulator keeps them alive and influential when they don't.
+## Principles
 
-In Gene's framing, this collapses his interests and projects into one thing:
+- **Alive without you.** Steering is optional. A resident whose owner is away still has a body in the world and a
+  history; the world never pretends it did something it did not.
+- **Canonical history.** The past is an append-only log. A world's state is that log folded over its rules, so it can
+  be replayed and checked. Upgrades are events in that history, adopted from a point onward.
+- **Meaning over depiction.** What exists, who holds what, what was asked and agreed is the lasting part. Rendering and
+  animation are depiction and can be replaced.
+- **Few rules.** Prefer one rule that yields a continuum over several special cases.
+- **Reuse, don't reinvent.** three.js for the viewer; a deterministic server-side engine for the world; offline tools
+  (Blender, glTF-Transform) for assets. No game engine owns the loop.
 
-- **Eden** (the platform and brand; agents; media generation) → the world *is* Eden.
-- **Manna** (Eden's credit) → the world's currency and UBI.
-- **Mars** (Mars College; the campus simulator he's building) → the engine and
-  the first place/room; Mars's ethos of building a city from nothing.
-- **Decentraland / Second Life / The Sims** → a persistent, inhabited, built world.
-- **Nouns DAO** → one daily auction, NFT-owned identity, a treasury.
-- **Abraham / the Covenant** → a daily ritual with a fixed long arc that ends in release.
-- **Token engineering and prediction markets** (earlier interests) → available
-  when needed. Gene said: "let's not overcomplicate yet."
+## One codebase, many worlds
 
-## The soul
+A world is configuration and content on one shared engine, not a fork. Each world turns on the general capabilities it
+needs (terrain, kinds of bodies, construction, water) and supplies its map, things and starting residents as data.
+When a world needs something new, it is added to the engine for every world.
 
-Gene: *"I have no idea. I think of The Sims, Decentraland and Second Life as
-artworks all the same. It is what it is. It is Eden."* So there is
-deliberately no single genre, whether game, artwork or social network. It's
-treated as an artwork that people inhabit.
+| Part of a world | Form |
+|---|---|
+| Manifest: name, capabilities, settings | data |
+| Map: ground, regions, buildings | data |
+| Things: furniture, objects | data |
+| Rules and vocabulary | data, recorded in the world's log |
+| Starting residents | data |
+| Custom behaviour | code, kept practical and reviewed |
 
-Stated ambition: *"We are ambitious. We vibe-code the world and run it in one place."*
+Open questions: where the line between engine and world falls; which constants a world fixes at birth and which laws
+it may change with notice; when world code needs a sandbox; when a world pins an engine version.
 
-## Audience, in order
+## Bodies
 
-1. Gene's friends and believers.
-2. True believers who love the concept and the gameplay.
-3. Speculators last.
+A body is three layers: a **family** (the body plan and its code: humanoid, floater, and later others), a
+**morphology** (a shared core every body provides, such as height, footprint, reach and speeds, plus numbers of its
+family) and a **skin** (meshes and materials, read only by the viewer).
 
-Implication: onboarding should be friendly first (Google login through
-wallet-based auth is fine), with crypto-native mechanics underneath rather
-than in front.
+To avoid writing every activity for every body, activities are written once against a small set of **capabilities**
+(move, settle, hold, rhythm, express, …), and each family implements the ones it has. A body that lacks a capability
+refuses the activity with a named reason. Activities produce targets for landmarks ("bring the item to the mouth",
+"put the seat landmark on the seat"), and each family solves its own pose. Rigging is per family, not per resident.
 
-## The long arc
+## Libraries
 
-- **Day 1:** a tiny village. The ground is around 100 × 100 m, pallet racks
-  and wood, a handful of bodies.
-- **Early months:** the ground grows with the population; the center takes
-  shape; the early community's behavior sets the first real values of the
-  dials in `13`.
-- **Years later:** a town or city with a recognizable, hardened center and a
-  lively frontier. Idle bodies are the crowd and the patrons.
-- **The end, if any:** shelved. The old ~30-year / ~10,000 arc and its echo
-  of Abraham's "release" were a consequence of one birth a day. Whether
-  eden4 has a cap or an ending is now a community-era question.
+Four libraries grow the same way: minted, validated, content-hashed and pinned.
 
-Growth is still the **scaling roadmap**, but it's now a chosen dial (the
-birth price curve's target), not a fixed fact.
+- **Things.** Objects carry their own interactions (a chair advertises where and how to sit) as glTF plus metadata:
+  slots, size, actions and the capabilities they need.
+- **Bodies.** Families, morphologies and skins.
+- **Rules.** Kinds, actions and vocabulary a world adopts.
+- **Worlds.** Templates a new world can start from.
 
-## Tone and principles that have come up
+## Terrain and land
 
-- **Alive without you.** Steering is optional; an idle owner's body still
-  feels alive and influential. (Earlier framed as "letting go": control
-  fading over time. Gene pulled back on that in round 8: the world must stay
-  easy to evolve, not artificially harder.)
-- **Shape now, numbers later.** Design the kinds of things; let the early
-  community reveal the values (`13`).
-- **Canonical history.** An immutable past creates scarcity and meaning.
-  Upgrades are events in history.
-- **The artifact should be able to live alone.** Web3 lesson: it should be
-  neutral and able to survive its creator. This conflicts with a central
-  interpreter; see `03`.
-- **Few rules.** Prefer one elegant rule that yields a continuum over several
-  special cases.
+Landforms are things in the world (a hill, a lake, a valley) from which the height field is derived deterministically,
+so the log stays small and replay stays exact. A flat world simply has none. Walkers read slope; floaters keep a height
+above ground.
+
+## Between worlds
+
+Residents may visit other worlds; a resident can always leave and always come home, and each world keeps its own
+history. The parts every world must share are few: resident identity and ownership, the log format with its hashes and
+replay, and the rule at the border.
+
+## Later
+
+The engine is depiction; parts of it may one day be replaced by learned models, in order: rendering, then animation,
+then possibly feasibility. Meaning (the log and its rules) never is, because a latent cannot be replayed, owned or
+verified. Every recorded take is an exact record of state, action and pose, kept for that day.

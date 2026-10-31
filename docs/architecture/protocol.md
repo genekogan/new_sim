@@ -1,114 +1,83 @@
 # Protocol: events and WebSocket messages
 
-Everything that crosses a process boundary is defined in
-`packages/protocol/src/index.ts` (types and zod schemas). This is the prose.
+Everything that crosses a process boundary is typed in `packages/protocol/src` (types and zod schemas; `PROTO = 1`).
+This page is the prose.
 
 ## Log events
 
-`LogEvent { seq, tick, kind, author, payload, at }`, one row per event in `events`.
-`fold.ts` applies each to the engine and the kernel; `world.ts` then updates minds.
+`LogEvent { seq, tick, kind, author, payload, at }`, one row per event in the `events` table. `WorldHost` assigns
+`seq` and `tick` at the start of a tick; `fold.ts` applies the event to the engine and the kernel. The full
+`EventKind` union is in `packages/protocol/src/index.ts`.
 
-| kind | author | payload | effect when applied |
-|---|---|---|---|
-| `birth` | `soul:<id>` or `world` | `{ soulId, entityId, name, description, owner }` | spawn a human at the engine's arrival point; make the Soul's Thing at the arrival place with the base deck and up to three default manners; create the mind |
-| `intent` | `soul:<id>` | `{ soulId, intent, source: web\|api\|mcp\|system }` | replace the standing intent and its agenda, start the agenda from its first step; re-think at once |
-| `decision` | `brain:mid` or `brain:reflex` | `{ soulId, entityId, option, label, steps[], mood?, reevalTicks, fallback, call?, trigger, card?, target?, manner?, approachLen? }` | `engine.perform({actor, label, steps})`, replacing the actor's program; the card is remembered as pending |
-| `play` | `soul:<id>` | `{ soulId, card, hash, target, manner? }` | apply the card's changes to the kernel. Refused, with the program stopped, if the card or its hash is unknown, a condition no longer holds, or the coherence rule forbids a change |
-| `mint` | `soul:<id>` | `{ card: MintedCard, links?, kinds?, forSoul? }` | add the declared kinds and link kinds that do not exist yet; add the card if its name is free; deal it to `forSoul` if the card under that name has the same hash |
-| `deck` | `soul:<id>` or `brain:attune` | `{ soulId, add?, remove?, manners?, why }` | add known cards (a deck holds at most 80), remove cards, set manners (known ones, at most 4) |
-| `scene` | `narrator:<region>` | `{ region, narrative, beat: {at_min, kind, directive, targets[], flavor} }` | nudge the named Souls (or, for a `scene` beat, all in the region; `quiet` nudges nobody) and re-think |
-| `retire` | `soul:<id>` | `{ soulId, entityId }` | remove the entity, the Soul's Thing, the things it made, its deck and the mind |
-| `rules` | `admin` / `system` | `{ clockRate, why }`, `{ vocabulary: { kinds, links, manners, cards }, why }` or `{ kernelBootstrap: { at }, why }` | clock rate: recorded, no world effect. `vocabulary` sets the base vocabulary (kinds, link kinds, manners, base cards): logged once at a world's first tick so its history replays with its own words, and again whenever an admin adopts a newer set. `kernelBootstrap` (logged once for a world that predates the kernel) sets where each Soul's Thing is |
-| `admin` | `admin` | `{ action, … }` | recorded; no world effect |
+| Kind | Typical author | Effect when folded |
+|---|---|---|
+| `birth` | `world`, `soul:<id>` | Spawn the Soul's body at the arrival point, its kernel Thing and its mind |
+| `decision` | `edge:<soulId>`, `brain:*` | Start an engine program (the resolved verb steps) for that body, replacing what it was doing |
+| `edge-stop`, `edge-relocate`, `edge-attention` | `edge:<soulId>` | Stop a body's program, move a body (for example back to its sleeping place), set where it looks |
+| `body-assignment-v1` | owner, world | Give a Soul's body a look or body kind |
+| `world-edit` | god | Apply the physics derived from a god's committed edit (new or moved objects, terrain) |
+| `edge-god-walkout` | world | Move bodies out of space that a god's edit has just filled |
+| `retire` | `soul:<id>` | Remove the body, the Soul's Thing, what it made and its mind |
+| `rules` | `world`, `admin`, operator | World rules and policies: clock rate, day configuration, vocabulary, runtime policies |
+| `intent-*-v2`, `intent-arrival-v1`, `intent-sleep-stop-v1` | system | Structured intent requests, admission, controller and arrival facts used by the Eden world |
+| `mandate`, `play`, `mint`, `deck`, `intent`, `scene` | owner, brain | Kernel/cards steering used by the central mind driver (see [brain](brain.md)) |
+| `admin` | `admin` | Recorded; no world effect |
 
-Living worlds additionally accept `mandate` events (add/update/remove/wake/status/
-report/condition) and `rules` payloads for day configuration, quiet renewal,
-reflection, accepted-baseline recovery, runtime policies and an unsnappable-head
-marker. These update replayable state, not just operator metadata. Exact shapes
-are defined in `packages/protocol/src/mandate.ts` and `apps/server/src/world.ts`.
-Public event projections retain identifiers/status while redacting owner words,
-reflection text and recovery recipes. Birth projections hide account IDs.
+Replay applies the same events at the same ticks and reproduces the engine state hash and the kernel hash. Replay never
+calls a model: a model's choice is already a logged `decision`.
 
-A `play` is logged by the host when the engine reports that the pending card's
-program has reached step index `approachLen`, or has completed. Plays are in the
-log, so replay applies them without watching programs.
+`publicEvent()` produces the public projection: owner words, private notes, reflection text and recovery details are
+removed, and account ids are hidden.
 
-**Intent.** `{ goal?, target?, note?, agenda?, text? }`; a goal or an agenda is
-required.
+## WebSocket (`/ws`, JSON)
 
-- `agenda`: 1 to 8 steps `{ card, target?, of? }` (`agendaStepSchema`). `target` is
-  one thing. `of` means any target that is that thing, was made by it, or that it
-  holds a control link to; it lets a plan name something that does not exist yet
-  ("the gathering Rob hosts").
-- `goal` (closed list): `wander, go, follow, attend, gather, converse, rest, perform`.
-  The server turns a goal into an agenda of base cards before logging the event.
-- `note` (≤160 chars) and `text` (≤280, the owner's wish) are the owner's own
-  words. They are stored in the log and given to the Soul's mind, and `publicEvent()`
-  removes both from every public view.
+Each connection belongs to one world (`<world base>/ws`). The hub also routes the Soul event stream
+(`/v1/edge/events/ws`, see [Souls](souls.md)).
 
-## WebSocket (`/ws`, JSON, protocol 1)
+Client → server (validated; at most 20 messages per 10 s, else the socket closes with 1008; 64 KB each):
 
-Public URLs use `/w/<key>/ws`; each connection belongs to one world process.
-
-Client → server (validated; max 20 messages per 10 s, beyond which the socket is
-closed with code 1008; 64 KB each):
-
-| message | meaning |
+| Message | Meaning |
 |---|---|
-| `{t:'hello', proto, token?, since?, epoch?}` | join; `token` = Privy access token (or none); `since` = last batch seq for resume |
-| `{t:'resync', reason}` | ask for a fresh snapshot |
-| `{t:'ping', n}` | latency probe |
+| `{t:'hello', proto, token?, since?, epoch?, …}` | Join. `token` = the user's session token (optional); `since` = last batch seq for resume. An anonymous hello may also come in the URL (`/ws?hello=…`) |
+| `{t:'resync', reason}` | Ask for a fresh snapshot |
+| `{t:'ping', n}` | Latency probe |
+
+A socket with no hello within 15 s is closed.
 
 Server → client:
 
-| message | when | content |
+| Message | When | Content |
 |---|---|---|
-| `welcome` | after hello | `build, proto, worldId, rulesVersion, schema, dt, clockRate, serverTick, serverTime, you, epoch?, paused?` |
-| `snapshot` | join, resync, or too far behind | `tick, seq, viewHash, entities, regions, env, paths[], souls[]` |
-| `batch` | every 10 ticks (500 ms) | `seq, fromTick, toTick, paths[], changes[], souls[], removedSouls[], log[]` |
-| `heartbeat` | every 100 ticks (5 s) | `tick, seq, viewHash, keyframes{id: PoseSample}, clients, clockRate, paused` |
-| `takes` | recorded chunk broadcast | `serverTick, chunks[]` (physical depiction only) |
-| `log` | on join | last 150 public events |
-| `kernel` | on join; after a batch when the kernel changed; at least every 200 ticks | `view: KernelView { tick, things, links, decks, vocab, hash, plays }` (unexpired links; `plays` counts successful plays per card) |
-| `plays` | on join (last 60), then one per play | `PlayView { seq, tick, soulId, soul, card, target, targetName, manner?, ok, reason?, changes[] }` |
-| `talk` | on join (last 40), then when words are rendered | `TalkLine { id, tick, at, from, to, fromName, toName, act, manner?, text, place }` |
-| `brain` | on join and live | model calls, **scoped**: admins all; owners only calls about their Souls |
-| `camera`, `ticker`, `narrative` | live | broadcast shot, ticker lines, narrator plan per region |
-| `stats` | every 2 s | server counters |
-| `pong`, `error` | | |
+| `welcome` | after hello | build, proto, world id, rules version, schema, dt, clock rate, server tick and time, process `epoch`, paused |
+| `snapshot` | join, resync, or when a resume is impossible | entities, regions, environment, paths, Souls, view hash |
+| `batch` | every 10 ticks (500 ms) | paths, field changes, Souls, removed Souls, public log lines |
+| `heartbeat` | every 100 ticks (5 s) | tick, seq, view hash, keyframes, clients, clock rate, paused |
+| `takes` | as chunks are recorded | recorded pose chunks for the 3D view |
+| `log`, `kernel`, `plays`, `talk` | join, then live | public events, kernel view, plays, rendered speech |
+| `brain` | signed-in viewers | model calls about the viewer's own Souls (admins: all) |
+| `camera`, `ticker`, `narrative`, `stats`, `me`, `station`, `pong`, `error` | live | broadcast shot, ticker lines, narrator plans, server counters, the viewer's own state |
 
-`paths[]` entries are `PathCommit { entity, startTick, speed, waypoints: PoseSample[],
-activity, actionId }`. On the toy engine a path is the whole timed walk, and a
-one-waypoint path means "stopped here". On the Mars adapter a path is a
-two-waypoint keyframe (`speed` 0) sent every 5 ticks while a body moves.
-`changes[]` entries are `[tick, entityId, field, value]`. Both engines send
-`present`, `activity` and `on`; the toy engine also sends `task`, `doing` and
-`$env.datetime`.
+God edits reach viewers as `world-diff` messages broadcast through the same hub.
 
-`BrainCall.tier` is one of `mid, translate, director, narrator, shot, compile,
-talk, attune, reflection`. A reflex decision is recorded as tier `mid` with model `reflex`.
+Limits: 30 connections per IP, 2,000 per world (beyond: close 1013). A client more than 1 MB behind is skipped and
+resyncs at the next heartbeat. The last 600 batches are kept so a reconnecting client resumes with `since`; a changed
+`epoch` (a new process) forces a snapshot.
 
-`PlayView.changes` are kernel `Change` values. A refused play has `ok: false`, a
-`reason` and no changes. A `TalkLine` is depiction: the act it renders is already
-in the kernel as a `said` link.
+`paths[]` entries are `PathCommit { entity, startTick, speed, waypoints, activity, actionId }`; the Mars adapter sends
+two-point keyframe paths for moving bodies every 5 ticks. `changes[]` entries are `[tick, entityId, field, value]`.
 
 ## Client replica (`packages/client`)
 
-`Replica` applies snapshots and batches (a gap in `seq` → resync) and computes any
-entity's position at a tick with `samplePath`. `Connection` reconnects with
-jittered exponential backoff and resumes from the ring buffer by sending `since`.
-On each heartbeat it recomputes `viewHash` (sorted `[id, activity, seat, x mm, z mm]`
-for every human) and resyncs on mismatch. A `welcome.build` different from the
-page's own build makes the page reload once. `kernel`, `plays` and `talk` are
-passed to handlers (`onKernel`, `onPlays`, `onTalk`) and are not part of the
-replica or the view hash.
+`Replica` applies snapshots and batches (a gap in `seq` triggers a resync) and samples any entity's pose at a tick.
+`Connection` reconnects with jittered exponential backoff and resumes from the ring buffer. On each heartbeat it
+recomputes the view hash (sorted `[id, activity, seat, x mm, z mm]` for every human) and resyncs on mismatch. A
+`welcome.build` different from the page's own build reloads the page once.
 
-Limits: 30 connections per IP, 2,000 total; a client more than 1 MB behind is
-skipped and resyncs at the next heartbeat.
+## Recorded takes
 
-## Recorded 3D observer
-
-The live view uses `/v1/scene` and `/v1/take` hot chunks, plus `/v1/takes` paged
-local/verified archives for rewind. TakePeople/FloaterView sample quantized recorded
-poses about one second behind the server. They do not run a browser Runtime or
-replace the accepted event-log cursor. Labs execute a separate paused Runtime.
+The 3D view draws recorded poses, not a live runtime. The server records pose chunks (`mars-take/4`): absolute tick
+range `fromTick..toTick` plus a take whose pose samples are relative to its `startTick`. `/v1/take?after=<tick>` returns
+the hot chunks; `/v1/takes` pages history (1–120 per page) with a `next` cursor. The viewer samples about a second
+behind the server. Units: metres, Y up, yaw 0 faces +X; pose samples store millimetres and milliradians
+(`[relativeTick, x, y, z, yaw]`). Structural decoders (`recordedTakeSchema`, `recordedTakeChunkSchema`, …) are
+exported from `@sim/protocol`; they validate shape, not physics or privacy.

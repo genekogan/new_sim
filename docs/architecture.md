@@ -1,286 +1,98 @@
-# Sim architecture
+# Architecture
 
-How the shell is put together, as built. For what each part should become, see
-`../eden4/`; for current state and gaps, `../STATUS.md`.
+Sim runs persistent worlds. Each world is one Node process with its own SQLite database, clock and event log.
+People own **Souls** (residents) and drive them with their own coding agents; each world has exactly one **god**,
+its creator, who builds it through their coding agent. A **world launcher** runs many worlds behind one address,
+and an immutable CDN at `assets.eden.art` serves heavy media.
 
-## October 3 world architecture
+This page is the overview. Details: [API](architecture/api.md) · [protocol](architecture/protocol.md) ·
+[engine contract](architecture/engine-contract.md) · [data](architecture/data.md) · [worlds](architecture/worlds.md) ·
+[Souls](architecture/souls.md) · [god mode](architecture/godmode.md) · [brain and budget](architecture/brain.md) ·
+[contracts](architecture/contracts.md) · [safety](architecture/safety.md) · [glossary](glossary.md).
 
-Four independent processes serve `/w/toy`, `/w/mars`, `/w/littlemartians` and
-`/w/eden`, with separate SQLite files, clocks, logs, owner-bound new Souls and
-budget ledgers. Caddy routes each world; the common shell and browser-only
-Labs/year pages ship in the same immutable release. The Mars engine is a hard
-fork under `mars/`, imported through the engine contract inside this repository.
+## Components
 
-Living Mars and Little Martians keep one-hour world days. Customs and first
-light/supper/dusk are observations. Logged decisions choose playable cards from
-mandate, context, needs and journal; a seeded fallback makes the same decision
-path when paid minds cannot run. There is no routine object or daily action
-schedule. Eden remains idle without owner direction. Owner mandate and journal
-text stay private; public physical takes contain no owner rules or reflection.
+| Part | Where | Role |
+|---|---|---|
+| World server | `apps/server` | One process per world: HTTP (Hono), WebSocket hub, MCP, tick loop, event log, SQLite |
+| Web app | `apps/web` | Vite + React + three.js: world list, 3D world view, god panel, Soul pages; Clerk sign-in |
+| Engine seam | `packages/engine-contract` | The interface every engine implements; determinism conformance suite |
+| Mars adapter | `packages/engine-mars` | Wraps the vendored deterministic Mars engine in `mars/viewer/engine` |
+| Toy engine | `packages/engine-toy` | Small reference engine behind the same contract (tests, `toy` world) |
+| Kernel | `packages/kernel` | Meaning layer: things, links, changes, cards; replays without an engine |
+| World compiler | `packages/world-compiler` | Turns a god's batch of ops into a refusal or a commit plus its inverse; core object library |
+| Generators, ground | `packages/generators`, `packages/ground` | Kit shapes, buildings, creation limits; deterministic terrain height model |
+| Protocol | `packages/protocol` | Shared types and zod schemas for events, HTTP and WebSocket messages |
+| Client | `packages/client` | Browser/Node replica built from snapshot + batches, checked against the heartbeat hash |
+| Soul client | `tools/edge-skill` | `eden-agent.mjs` CLI and the skill a Soul's agent installs |
+| God client | `tools/god-skill` | `eden-god.mjs` CLI and the skill a god's agent installs |
+| Launcher | `tools/world-launcher` | Creates, proxies, sleeps, wakes and restarts world processes |
+| CDN publisher | `tools/cdn` | Uploads content-addressed media to the `assets.eden.art` bucket |
 
-At a daily quiet point the Mars adapter settles finite programs and releases
-ordinary controllers, then builds a fresh Runtime from WorldState. Checkpoints
-plus logged suffixes preserve engine, kernel and mind state across restarts.
-Resumability uses actual ActionDef capabilities. Fault recovery restores an
-accepted baseline, avoids the failed card and quarantines repeat faults. Long
-soak qualification rejects every physical recovery rather than reading only a
-cleared violation list. The 48-day camp proof remains separate from floater proof.
+The server is TypeScript run directly by Node ≥ 22.18 (type stripping; no build step). The web app is built with Vite.
 
-Floater bodies retain the same action registry objects and physical world shape.
-Body admission rejects hand-dependent activities with named reasons. A derived
-per-Runtime navigation cache opens only the declared floater shafts at the same
-0.1 m grid. Continuous shaft motion, height-aware separation, traffic admission
-and serializable landing clearances live in ordinary locomotion. Humans retain
-the original profile and refuse these shafts. Ceramic recharge and quiet company
-are enacted during settled rest; they are not a scheduled replenishment.
+## How a tick flows
 
-Toy has a recording-only factory that observes the original engine through the shared recorder and a separate bounded event buffer. Its rules, state/hash, outputs and checkpoint schema remain identical to the original engine. All four live worlds use the shared 3D shell.
+1. **Inputs.** HTTP and WebSocket handlers never touch the engine. They call `WorldHost.enqueue(kind, author, payload)`:
+   a Soul's accepted action becomes a `decision` event, a god's commit a `world-edit`, a new resident a `birth`.
+2. **Logging.** Every 50 ms the tick loop runs as many fixed steps as the clock rate requires (at most 40 per frame;
+   repeated overruns halve the rate temporarily). At the start of each tick, queued inputs get a `seq` and the tick
+   number and are written to the `events` table.
+3. **Folding.** `fold.ts` applies each logged event to the engine and the kernel. Then the engine steps one tick
+   (`DT = 1/20 s`). Replaying the log from genesis reproduces the same state hash.
+4. **Broadcast.** Every 10 ticks the hub sends a batch to viewers, every 100 ticks a heartbeat with a view hash. Every
+   `SNAPSHOT_EVERY_TICKS` (default 6,000, five minutes) the host saves a snapshot.
+5. **Answers.** The handler that enqueued an input answers once its tick accepts it. Long-running results (a walk
+   finished, a refusal) reach the Soul's agent as receipts on its event stream.
 
-The observer records server takes in bounded chunks; the browser draws sampled
-poses through TakePeople and FloaterView, about one second behind. Selection,
-follow and rewind share this path. Five-minute archives are compressed off-loop,
-verified in R2 before local pruning, and indexed forever; SQLite keeps 24 hours.
-New-world Labs start paused, run an isolated browser Runtime and expose explicit
-movement requests, Play and Reset. They have no server day, ownership or minds.
+Model output never enters the engine directly. It arrives as an ordinary logged event, so replay never calls a model.
 
-The sections below describe shared shell components. Toy-specific intent/agenda
-behavior is labeled; living worlds add mandate, life and daily renewal state.
+## Where state lives
 
-## One process per world
+- **Canonical:** the append-only `events` log, world metadata, accounts and Souls, god edits, and paid-cost
+  reservations, all in `$DATA_DIR/sim.db` (one file per world).
+- **Derived:** snapshots (engine + kernel + minds) for fast boot, take chunks for the 3D viewer, projections served to
+  clients. Losing them loses no history.
+- **Edge-side:** each Soul's agent keeps its own folder (credentials, queue, schedule, memory). The world never
+  stores the agent's thoughts. See [Souls](architecture/souls.md).
+- **Media:** content-addressed files on `assets.eden.art` (see [CDN](operations/cdn.md)).
 
-Everything server-side is one Node process (`apps/server/src/main.ts`), TypeScript
-run directly by Node's type stripping (no build step for the server).
+## How Souls connect
 
-```
- owners' agents ── REST /v1/agent/*, MCP /mcp ──┐          browser (apps/web)
-                                                ▼             │  REST /v1/*, WebSocket /ws
-┌───────────────────────────── sim server ──────────────────────────────────────┐
-│ http.ts   Hono routes (public, signed-in, admin, agent) + static web app      │
-│ mcp.ts    MCP tools over Streamable HTTP (stateless)                          │
-│ hub.ts    WebSocket hub: join snapshot, batches, heartbeat, resume, limits    │
-│ auth.ts   Privy access-token verification, users, roles                       │
-│ souls.ts  Soul lifecycle, intents, commands, card proposals, perceive, wait   │
-│ world.ts  WorldHost: tick loop, event queue → log → fold, minds, snapshots    │
-│ fold.ts   one logged event applied to the engine and the kernel; replay       │
-│ deck.ts   a Soul's cards → the options its mind chooses among; plan progress  │
-│ brain.ts  reflex, mid-brain, narrator, director, compiler, speech, translator │
-│ governor.ts  daily budget → per-tier token buckets                            │
-│ db.ts, migrations.ts   SQLite (node:sqlite), numbered migrations              │
-└───────────────────────────────────────────────────────────────────────────────┘
-   meaning   = packages/kernel (things, links, changes, cards)
-   depiction = packages/engine-toy or packages/engine-mars, behind packages/engine-contract
-```
+Souls are agents at the edge. `MIND_DRIVER` defaults to `edge`: the world runs no Soul mind and makes no model calls
+for Soul decisions. The owner gives their coding agent a one-line prompt pointing at the world's `/instructions.md`.
+The agent installs the Soul skill and CLI, asks the owner to approve it in the browser, and receives a Soul token. It
+then reads the world (`/v1/edge/boot`, `/v1/edge/here`), acts (`/v1/edge/act`) and listens (`/v1/edge/wait`, SSE or
+WebSocket). The world decides whether each action is physically possible and reports what actually happened.
+Optional **Eyes** renders what a Soul sees. See [Souls](architecture/souls.md).
 
-The world has two parts. The **kernel** holds meaning: what exists, where it is,
-who hosts what, what was asked and agreed. The **engine** holds depiction: bodies
-and motion. The kernel never reads poses and replays from the log with no engine.
-`ENGINE` selects the engine (`toy` by default, or `mars`; see `ENGINE-CONTRACT.md`).
+## How gods connect
 
-## Kernel and cards
+On a launcher world, the creator signs in and claims the world, or the launcher claims it for them at creation. Their
+agent downloads `/god/eden-god.mjs` and `/god/SKILL.md`, pairs with a code the owner approves, and receives a god
+token. It edits the world in validated batches (`/v1/god/act`), with undo and redo, weather, terrain and building
+tools. Commits are logged, pushed into the engine as physics and sent to viewers as diffs. One god per world; there
+are no co-builders. See [god mode](architecture/godmode.md).
 
-`packages/kernel` (`types.ts`, `kernel.ts`, `cards.ts`, `vocab.ts`). State is `KState
-{ tick, things, links, vocab, decks, nextId }`.
+## Many worlds
 
-- **Thing** `{ id, kind, name, traits, states, at, born, by }`. `traits` are fixed at
-  creation, `states` change, `at` is the id of the thing it is at (or null), `by` is
-  its maker (a thing id or `world`).
-- **Link** `{ kind, from, to, value?, data?, since, until? }`, keyed `kind|from|to`. A
-  link whose `until` tick has passed is invisible to queries and swept later.
-- **Five changes** (`Change.op`): `appear` / `vanish`, `set` (a state; null clears
-  it), `move` (sets `at`), `link` / `unlink`, `say`. Vanishing a thing also removes
-  its links and anything made to exist `with` it (`traits.with`).
-- **Saying** is the only source of the speech links. `say` writes `said` (2 minutes,
-  data `{act, about?, manner?}`). Act `ask` also opens `asked` (2 minutes). `agree`
-  or `decline` closes the asker's `asked`; `agree` writes `agreed` (30 minutes).
-- **Vocabulary** (`KState.vocab`: kinds, link kinds, manners, cards) is open data.
-  A link kind may be declared `control: true` (`hosts`, `made`, `holds` in the base
-  vocabulary). `vocab.ts` seeds 4 kinds, 9 link kinds, 8 manners and 15 cards.
-- **Decks**: per Soul, the card names it holds (at most 80) and its manners.
+`tools/world-launcher/launcher.mjs` serves the world list, creates worlds from templates, and proxies `/w/<slug>/*`
+(HTTP, SSE, WebSocket) to a child process per world, started on demand on a port from a fixed range. Idle worlds are
+paused and later released; a visit wakes them. Unwatched worlds run their clock at a slower pace; on return the time
+of day jumps to the present. Each child is an ordinary world server with `ENGINE=mars`, `ENABLE_WORLD_ENGINE=1`,
+Clerk sign-in and `BRAIN_MODE=fake`. A Soul may travel between worlds of one launcher site. See
+[worlds](architecture/worlds.md).
 
-**The coherence rule** (`check()`): an actor changes only itself, what it controls,
-and what it made.
+## The Mars engine
 
-- `world` may change anything. Only the world makes or removes a Soul.
-- A Soul may never set, move or remove another Soul.
-- A thing that is not a Soul may be changed by whoever holds a control link to it.
-  If nobody does, only by its maker, or by anyone when `traits.loose` is true.
-  Places and regions are made by the world, so nobody can change them.
-- `link` must start from the actor; `unlink` needs the actor at one end; `say` is
-  from the actor. `said`, `asked` and `agreed` can never be linked or unlinked.
-- A control link can be taken only over a thing the actor made, over a loose thing
-  nobody controls, or when someone who controls it has an `agreed` link to the actor.
-- Bounds: at most 24 things of one maker at a time (`MAX_MADE`), at most 400 links
-  from one Soul (`MAX_LINKS`).
+`mars/` is a hard fork of the Mars College simulator: a deterministic, server-side activity engine with named
+refusals, its own runtime, planner, bodies and recorded takes. `packages/engine-mars` loads it from
+`mars/viewer/engine`, installs a Node SHA-256 provider, lowers the shared body verbs to Mars actions and exposes
+Mars's own verbs as `mars:<verb>`. `WORLD_KEY` picks the world configuration (green field for launcher worlds,
+Little Martians, the Mars proving ground). Engine documentation is in [docs/mars](mars/README.md).
 
-`preview(state, changes, by)` checks and applies a batch on a copy and returns the
-new state or the refusal `{code, message}`. `applyAll` commits the same batch
-atomically: every change passes in order, or none applies. `kernelHash` covers
-things, unexpired links, decks, `nextId` and the vocabulary (cards by hash).
+## Assets
 
-**Cards** are data: `{ name, summary, good_when?, not_for?, target, derive?, when,
-then, approach, during, wants?, takes }`.
-
-| Field | Meaning |
-|---|---|
-| `target` | `{kind, same_place?}` or null. The one free choice of a play. Kind `any` accepts every kind; a card is never played on its own actor |
-| `derive` | extra slots found through links, e.g. `host` = whoever `hosts` `$target` |
-| `when` | up to 8 conditions: `is`, `at`, `notAt`, `linked`, `notLinked`, `noneLinkedTo`, `state`, `notState`, `said`, `distinct` |
-| `then` | 1 to 8 steps, one per kind of change: `move`, `set`, `link` (`value`, `data`, `forSeconds`), `unlink`, `say` (`about`), `appear` (`with`, `states`, `linkFromActor`), `vanish` |
-| `approach`, `during` | engine verb steps (at most 4 and 6). `approach` runs before the changes apply, `during` after |
-| `wants` | motions the card would have liked that no engine verb expresses |
-| `takes` | `seconds`, `minute`, `minutes` or `long` |
-
-References are `$actor`, `$target`, `$region`, a derived slot, `$new` (a thing the
-card just made) or a literal id; `.at` means "the place of". `validateCard` refuses
-a card that: exceeds 4,000 characters; fails the schema; refers to an unknown slot;
-moves, links or speaks for anyone but `$actor`; cuts a link `$actor` is not an end
-of; sets a state on anything but `$actor`, `$target` or `$new`; makes or cuts a
-speech link; makes a Soul; uses an undeclared link kind; changes or removes
-`$target` without requiring or taking a control link to it; names a verb the engine
-lacks; or reuses the name of a different card. The library holds at most 5,000 cards. A minted card records `hash`, `by`,
-`mintedAt` and `origin` (`base`, `compiled`, `agent`).
-
-**One-step lookahead.** `unmet` lists the conditions of a play that do not hold,
-`gap` is the fewest unmet over the possible targets, and `enablers` returns the
-plays open now that would shrink that gap, each tried with `preview`. This is how
-travel and unblocking serve a plan without being written into it.
-
-## The fold
-
-The world is the fold of an append-only event log over the engine and the kernel
-(`fold.ts`; design in `../eden4/11-STATE-AND-UPDATE-FORMALISM.md`):
-
-1. Inputs (`birth`, `intent`, `decision`, `play`, `mint`, `deck`, `scene`, `rules`,
-   `admin`, `retire`, `mandate`) are queued with `WorldHost.enqueue`.
-2. At the next tick boundary each is assigned `seq` and the current `tick`,
-   written to the `events` table, and applied: `foldEvent` moves the engine and the
-   kernel, then `WorldHost.apply` updates the minds.
-3. The engine steps one tick (`DT = 1/20 s`).
-4. Events logged with tick T are always applied when `world.tick == T`, before
-   stepping to T+1. `replayFromGenesis` therefore reproduces the engine state hash
-   and the kernel hash, and `replayKernel` rebuilds the kernel from `birth`, `play`,
-   `mint`, `deck` and `retire` events with no engine (both tested).
-
-Model outputs never enter the engine or the kernel directly. A choice becomes a
-`decision` event carrying the concrete verb steps; a narrator beat becomes a
-`scene` event. Replay never calls a model.
-
-**From a decision to a play.**
-
-1. `deck.ts` builds a Soul's options: every playable (card, target) pair, ranked,
-   at most twelve, and at most three targets per card unless they serve the plan.
-   Each option's first verb step is checked with `engine.canPerform`.
-2. The choice is logged as `decision` with the card, target, manner and the
-   resolved steps (`approach` then `during`). The fold starts them as one engine
-   program (`engine.perform`).
-3. The engine reports program progress every tick. When the approach steps are
-   done, the host logs a `play` event. The fold checks the card's conditions
-   again, turns it into changes and applies them under the coherence rule.
-4. If the play is refused, its program is stopped and that option is not offered
-   again for a minute. If it succeeds, an active immediate agenda may advance, a Soul that
-   was greeted, asked or answered re-thinks soon, and the words of anything said
-   are rendered (`BRAIN.md`).
-
-`mint` adds a card (and any link kinds and kinds it declares) to the vocabulary
-and deals it to a Soul. `deck` adds or removes cards and sets manners. `retire`
-removes the body, the Soul's Thing, the things it made and its deck.
-
-## Tick loop
-
-`setInterval` every 50 ms; a fixed-step accumulator runs `elapsed × clockRate / 50`
-ticks, at most 40 per frame. Three consecutive overruns halve the effective clock
-rate (time dilation, down to a quarter of the set rate) and log a `rules` event;
-after about ten seconds of keeping up it doubles back toward the set rate.
-Dilation is not persisted. Pause and the set clock rate are admin dials; the set
-rate persists across restarts.
-Every 10 ticks a batch is broadcast; every 100 ticks a heartbeat; every
-`SNAPSHOT_EVERY_TICKS` (default 6,000 = 5 min) a snapshot. The kernel view is
-broadcast with a batch when the kernel changed, and at least every 200 ticks.
-
-## Persistence and recovery
-
-- **Snapshot** = the engine's snapshot (world + in-flight actions) + minds + module
-  state + the kernel + play counts per card, captured inside a tick; the database
-  write is deferred past the tick for periodic snapshots. Also taken synchronously
-  on SIGTERM.
-- **Boot** = the latest snapshot, if its rules version matches or is explicitly admitted by the factory, then
-  fast-forward through later log events by stepping the engine to their ticks.
-  No admitted snapshot → genesis and replay. The activities29→31 additive upgrade
-  is explicitly qualified; arbitrary physics epochs/migrations are not built.
-  Explicit shutdown at an unsnappable head logs a passive accepted tick marker;
-  periodic retries stay quiet. Hard crashes recover only durable accepted state.
-- **A snapshot from before the kernel existed** gets a kernel at boot: places from
-  the engine, a Thing and a deck per Soul. Where each Soul stood is logged once as
-  a `rules` event (`kernelBootstrap`), so a replay from genesis puts each Soul in
-  the same place.
-- **A world's base vocabulary is in its log.** At the first tick (or, for a world
-  that predates this, at its next boot) the kinds, link kinds, manners and base
-  cards are written as a `rules` event (`vocabulary`). Replay starts its kernel
-  from that, not from `vocab.ts`, so changing a base card in the code changes new
-  worlds only. An existing world takes a newer set when an admin adopts it
-  (`adopt_vocabulary`), which is another logged `rules` event.
-  At start, a mind that has a goal intent and no agenda is given the matching
-  agenda of base cards (`Souls.carryOverDirections`; in memory, not logged).
-- **Off-box**: Litestream replicates the SQLite file to R2 continuously; hourly
-  on-box backups are kept too. See `RUNBOOK.md`.
-
-## Sync (server → clients)
-
-The replica protocol carries paths/keyframes and metadata. The 3D observer
-separately consumes server-recorded take chunks; it never steps a live Runtime.
-On the Toy engine, when a Soul commits to
-walking, the engine emits a timed path and clients compute positions locally with
-the shared kinematics (`samplePath`). The Mars adapter sends a two-point keyframe
-path for each moving body every 5 ticks instead. See `PROTOCOL.md`. Each heartbeat
-carries a hash of every human's activity, seat and position; a client whose
-replica disagrees requests a fresh snapshot. A ring buffer of the last 600 batches
-lets a reconnecting client resume. The kernel, plays and spoken lines travel as
-their own messages and are also public over REST.
-
-## Souls, minds, entities
-
-A Soul exists in four places: a `souls` row (identity, owner, agent token); a
-**mind** in `WorldHost.minds`; an engine **entity** of kind `human`; and a kernel
-**Thing** of kind `soul` whose id is the Soul id and whose `traits.body` is the
-entity id. Ids: Soul `s_<hex>`, entity `h_<hex>`.
-
-The mind holds the standing intent, its agenda and position (`agenda`,
-`agendaPos`), the card whose effects are still to apply (`pending`), an option to
-avoid for a minute after it failed (`avoid`), since when the plan has been blocked
-(`planBlockedSince`), mood, energy, recent history and the next-think time. Minds
-are snapshotted outside the engine hash. Accepted decisions, intents, mandates
-and day/reflection events rebuild their replayable state; no model is called
-during replay. Living minds additionally carry needs, journal and active-rule
-state. Exact restart compares these alongside engine and kernel state.
-
-In the preserved Toy world, six "native" Souls owned by `system` (Oda, Pim, Rowan, Tamsin, Juno, Basil) are
-seeded when the world has no live Souls.
-
-## Web app
-
-`apps/web` is one page with tabs: `watch`, `my soul`, `grammar`, `notebook`, `world`,
-`brain`, `story`, `sync`, `spend`, `admin`, `architecture`, `everything` (`spend` and
-`admin` are shown to admins only). `grammar` shows plays as sentences, the
-vocabulary, the motions cards wanted and did not get, every thing, and the card
-library. `notebook` sets open design questions beside counts from the running
-world. `my soul` shows the Soul's deck and plan, its plays and what was said to or
-by it. `watch` includes overheard speech.
-
-## What is real and what is faked
-
-| Part | State |
-|---|---|
-| Log, fold, replay, snapshots, restore, tick loop, dilation | real |
-| Kernel, cards, decks, plays, minting, agendas, lookahead | real |
-| WebSocket sync, replica, resync, resume | real |
-| Accounts (Privy), invites, Souls, ownership, agent pairing, MCP | real |
-| Mid-brain, narrator, director, compiler, speech, translator calling live models | real |
-| Spend tracking and governor | real |
-| Engine (default) | **toy**: 100 m plane, 7 fixtures, straight-line walking, 10 verbs |
-| Engine (`ENGINE=mars`) | vendored native engine, required in CI/deployment; camp, ceramic garden and green field |
-| Speech | the act (ask, agree, chat…) is kernel state; the words are rendered afterwards and change nothing |
-| Things made by cards | exist in the kernel only; no engine entity is created |
-| Rendering | shared recorded 3D observer for all four worlds; Lab is separate browser execution |
-| Scenes (several bodies staged as one), retiring or revising a card | not built |
-| Physical building/rooms | finite lookout construction and seven ceramic rooms delivered |
-| Economy (manna), terrain, central ritual, NFTs, chain | deferred design |
+Large media (GLB models, textures, images, audio) is not in git. Published files live on `assets.eden.art` under
+content-addressed keys and are served `immutable`; the web app maps origin paths to CDN keys through a manifest. God
+uploads in a world are content-addressed too (`/assets/<sha256>.<ext>`). See [CDN](operations/cdn.md).

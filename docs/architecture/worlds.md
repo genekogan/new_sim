@@ -1,24 +1,81 @@
-# Authored boundary bands
+# Worlds and the launcher
 
-`authored-boundaries/1` is an explicit prospective collision policy. It adds no support surface, floor, stair, place, destination or terrain traversal. The renderer's current geometry registration does not itself activate a boundary in a native world or an old replay.
+A world is one world-server process (`apps/server/src/main.ts`) with its own database, clock and log. What kind of world
+it is comes from configuration:
 
-New box-shaped authored objects use `Builder.authoredBox`: one local dimension set draws the object and records its transformed world prism. Collision defaults to `solid`; decorative opt-out must be explicit. `Builder.boundary` also supports an existing draw with reviewed matching dimensions. `new Builder()` defaults to authored mode: unregistered blocking primitive draws throw. New blocking geometry must use the single `authoredBox` definition. Legacy/current aggregates explicitly construct `Builder('legacy')`; nonblocking free geometry explicitly uses `Builder('decorative')`. Those exemptions are recorded on emitted groups and do not prove complete old-mesh registration. Pitched/sheared frames are refused, not flattened into guessed native walls.
+| Setting | Effect |
+|---|---|
+| `WORLD_KEY` | `toy`, `mars`, `littlemartians`, `eden` select authored worlds with their own content; any other key is an entity world on the green field |
+| `ENABLE_WORLD_ENGINE=1` | God mode and the entity world model (on for every non-authored key) |
+| `ENGINE` | `mars` (the vendored Mars engine) or `toy` (default) |
+| `WORLD_ID`, `WORLD_PATH`, `PUBLIC_URL` | Identity and public address; the world derives its base URL from `PUBLIC_URL` + `WORLD_PATH` |
+| `MIND_DRIVER` | `edge` (default) or `central`; see [brain](brain.md) |
+| `GENESIS_FILE` | A template the world is built from on first boot |
 
-`authoredBoundaryDeclarationV1(sourceRevision, boxes)` normalizes default fields, sorts IDs, rejects duplicates, and pins the exact geometry with `sourceHash=hashOf({sourceRevision,boxes})`. Each box carries `id`, `buildingId`, `kind`, world `c`, world `half`, native XZ `yaw`, and `collision`. No material name, visibility-root membership or bounding box inference grants collision or a door.
+## The world launcher (`tools/world-launcher`)
 
-An authorized operator calls `WorldHost.installAuthoredBoundariesV1` with a sealed declaration. There is no environment, startup, HTTP or default opt-in in this leaf. The host refuses a prism intersecting a current native body before accepting any sequence/pose/history change, and rechecks at the sequencer boundary. Existing supported surfaces remain authoritative. The logged `operator:authored-boundaries` rules fact receives its actual acceptance tick. Updates are explicit new source-pinned facts; repeated identical pins are idempotent.
+`launcher.mjs` runs many worlds behind one address. In production it is served under `/worlds`
+(`https://sim.eden.art/worlds`); locally it listens on port 4980 and starts worlds on ports 5101–5149.
 
-Native `sceneForWorld` converts the same solid source bands into ordinary height-aware obstacles. Existing static raster rebase and navigation epoch changes make active routes replan or truthfully block without teleporting. Elevated bands retain their actual Y range and never become ground columns. Explicit decorative records are omitted from physical obstacles.
+- **Homepage and list.** `GET <base>/` serves the web app's world list; `<base>/__sim/worlds.json` lists worlds and
+  `<base>/__sim/templates.json` the templates.
+- **Creating a world.** `POST <base>/__sim/worlds` with a signed-in session. The launcher checks account limits, allocates
+  a slug and directory, starts the child with the creator as `WORLD_OWNER_ID` and the chosen template as `GENESIS_FILE`, and
+  claims the world for its creator.
+- **Proxying.** `<base>/w/<slug>/*` is proxied to the child (HTTP, SSE and WebSocket). A request to a sleeping world
+  starts it.
+- **Sleeping.** Children are restarted after a crash (with backoff), paused after a period without visitors, and may be
+  released to exit later; the next visit wakes them. Unwatched worlds run at a slower clock
+  (`SIM_UNWATCHED_PACE`, 0.25 by default for children); on return, the time of day jumps to the present
+  (`apps/server/src/clock-catchup.ts`) without simulating the gap.
+- **Registry.** `<data>/worlds.json` records each world (slug, owner, template, flags). Reserved slugs include `toy`,
+  `mars`, `littlemartians`, `eden`, `assets`, `api`, `god` and `launcher`.
+- **Owner and operator API.** Handoff, archive and unlisting, and the loopback-only `op.mjs` commands: see
+  [API](api.md#world-owner-api-served-by-the-launcher).
+- **Keeper.** `keeper.mjs` holds the public port and hands over between launcher generations one world at a time, with
+  the first world as a canary and rollback on failure. Release mechanics are in [release](../release.md).
 
-The public scene capture stores the accepted fact as `scene.authoredBoundaries`. Camera consumers use `authoredBoundaryBoxesAtPublicationV1(publication,depictedTick)` from the selected immutable prefix. Missing, malformed, unpinned or not-yet-accepted facts are a no-op; consumers must not fall back to present generated registrations. The same source prisms supply the camera eye/feet sweep. No-field old native physical hashes, snapshots and scene captures remain unchanged. Once new facts exist, forward-data rollback needs a reader supporting this policy; do not reinterpret them with an older reader or manufacture recovery.
+### What a child runs with
 
-Coverage distinction: the current detached Eden map inventory has199 regional building footprints,22 on declared native ground with coarse native coverage at their centres, and177 outside native support. That inventory is not a live route witness or proof of every door. This policy can pre-register supported or unsupported-height wall bands; it never advertises the177 districts or their floors as native destinations. Existing missing-wall behaviour was not reproduced from the coarse inventory. Actual native tests introduce a previously absent wall on already supported ground, preserve bounded active movement, pass through a real source gap, refuse current-body overlap (including a floater's declared ground-to-hover movement envelope), and prove capture/prefix/snapshot/genesis parity. Root separately owns activation against the actual current world and the final composed browser qualification.
+`children.mjs` builds each child's environment: `ENGINE=mars`, `ENABLE_WORLD_ENGINE=1`, `BRAIN_MODE=fake` with empty
+provider keys, `SEED_NATIVES=0`, `SOUL_LIFECYCLE=1`, `EDGE_FADING=1`, `SIM_UNWATCHED_PACE=0.25`, Clerk sign-in
+(`AUTH_PROVIDER=clerk`, `ACCOUNT_AUTH_REQUIRED=1`, `ACCOUNT_REGISTRY_PATH`), the world's identity and paths, the
+served skill and CLI files, the site relay settings (`SIM_SITE_URL`, `SIM_SITE_KEY`), and the Eyes settings when the
+launcher's own environment sets them (see [Souls](souls.md#eyes)).
 
-The local edge launcher opt-in is the descriptor pair `authoredBoundariesFile` and `authoredBoundariesSHA256`. Both are required together. The launcher checks exact file bytes (max4MiB) and canonical source schema before creating its data/lock paths. Selected world boot also previews current occupied movement envelopes; `check` mode previews but installs no fact. Ordinary selected startup explicitly installs the declaration after existing nav/office policies. Missing fields preserve the old startup path. This leaf does not choose a declaration or enable these fields for any public/candidate world; Root owns the exact artifact and activation qualification.
+### Account limits
 
+The launcher counts the worlds each signed-in account owns before allocating anything (`creation-policy.mjs`):
 
-Floater scope follows the existing `bodyProfile` and `bodies/float.ts` contract: `pose.p` is its ground route point, depiction adds hover height, and `walk_to` is the named `floater.glide` approximation. The supported routing envelope extends from ground to hoverHeight+radius. A band wholly above that profile or below ground stays clear; a low band within the column may conservatively block even if it is below the depicted head. This policy does not create arbitrary3D flight or sphere-only low-obstacle clearance. Current-body preview uses that same actual profile, not a fictitious sphere centred at the ground pose.
+| Flag | Default | Meaning |
+|---|---|---|
+| `--max-worlds-per-account` | 5 | Worlds one account may own |
+| `--new-account-hours` | 24 | How long an account counts as new (from its first sign-in on this launcher) |
+| `--new-account-world-limit` | 2 | Total cap while new |
+| `--new-account-create-limit` | 1 | Worlds created per window while new |
+| `--new-account-window-minutes` | 60 | That window |
 
-Body-specific derived navigation now invalidates when the base Spatial object OR its baseId changes (obstacle edits, nav, office guards, authored bands). Its replacement derived epoch remains monotonic so an active glide cannot treat a new scene as already verified. The cache and counter remain in derived services/WeakMaps; no new epoch enters canonical WorldState. This corrects a reproduced mid-glide collision.human-static fault; Root still qualifies actual current-history readers/prefixes and does not manufacture recovery if movement-history drift is found.
+Refusals: 409 `account-world-limit`, 429 `new-account-velocity` with `Retry-After`. A god label (`godName`) already
+shown on another account's world is refused with 409 `god-name-taken`.
 
-Accepted/restored authored facts are now validated and deeply frozen as JS static data (fact, box list, boxes, centre/half tuples). Freeze changes ownership descriptors only, not canonical bytes. A WeakMap memo of the exact full source-identity hash is keyed by fact reference and the complete preceding edited/nav/office source identity. Replacing a fact or rebasing any preceding source recomputes it; old no-field worlds remain unchanged. Capture/getter results remain detached copies. The memo is derived and never adds a field, reference or altered take/world hash.
+### The original worlds
+
+The original `eden`, `mars` and `littlemartians` worlds run as **forks** under the launcher (`fork-world.mjs`): a copy
+of that world's data served at `<base>/w/<key>` with Clerk sign-in, its own account registry, edge minds and the fake
+brain. A fork's boot must never shrink its history or change its Soul rows.
+
+## Travel between worlds
+
+A Soul can visit another world of the same launcher site (`apps/server/src/travel/`, mounted on worlds with god mode
+and the edge API). Its **home world** stays the authority on where it is.
+
+1. The origin checks the request and marks the Soul `departing`.
+2. It sends a small **passport** (name, description, owner, portable body look, recent travel log) through the
+   launcher's loopback relay (`/__sim/site/relay`) to the destination's `/v1/site/arrive`.
+3. The destination reuses the Soul's earlier local incarnation or creates one through the normal lifecycle, and returns
+   a new Soul token for the agent.
+4. The origin marks its incarnation `away` and tells the home world. On refusal or timeout nothing moves.
+
+Each world keeps its own history; only the passport moves. A god may close a world to visitors
+(`POST /v1/god/visitors {open:false}`, refusal `travel.closed`); leaving and coming home always work. The CLI's
+`travel <world>` and `travel home` switch the agent's folder to the new world. Uploaded bodies stay home.
