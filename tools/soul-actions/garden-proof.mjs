@@ -12,7 +12,7 @@ try{
  await post('/v1/god/env',{timeOfDay:'14:00',timeScale:0,weather:{kind:'clear'}});
  await page.goto(base+'/?eye=-1.5,1.7,2.4&at=0.05,1.3,3.95');await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=1,null,{timeout:120000});await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(3000);await installFrameStamp(page);
  timer=setInterval(async()=>{if(busy)return;busy=true;try{const s=await sample();if(s)samples.push(s);}finally{busy=false;}},50);
- await camera([4.6,2.5,2.2],[0.2,0.7,5.2]);await page.waitForTimeout(1500);
+ await camera([4.4,1.6,3.0],[-0.4,0.8,5.6]);await page.waitForTimeout(1500);
  await act('ada','turn on the sprinkler');await page.waitForTimeout(3000);
  await act('ada','turn off the sprinkler');
  assert.deepEqual(errors,[]);
