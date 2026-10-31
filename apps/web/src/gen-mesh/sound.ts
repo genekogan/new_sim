@@ -89,6 +89,38 @@ function playPianos(host: Host, x: number, y: number, z: number) {
   }
   for (const [k, t] of pianoDone) if (t < now - 2) pianoDone.delete(k);
 }
+// Entry 20: a jukebox a Soul switched on by hand plays a song from the same score clock as the piano (seeded by the
+// jukebox), with a soft beat, heard where it stands. Jukeboxes are picked out of the emitter scan (`objects`, rebuilt on
+// an edit or every 2 s), never by a per-tick world scan; their generic music loop never plays.
+const JUKEBOX_AHEAD = 0.35, jukeboxDone = new Map<string, number>();
+let jukeboxIds = new Set<string>(), jukeboxNear = false;
+function jukeboxesOf(model: WorldModel, list: Emitter[]) {
+  const ids = new Set<string>();
+  for (const e of list) if (e.spec.kind === 'music' && !e.cloud) { const ent = model.entities.get(e.id), def = ent && model.resolvedDef(ent.def); if (def?.tags?.includes('jukebox')) ids.add(e.id); }
+  return ids;
+}
+function playJukeboxes(host: Host, x: number, y: number, z: number) {
+  jukeboxNear = false;
+  const now = host.worldSeconds, model = host.layer.model; if (typeof now !== 'number' || !ctx || !master || !model || !jukeboxIds.size) return;
+  for (const e of objects) {
+    // the switch is read live (a map lookup per jukebox): the emitter scan can be up to 2 s old after a state change
+    if (!jukeboxIds.has(e.id) || !condition(e.spec.when, { ...e.state, ...model.entities.get(e.id)?.state }, night)) continue;
+    const g = falloff(distanceTo(e, x, y, z), e.spec.radius, e.spec.volume); if (g <= 0.001) continue;
+    jukeboxNear = true;
+    for (const n of pianoNotes('jukebox:' + e.id, now - 0.05, now + JUKEBOX_AHEAD)) {
+      const key = `${e.id}:${n.t}:${n.hand}`; if (jukeboxDone.has(key)) continue; jukeboxDone.set(key, n.t);
+      const at = ctx.currentTime + Math.max(0, n.t - now);
+      pianoKey(ctx, master, at, n.midi, g * n.vel * 0.45);
+      if (n.hand === 0) burst(ctx, master, at, 0.09, g * 0.12, 120, 'lowpass');   // a soft kick under the bass
+    }
+    // a brushed off-beat every half second
+    for (let k = Math.ceil((now - 0.05) / 0.5); k * 0.5 < now + JUKEBOX_AHEAD; k++) {
+      const key = `${e.id}:b${k}`; if (jukeboxDone.has(key)) continue; jukeboxDone.set(key, k * 0.5);
+      if (k % 2) burst(ctx, master, ctx.currentTime + Math.max(0, k * 0.5 - now), 0.07, g * 0.06, 5000);
+    }
+  }
+  for (const [k, t] of jukeboxDone) if (t < now - 2) jukeboxDone.delete(k);
+}
 function bell(c: AudioContext, out: AudioNode, at: number, f = 1180, peak = 0.35) {
   for (const [m, a, d] of [[1, 1, 1.4], [2.0, 0.5, 0.9], [2.76, 0.35, 0.6], [5.4, 0.15, 0.3]] as const) tone(c, out, at, f * m, f * m * 0.995, d, peak * a);
 }
@@ -250,7 +282,7 @@ function unlock() {
 function step(host: Host) {
   const model = host.layer.model; if (!model) return;
   const now = performance.now(), seq = (model as unknown as { editSeq?: number }).editSeq ?? -2;
-  if (now - lastScan > 2000 || seq !== lastSeq) { objects = emittersOf(model); if (seq !== lastSeq || now - lastScan > 10000 || !trees.count) scanWorld(model); lastScan = now; lastSeq = seq; }
+  if (now - lastScan > 2000 || seq !== lastSeq) { objects = emittersOf(model); jukeboxIds = jukeboxesOf(model, objects); if (seq !== lastSeq || now - lastScan > 10000 || !trees.count) scanWorld(model); lastScan = now; lastSeq = seq; }
   const { x, y, z } = host.camera.position;
   const ground = host.layer.groundAt?.(x, z) ?? null;
   if (now - lastAmb > 500) {
@@ -264,9 +296,10 @@ function step(host: Host) {
     ambient = ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure });
   }
   people = movement.emitters(host.residents?.() ?? [], { x, y, z, ground }, now / 1000);
-  if (!settings.muted) playPianos(host, x, y, z); else pianoNear = false;
+  if (!settings.muted) { playPianos(host, x, y, z); playJukeboxes(host, x, y, z); } else pianoNear = jukeboxNear = false;
   const heard: Heard[] = [], playlist = musicPlaying();
   for (const e of [...objects, ...ambient, ...people]) {
+    if (e.spec.kind === 'music' && jukeboxIds.has(e.id)) continue;   // a jukebox plays its song (playJukeboxes)
     if (playlist && e.spec.kind === 'music') continue;   // a world's own music things stay quiet under the playlist
     const d = e.follow ? 0 : distanceTo(e, x, y, z);
     if (e.spec.mode === 'change') {
@@ -353,7 +386,7 @@ export function startSoundLayer() {
   settings = loadSettings(store());
   const w = window as unknown as { __simEntity?: Host; __edenSound?: unknown };
   w.__edenSound = {
-    state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered, piano: { near: pianoNear, scheduled: pianoDone.size },
+    state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered, piano: { near: pianoNear, scheduled: pianoDone.size }, jukebox: { near: jukeboxNear, ids: jukeboxIds.size, scheduled: jukeboxDone.size },
       world: { trees: trees.count, exposure: +exposure.toFixed(2), night: +night.toFixed(2), typicalGround: +typicalGround.toFixed(1) },
       emitters: [...objects, ...ambient, ...people].map((e) => ({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, when: e.spec.when ?? null, on: condition(e.spec.when, e.state, night) })),
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
@@ -377,7 +410,7 @@ export function startSoundLayer() {
   };
   (window as unknown as { __edenMusic?: unknown }).__edenMusic = { state: musicState, log: musicLog, level: musicLevel, next: nextPiece, trackSeconds: musicTrackSeconds };
   // another tab took the sound, or this one came back: act now, not on the next (throttled, when hidden) tick
-  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' }); });
+  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' }); });
   const gesture = () => { unlock(); musicGesture(); };
   for (const ev of ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'] as const) window.addEventListener(ev, gesture, { capture: true, passive: true });
   // lane W1: the first scan of the world's sound sources (~0.2 s at 2x CPU on Eden 2026) waits until the arrival is over.
@@ -385,7 +418,7 @@ export function startSoundLayer() {
   setInterval(() => {
     if (!arrivalOver() || !document.querySelector('.world-scene canvas')) return;
     mountUi();
-    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
+    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
     const host = w.__simEntity; if (host?.camera && host.layer) { const t0 = performance.now(); try { step(host); } catch { /* a world mid-reload */ } cost.ticks++; cost.tickMs += performance.now() - t0; }
   }, TICK_MS);
 }
