@@ -168,10 +168,11 @@ class BridgeStats {
         extra += `; table ${k.length} keys ${Math.round(keysUs)} us fill ${Math.round(fillUs)} us`;
         const calls = ((b.host.engine as unknown as { constructor?: { tableWriteSitesV1?: Map<string, number> | null } }).constructor)?.tableWriteSitesV1;
         if (calls) { extra += `; engine calls ${[...calls].sort((x, y) => y[1] - x[1]).slice(0, 14).map(([k, v]) => `${k}=${v}`).join(' ')}`; calls.clear(); }
-        const reuse = (b.host.engine as unknown as { tableReusesV1?: number }).tableReusesV1 ?? 0;
-        extra += `; table reused ${reuse - this.lastReuse} steps`; this.lastReuse = reuse;
+
       }
     }
+    const reuse = (b.host.engine as unknown as { tableReusesV1?: number }).tableReusesV1 ?? 0;
+    extra += `; table reused ${reuse - this.lastReuse} steps`; this.lastReuse = reuse;
     if (sp) this.last.spatial = { ...sp }; this.last.perceive = b.perceive.stats.runs; this.last.spots = b.activitySpots.stats.derives; this.last.wall = now; this.last.cpu = cpu; this.steps.clear();
     return out + extra;
   }

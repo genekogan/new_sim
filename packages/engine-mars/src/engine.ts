@@ -2382,7 +2382,12 @@ export class MarsEngine implements Engine {
 // the count is unchanged and the table is the same object. Exact: the same keys, order and values as a fresh listing
 // (oracle SIM_TABLE_CHECK=1 lists afresh and throws on any difference). A method added later is wrapped by default.
 /** Reads called between ticks on a served world that never add, remove or replace an entry of the table. */
-const TABLE_PURE: ReadonlySet<string> = new Set<string>([]);
+const TABLE_PURE: ReadonlySet<string> = new Set<string>([
+  // read every tick by the server and the step itself (SIM_L4_SCAN_SITES=1 engine calls on the live copy); each only reads
+  // the table (spatial syncs and connectivity labels are derived state outside it)
+  'takeChunks', 'composedRules', 'renderContextKeyV1', 'carrierOf', 'carriers', 'stallProbeV1', 'placeLevelV1', 'programOf',
+  'poseSampleOf', 'staticEpochV1', 'lyingRoomAtV1', 'navWarmV1', 'connectivityV1', 'navCheckV1',
+]);
 const TABLE_COUNT = process.env.SIM_L4_SCAN_SITES === '1' ? new Map<string, number>() : null;
 (MarsEngine as unknown as { tableWriteSitesV1?: Map<string, number> | null }).tableWriteSitesV1 = TABLE_COUNT;   // diagnostic (SIM_L4_SCAN_SITES=1): calls per method
 for (const name of Object.getOwnPropertyNames(MarsEngine.prototype)) {
