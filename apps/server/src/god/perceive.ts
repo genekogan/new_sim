@@ -313,7 +313,7 @@ export class GodPerceive {
     return { queue: [...ids], i: 0, changed: [], made: 0, root, layersOn, full, ms: 0 };
   }
   /** Recompute one id and bring its object in line. */
-  private apply(r: Run, id: string, objs: { create(i: unknown): unknown }) {
+  private apply(r: Run, id: string, objs: { create(i: unknown): unknown; refresh?(ids: string[]): void }) {
     const e = this.h.model.entities.get(id), x = e ? this.wantOne(e, r.layersOn) : null;
     const old = this.entries.get(id);
     if (old) { this.cellDel(id, old.at); this.entries.delete(id); this.signs.delete(id); }
@@ -321,7 +321,7 @@ export class GodPerceive {
       // gone from the entity world: hidden (removed), never deleted (an undo brings the same id back)
       const sig = this.sigs.get(id); if (sig === undefined) return;
       const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }, n = canonicalJson(st);
-      if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); r.changed.push(id); }
+      if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); r.changed.push(id); objs.refresh?.([id]); }
       return;
     }
     const at = x.w.params.at as Vec2;
@@ -330,7 +330,9 @@ export class GodPerceive {
     if (this.sigs.get(id) === sig) return;
     this.desired.set(id, state);
     try {
-      if (!this.sigs.has(id)) { objs.create({ id, kind: x.w.kind, name: x.w.name, description: x.w.description, placeId: r.root, params: { ...x.w.params, key: id } }); r.made++; } else r.changed.push(id);
+      // L8: a changed object is brought in line at once, not at the end of the (sliced) catch-up: built kinds' advance is
+      // refresh-only, so a listing between slices would otherwise show the old state of an object already recomputed
+      if (!this.sigs.has(id)) { objs.create({ id, kind: x.w.kind, name: x.w.name, description: x.w.description, placeId: r.root, params: { ...x.w.params, key: id } }); r.made++; } else { r.changed.push(id); objs.refresh?.([id]); }
       this.sigs.set(id, sig);
     } catch (err) { this.h.log(`built object ${id}: ${(err as Error).message}`); }
   }
@@ -357,7 +359,7 @@ export class GodPerceive {
       // One apply can rebuild the named-thing index; do not start another object after it consumes the slice.
       if (performance.now() - t0 >= budgetMs) { r.ms += performance.now() - t0; return false; }
     }
-    if (r.changed.length) { if (objs.refresh) objs.refresh(r.changed); else objs.fresh(); }
+    if (r.changed.length && !objs.refresh) objs.fresh();   // with refresh, apply() already brought each one in line
     r.ms += performance.now() - t0;
     this.run = null;
     Object.assign(this.stats, { runs: this.stats.runs + 1, lastIds: r.queue.length, lastFull: r.full, lastMs: Math.round(r.ms * 10) / 10 });
