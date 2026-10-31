@@ -740,11 +740,11 @@ export class GodNav {
   }
   /** Named things within 15 m of a thing (its "by the X"), nearest first. */
   landmarks(t: Thing, n = 2): Thing[] {
-    return this.byVersion(`l|${t.ref}|${n}`, () => this.within(t.at, 15).filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o));
+    return this.byVersion(`l|${t.ref}|${n}`, () => this.within(t.at, 15).filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d || (a.o.ref < b.o.ref ? -1 : 1)).slice(0, n).map((x) => x.o));
   }
   /** Names of the named things within `within` m of a point (not `except`, not rooms), nearest first: "by the X". */
   namesNear(at: Vec2, except: string, n = 2, within = 12): string[] {
-    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.within(at, within).filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref));
+    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.within(at, within).filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d || (a.o.ref < b.o.ref ? -1 : 1)).slice(0, n).map((x) => x.o.ref));
   }
   /** L1: the things (rooms included) that can lie within `r` m of a point by `distance`, in things() order — a superset
    *  (callers filter by distance as before), so "by the X" answers are unchanged. A grid of each thing's box (a path's
