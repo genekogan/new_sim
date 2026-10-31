@@ -592,7 +592,9 @@ export class HumanViews {
         }
       }
     }
-    const pz = solvePosture(d, ts, styleFor(v.activity, walking));
+    // A hand actuator (not a door) whose hand points are all at or above the hip joints is a standing reach: lean, never dip.
+    const style = styleFor(v.activity, walking), standing = style === 'knees' && !!v.handActuator && !v.handActuator.opening && ts.length > 0 && ts.every((t) => t.up >= d.hipH);
+    const pz = solvePosture(d, ts, standing ? 'stand' : style);
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
     if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
