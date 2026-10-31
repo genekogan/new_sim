@@ -21,13 +21,23 @@ type V3=[number,number,number];
 export type InsideVia={into:boolean;c1:V3;c2:V3;j:V3;a:number};
 const bez3=(p:V3,b:V3,c:V3,d:V3,t:number):V3=>{const u=1-t,k0=u*u*u,k1=3*u*u*t,k2=3*u*t*t,k3=t*t*t;return [p[0]*k0+b[0]*k1+c[0]*k2+d[0]*k3,p[1]*k0+b[1]*k1+c[1]*k2+d[1]*k3,p[2]*k0+b[2]*k1+c[2]*k2+d[2]*k3];};
 const lin=(p:V3,q:V3,t:number):V3=>[p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,p[2]+(q[2]-p[2])*t];
-/** A point on an inside path at parameter u (0 at `from`, 1 at `to`); the caller applies the smoothstep clock. */
+const raw=(from:V3,v:InsideVia,to:V3,u:number):V3=>v.into?(u<v.a?bez3(from,v.c1,v.c2,v.j,u/v.a):lin(v.j,to,(u-v.a)/(1-v.a))):(u<v.a?lin(from,v.j,u/v.a):bez3(v.j,v.c1,v.c2,to,(u-v.a)/(1-v.a)));
+const ARC_N=48;
+function arcTable(from:V3,v:InsideVia,to:V3){const acc=[0];let p=raw(from,v,to,0);for(let i=1;i<=ARC_N;i++){const q=raw(from,v,to,i/ARC_N);acc.push(acc[i-1]+Math.hypot(q[0]-p[0],q[1]-p[1],q[2]-p[2]));p=q;}return acc;}
+/** How long an inside path is (m). */
+export const insideLength=(from:V3,v:InsideVia,to:V3)=>arcTable(from,v,to)[ARC_N];
+/** A point on an inside path a share u of the way along it by length (0 at `from`, 1 at `to`), so the hand moves at the
+ *  clock's own speed profile (a cubic's parameter runs fast where its control points are far apart: 0.17 m per 50 ms at a
+ *  reach start in take 1); the caller applies the smoothstep clock. */
 export function insidePoint(from:V3,v:InsideVia,to:V3,u:number):V3{
- if(v.into)return u<v.a?bez3(from,v.c1,v.c2,v.j,u/v.a):lin(v.j,to,(u-v.a)/(1-v.a));
- return u<v.a?lin(from,v.j,u/v.a):bez3(v.j,v.c1,v.c2,to,(u-v.a)/(1-v.a));
+ const acc=arcTable(from,v,to),want=Math.max(0,Math.min(1,u))*acc[ARC_N];let i=1;while(i<ARC_N&&acc[i]<want)i++;
+ const seg=acc[i]-acc[i-1];return raw(from,v,to,(i-1+(seg>1e-9?(want-acc[i-1])/seg:0))/ARC_N);
 }
+/** Entry 42: an inside reach takes long enough that its hand travels at most ~0.8 m/s on average (peak 1.2 m/s, 0.06 m per
+ *  50 ms under the smoothstep): its path over the lip is ~1.2 m against a table reach's ~0.7 m. */
+export const insideReachSeconds=(length:number)=>Math.min(1.8,Math.max(ITEM_REACH_SECONDS,Math.round(length/0.8*20)/20));
 /** `via`: entry 42, the reach's path over a container's lip (world, m); absent: a straight reach. */
-export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number];via?:InsideVia};
+export type ItemTransferV1={item:string;hand:'left'|'right';action:string;mode?:'take'|'put';startTick:number;reachTick?:number;releaseTick?:number;cancelTick?:number;target?:[number,number,number];via?:InsideVia;reachSeconds?:number};
 /** `posture`: bend toward the fixed grasp point, scaled by `k` — smoothstep up over the reach and down over the
  *  withdraw, the same clock as the engine's hand lerp, so the torso can neither pop nor hop between solutions.
  *  `goal`: a pick-up's empty-handed reach, drawn instead of the engine hand point: from the drawn palm (clip and idle
@@ -37,7 +47,7 @@ const smooth=(n:number)=>{const k=Math.max(0,Math.min(1,n));return k*k*(3-2*k)};
 /** Reach hump on the transfer clock: 0 before the reach, 1 at the grasp, 0 again once the withdraw is over. */
 export function itemPostureK(transfer:ItemTransferV1,tick:number,dt:number){
  if(transfer.reachTick===undefined)return 0;
- const u=(tick-transfer.reachTick)*dt/ITEM_REACH_SECONDS;
+ const u=(tick-transfer.reachTick)*dt/(transfer.reachSeconds??ITEM_REACH_SECONDS);
  return u<=1?smooth(u):1-smooth(u-1);
 }
 export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:string;right?:string}|undefined,tick:number,dt:number):ItemPresentation|undefined {
@@ -64,12 +74,13 @@ export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:s
  // An interrupted pick-up: the goal stops where it was and the drawn arm goes back to the clip over the engine's
  // withdraw, then stays there through the recovery.
  const cancelled=reaching&&transfer.cancelTick!==undefined;
- const reachK=reaching?smooth((cancelled?transfer.cancelTick!-transfer.reachTick!:tick-transfer.reachTick!)*dt/ITEM_REACH_SECONDS):0;
- const lead=smooth(s/ITEM_ARM_LEAD_SECONDS),back=cancelled?lead*(1-smooth((tick-transfer.cancelTick!)*dt/ITEM_REACH_SECONDS)):0;
+ const R=transfer.reachSeconds??ITEM_REACH_SECONDS;
+ const reachK=reaching?smooth((cancelled?transfer.cancelTick!-transfer.reachTick!:tick-transfer.reachTick!)*dt/R):0;
+ const lead=smooth(s/ITEM_ARM_LEAD_SECONDS),back=cancelled?lead*(1-smooth((tick-transfer.cancelTick!)*dt/R)):0;
  const goal=reaching?{goal:{hand:transfer.hand,p:transfer.target!,k:lead>1e-6?Math.min(1,reachK/lead):0,...(transfer.via?{via:transfer.via}:{})}}:{};
  // After release the engine keeps the hand at its rest point through recovery: the drawn arm eases from it to the clip.
  // A pick-up's recovery ends holding the item: no gesture comes back (it would be cut when the record clears), only
  // the reach-start fade runs out.
  if(transfer.releaseTick!==undefined){const r=smooth((tick-transfer.releaseTick)*dt/ITEM_RECOVERY_SECONDS);return{weight:holding?1:pickUp&&transfer.cancelTick!==undefined?0:1-r,idleBlend:holding?fade:Math.max(r,fade),...posture};}
- return{weight:holding?1:cancelled?back:reaching?lead:pickUp?smooth(s/ITEM_REACH_SECONDS):1,idleBlend:fade,...goal,...posture};
+ return{weight:holding?1:cancelled?back:reaching?lead:pickUp?smooth(s/R):1,idleBlend:fade,...goal,...posture};
 }

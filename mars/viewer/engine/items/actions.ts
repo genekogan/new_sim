@@ -8,7 +8,7 @@
 // its own activity this tick, because they are submitted later) and publish `human.baseActivity` =
 // the activity they are layered on ('sit' = seated).
 import { z } from 'zod';
-import {insidePoint,ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS,type InsideVia} from './presentation.ts';
+import {insideLength,insidePoint,insideReachSeconds,ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS,type InsideVia} from './presentation.ts';
 import { angleDelta, clamp, heading, q6, rot2, wrapAngle, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
@@ -156,6 +156,8 @@ type TransferExec = {
   source?: string;
   /** Entry 42: the place inside a container the item goes into or comes out of, and the hand's current arc over its lip. */
   inside?: SurfaceSlot; via?: InsideVia;
+  /** Entry 42: the half step in toward a container over the reach (and back out over the withdraw), x/z. */
+  lean?: { out: [number, number]; in: [number, number]; cancelFrom?: [number, number] };
 };
 
 // ---- inside a container (Soul Actions entry 42) ----
@@ -163,7 +165,7 @@ type TransferExec = {
 /** Arc heights tried over a container's lip (m above it), lowest first. */
 const LIFT_STEPS = Array.from({ length: 16 }, (_, i) => 0.04 + i * 0.02);
 /** A container front's thickness behind its face (m): the band a stored thing must clear the lip over. */
-const FRONT_BAND = 0.02;
+const FRONT_BAND = 0.02, LIP_MARGIN = 0.01;
 /** The hand's path into (or out of) a container (presentation.ts insidePoint): up over the lip in front of it, across to
  *  straight above the place at the lip's height, then straight down to it (or the reverse). The lowest lift whose whole
  *  path keeps the thing (an empty hand: the hand) above the lip wherever its footprint is over the front band; `size` is
@@ -178,14 +180,29 @@ function insideArc(owner: Entity, slot: SurfaceSlot, from: Vec3, to: Vec3, into:
     const straight = Math.max(1e-3, j[1] - low), share = (3 * lift) / (3 * lift + straight);
     via = into ? { into, c1: front, c2: above, j, a: share } : { into, c1: above, c2: front, j, a: 1 - share };
     let ok = true;
-    for (let i = 0; i <= 64 && ok; i++) {
-      const q = fixtureLocal(owner, insidePoint(from, via, to, i / 64));
-      if (q[2] + half >= ins.face - FRONT_BAND && q[2] - half <= ins.face && q[1] - drop < ins.lip - 1e-6) ok = false;
+    // 1 cm of margin over the lip, checked finer than any tick samples it
+    for (let i = 0; i <= 128 && ok; i++) {
+      const q = fixtureLocal(owner, insidePoint(from, via, to, i / 128));
+      if (q[2] + half >= ins.face - FRONT_BAND && q[2] - half <= ins.face && q[1] - drop < ins.lip + LIP_MARGIN) ok = false;
     }
     if (ok) break;
   }
   const r = (v: Vec3) => v.map(q6) as Vec3;
   return { into, c1: r(via!.c1), c2: r(via!.c2), j: r(via!.j), a: q6(via!.a) };
+}
+/** Closest a body steps in to a container's face while reaching in (m from the face to the body axis): body radius 0.28 +
+ *  room for a knob or a door edge. */
+const LEAN_FACE = 0.35;
+/** How far in a body leans its step: until the place is this far ahead (m, horizontal), at most LEAN_MAX. A 0.71 m reach to a
+ *  drawer floor 1 m up bent a 1.6 m body 50° with its head over the drawer (take 1); people step in. */
+const LEAN_REACH = 0.5, LEAN_MAX = 0.2;
+/** Entry 42: the half step from the stand point toward the place (local z only, never past LEAN_FACE from the face). */
+function insideLean(owner: Entity, slot: SurfaceSlot, at: [number, number]): { out: [number, number]; in: [number, number] } | undefined {
+  const me = fixtureLocal(owner, [at[0], 0, at[1]]), l = slot.local!, reach = Math.hypot(l[0] - me[0], l[2] - me[2]);
+  const z = Math.max(slot.inside!.face + LEAN_FACE, me[2] - Math.min(LEAN_MAX, Math.max(0, reach - LEAN_REACH)));
+  if (me[2] - z < 0.02) return undefined;
+  const q = fixturePoint(owner, [me[0], 0, z]);
+  return { out: [q6(at[0]), q6(at[1])], in: [q6(q[0]), q6(q[2])] };
 }
 /** Where a body stands to reach into a container: its authored stand point, facing the place inside. */
 function insideStation(owner: Entity, slot: SurfaceSlot): Station {
@@ -331,6 +348,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       }
       if(ex.phase==='cancel-withdraw'){
         const R=ex.reachTicks??ticks(REACH_TIME);ex.t++;const q=handPath(ex,smooth(ex.t/R));setHand(a,ex.hand,q);a.human!.activity='reach';
+        if(ex.lean){const w=1-smooth(ex.t/R),c=ex.lean.cancelFrom??ex.lean.in,o=ex.lean.out;a.pose.p=[o[0]+(c[0]-o[0])*w,a.pose.p[1],o[1]+(c[1]-o[1])*w];}
         if(inHand(rt.world,ex.actor,ex.hand))followHand(it,q,a.pose.yaw);
         if(ex.t<R)return{status:'running',phase:'cancel-withdraw'};
         ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};
@@ -368,12 +386,24 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         // entry 42: into a container, up over its lip and down to the place inside (the drawn pick-up hand takes the same arc)
         const box = ex.inside && rt.world.entities[ex.inside.owner];
         ex.via = box ? insideArc(box, ex.inside!, ex.from, ex.to, true, ex.mode === 'put' ? CATALOG[it.def].size : null) : undefined;
-        if(a.human!.itemTransferV1?.action===ex.id){a.human!.itemTransferV1.reachTick=rt.tick-1;a.human!.itemTransferV1.target=ex.target.map(x=>Math.round(x*1000)/1000) as [number,number,number];if(ex.via){const mm=(v:Vec3)=>v.map(x=>Math.round(x*1000)/1000) as Vec3;a.human!.itemTransferV1.via={into:true,c1:mm(ex.via.c1),c2:mm(ex.via.c2),j:mm(ex.via.j),a:Math.round(ex.via.a*1e4)/1e4};}}
+        // the reach and the withdraw share one clock: long enough for the longer of the two paths (the way back out is
+        // known now: the body stands still from here to the release)
+        let reachSeconds: number | undefined;
+        if (box && ex.via) {
+          ex.lean = insideLean(box, ex.inside!, [a.pose.p[0], a.pose.p[2]]);
+          const bf = bodyFrame(a), back = ex.mode === 'put' ? restHand(bf, ex.hand) : carryHand(bf, ex.hand);
+          const out = insideArc(box, ex.inside!, ex.to, back, false, ex.mode === 'take' ? CATALOG[it.def].size : null);
+          reachSeconds = insideReachSeconds(Math.max(insideLength(ex.from, ex.via, ex.to), insideLength(ex.to, out, back)));
+          ex.reachTicks = ticks(reachSeconds);
+        }
+        if(a.human!.itemTransferV1?.action===ex.id){if(reachSeconds!==undefined)a.human!.itemTransferV1.reachSeconds=reachSeconds;a.human!.itemTransferV1.reachTick=rt.tick-1;a.human!.itemTransferV1.target=ex.target.map(x=>Math.round(x*1000)/1000) as [number,number,number];if(ex.via){const mm=(v:Vec3)=>v.map(x=>Math.round(x*1000)/1000) as Vec3;a.human!.itemTransferV1.via={into:true,c1:mm(ex.via.c1),c2:mm(ex.via.c2),j:mm(ex.via.j),a:Math.round(ex.via.a*1e4)/1e4};}}
       }
       a.human!.activity = 'reach';
       ex.t++;
       const R = ex.reachTicks ?? ticks(REACH_TIME);
       const k = smooth(ex.t / R);
+      // entry 42: the body steps half a step in as the hand goes in, and back as it comes out
+      if (ex.lean) { const [o, i] = [ex.lean.out, ex.lean.in], w = ex.phase === 'reach' ? k : 1 - k; a.pose.p = [o[0] + (i[0] - o[0]) * w, a.pose.p[1], o[1] + (i[1] - o[1]) * w]; }
       const q = handPath(ex, k);
       setHand(a, ex.hand, q);
       const holding = (ex.mode === 'take') === (ex.phase === 'withdraw');
@@ -413,6 +443,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
           else placeOnGround(it, ex.dest!.ground, a.pose.yaw);
           ex.to = restHand(b, ex.hand);
         }
+        // the withdraw ends where the body will be: back at its stand point
+        if (ex.lean) ex.to = [ex.to![0] + ex.lean.out[0] - a.pose.p[0], ex.to![1], ex.to![2] + ex.lean.out[1] - a.pose.p[2]];
         ex.phase = 'withdraw';
         ex.t = 0;
         ex.from = q;
@@ -444,6 +476,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         if(a.human.itemTransferV1?.action===ex.id&&['reach','withdraw','cancel-withdraw','recover'].includes(ex.phase)){
           if(ex.phase!=='recover'&&ex.phase!=='cancel-withdraw'){a.human.itemTransferV1.cancelTick=rt.tick;ex.from=handNow(a,ex.hand,bodyFrame(a));const held=inHand(rt.world,ex.actor,ex.hand);ex.to=held?carryHand(bodyFrame(a),ex.hand):restHand(bodyFrame(a),ex.hand);
             // entry 42: a hand already past a container's front comes back out over its lip
+            if(ex.lean){ex.lean.cancelFrom=[a.pose.p[0],a.pose.p[2]];ex.to=[ex.to[0]+ex.lean.out[0]-a.pose.p[0],ex.to[1],ex.to[2]+ex.lean.out[1]-a.pose.p[2]];}
             const box=ex.inside&&rt.world.entities[ex.inside.owner],inner=box&&fixtureLocal(box,ex.from)[2]<ex.inside!.inside!.face+.05;ex.via=box&&inner?insideArc(box,ex.inside!,ex.from,ex.to,false,held?CATALOG[held.def].size:null):undefined;
             ex.phase='cancel-withdraw';ex.t=0;}
           return{ok:true,deferred:true};

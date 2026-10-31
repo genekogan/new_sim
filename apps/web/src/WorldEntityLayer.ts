@@ -838,6 +838,8 @@ export class WorldEntityLayer {
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
     const mdef = rideMotionDef(def);  // BALLOON-BODY: a ride balloon does not hover; Core's vehicle owns its motion
     this.drawn.set(e.id, { ...(opening ? {opening} : {}), ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(mdef) ? { motion: { entity: e, def: mdef, yaw: wp.yaw, glowOnly: glowOnly(mdef) } } : {}) });
+    // entry 42: a thing kept in a shut container is hidden from its first frame (a resync can draw before the next update)
+    if (this.keptIn.has(e.id)) { const k = this.drawn.get(e.id)!; if (!k.inst) k.obj.visible = this.interiorVisible(e.id, k); }
   }
   private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id); this.keptIn.delete(id);

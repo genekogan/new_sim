@@ -1,4 +1,4 @@
-import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
+import {actuatorHand,handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
 import {insidePoint,itemPresentation,type ItemPresentation} from '../../engine/items/presentation.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
@@ -1056,8 +1056,13 @@ export class HumanViews {
       } } : expression?.kind === 'planted-dance' ? {girdle:0,pole:arm=>V().copy(_right).multiplyScalar(-arm.side*(.35+expression.elbowLift)).addScaledVector(UP,-.5+expression.elbowLift).addScaledVector(_fwd,.15)} : undefined;
       // Blend the actual arm bones to/from the existing idle/walk clip; lowering a
       // Cartesian hand target alone leaves the elbow/shoulder snapping at release.
-      const weight=v.itemPose?.weight??(v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:1);
-      const armBase=weight<1?v.arms.flatMap(arm=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand]).map(o=>({o,q:o.quaternion.clone(),p:o.position.clone()})):[];
+      const actW=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:undefined;
+      const weight=v.itemPose?.weight??actW??1;
+      // entry 42: carrying in one hand while the free hand works a drawer or door: that hand takes the actuator's clock,
+      // the carrying hand the item's (one weight for both popped the free arm onto the knob in one frame)
+      const actSide=v.itemPose&&v.handActuator&&actW!==undefined?actuatorHand(v.handActuator.opening,v.handActuator.hand):undefined;
+      const armW=v.arms.map((_,i)=>actSide&&armSide(v,i)===actSide?actW!:weight);
+      const armBase=v.arms.flatMap((arm,i)=>armW[i]<1?[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand].map(o=>({o,w:armW[i],q:o.quaternion.clone(),p:o.position.clone()})):[]);
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0 && !seatClip) handOnThigh(v, i, sitW);
@@ -1067,8 +1072,8 @@ export class HumanViews {
       // pick-up) keeps the free arm until it has gone: hung at the bend's rate, it dropped 0.11 m per 50 ms
       if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k, v.itemPose?.posture ? 0 : DANGLE_FROM, v.itemPose?.posture ? 1 - clamp01(v.variety ?? 0) : 1);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
-      for(const b of armBase){b.o.quaternion.slerp(b.q,1-weight);b.o.position.lerp(b.p,1-weight);}if(armBase.length)h.updateMatrixWorld(true);
-      closeHands(v, k.map((c, i) => weight*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
+      for(const b of armBase){b.o.quaternion.slerp(b.q,1-b.w);b.o.position.lerp(b.p,1-b.w);}if(armBase.length)h.updateMatrixWorld(true);
+      closeHands(v, k.map((c, i) => armW[i]*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
     } else if (v.sleepPose && pr && v.dims && proneW > 0) {
       // Free contact expression is private to the current rig, never authoritative hands/grips.
       source = 'sleep';
