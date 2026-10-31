@@ -8,8 +8,11 @@ import {Admission} from './load/admission.ts';
 import {liveOf, newSharedLoad, S} from './load/shared.ts';
 import type {WorldInit} from './split/read-model.ts';
 
-const init = (tick = 7): WorldInit => ({tick, static: {epoch: 'e1', places: [], shells: {}, solids: [], fires: [{id: 'fire1', name: 'campfire', at: [3, 0]}], regions: [], spots: []},
-  bodies: [['ent1', 0, 0, 0, 0, '', 0], ['ent2', 5, 0, 0, 0, '', 0]], minds: [{soulId: 's1', entityId: 'ent1', name: 'A'}, {soulId: 's2', entityId: 'ent2', name: 'B'}], faded: [], objects: [], items: []});
+const human = (id: string, x: number) => ({id, kind: 'human', pose: {p: [x, 0, 0], yaw: 0}, human: {}});
+const init = (tick = 7): WorldInit => ({v: 1, gen: 1, seq: 0, tick, logSeq: 0, entities: {ent1: human('ent1', 0), ent2: human('ent2', 5)}, env: {}, living: null,
+  static: {epoch: 'e1', places: [], shells: {}, solids: [], fires: [{id: 'fire1', name: 'campfire', at: [3, 0]}], regions: [], spots: []},
+  minds: [{soulId: 's1', entityId: 'ent1', name: 'A', owner: 'o', native: false}, {soulId: 's2', entityId: 'ent2', name: 'B', owner: 'o', native: false}], faded: [], receipts: [], programs: [], holds: [],
+  objects: {gen: 0, records: []}, items: [], togetherVersion: 0, menuInputs: [], scene: null, sceneKey: '', pages: null, navReady: false});
 const TOKENS: Record<string, string> = {sim_a: 's1', sim_b: 's2'};
 const until = async (f: () => boolean, ms = 5000) => { const t0 = Date.now(); while (!f()) { if (Date.now() - t0 > ms) throw Error('timed out'); await new Promise(r => setTimeout(r, 10)); } };
 const get = async (port: number, path: string, token?: string, init: RequestInit = {}) => { const r = await fetch(`http://127.0.0.1:${port}${path}`, {...init, headers: {...(token ? {authorization: `Bearer ${token}`} : {}), ...(init.headers ?? {})}}); return {status: r.status, headers: r.headers, body: await r.json().catch(() => null) as Record<string, unknown> | null}; };
@@ -44,7 +47,7 @@ test('one worker: health, subset answers by token, lag, live.json advertises rea
     assert.equal(p.stats.auths, 2);
     await get(port, '/v1/edge/here', 'sim_a'); assert.equal(p.stats.auths, 2, 'a token is looked up once, then cached');
     // deltas move the replica; lag is gens behind main
-    p.delta({tick: 8, bodies: [['ent2', 1, 0, 0, 0, '', 0]]});
+    p.delta({v: 1, gen: 1, seq: 1, tick: 8, logSeq: 0, bodies: [['ent2', 1, 0, 0, 0]]});
     await until(() => p.lagGens() === 0 && p.lag[1] === p.gen);
     await until(() => shared[S.readLagGens] === 0);   // republished every 250 ms
     const near = await get(port, '/v1/edge/here', 'sim_a');

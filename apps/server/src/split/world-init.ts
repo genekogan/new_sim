@@ -29,7 +29,8 @@ export function freshTables(host: WorldHost, L: EdgeLedger, tap: DeltaTap, opts:
     objects: {gen: snap?.gen ?? 0, records: (snap?.records ?? []) as ObjectRecordRow[]},
     items: tap.itemsNow(), togetherVersion: L.together.version, menuInputs: tap.menuInputsNow(),
     scene: tap.sceneNow(), sceneKey: tap.sceneKeyNow(), pages: tap.pagesNow(), navReady: tap.navReadyNow(),
-  };
+    ...(tap.extend ? {menu: tap.extend.init()} : {}),
+  } as Fresh;
 }
 
 let cache: {key: string; init: WorldInit} | null = null;

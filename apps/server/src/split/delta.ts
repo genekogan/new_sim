@@ -5,6 +5,8 @@
 // Read-only over the engine and the ledger: it never writes world state, so the engine stays bit-for-bit the same.
 // Nothing here scans the world per tick: bodies are the tracked set (Soul/native humans, carriers, and entities the tick
 // reported), comms objects come from L8's table.changes(since), receipts from the ledger's receipt listener.
+import {VerdictPump} from './verdict-pump.ts';
+import {menuWorldOf, type LiveMenuWorld} from './menu-world.ts';
 import {threadCpuUsage} from 'node:process';
 import type {ChangeEvent, PathCommit, ProgramEvent} from '@sim/engine-contract';
 import type {WorldHost} from '../world.ts';
@@ -63,6 +65,8 @@ export class DeltaTap {
   readonly cost = {ticks: 0, cpuMs: 0, maxCpuMs: 0, bytes: 0, maxBytes: 0, resnapshots: 0, staticSends: 0, sceneSends: 0, epochReads: 0, itemReads: 0, objectDeltas: 0, receipts: 0, ents: 0, bodyRows: 0, unsettled: 0};
   readonly samples: [number, number][] = [];
   measureBytes = false;
+  /** B-facade (split/verdict-pump.ts): the `menu` section of every delta / WorldInit (action rows, verdicts, menu statics). */
+  extend: {delta(staticMoved: boolean): unknown; init(): unknown} | null = null;
 
   constructor(host: WorldHost, L: EdgeLedger) {
     this.host = host; this.L = L;
@@ -249,6 +253,7 @@ export class DeltaTap {
     const sk = this.sceneKeyNow(); if (sk !== this.sceneKey) {this.sceneKey = sk; d.sceneKey = sk; d.scene = this.sceneNow(); this.cost.sceneSends++;}
     mark('items+static');
     const menu = this.menuInputsNow(), mk = JSON.stringify(menu); if (mk !== this.menuKey) {this.menuKey = mk; d.menuInputs = menu;}
+    if (this.extend) {const m = this.extend.delta(!!d.static); if (m) (d as WorldDelta & {menu?: unknown}).menu = m;}
     this.seq = d.seq;
     this.ring.push(d); if (this.ring.length > 2 * DELTA_RING) this.ring = this.ring.slice(-DELTA_RING);
     mark('spatial+menu');
@@ -266,6 +271,7 @@ export class DeltaTap {
 export function installDeltaStream(host: WorldHost, L: EdgeLedger, env: NodeJS.ProcessEnv = process.env): DeltaTap | null {
   if (env.SIM_READ_WORKER !== '1') return null;
   const tap = new DeltaTap(host, L);
+  tap.extend = new VerdictPump(menuWorldOf(host) as LiveMenuWorld, host as never);
   host.splitTap = (tick, out) => tap.onTick(tick, out);
   return tap;
 }

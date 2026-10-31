@@ -38,7 +38,7 @@ const answer = (kind: string, soulId: string) => {
 };
 parentPort!.on('message', (m: ToWorker) => {
   if (m.t === 'init') {const c = cpuMs(); M.init(m.w); cost.initCpuMs = cpuMs() - c; myGen(m.gen); parentPort!.postMessage({t: 'ready', index: wd.index, gen: m.gen, tick: M.tick, stats: M.stats(), initCpuMs: cost.initCpuMs});}
-  else if (m.t === 'delta') {const c = cpuMs(); M.apply(m.d); const ms = cpuMs() - c; cost.deltas++; cost.ingestCpuMs += ms; cost.maxIngestCpuMs = Math.max(cost.maxIngestCpuMs, ms); myGen(m.gen);}
+  else if (m.t === 'delta') {const c = cpuMs(); if (!M.apply(m.d)) {parentPort!.postMessage({t: 'resync', index: wd.index}); return;} const ms = cpuMs() - c; cost.deltas++; cost.ingestCpuMs += ms; cost.maxIngestCpuMs = Math.max(cost.maxIngestCpuMs, ms); myGen(m.gen);}
   else if (m.t === 'query') parentPort!.postMessage({t: 'answer', id: m.id, v: answer(m.kind, m.soulId)});
   else if (m.t === 'forget') tokens.clear();
 });
@@ -110,7 +110,7 @@ async function forward(req: IncomingMessage, res: ServerResponse, url: string, p
 
 /** The replica has this Soul and its body (else main answers: a Soul born since the last delta, a body asleep). The
  *  minds map is private to read-model.ts (lane B-delta's file); read through a cast until its API grows one. */
-const knows = (soulId: string) => {const m = (M as unknown as {minds: Map<string, {entityId: string}>}).minds.get(soulId); return !!m && M.bodies.has(m.entityId);};
+const knows = (soulId: string) => {const m = M.R.minds.get(soulId); return !!m && M.R.entities.has(m.entityId);};
 const SUBSET = new Set(['/v1/edge/here', '/v1/edge/capabilities']);
 async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = stripWorldRequestPath(req.url, wd.worldPath) ?? '/', q = url.indexOf('?'), path = q < 0 ? url : url.slice(0, q);

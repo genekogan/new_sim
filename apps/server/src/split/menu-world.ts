@@ -91,6 +91,8 @@ type EngineLike = {readonly world: NativeWorld; readonly runtime: RuntimeView; r
 export class LiveFeasibility implements Feasibility {
   private at = ''; private cache = new Map<string, Diag | null>();
   readonly asked = new Map<string, Map<string, {program: Program; scope: string}>>();
+  /** When a VerdictPump is attached (split/verdict-pump.ts): every answer computed afresh, shipped with the next delta. */
+  fresh?: {key: string; program: Program; scope: string; verdict: Diag | null}[];
   hits = 0; calls = 0;
   private engine: EngineLike; private logSeq: () => number;
   constructor(engine: EngineLike, logSeq: () => number) {this.engine = engine; this.logSeq = logSeq;}
@@ -100,6 +102,7 @@ export class LiveFeasibility implements Feasibility {
     const key = scope + '\u0002' + planKey(program); this.calls++;
     if (this.cache.has(key)) {this.hits++; const v = this.cache.get(key)!; return v && {...v};}
     const v = this.engine.canPerform(program); this.cache.set(key, v && {...v});
+    if (this.fresh && this.fresh.length < 4096) this.fresh.push({key, program, scope, verdict: v && {...v}});
     let mine = this.asked.get(program.actor); if (!mine) this.asked.set(program.actor, mine = new Map());
     if (!mine.has(key) && mine.size < 256) mine.set(key, {program, scope});
     return v;
@@ -142,13 +145,17 @@ export function menuWorldOf(host: HostLike): MenuWorld {
 export function setMenuWorld(host: object, mw: MenuWorld | null) {if (mw) SET.set(host, mw); else SET.delete(host);}
 
 // ---- replica side (item 2b): plain state + spatial replica + verdicts
-/** Main ships these with the verdicts (B-delta does not replicate them: they change inside a step without an event).
- *  One row per actor with a program, emitted when `programAction(p).action.status` or the action id changes (main
- *  compares per actor with a program after each tick: O(programs)). Answers `programAction`, here.ts `endsIn`
- *  (params.seconds + the first 'running' tick) and the replica runtime's record for that action. Receipt
- *  plan/detail/outcome are NOT shipped: the worker reads them from sqlite (read-only WAL connection), as the ledger does. */
-export type ActionRow = {actor: string; programId: string; step: number; action: {id: string; verb: string; status: string; phase?: string};
-  params: {seconds?: number; actor?: string; fixture?: string; on?: string; slot?: string}; requestedTick?: number; runningTick?: number; tick: number};
+/** Main ships these with the verdicts (split/verdict-pump.ts; B-delta does not replicate them: they change inside a step
+ *  without an event). `ActionRow`: one per actor with a program (answers `programAction`), emitted when it changes.
+ *  `RecordRow`: the runtime records the read code reads (live sit/take_slot holds; each program's current action, with
+ *  params.seconds and the first 'running' tick for here.ts `endsIn`). Receipt plan/detail/outcome are NOT shipped: the
+ *  worker reads them from sqlite (read-only WAL connection), as the ledger does. */
+export type ActionRow = {programId: string; actor: string; step: number; action: {id: string; verb: string; status: string; phase?: string} | null; tick: number};
+export type RecordRow = {id: string; verb: string; status: string; phase?: string; live: boolean; params: Record<string, unknown>; requestedTick?: number; runningTick?: number};
+/** The engine's static-per-epoch reads (resent whole when they move). `kernel` = host.kernel (things, vocab, decks). */
+export type MenuStatics = {regions: unknown; navV1: unknown; rulesVersion: string; verbs: VerbInfo[]; anchors: Anchor[]; newcomer?: NewcomerResource[]; deliveries?: {batch: number}[]; kernel?: unknown};
+export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics};
+export type MenuDelta = {actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel'>; kernel?: unknown};
 export type VerdictRow = {soulId: string; actor: string; key: string; verdict: Diag | null; tick: number};
 /** The verdicts main computed for the programs a replica's reads ask about. A miss answers "feasible" (the planner's
  *  refusal then comes at act time, as `deferRouteChecks` offers do today) and is queued for main (`misses`). */
@@ -158,6 +165,7 @@ export class VerdictTable implements Feasibility {
   private reachOf?: (from: {p: V2; level?: number}, to: {p: V2; level?: number}) => Reach | undefined;
   constructor(reachOf?: (from: {p: V2; level?: number}, to: {p: V2; level?: number}) => Reach | undefined) {this.reachOf = reachOf;}
   apply(rows: readonly VerdictRow[]) {for (const r of rows) {this.rows.set(r.key, r); this.misses.delete(r.key);}}
+  clear() {this.rows.clear(); this.misses.clear();}
   forget(actor: string) {for (const [k, r] of this.rows) if (r.actor === actor) this.rows.delete(k);}
   canPerform(program: Program, scope = ''): Diag | null {
     const key = scope + '\u0002' + planKey(program), hit = this.rows.get(key);
@@ -197,8 +205,8 @@ export class ReplicaMenuWorld implements MenuWorld {
     for (const k of Object.keys(sp)) if (typeof sp[k] === 'function') self[k] = (sp[k] as (...a: unknown[]) => unknown).bind(s.spatial);
     if (s.carriers) self.carriers = s.carriers; if (s.carrierOf) self.carrierOf = s.carrierOf;
     if (s.placeLevelV1) self.placeLevelV1 = s.placeLevelV1; if (s.bodyUsesV1) self.bodyUsesV1 = s.bodyUsesV1;
-    if (s.statics.newcomer) self.commonsNewcomerResourcesV1 = () => structuredClone(s.statics.newcomer);
-    if (s.statics.deliveries) self.commonsFoodDeliveriesV1 = () => structuredClone(s.statics.deliveries);
+    if ('newcomer' in s.statics) self.commonsNewcomerResourcesV1 = () => structuredClone(s.statics.newcomer);
+    if ('deliveries' in s.statics) self.commonsFoodDeliveriesV1 = () => structuredClone(s.statics.deliveries);
   }
   get world() {return this.s.world();}
   get runtime() {return this.s.runtime();}

@@ -204,14 +204,14 @@ if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
 // Stage B (lane B-port): the read-worker pool, DARK unless SIM_READ_WORKER=1 (split/read-pool.ts; nothing is imported
 // otherwise). SIM_READ_WORKERS = pool size (registry `readWorkers`, 1–4, default 1); SIM_READ_PORTS = the launcher's ports.
 if (process.env.SIM_READ_WORKER === '1' && edge) {
-  const { ReadPool, readPorts, spikeDeltaSource } = await import('./split/read-pool.ts');
+  const { ReadPool, readPorts, deltaSource } = await import('./split/read-pool.ts');
   const { accountTag } = await import('./load/admission.ts');
-  const source = await spikeDeltaSource(host, edge);
-  const pool = new ReadPool({ workers: Number(process.env.SIM_READ_WORKERS) || 1, ports: readPorts(process.env.SIM_READ_PORTS), mode: 1, worldPath: config.worldPath, shared: sharedLoad, admission, init: source.init,
+  const source = await deltaSource(host, edge);
+  const pool = new ReadPool({ workers: Number(process.env.SIM_READ_WORKERS) || 1, ports: readPorts(process.env.SIM_READ_PORTS), mode: 1, worldPath: config.worldPath, shared: sharedLoad, admission, init: source.init, ask: source.ask,
     auth: (token) => { const s = souls.soulFromToken(token); return s && !s.retired_at && s.world_id === host.worldId ? { soulId: s.id, account: accountTag(s.owner) } : { soulId: null }; },
     run: async (f) => { const r = await app.fetch(new Request('http://127.0.0.1' + f.url, { method: f.method, headers: f.headers, ...(f.body && f.method !== 'GET' && f.method !== 'HEAD' ? { body: f.body } : {}) }), { simAdmitted: true });
       return { status: r.status, headers: [...r.headers], body: await r.arrayBuffer() }; } }).start();
-  source.onDelta((d) => pool.delta(d));
+  source.onDelta((d) => pool.delta(d), () => pool.reinit());
   (globalThis as { __simReadPool?: unknown }).__simReadPool = pool;   // tests and the harness read pool.status()
   console.log(`[read] ${pool.size} read worker(s), mode subset (here, capabilities)`);
 }

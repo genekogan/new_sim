@@ -4,6 +4,7 @@
 //               (docs/sim/LOAD-CONTRACT.md §6 "WorldDelta v1"; the oracle in split/delta-oracle.ts checks it against main).
 //   ReadModel = the spike's declared SUBSET of `here` and `capabilities` over a Replica (docs/sim/STAGE-B-SPLIT.md §3),
 //               kept so the read worker can serve it until B-facade's MenuWorld runs the real read code.
+import type {MenuDelta, MenuInit} from './menu-world.ts';
 import {clearSight, dist2, round1, type Solid} from '../edge/perception/geometry.ts';
 import {PlaceIndex, centroid, inPoly, type Place} from '../edge/ledger/places.ts';
 
@@ -57,6 +58,8 @@ export type WorldInit = StreamPos & {
   menuInputs: string[];            // ledger addMenuInput sources (a god world: commit version | closing construction sites)
   /** B-spatial: engine.exportStaticScene() (structured clone, not JSON), its rebuild key, the paged windows, connectivity ready */
   scene: unknown; sceneKey: string; pages: unknown; navReady: boolean;
+  /** B-facade (split/verdict-pump.ts): action rows, verdicts, menu statics; absent when no pump is attached */
+  menu?: MenuInit;
 };
 export type WorldDelta = StreamPos & {
   bodies?: BodyRow[];              // pose-only updates
@@ -75,6 +78,7 @@ export type WorldDelta = StreamPos & {
   scene?: unknown; sceneKey?: string;   // B-spatial: when `${spatial.epoch}|${entityPhysicsV1.hash}` moved: rebuild the spatial replica
   pages?: unknown;                 // B-spatial: spatial.pageRectsV1() when the windows moved
   navReady?: boolean;              // B-spatial: main's connectivity ready flag when it flipped
+  menu?: MenuDelta;                // B-facade: changed action rows, verdicts, menu statics
 };
 /** Sent instead of a delta when a consumer can no longer follow: it must load a new WorldInit. */
 export type Resnapshot = {t: 'resnapshot'; gen: number; reason: string};

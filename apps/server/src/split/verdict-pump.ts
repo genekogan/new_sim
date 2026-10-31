@@ -1,0 +1,128 @@
+// Stage B (lane B-facade, item 3): what main ships besides B-delta's WorldDelta so a ReplicaMenuWorld answers every read
+// the Soul read code makes: the action rows (each program's current action; the live sit/take_slot holds; the record
+// fields here.ts reads for "ends in"), the engine's admission verdicts (`canPerform` per program key), and the menu
+// statics (regions, nav solids, anchors, verbs, the kernel) whenever they move. Riding on the DeltaTap (delta.ts `extend`):
+// one `menu` section per delta, emitted only when something in it changed; a WorldInit carries the whole set.
+//
+// Verdicts: main's own reads ask `LiveFeasibility` (menu-world.ts) and every fresh answer is shipped with the next delta;
+// a replica's misses come back with `ask()` and are answered at the next tick boundary (the agent-visible trade-off:
+// one delta). Shipped verdicts are re-asked when their actor's action changes (route keys) or any action changes
+// (scope-'' keys, e.g. a seat taken), under a CPU budget per tick, so a verdict is never older than its inputs for long.
+import type {Program, RuntimeView} from '@sim/engine-contract';
+import {LiveFeasibility, planKey, type ActionRow, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow, type VerdictRow, type MenuWorld} from './menu-world.ts';
+
+/** The record verbs the read code reads from `runtime.records` (held seats, berths, slots). */
+/** A test engine may lack a read: the statics then carry the empty value. */
+const tryOr = <T>(f: () => T, d: T): T => {try {return f();} catch {return d;}};
+const HELD = new Set(['sit', 'take_slot']);
+const PARAMS = ['actor', 'fixture', 'on', 'slot', 'activity', 'seconds'] as const;
+
+type Host = {minds: Map<string, {soulId: string; entityId: string}>; mindByEntity?: Map<string, {soulId: string}>; kernel?: unknown};
+
+export class VerdictPump {
+  private mw: MenuWorld & {feasibility: LiveFeasibility}; private host: Host;
+  private actionKeys = new Map<string, string>(); private recordKeys = new Map<string, string>();
+  private shipped = new Map<string, {actor: string; program: Program; scope: string; v: string}>();
+  private asks = new Map<string, {program: Program; scope: string}>();
+  private dirty: string[] = []; private dirtyAll = false;
+  private staticsRef: unknown[] = []; private staticsKey = ''; private kernelKey = '';
+  /** CPU budget (ms) per tick for re-asking shipped verdicts. */
+  budgetMs = 2;
+  readonly cost = {ticks: 0, cpuMs: 0, maxCpuMs: 0, verdicts: 0, reasks: 0, asks: 0, actions: 0, records: 0, statics: 0, kernels: 0};
+
+  constructor(mw: MenuWorld & {feasibility: LiveFeasibility}, host: Host) {
+    this.mw = mw; this.host = host;
+    mw.feasibility.fresh = [];
+    for (const a of this.actionRows()) this.actionKeys.set(a.actor, JSON.stringify(a));
+    for (const r of this.recordRows()) this.recordKeys.set(r.id, JSON.stringify(r));
+    const s = this.statics(); this.staticsRef = this.refs(); this.staticsKey = JSON.stringify([s.anchors, s.newcomer ?? null, s.deliveries ?? null]); this.kernelKey = JSON.stringify(s.kernel);
+  }
+  /** A replica's misses (VerdictTable.misses): answered with the next delta. */
+  ask(misses: Iterable<{program: Program; scope: string}>) {for (const m of misses) if (this.asks.size < 4096) this.asks.set(m.scope + '\u0002' + planKey(m.program), m);}
+
+  private soulOf(actor: string) {return this.host.mindByEntity?.get(actor)?.soulId ?? actor;}
+  private row(key: string, program: Program, scope: string, verdict: VerdictRow['verdict'], tick: number): VerdictRow {
+    this.shipped.set(key, {actor: program.actor, program, scope, v: JSON.stringify(verdict)});
+    return {soulId: this.soulOf(program.actor), actor: program.actor, key, verdict, tick};
+  }
+  actionRows(): ActionRow[] {
+    const out: ActionRow[] = [], tick = this.mw.world.tick;
+    for (const m of this.host.minds.values()) {
+      const pid = this.mw.programOf?.(m.entityId), pa = pid ? this.mw.programAction?.(pid) : null;
+      if (pid) out.push({programId: pid, actor: m.entityId, step: pa?.step ?? 0, action: pa ? {...pa.action} : null, tick: pa?.tick ?? tick});
+    }
+    return out;
+  }
+  recordRows(): RecordRow[] {
+    const rt = this.mw.runtime as RuntimeView | undefined, live = new Set(rt?.liveIds?.() ?? []), mine = new Set<string>();
+    if (!rt?.records) return [];
+    for (const m of this.host.minds.values()) {const pid = this.mw.programOf?.(m.entityId), a = pid ? this.mw.programAction?.(pid)?.action.id : undefined; if (a) mine.add(a);}
+    const out: RecordRow[] = [];
+    for (const id of new Set([...live, ...mine])) {
+      const r = rt.records.get(id) as (undefined | {id: string; verb: string; status: string; phase?: string; params?: Record<string, unknown>; requestedTick?: number; history?: {tick: number; status: string}[]});
+      if (!r || (!mine.has(id) && !HELD.has(r.verb))) continue;
+      const params: Record<string, unknown> = {}; for (const k of PARAMS) if (r.params && r.params[k] !== undefined) params[k] = r.params[k];
+      const running = r.history?.find(h => h.status === 'running');
+      out.push({id, verb: r.verb, status: r.status, ...(r.phase !== undefined ? {phase: r.phase} : {}), live: live.has(id), params,
+        ...(r.requestedTick !== undefined ? {requestedTick: r.requestedTick} : {}), ...(running ? {runningTick: running.tick} : {})});
+    }
+    return out;
+  }
+  statics(): MenuStatics {
+    const w = this.mw.world as unknown as {regions?: unknown; navV1?: unknown};
+    return {regions: structuredClone(w.regions ?? {}), navV1: structuredClone(w.navV1 ?? null), rulesVersion: this.mw.rulesVersion, verbs: structuredClone(tryOr(() => this.mw.describeVerbs(), [])),
+      anchors: structuredClone(tryOr(() => this.mw.anchors(), [])), newcomer: this.mw.commonsNewcomerResourcesV1?.(), deliveries: this.mw.commonsFoodDeliveriesV1?.(),
+      kernel: structuredClone(this.host.kernel ?? null)};
+  }
+  private refs() {const w = this.mw.world as unknown as {regions?: unknown; navV1?: unknown}; return [w.regions, w.navV1, this.mw.rulesVersion];}
+  /** The whole menu section for a WorldInit. Pure: the deltas keep their own baseline (a row in both is an idempotent
+   *  upsert), so consumers following the stream from an older init miss nothing. */
+  init(): MenuInit {
+    const actions = this.actionRows(), records = this.recordRows(), statics = this.statics();
+    const tick = this.mw.world.tick, verdicts = [...this.shipped].map(([key, s]) => ({soulId: this.soulOf(s.actor), actor: s.actor, key, verdict: JSON.parse(s.v), tick}));
+    return {actions, records, verdicts, statics};
+  }
+  /** After each tick (from the tap): the changed rows, or undefined when nothing in the menu section moved. */
+  delta(staticMoved: boolean): MenuDelta | undefined {
+    const t0 = performance.now(), d: MenuDelta = {}, tick = this.mw.world.tick, F = this.mw.feasibility;
+    // action rows: one per actor with a program; gone when the program ends
+    const seen = new Set<string>(), changedActors: string[] = [];
+    for (const a of this.actionRows()) {seen.add(a.actor); const k = JSON.stringify(a); if (this.actionKeys.get(a.actor) !== k) {this.actionKeys.set(a.actor, k); (d.actions ??= []).push(a); changedActors.push(a.actor);}}
+    for (const actor of this.actionKeys.keys()) if (!seen.has(actor)) {this.actionKeys.delete(actor); (d.actionsGone ??= []).push(actor); changedActors.push(actor);}
+    const rseen = new Set<string>();
+    for (const r of this.recordRows()) {rseen.add(r.id); const k = JSON.stringify(r); if (this.recordKeys.get(r.id) !== k) {this.recordKeys.set(r.id, k); (d.records ??= []).push(r);}}
+    for (const id of this.recordKeys.keys()) if (!rseen.has(id)) {this.recordKeys.delete(id); (d.recordsGone ??= []).push(id);}
+    // statics: by reference (the engine replaces regions/navV1 on a static change) and on the tap's static epoch
+    const refs = this.refs();
+    if (staticMoved || refs.some((x, i) => x !== this.staticsRef[i]) || tick % 200 === 0) {
+      const s = this.statics(), k = JSON.stringify([s.anchors, s.newcomer ?? null, s.deliveries ?? null]);
+      if (staticMoved || refs.some((x, i) => x !== this.staticsRef[i]) || k !== this.staticsKey) {this.staticsRef = refs; this.staticsKey = k; const {kernel: _k, ...rest} = s; d.statics = rest; this.cost.statics++;}
+    }
+    // the kernel (things, vocab, decks): resent whole when it changed (checked every 20 ticks; it changes on births and rules)
+    if (tick % 20 === 0) {const k = JSON.stringify(this.host.kernel ?? null); if (k !== this.kernelKey) {this.kernelKey = k; d.kernel = JSON.parse(k); this.cost.kernels++;}}
+    // verdicts: main's own fresh answers, the replicas' asks, then re-asks of shipped ones within the budget
+    const out: VerdictRow[] = [];
+    for (const f of F.fresh ?? []) {const prev = this.shipped.get(f.key); if (!prev || prev.v !== JSON.stringify(f.verdict)) out.push(this.row(f.key, f.program, f.scope, f.verdict, tick)); else this.shipped.set(f.key, {...prev, program: f.program});}
+    if (F.fresh) F.fresh.length = 0;
+    for (const [key, a] of this.asks) {if (this.shipped.has(key)) continue; out.push(this.row(key, a.program, a.scope, F.canPerform(a.program, a.scope), tick)); this.cost.asks++;}
+    this.asks.clear();
+    if (F.fresh) F.fresh.length = 0;
+    if (changedActors.length) {this.dirty.push(...changedActors); this.dirtyAll = true;}
+    if (this.dirty.length || this.dirtyAll) {
+      const own = new Set(this.dirty);
+      for (const [key, s] of this.shipped) {
+        if (performance.now() - t0 > this.budgetMs) break;
+        if (!own.has(s.actor) && !(this.dirtyAll && s.scope === '')) continue;
+        const v = F.canPerform(s.program, s.scope), j = JSON.stringify(v); this.cost.reasks++;
+        if (j !== s.v) out.push(this.row(key, s.program, s.scope, v, tick));
+      }
+      this.dirty = []; this.dirtyAll = false;
+      if (F.fresh) F.fresh.length = 0;
+    }
+    if (out.length) {d.verdicts = out; this.cost.verdicts += out.length;}
+    if (this.shipped.size > 20000) this.shipped.clear();
+    const ms = performance.now() - t0, C = this.cost; C.ticks++; C.cpuMs += ms; C.maxCpuMs = Math.max(C.maxCpuMs, ms);
+    C.actions += d.actions?.length ?? 0; C.records += d.records?.length ?? 0;
+    return Object.keys(d).length ? d : undefined;
+  }
+}

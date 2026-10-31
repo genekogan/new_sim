@@ -26,6 +26,8 @@ export type ReadPoolOptions = {
   run: (f: Forward) => Promise<Forwarded>;
   /** a Soul token → its Soul (null: not a Soul of this world) and the opaque account tag for x-sim-account */
   auth: (token: string) => {soulId: string | null; account?: string | null};
+  /** B-facade: a worker's verdict misses, to main's pump */
+  ask?: (misses: {program: import('@sim/engine-contract').Program; scope: string}[]) => void;
   respawnMs?: number; heapMb?: number; log?: (m: string) => void;
 };
 type Slot = {index: number; worker: Worker | null; port: number; alive: boolean; ready: boolean; restarts: number; lastError?: string};
@@ -34,7 +36,7 @@ export class ReadPool {
   gen = 0;
   readonly lag = new Float64Array(new SharedArrayBuffer((1 + MAX_READ_WORKERS) * 8));
   readonly slots: Slot[] = [];
-  readonly stats = {deltas: 0, inits: 0, auths: 0, jobs: [] as {jobs: number; refused: number; dropped: number; failed: number}[]};
+  readonly stats = {deltas: 0, inits: 0, resyncs: 0, auths: 0, jobs: [] as {jobs: number; refused: number; dropped: number; failed: number}[]};
   private closing = false; private timer: NodeJS.Timeout | null = null;
   private readonly o: ReadPoolOptions; private readonly n: number; private readonly mode: number;
   constructor(o: ReadPoolOptions) {
@@ -72,6 +74,8 @@ export class ReadPool {
       if (m.t === 'listening') { s.port = m.port!; this.publish(); this.log(`worker ${s.index} on 127.0.0.1:${s.port}`); }
       else if (m.t === 'ready') { s.ready = true; this.publish(); }
       else if (m.t === 'error') { s.lastError = m.error; this.log(`worker ${s.index}: ${m.error}`); }
+      else if (m.t === 'resync') { this.stats.resyncs = (this.stats.resyncs ?? 0) + 1; this.reinit(); }
+      else if (m.t === 'ask') this.o.ask?.((m as unknown as {misses: {program: import('@sim/engine-contract').Program; scope: string}[]}).misses);
     });
     w.on('error', (e) => { s.lastError = e.message; this.log(`worker ${s.index} failed: ${e.message}`); });
     w.once('exit', (code) => {
@@ -112,16 +116,15 @@ export class ReadPool {
 /** SIM_READ_PORTS="5231,5232" → ports (0 for a missing one: the OS picks). */
 export function readPorts(env: string | undefined) { return (env ?? '').split(',').map(x => Number(x.trim())).filter(p => Number.isInteger(p) && p > 0 && p < 65536); }
 
-/** The delta source until lane B-delta's WorldDelta v1 lands: the spike's DeltaTap (bodies, minds, faded, objects and
- *  items every 20 ticks, the static layer on an epoch change). Entities the engine moved are learned from the hub
- *  batch (every 10 ticks), which is enough for the spike's subset; B-delta's tap in world.ts replaces this. */
-export async function spikeDeltaSource(host: import('../world.ts').WorldHost, L: import('../edge/ledger/ledger.ts').EdgeLedger) {
-  const {DeltaTap} = await import('./delta.ts');
-  const tap = new DeltaTap(host, L), changed = new Set<string>();
-  let sink: ((d: WorldDelta) => void) | null = null;
-  host.listeners.push({
-    onBatch: (b) => { for (const p of b.paths as {entity: string}[]) changed.add(p.entity); for (const c of b.changes as unknown as [number, string][]) changed.add(c[1]); },
-    afterTickComplete: () => { if (!sink) return; const d = tap.delta(changed); changed.clear(); sink(d); },
-  });
-  return {init: () => tap.init(), onDelta: (f: (d: WorldDelta) => void) => { sink = f; }, cost: tap.cost};
+/** The delta source: B-delta's WorldDelta v1 tap (installDeltaStream, after every tick) and WorldInit v1, with B-facade's
+ *  `menu` section (split/verdict-pump.ts: action rows, verdicts, menu statics). A resnapshot re-inits every worker;
+ *  `ask` takes a worker's verdict misses to main's pump (answered with the next delta). */
+export async function deltaSource(host: import('../world.ts').WorldHost, L: import('../edge/ledger/ledger.ts').EdgeLedger, env: NodeJS.ProcessEnv = process.env) {
+  const {installDeltaStream} = await import('./delta.ts'), {worldInit} = await import('./world-init.ts');
+  const tap = installDeltaStream(host, L, env);
+  if (!tap) throw new Error('read pool: the delta stream is off (SIM_READ_WORKER is not 1)');
+  const pump = tap.extend as import('./verdict-pump.ts').VerdictPump;
+  return {tap, pump, init: () => worldInit(host, L, tap), cost: tap.cost,
+    onDelta: (f: (d: WorldDelta) => void, resnapshot: () => void) => tap.subscribe(m => {if ('t' in m) resnapshot(); else f(m);}),
+    ask: (misses: {program: import('@sim/engine-contract').Program; scope: string}[]) => pump.ask(misses)};
 }
