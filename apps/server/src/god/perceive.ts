@@ -12,7 +12,7 @@
 // The object id is the entity id. Objects follow the entity world: re-derived on each god edit, removed with the thing.
 // No edge file changes: the kind registers on the ledger's comms objects when they exist; the read capability goes in
 // through the ledger's world-profile hook (as nav.ts's `walk:<path>`).
-import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
+import { gameStatus, type Entity, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { paintingLine } from '../art/art.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -27,7 +27,9 @@ import { supportY } from './nav.ts';
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
 type Want = { name: string; kind: string; description: string; params: BuiltState & { paintingWhat?: true } };
-type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string; writable?: boolean };
+/** Entry 27: a game board's read offer names only its state, never the grid or the players. */
+function gameLabel(state: Record<string, unknown>): string { const st = gameStatus(String(state.text ?? '')); return st.moves === 0 ? 'a game of noughts and crosses, not started' : st.winner ? `a game of noughts and crosses, won by ${st.winner}` : st.draw ? 'a game of noughts and crosses, a draw' : `a game of noughts and crosses, ${st.turn} to play`; }
+type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string; writable?: boolean; game?: string };
 /** x0, z0, x1, z1 */
 type Box = [number, number, number, number];
 type Run = { queue: string[]; i: number; changed: string[]; made: number; root: string; layersOn: boolean; full: boolean; ms: number };
@@ -225,10 +227,12 @@ export class GodPerceive {
     // Unpainted input is unchanged; only painted initialization opts into the 230-character bound.
     const what = painting ? painting + clip(prefix + suffix, 120).slice(prefix.length) : prefix + suffix;
     const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
-    const w: Want = { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, ...(painting ? { paintingWhat: true as const } : {}), text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
+    // a board Souls write on keeps its own kind: kinds carry actions, and two writable v1 boards (a whiteboard, a game board)
+    // under one `sign` kind would share whichever registered first (entry 25's finding)
+    const w: Want = { name, kind: this.kindFor(text !== null && !def.tags.includes('hand-writable') ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, ...(painting ? { paintingWhat: true as const } : {}), text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
     if (text === null) return { w };
     // read from in front of its face (entity frame: the front is +z, turned by the yaw)
-    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text, ...(def.tags.includes('hand-writable') ? { writable: true } : {}) } };
+    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text, ...(def.tags.includes('hand-writable') ? { writable: true } : {}), ...(def.tags.includes('tictactoe') ? { game: gameLabel(e.state ?? {}) } : {}) } };
   }
   private at(e: Entity, def: StoredDef): Vec2 | null {
     const sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
@@ -433,8 +437,8 @@ export class GodPerceive {
       const id = `read:${s.id}`; if (caps.some((c) => c.id === id)) continue;
       const words = s.text.replace(/\s*\n\s*/g, ' / ');
       // A Soul-written board offers a read only when written on, and never carries its words: they come with the read.
-      if (s.writable && !words) continue;
-      const label = s.writable ? `Read ${s.name} (a board with writing on it, ${Math.round(d)} m)` : `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
+      if (s.writable && !words && !s.game) continue;
+      const label = s.game ? `Read ${s.name} (${s.game}, ${Math.round(d)} m)` : s.writable ? `Read ${s.name} (a board with writing on it, ${Math.round(d)} m)` : `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
       caps.push({ id, verb: 'read', label, target: { id: s.id, kind: 'object' }, available: true });
       plans.set(id, { label: `Read ${s.name}`, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), ...(Math.hypot(s.front[0] - here[0], s.front[1] - here[1]) > 0.8 ? [{ verb: 'walk_to', params: { to: s.front, standoff: 0 } }] : []), { verb: 'wave', params: { at: s.id, seconds: 1 } }] });
     }

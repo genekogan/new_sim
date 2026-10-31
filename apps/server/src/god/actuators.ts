@@ -4,7 +4,7 @@
 // `object:<entity>:switch-off`, walks up to it, reaches out, and the lamp's state changes in the world (an engine edit:
 // in the ledger, broadcast to viewers, never the god's to undo). Nothing in the edge changes: the object framework's own
 // capabilities, admission, receipts and body plans carry it.
-import type { Entity, StoredDef } from '@sim/world-compiler';
+import { gameSquareOf, gameStatus, type Entity, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { isContactActuator, CONTACT_REACH } from './contact-actuator.ts';
 import { afterCommit } from '../edge/comms/store.ts';
@@ -107,6 +107,33 @@ export function waterPlan(a: Action, id: string, soul: EdgeSoul, host: ActuatorH
 const isRefusal = (x: Transfer | Refusal | null): x is Refusal => !!x && 'code' in x;
 type BuiltLike = { at: Vec2 | null; state?: Record<string, unknown>; removed?: boolean; key?: string; front?: Vec2 | null };
 
+/** Entry 27: noughts and crosses with honest turns. The first Soul to mark plays X, the second O; then the world keeps turns. */
+export const isGameAction = (def: StoredDef, a: { name: string }) => !!def.tags?.includes('tictactoe') && (a.name === 'mark' || a.name === 'erase');
+const gameGrid = (state: Record<string, unknown>) => (typeof state.text === 'string' && state.text ? state.text : '').padEnd(9, '.').slice(0, 9);
+const gamePlayers = (state: Record<string, unknown>) => ({ ids: typeof state.textBy === 'string' && state.textBy ? state.textBy.split(',') : [], names: typeof state.players === 'string' && state.players ? state.players.split(',') : [] });
+/** Why this Soul cannot mark (this square) or wipe the game now; null = it can. `square` undefined = availability only. */
+export function gameProblem(a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, square?: unknown): Refusal | null {
+  const g = gameGrid(state), st = gameStatus(g), { ids, names } = gamePlayers(state), me = ids.indexOf(soul.soulId);
+  if (a.name === 'erase') return st.winner || st.draw || me >= 0 || ids.length < 2 ? null : { code: 'object.not-yours', reason: `A game between ${names.join(' and ')} is in progress; only they wipe it before it ends.` };
+  if (st.winner) return { code: 'object.state', reason: `The game is over: ${names[st.winner === 'X' ? 0 : 1] ?? st.winner} won. Wipe the board for a new game.` };
+  if (st.draw) return { code: 'object.state', reason: 'The game is over: a draw. Wipe the board for a new game.' };
+  if (ids.length >= 2 && me < 0) return { code: 'object.not-yours', reason: `This game is between ${names.join(' and ')}; wait for the next one.` };
+  const mine = me >= 0 ? (me === 0 ? 'X' : 'O') : ids.length === 0 ? 'X' : 'O';
+  if (mine !== st.turn) return { code: 'object.state', reason: names[st.turn === 'X' ? 0 : 1] ? `It is ${names[st.turn === 'X' ? 0 : 1]}'s turn.` : `It is O's turn: the next Soul to mark plays O against ${names[0]}.` };
+  if (square === undefined) return null;
+  const i = gameSquareOf(square);
+  if (i < 0) return { code: 'capability.params', reason: 'Say which square: 1-9 (top left is 1), or words like "top left", "centre", "bottom right".' };
+  if (g[i] !== '.') return { code: 'object.state', reason: 'That square is taken.' };
+  return null;
+}
+/** The game board's next state after this Soul's mark (or a wipe). */
+export function gamePatch(a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, square: unknown): Record<string, unknown> {
+  if (a.name === 'erase') return { text: '', textBy: '', players: '' };
+  const g = [...gameGrid(state)], { ids, names } = gamePlayers(state), i = gameSquareOf(square), name = (soul.name || 'a Soul').replace(/[,\n]/g, ' ').slice(0, 40);
+  if (!ids.includes(soul.soulId)) { ids.push(soul.soulId); names.push(name); }
+  if (i >= 0 && g[i] === '.') g[i] = ids.indexOf(soul.soulId) === 0 ? 'X' : 'O';
+  return { text: g.join(''), textBy: ids.join(','), players: names.join(',') };
+}
 /** Soul-written board text (entry 13): short, at most three lines, printable. Null = acceptable. */
 export function boardTextProblem(v: unknown, max = 100, lines = 3): Refusal | null {
   if (typeof v !== 'string' || !v.trim()) return { code: 'capability.params', reason: 'Say what to write: text is required.' };
@@ -135,12 +162,13 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
-      return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));
+      const st0 = (s.key && host.stateOf?.(s.key)) || s.state || {};
+      return whenRefusal(a, st0, nameOf(s)) ?? (isGameAction(def, a) ? gameProblem(a, st0, ctx.soul) : null);
     };
     out[a.name] = {
       label: a.label, roles: 'anyone', reach: 'anywhere', params: actionParams(a), movesBody: true,
       available: (s: BuiltLike, ctx: any) => check(s, ctx),
-      validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
+      validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (isGameAction(def, a) && a.name === 'mark' ? gameProblem(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, ctx.soul, p?.square ?? '') : null) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
