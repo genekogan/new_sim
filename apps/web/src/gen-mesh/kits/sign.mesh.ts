@@ -9,7 +9,7 @@ import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
 import { apiPath } from '../../world-path.ts';
 import { artOf, brokenLinkLines, coverWhenReady, imageBroken, imageFailed, imageLoaded, videoTexture, whenImageFails } from '../art-media.ts';
-import { frameMediaKind, pinSlot } from '@sim/world-compiler';
+import { frameMediaKind, pinSlot, signupSlot, pollSlot, pollOptions } from '@sim/world-compiler';
 
 type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean; slot?: number };
 const texCache = new Map<string, THREE.Texture>();
@@ -72,6 +72,61 @@ export function pinboardTexture(lines: string[], f: Face): THREE.Texture {
   });
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; texCache.set(key, t); return t;
 }
+/** Soul Actions entry 25: chalk on slate (a dusty board, hand lettering left-aligned), a sign-up sheet (printed title, ruled
+ *  numbered lines, each name in its signer's hand at signupSlot), a poll (question, options, tally marks at pollSlot). */
+const HAND = "'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive", CHALK = "'Chalkboard SE', 'Chalkboard', 'Marker Felt', 'Comic Sans MS', cursive";
+const hashOf = (t: string) => { let h = 2166136261; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+function canvasOf(f: Face, w = 1024) { const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * f.h / f.w); return { c, g: c.getContext('2d')!, cw: c.width, ch: c.height, px: c.width / f.w }; }
+function done(c: HTMLCanvasElement, key: string) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; texCache.set(key, t); return t; }
+export function chalkTexture(lines: string[], f: Face): THREE.Texture {
+  const key = JSON.stringify(['chalk', lines, f.w, f.h, f.bg]); const hit = texCache.get(key); if (hit) return hit;
+  const { c, g, cw, ch } = canvasOf(f, 768); let seed = 11; const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 13), 1103515245) + 12345 | 0) >>> 0) / 4294967296;
+  g.fillStyle = f.bg ?? '#2b322e'; g.fillRect(0, 0, cw, ch);
+  // old wiping: a few broad, faint horizontal smears, then fine chalk dust
+  for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(235,235,225,${0.015 + rnd() * 0.02})`; g.beginPath(); g.ellipse(rnd() * cw, rnd() * ch, 120 + rnd() * 200, 18 + rnd() * 26, (rnd() - 0.5) * 0.25, 0, Math.PI * 2); g.fill(); }
+  for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(240,240,230,${0.04 + rnd() * 0.08})`; g.fillRect(rnd() * cw, rnd() * ch, 1.5, 1.5); }
+  const ls = lines.filter((l) => l.trim()).slice(0, 6); let size = 74; g.font = `600 ${size}px ${CHALK}`;
+  while (size > 22 && (ls.some((l) => g.measureText(l).width > cw * 0.86) || ls.length * size * 1.25 > ch * 0.85)) { size -= 2; g.font = `600 ${size}px ${CHALK}`; }
+  g.fillStyle = f.ink ?? '#f4f2e8'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.shadowColor = 'rgba(255,255,255,0.35)'; g.shadowBlur = 3;
+  ls.forEach((l, i) => g.fillText(l, cw * 0.07, ch / 2 + (i - (ls.length - 1) / 2) * size * 1.25));
+  return done(c, key);
+}
+export function signupTexture(title: string, names: string[], f: Face): THREE.Texture {
+  const key = JSON.stringify(['signup', title, names, f.w, f.h]); const hit = texCache.get(key); if (hit) return hit;
+  const { c, g, cw, ch, px } = canvasOf(f, 768);
+  g.fillStyle = f.bg ?? '#fbfaf4'; g.fillRect(0, 0, cw, ch);
+  g.fillStyle = '#22303e'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${Math.round(0.034 * px)}px Georgia, serif`; g.fillText(title || 'Sign up', cw / 2, ch * 0.09, cw * 0.9);
+  for (let i = 0; i < 8; i++) {
+    const [, sy] = signupSlot(i), y = (0.5 - sy / f.h) * ch;
+    g.strokeStyle = 'rgba(70,110,160,0.45)'; g.lineWidth = 2; g.beginPath(); g.moveTo(cw * 0.1, y + 0.014 * px); g.lineTo(cw * 0.92, y + 0.014 * px); g.stroke();
+    g.fillStyle = '#7a8796'; g.textAlign = 'right'; g.font = `500 ${Math.round(0.022 * px)}px Georgia, serif`; g.fillText(`${i + 1}.`, cw * 0.17, y);
+    const name = names[i]; if (!name) continue;
+    const r = hashOf(name); g.save(); g.translate(cw * 0.21, y); g.rotate((r - 0.5) * 0.06);
+    g.fillStyle = ['#1d2f6e', '#2a2622', '#6b1d1d'][Math.floor(r * 3)]; g.textAlign = 'left'; g.font = `600 ${Math.round(0.032 * px)}px ${HAND}`; g.fillText(name, 0, 0, cw * 0.68); g.restore();
+  }
+  return done(c, key);
+}
+export function pollTexture(title: string, options: string[], counts: number[], f: Face): THREE.Texture {
+  const key = JSON.stringify(['poll', title, options, counts, f.w, f.h]); const hit = texCache.get(key); if (hit) return hit;
+  const { c, g, cw, ch, px } = canvasOf(f, 1024);
+  g.fillStyle = f.bg ?? '#f3efe2'; g.fillRect(0, 0, cw, ch);
+  g.fillStyle = '#2a2622'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${Math.round(0.06 * px)}px Georgia, serif`; g.fillText(title || 'Poll', cw / 2, ch * 0.12, cw * 0.92);
+  options.forEach((o, i) => {
+    const [tx, ty] = pollSlot(i), y = (0.5 - ty / f.h) * ch, x0 = (tx / f.w + 0.5) * cw - 0.06 * px;
+    g.fillStyle = '#2a2622'; g.textAlign = 'right'; g.font = `600 ${Math.round(0.05 * px)}px Georgia, serif`; g.fillText(o, x0 - 0.04 * px, y, cw * 0.5);
+    g.strokeStyle = 'rgba(40,40,40,0.25)'; g.lineWidth = 2; g.beginPath(); g.moveTo(x0 - 0.02 * px, y + 0.04 * px); g.lineTo(cw * 0.95, y + 0.04 * px); g.stroke();
+    // tally marks in fives, each stroke a little crooked, in marker
+    g.strokeStyle = '#1d4f8f'; g.lineWidth = 0.009 * px; g.lineCap = 'round';
+    for (let k = 0; k < (counts[i] ?? 0); k++) {
+      const grp = Math.floor(k / 5), j = k % 5, gx = x0 + grp * 0.085 * px, r = hashOf(`${o}${k}`), h = 0.036 * px;
+      g.beginPath();
+      if (j < 4) { const xx = gx + j * 0.016 * px; g.moveTo(xx + (r - 0.5) * 4, y - h); g.lineTo(xx - (r - 0.5) * 4, y + h); }
+      else { g.moveTo(gx - 0.008 * px, y + h * 0.7); g.lineTo(gx + 0.056 * px, y - h * 0.7); }
+      g.stroke();
+    }
+  });
+  return done(c, key);
+}
 function paintingTexture(seed: number, bg: string): THREE.Texture {
   const key = `painting:${seed}:${bg}`; const hit = texCache.get(key); if (hit) return hit;
   const c = document.createElement('canvas'); c.width = 128; c.height = 96; const g = c.getContext('2d')!;
@@ -107,6 +162,9 @@ registerMesh({
       else if (f.media && text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
       else if (f.media) map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');
       else if (ctx.def.tags.includes('pinboard')) map = pinboardTexture(typeof st.text === 'string' ? st.text.split('\n') : [], f);
+      else if (ctx.def.tags.includes('signup')) map = signupTexture(String(st.title ?? ''), typeof st.text === 'string' && st.text ? st.text.split('\n') : [], f);
+      else if (ctx.def.tags.includes('poll')) { const opts = pollOptions(st), votes = typeof st.textBy === 'string' && st.textBy ? st.textBy.split(',').map((v) => Number(v.split(':')[1])) : []; map = pollTexture(String(st.title ?? ''), opts, opts.map((_, i) => votes.filter((v) => v === i).length), f); }
+      else if (ctx.def.tags.includes('chalkboard') && ctx.def.tags.includes('hand-writable')) map = chalkTexture(text, f);
       else map = textTexture((f.line !== undefined ? [text[f.line] ?? ''] : text).slice(0, 6), f);
       // video and images glow a little so art reads in dim rooms; text keeps the matte board look
       plane.material = art ? new THREE.MeshBasicMaterial({ map, toneMapped: false }) : new THREE.MeshStandardMaterial({ map, roughness: 0.85, metalness: 0 });
