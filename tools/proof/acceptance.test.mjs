@@ -1,0 +1,182 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import {
+  checkPr, linkedIssues, loadChecks, parseAudit, parseChecklist, prMode, renderComment, sections, skeleton, validateProof, MARKER, SCHEMA,
+} from './acceptance.mjs';
+
+const policy = loadChecks();
+const VIDEO = 'https://github.com/o/r/releases/download/proofs/pr-7.desktop.mp4';
+const PROOF = 'https://github.com/o/r/releases/download/proofs/pr-7.proof.json';
+
+const body = ({ problem = 'Visitors on phones cannot open the seat menu. Closes #12', acceptance, audit, proof = '' } = {}) => `## Problem
+<!-- a comment that must not count -->
+${problem}
+
+## Acceptance
+${acceptance ?? `- [x] **A1** Tapping a seat opens its menu — evidence: ${VIDEO} at 0:07
+- [x] **A2** Desktop click still works — evidence: \`node --test apps/web/src/seat.test.ts\` -> pass
+- [ ] **A3** Long-press shows a hint — deferred: #44`}
+
+## Proof
+Tier: T2
+${proof}
+
+## Self-audit
+${audit ?? `- **Checks run**: \`node --test apps/web/src/seat.test.ts\` -> 12/12 pass
+- **Failed attempts**: first take hid the menu behind the HUD (kept: ${VIDEO.replace('desktop', 'take1')})
+- **Long tail / externalities**: 100 distant seats add 0 bytes to the snapshot
+- **Known limits**: none known`}
+
+## Changelog
+- changes/seat-menu.md
+`;
+
+const proofDoc = (over = {}) => ({
+  schema: SCHEMA, pr: 7, issue: 12, commit: 'abc1234', tier: 'T2',
+  criteria: [
+    { id: 'A1', text: 'Tapping a seat opens its menu', status: 'met', evidence: [VIDEO] },
+    { id: 'A2', text: 'Desktop click still works', status: 'met', evidence: ['`node --test` -> pass'] },
+    { id: 'A3', text: 'Long-press shows a hint', status: 'deferred', evidence: ['#44'] },
+  ],
+  media: [{ file: 'desktop.mp4', url: VIDEO, kind: 'video', seconds: 21, viewport: 'desktop', uncut: true, realSpeed: true }],
+  checks: [{ cmd: 'node --test apps/web/src/seat.test.ts', result: 'pass' }],
+  failedAttempts: [{ what: 'take 1', why: 'menu hidden', evidence: VIDEO }],
+  externalities: [{ what: 'snapshot bytes, 100 distant seats', result: '+0 B', ok: true }],
+  limits: [],
+  ...over,
+});
+
+test('the policy declares pr_checks for every tier, T0 only the problem statement', () => {
+  assert.deepEqual(policy.prChecks.T0, ['problem']);
+  for (const t of ['T1', 'T2', 'T3', 'T4']) assert.ok(policy.prChecks[t].includes('acceptance'), t);
+  assert.ok(policy.prChecks.T2.includes('clip') && policy.prChecks.T3.includes('playtest'));
+  assert.ok(policy.required.T2.length > 0);
+  assert.equal(policy.knobs.repeats_per_arm, 2);
+});
+
+test('sections: ## and ### headings, aliases, comments stripped', () => {
+  const s = sections('### Problem statement\n\nBroken <!-- hidden -->thing here now\n\n### Acceptance criteria\n- [ ] x\n\n### Other\nz');
+  assert.equal(s.problem, 'Broken thing here now');
+  assert.equal(s.acceptance, '- [ ] x');
+  assert.equal(s['other:other'], 'z');
+});
+
+test('parseChecklist: ids, met/deferred/unmet/open and evidence notes', () => {
+  const items = parseChecklist(`- [x] **A1** One — evidence: \`cmd\`
+- [ ] A2: Two — unmet: flaky on phone
+- [ ] ~~**A3** Three~~ deferred: #9
+- [ ] Four with no note
+* [X] B1. Five evidence: https://x.test/a.png`);
+  assert.deepEqual(items.map(i => [i.id, i.text, i.status]), [
+    ['A1', 'One', 'met'], ['A2', 'Two', 'unmet'], ['A3', 'Three', 'deferred'], [null, 'Four with no note', 'open'], ['B1', 'Five', 'met'],
+  ]);
+  assert.equal(items[0].note, '`cmd`');
+  assert.equal(items[1].note, 'flaky on phone');
+});
+
+test('linkedIssues: closing keywords, bare refs and issue URLs, not HTML entities', () => {
+  assert.deepEqual(linkedIssues('Closes #12, see https://github.com/o/r/issues/40 and &#39;'), [12, 40]);
+});
+
+test('parseAudit reads labelled top-level bullets with continuation lines', () => {
+  const a = parseAudit('- **Checks run**: `a` -> pass\n  - `b` -> pass\n- Failed attempts: none\n- Externalities: +0 B\n- **Known limits:** grey paper');
+  assert.match(a.checks, /`b`/);
+  assert.equal(a.failed, 'none');
+  assert.equal(a.longTail, '+0 B');
+  assert.equal(a.limits, 'grey paper');
+});
+
+test('T0 needs only the problem statement', () => {
+  assert.equal(checkPr({ body: '## Problem\nThe README names a removed command.\n', tier: 'T0', policy }).ok, true);
+  const r = checkPr({ body: '## Problem\n\n## Acceptance\n', tier: 'T0', policy });
+  assert.equal(r.ok, false);
+  assert.match(r.problems[0], /problem statement/);
+});
+
+test('T1: every box needs evidence, an open box fails, the self-audit must be filled', () => {
+  assert.equal(checkPr({ body: body(), tier: 'T1', policy }).ok, true);
+  const open = checkPr({ body: body({ acceptance: '- [x] **A1** Works — evidence: `node --test x` -> pass\n- [ ] **A2** Also works' }), tier: 'T1', policy });
+  assert.equal(open.ok, false);
+  assert.ok(open.problems.some(p => /A2 Also works" is not ticked/.test(p)));
+  const noEvidence = checkPr({ body: body({ acceptance: '- [x] **A1** Works' }), tier: 'T1', policy });
+  assert.ok(noEvidence.problems.some(p => /without evidence/.test(p)));
+  const unmet = checkPr({ body: body({ acceptance: '- [ ] **A1** Works — unmet: phone layout overflows' }), tier: 'T1', policy });
+  assert.ok(unmet.problems.some(p => /unmet: phone layout overflows/.test(p)));
+  const audit = checkPr({ body: body({ audit: '- **Checks run**: ran tests\n- **Failed attempts**: none' }), tier: 'T1', policy });
+  assert.ok(audit.problems.some(p => /self-audit: fill: long tail \/ externalities, known limits/.test(p)));
+});
+
+test('criteria from the linked issue must be carried into the PR', () => {
+  const issue = '### Problem\nx y z\n\n### Acceptance criteria\n- [ ] **A1** Tapping a seat opens its menu\n- [ ] **A4** Menu closes on Escape';
+  const r = checkPr({ body: body(), tier: 'T1', issueBody: issue, policy });
+  assert.equal(r.ok, false);
+  assert.ok(r.problems.some(p => /A4 Menu closes on Escape/.test(p)));
+});
+
+test('T2 needs the issue link, a clip and a valid proof.json that agrees with the checklist', () => {
+  const withLinks = body({ proof: `- clip: ${VIDEO}\n- proof.json: ${PROOF}` });
+  assert.equal(checkPr({ body: withLinks, tier: 'T2', proof: proofDoc(), head: 'abc1234def', policy }).ok, true);
+  const bare = checkPr({ body: body({ problem: 'Visitors on phones cannot open the seat menu.', acceptance: '- [x] **A1** Opens — evidence: `node --test x` -> pass', audit: '- **Checks run**: `x` -> pass\n- **Failed attempts**: none\n- **Long tail**: +0 B\n- **Known limits**: none' }), tier: 'T2', policy });
+  for (const name of ['linked issue', 'clip', 'proof.json']) assert.ok(bare.rows.find(r => r.name === name && r.ok === false), name);
+  const disagree = checkPr({ body: withLinks, tier: 'T2', proof: proofDoc({ criteria: proofDoc().criteria.map(c => c.id === 'A2' ? { ...c, status: 'unmet' } : c) }), policy });
+  assert.ok(disagree.problems.some(p => /A2 Desktop click still works" is met in the PR but unmet in proof.json/.test(p)));
+  const unreadable = checkPr({ body: withLinks, tier: 'T2', proof: { error: 'HTTP 404' }, policy });
+  assert.ok(unreadable.problems.some(p => /HTTP 404/.test(p)));
+});
+
+test('validateProof: schema, evidence, uncut real-speed video, stale commit warning', () => {
+  assert.deepEqual(validateProof(proofDoc(), { tier: 'T2' }).problems, []);
+  const p = validateProof(proofDoc({ schema: 'x', media: [{ kind: 'video', url: 'http://x/a.mp4', uncut: false, realSpeed: true }], criteria: [{ id: 'A1', text: 't', status: 'met', evidence: [] }] }), { tier: 'T2', head: 'fff0000' });
+  for (const re of [/schema/, /met without evidence/, /url must be https/, /uncut and real speed/]) assert.ok(p.problems.some(x => re.test(x)), re);
+  assert.ok(p.warnings.some(w => /recorded on abc1234/.test(w)));
+  assert.ok(validateProof(proofDoc({ tier: 'T1' }), { tier: 'T2' }).problems.some(x => /records T1 proof/.test(x)));
+});
+
+test('T3 needs playtest arms with the policy repeats and a reviewer verdict', () => {
+  const bad = validateProof(proofDoc({ tier: 'T3', playtest: { arms: [{ name: 'baseline', repeats: 2 }, { name: 'candidate', repeats: 1 }] } }), { tier: 'T3', knobs: policy.knobs });
+  assert.ok(bad.problems.some(x => /candidate: 1 repeat/.test(x)));
+  assert.ok(bad.problems.some(x => /review/.test(x)));
+  const good = validateProof(proofDoc({ tier: 'T3', playtest: { arms: [{ name: 'baseline', repeats: 2 }, { name: 'candidate', repeats: 2 }] }, review: { by: 'reviewer agent', verdict: 'approve' } }), { tier: 'T3', knobs: policy.knobs });
+  assert.deepEqual(good.problems, []);
+});
+
+test('the PR template itself fails T1 until filled, and the comment carries the marker', () => {
+  const template = readFileSync(fileURLToPath(new URL('../../.github/pull_request_template.md', import.meta.url)), 'utf8');
+  const r = checkPr({ body: template, tier: 'T1', policy });
+  assert.equal(r.ok, false);
+  const c = renderComment(r, { required: policy.required.T1, files: [{ file: 'apps/server/a.ts', tier: 'T1' }] });
+  assert.ok(c.startsWith(MARKER));
+  assert.match(c, /Tier T1/);
+  assert.match(c, /`proof-ok` fails/);
+});
+
+test('skeleton turns issue criteria into unmet proof.json criteria', () => {
+  const s = skeleton({ issueBody: '### Acceptance criteria\n- [ ] **A1** One\n- [ ] Two', tier: 'T3' });
+  assert.deepEqual(s.criteria.map(c => [c.id, c.status]), [['A1', 'unmet'], ['A2', 'unmet']]);
+  assert.ok(s.playtest && s.review);
+});
+
+test('prMode reads the PR, files, issue and proof.json through injected gh/fetch', async () => {
+  const withLinks = body({ proof: `- clip: ${VIDEO}\n- proof.json: ${PROOF}` });
+  const gh = path => {
+    if (path.endsWith('/pulls/7')) return { body: withLinks, labels: [], user: { login: 'someone' }, head: { sha: 'abc1234' }, draft: false };
+    if (path.includes('/pulls/7/files')) return [[{ filename: 'apps/web/src/seat.ts' }]];
+    if (path.endsWith('/issues/12')) return { body: '### Acceptance criteria\n- [ ] **A1** Tapping a seat opens its menu' };
+    throw Error(`unexpected ${path}`);
+  };
+  const fetchImpl = async () => ({ ok: true, status: 200, text: async () => JSON.stringify(proofDoc()) });
+  const { result, comment } = await prMode({ repo: 'o/r', pr: 7, gh, fetchImpl, policy });
+  assert.equal(result.tier, 'T2');
+  assert.equal(result.ok, true, result.problems.join('\n'));
+  assert.match(comment, /Tier T2/);
+  const waiver = actor => p => p.endsWith('/pulls/7') ? { body: '', labels: [{ name: 'proof:waived' }], user: { login: 'x' } }
+    : p.includes('/events') ? [[{ event: 'labeled', label: { name: 'proof:waived' }, actor: { login: actor } }]] : gh(p);
+  const waived = await prMode({ repo: 'o/r', pr: 7, gh: waiver('o'), fetchImpl, policy });
+  assert.equal(waived.result.ok, true);
+  assert.match(waived.comment, /Waived by the maintainer/);
+  const notMaintainer = await prMode({ repo: 'o/r', pr: 7, gh: waiver('someone-else'), fetchImpl, policy });
+  assert.equal(notMaintainer.result.ok, false);
+  assert.ok(notMaintainer.result.warnings.some(w => /does not count/.test(w)));
+});

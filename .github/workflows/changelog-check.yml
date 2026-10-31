@@ -1,0 +1,33 @@
+# Every PR adds a changes/<pr-or-slug>.md fragment (changes/README.md), or carries the `no-changelog` label.
+name: changelog
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
+  merge_group:
+permissions:
+  contents: read
+jobs:
+  fragment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
+      - name: Validate fragments
+        run: node tools/changelog/compile.mjs --check
+      - name: Require a fragment or the no-changelog label
+        if: github.event_name == 'pull_request'
+        env:
+          NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$NO_CHANGELOG" = true ]; then echo "no-changelog label set"; exit 0; fi
+          added=$(git diff --name-only --diff-filter=AM "$BASE...$HEAD_SHA" -- 'changes/*.md' ':!changes/README.md' ':!changes/_template.md')
+          if [ -z "$added" ]; then
+            echo "::error::Add a changelog fragment changes/<pr-or-slug>.md (format in changes/README.md), or label the PR no-changelog."
+            exit 1
+          fi
+          echo "fragments: $added"

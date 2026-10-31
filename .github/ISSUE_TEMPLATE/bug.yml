@@ -1,0 +1,69 @@
+name: Bug
+description: Something in Sim is broken or behaves wrongly
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What happened, and what you expected instead.
+    validations: { required: true }
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The world URL (or a fake-mind dev world), then each step. A screen recording helps a lot.
+      placeholder: |
+        1. Open /worlds/w/<world>/ on desktop
+        2. ...
+    validations: { required: true }
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Pass/fail, one box each. Triage or the fixing agent refines these before the fix starts.
+      value: |
+        - [ ] **A1** The steps above no longer reproduce the problem (on the same world template and viewport)
+        - [ ] **A2** A focused test fails before the fix and passes after
+        - [ ] **A3** Unrelated journeys around the fix still work: 
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [web client, world server, Souls, engine / navigation, world building, Mars, assets / CDN, release / ops, not sure]
+    validations: { required: true }
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Tier
+      description: "Proof the fix needs (docs/process/PROOF-POLICY.yml). Leave as not sure if you are reporting, not fixing."
+      options:
+        - "Not sure (triage decides)"
+        - "T0: docs, tools, process, CI"
+        - "T1: logic with no visible change"
+        - "T2: visible UI or behaviour"
+        - "T3: Soul behaviour, navigation, engine, shared or brittle code"
+  - type: textarea
+    id: touches
+    attributes:
+      label: Files and areas likely touched
+      description: If you know them. Helps parallel agents spot overlap.
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+  - type: input
+    id: build
+    attributes:
+      label: Build
+      description: The build id from /worlds/__sim/healthz, or the commit if running locally.
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: e.g. desktop Chrome, phone Safari
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output or logs
+      render: text

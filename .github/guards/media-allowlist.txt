@@ -1,0 +1,24 @@
+# Binary files allowed in the tree (small own-work: PWA icons, a procedural loop, test fixtures).
+# Media is pulled from the CDN (pnpm assets:pull), never committed. Adding a line here is a reviewed change.
+apps/web/pwa/icon-180.png
+apps/web/pwa/icon-192.png
+apps/web/pwa/icon-512.png
+apps/web/src/media/gallery-loop.mp4
+tools/god-skill/reference/kit-primitives.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/personas/pip/shown/1.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/personas/pip/shown/2.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/personas/pip/shown/3.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/personas/pip/shown/4.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/personas/pip/shown/5.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/personas/pip/shown/6.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/personas/pip/shown/7.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/shots/pip/100000.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/shots/pip/185000.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/shots/pip/230000.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/shots/pip/45000.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/shots/wide/185000.png
+tools/playtest/review/fixtures/runs/20261024-120000-fixture-newcomer-1/shots/wide/45000.png
+# Brotli-compressed text fixtures for the old-world replay tests.
+apps/server/test/fixtures/old-world-takes/eden.jsonl.br
+apps/server/test/fixtures/old-world-takes/littlemartians.jsonl.br
+apps/server/test/fixtures/old-world-takes/mars.jsonl.br

@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+// Picks the CI jobs a change needs, from the same path map the release gate uses (`release-gate.mjs --scope auto`).
+//
+//   node .github/scripts/ci-scope.mjs --base <ref|sha> [--head <ref|sha>]   (or --files a,b,c for tests)
+//
+// Paths no rule names (root files, the lockfile, mars/, worlds/, vendor/, .github/ ...) run every job; docs and
+// tools-only changes run none (ci-ok still reports). Writes `matrix`, `any` and `scope` to $GITHUB_OUTPUT when set.
+import { execFileSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { REQUIRED_STEPS, scopeFor } from '../../tools/test-harness/release-gate.mjs';
+
+// The qualify matrix (unchanged from the manual workflow). `steps` are the gate steps that make a job relevant;
+// `assets` says whether the job pulls media first. Keep this list and the case block in ci.yml in step.
+export const JOBS = [
+  { name: 'types-web', kind: 'types-web', assets: true, steps: ['V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-bundle'] },
+  { name: 'packages', kind: 'packages', assets: true, steps: ['V3-packages', 'V4-web', 'V3-walk'] },
+  { name: 'native', kind: 'native', assets: true, steps: ['V3-mars-engine'] },
+  { name: 'latency', kind: 'latency', assets: false, steps: ['V5-server-full'] },
+  { name: 'server-0', kind: 'server', shard: 0, assets: true, steps: ['V5-server-full', 'V6-'] },
+  { name: 'server-1', kind: 'server', shard: 1, assets: true, steps: ['V5-server-full', 'V6-'] },
+];
+
+const relevant = (job, steps) => job.steps.some(s => steps.some(step => s.endsWith('-') ? step.startsWith(s) : step === s));
+
+export function jobsFor(files) {
+  const scope = scopeFor(files);
+  const include = scope.resolved === 'full' ? JOBS : JOBS.filter(job => relevant(job, scope.steps));
+  return { scope: scope.resolved, steps: scope.steps, include: include.map(({ steps, ...job }) => job), diff: scope.diff };
+}
+
+const ZERO = /^0+$/;
+export function changedFiles(base, head = 'HEAD', git = (...a) => execFileSync('git', a, { encoding: 'utf8' })) {
+  if (!base || ZERO.test(base)) return null; // a new branch or a missing base: run everything
+  try { return git('diff', '--name-only', `${base}...${head}`).split('\n').filter(Boolean); }
+  catch { return null; }
+}
+
+function main(argv) {
+  const opt = k => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined; };
+  const files = opt('--files') !== undefined ? opt('--files').split(',').filter(Boolean) : changedFiles(opt('--base'), opt('--head'));
+  const plan = files ? jobsFor(files) : { scope: 'full', steps: REQUIRED_STEPS, include: JOBS.map(({ steps, ...job }) => job), diff: { reason: 'no usable base' } };
+  const out = { matrix: JSON.stringify({ include: plan.include }), any: String(plan.include.length > 0), scope: plan.scope };
+  console.log(JSON.stringify({ ...out, matrix: plan.include.map(j => j.name), diff: plan.diff }, null, 2));
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(out).map(([k, v]) => `${k}=${v}\n`).join(''));
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+    `### CI scope: ${plan.scope}\n\nJobs: ${plan.include.map(j => '`' + j.name + '`').join(', ') || 'none (docs/tools only)'}\n`);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv.slice(2));

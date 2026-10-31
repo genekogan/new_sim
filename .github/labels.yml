@@ -1,0 +1,46 @@
+# Repository labels live here; .github/workflows/labels.yml syncs them on every change to this file.
+# Labels not listed are left alone (delete-other-labels: false), so imported or ad-hoc labels survive.
+
+# type
+- { name: "type:bug", color: "d73a4a", description: "Something is broken" }
+- { name: "type:feature", color: "1d76db", description: "New capability or a visible improvement" }
+- { name: "type:perf", color: "fbca04", description: "Speed, memory, frame time or bundle size" }
+- { name: "type:docs", color: "0075ca", description: "Documentation only" }
+- { name: "type:internal", color: "c5def5", description: "Refactor, tooling, CI; nothing user-facing" }
+- { name: "type:epic", color: "3e4b9e", description: "A tranche or epic that groups several issues" }
+
+# proof tier (docs/process/PROOF-POLICY.yml); a label can raise a PR's computed tier, never lower it
+- { name: "tier:T0", color: "e6f4ea", description: "Docs, tools, process: lint only" }
+- { name: "tier:T1", color: "c2e7c9", description: "Logic, no visible change: focused tests + typecheck" }
+- { name: "tier:T2", color: "8fd19e", description: "Visible change: T1 + an uncut real-speed clip" }
+- { name: "tier:T3", color: "4caf50", description: "Soul/nav/engine or brittle: T2 + playtest + reviewer + maintainer" }
+- { name: "tier:T4", color: "1b5e20", description: "Release head: full gate, live walks, changelog" }
+
+# area
+- { name: "area:web", color: "bfd4f2", description: "Browser client (apps/web)" }
+- { name: "area:server", color: "bfd4f2", description: "World server (apps/server)" }
+- { name: "area:souls", color: "bfd4f2", description: "Soul agents, intents, brain" }
+- { name: "area:engine", color: "bfd4f2", description: "Engines, navigation, kernel, protocol (packages/)" }
+- { name: "area:god", color: "bfd4f2", description: "World building tools (god skill, launcher)" }
+- { name: "area:mars", color: "bfd4f2", description: "Mars campus viewer and content" }
+- { name: "area:assets", color: "bfd4f2", description: "Media, CDN, asset pipeline" }
+- { name: "area:release", color: "bfd4f2", description: "Gate, deploy, production operations" }
+- { name: "area:ci", color: "bfd4f2", description: "GitHub Actions, agent workflow, repo tooling" }
+- { name: "area:docs", color: "bfd4f2", description: "Documentation" }
+
+# workflow
+- { name: "agent:ready", color: "5319e7", description: "Triaged and specified well enough for an agent to pick up" }
+- { name: "agent:claimed", color: "7057ff", description: "An agent or person has claimed this issue; others leave it alone" }
+- { name: "merge:ready", color: "0e8a16", description: "Hand the PR to the merge train (.github/workflows/merge-train.yml)" }
+- { name: "needs:rebase", color: "e99695", description: "The merge train could not rebase cleanly; rebase by hand, then relabel merge:ready" }
+- { name: "approved:maintainer", color: "0e8a16", description: "Maintainer sign-off for a T3+ PR they authored (GitHub forbids self-approval); only counts when the maintainer adds it" }
+- { name: "proof:waived", color: "fef2c0", description: "Maintainer waives the proof-ok check for this PR (say why in a comment)" }
+- { name: "needs:gene", color: "b60205", description: "Needs a maintainer decision or sign-off" }
+- { name: "status:triaged", color: "ededed", description: "Seen by triage: labelled, deduped, repro attempted" }
+- { name: "status:needs-repro", color: "ededed", description: "Could not reproduce yet; more detail needed" }
+- { name: "status:in-progress", color: "ededed", description: "Someone (or an agent) is on it" }
+- { name: "status:blocked", color: "ededed", description: "Waiting on something outside this issue" }
+- { name: "status:duplicate", color: "ededed", description: "Duplicate of another issue (linked in a comment)" }
+- { name: "history:imported", color: "d4c5f9", description: "Imported from the pre-public development history" }
+- { name: "no-changelog", color: "eeeeee", description: "Nothing user-facing; no changes/ fragment needed" }
+- { name: "dependencies", color: "0366d6", description: "Dependency updates" }
