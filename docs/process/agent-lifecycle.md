@@ -73,11 +73,16 @@ needs, and which acceptance boxes have evidence. The `claude-review` workflow re
 the evidence supports each acceptance claim. `@claude` answers follow-ups, and the author answers each comment with
 a fix or a reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
 
+The maintainer gate is part of `proof-ok`: at T3 and T4 it fails until the maintainer approves (or, on their own PR,
+adds `approved:maintainer`), so no merge path, the train or `gh pr merge --auto`, lands a gated PR without them
+([agent workflow](agent-workflow.md#the-merge-train)). `proof-ok` is skipped on drafts and runs when the PR is marked
+ready for review; check a draft locally with `node tools/proof/acceptance.mjs check`.
+
 ## 7. Merge
 
 Label the PR `merge:ready`. The merge train rebases it onto `main`, re-runs the required checks and merges: T0–T2
-automatically on green, T3–T4 after the maintainer approves. A conflict it cannot resolve gets `needs:rebase`. See
-[the merge train](agent-workflow.md#the-merge-train). `main` is always releasable.
+automatically on green, T3–T4 after the maintainer approves (enforced by `proof-ok`). A conflict it cannot resolve
+gets `needs:rebase`. See [the merge train](agent-workflow.md#the-merge-train). `main` is always releasable.
 
 ## 8. Release
 

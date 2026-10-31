@@ -12,7 +12,9 @@
 #     3. merge           T0-T2 (tools/proof/tier.mjs over the PR's files and tier:Tn labels): squash, automatically.
 #                        T3-T4: only after the maintainer's approving review, or, on a PR the maintainer authored
 #                        (GitHub forbids self-approval), the approved:maintainer label added by the maintainer.
-#                        Until then the PR stays labelled and queued, with one comment saying so
+#                        Until then the PR stays labelled and queued, with one comment saying so. The gate is
+#                        enforced by the required proof-ok check (tools/proof/gate.mjs), so a merge outside the train
+#                        cannot skip it either; the train only applies the same rule to choose what to queue
 #   needs:rebase         rebase by hand, push, remove needs:rebase and relabel merge:ready
 #
 # One PR per run, serialized by the `merge-train` concurrency group. Each run re-reads the whole queue, then
@@ -36,9 +38,12 @@ on:
 permissions:
   contents: read
 jobs:
-  # A maintainer approval may unblock a waiting T3/T4 PR: start main's train (no PR code or secrets used here).
+  # A maintainer approval (or their approved:maintainer label) may unblock a waiting T3/T4 PR: start main's train (no
+  # PR code or secrets used here). The gate itself is the required proof-ok check (tools/proof/gate.mjs).
   kick:
-    if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
+    if: >-
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') ||
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'approved:maintainer')
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions:
