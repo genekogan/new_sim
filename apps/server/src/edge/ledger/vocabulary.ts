@@ -704,6 +704,40 @@ function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined)
   for (let p = id ? byId.get(id) : undefined, n = 0; p && n < 20; p = p.parent ? byId.get(p.parent) : undefined, n++) if (p.parent === ancestor) return true;
   return false;
 }
+/** srv-act-words (D): for a focused walk to these destination words, a test passing every walk offer the words could choose
+ *  (resolveWords' walk pool rules), so a focused build may skip building the rest (their route goals): an offer is kept
+ *  when any destination word (or its everyday synonym) is one of its own words (target id, id, label, target names, the
+ *  place it stands in, aliases), or its target is a place any such word names (name, id, aliases, kind, description: every
+ *  placeMatch tier and pass, leniently) or one inside or around such a place (3b: the place itself, its inner offers, the
+ *  containing place). Every rule that chooses a walk reads only offers like these; the rest are read by unknown answers,
+ *  which go to the words menu. Null (build every walk) for words other rules read whole: no word left after filler, here
+ *  / now words, numbers (numberWords), and a word the typo fallback could re-read (one no place spells exactly: typoFix
+ *  reads the offers' words). */
+const KEEP_WHOLE = new Set(['here', 'nearby', 'near', 'anywhere', 'somewhere', 'down', 'now', 'nearest']);
+const PLACE_TOKENS = new WeakMap<readonly VocabPlace[], Set<string>>();
+export function walkKeepV1(dest: string, places: VocabPlace[], target: VocabContext['target']): ((c: Pick<EdgeCapability, 'id' | 'verb' | 'label' | 'aliases' | 'target'>) => boolean) | null {
+  const q = tokens(dest);
+  if (!q.some(w => !FILLER.has(w)) || q.some(w => KEEP_WHOLE.has(w) || /\d/.test(w) || w in NUMBER_WORDS)) return null;
+  let exact = PLACE_TOKENS.get(places);
+  if (!exact) {exact = new Set(); for (const p of places) for (const s of [p.name, p.id, p.description ?? '', ...(p.aliases ?? [])]) for (const t of tokens(s)) exact.add(t); PLACE_TOKENS.set(places, exact);}
+  if (q.some(w => w.length >= 4 && !FILLER.has(w) && !exact!.has(w))) return null;
+  const Q = [...new Set([...q, ...q.flatMap(w => SYNONYMS[w] ?? [])])], qs = q.join(' ');
+  const named = new Set(places.filter(p => {const W = placeWords(p); return W.ids.includes(qs) || W.name === qs || W.aliases.includes(qs) || Q.some(w => tokenHit(w, W.nameT) || tokenHit(w, W.kindT) || tokenHit(w, W.descT));}).map(p => p.id));
+  // ... with every place around (isAncestor's chain) and inside them
+  let byId = PLACES_BY_ID.get(places); if (!byId) {byId = new Map(places.map(p => [p.id, p])); PLACES_BY_ID.set(places, byId);}
+  const near = new Set(named);
+  for (const p of places) {
+    const chain: string[] = [];
+    for (let x: VocabPlace | undefined = p, n = 0; x && n < 21; x = x.parent ? byId.get(x.parent) : undefined, n++) chain.push(x.id);
+    if (chain.slice(1).some(id => named.has(id))) near.add(p.id);
+    if (named.has(p.id)) for (const id of chain) near.add(id);
+  }
+  return c => {
+    const id = c.target?.id; if (id && near.has(id)) return true;
+    const t = target(c as EdgeCapability), own = [id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names, ...t.around, ...(c.aliases ?? [])].flatMap(tokens);
+    return Q.some(w => tokenHit(w, own));
+  };
+}
 /** Places named by these words: own name/id first, then everyday synonyms, then description words; the most
  *  obvious first (by name over description, walkable, outermost, larger). */
 /** VERBS (accept2 brief 10): "feed the ducks" away from a duck bank said "There are no ducks or birds to feed here" although

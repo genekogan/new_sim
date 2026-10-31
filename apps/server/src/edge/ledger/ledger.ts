@@ -35,7 +35,7 @@ const bboxDistance = (p: [number, number][], at: [number, number]) => {let x0 = 
 const LOOP_SPAN = 160;
 const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p.map(q => q[1]); return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));};
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
-import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, wordsFocusVerbsV1, type VocabContext, type VocabResult} from './vocabulary.ts';
+import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, wordsFocusVerbsV1, walkKeepV1, type VocabContext, type VocabResult} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, activityMayOffer, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, SPOT_REACH, type SpotsData} from './activities.ts';
 import type {PaintingIntent, PaintingService} from '../../art/painting-completion.ts';
@@ -826,8 +826,18 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // the words menu before any focused build (a misspelt or unknown place answered unknown on the focus, then paid for the
     // words menu too); a thing's name, a typo the words menu reads: the words menu, as before
     const dest = WALK_DEST.exec(low.trim().replace(/\s+/g, ' '));
-    if (dest) {const {places, withheld} = this.vocabPlaces(soul); if (!placeMatch(tokens(dest[1]), places, withheld).length) {menuStats.words.focusSkipped++; return null;}}
-    const f = this.bindFocus(soul, {ids: new Set(), verbs, targets: new Set()});
+    let keep: MenuFocus['walkKeep'] | undefined;
+    if (dest) {
+      const {places, withheld} = this.vocabPlaces(soul); if (!placeMatch(tokens(dest[1]), places, withheld).length) {menuStats.words.focusSkipped++; return null;}
+      // (D) ... and builds only the walks those words could choose (vocabulary walkKeepV1), not every walk's route goal
+      const test = walkKeepV1(dest[1], places, this.vocabularyOf(soul, []).target);
+      if (test) keep = {sig: dest[1], keep: test};
+    }
+    let f = this.bindFocus(soul, {ids: new Set(), verbs, targets: new Set(), ...(keep ? {walkKeep: keep} : {})});
+    // (a kept build need not have run the test; the words' own verbs must all still be offered, as on the whole focus,
+    // else parseCapability could read them differently: build every walk)
+    if (keep && !['walk', 'hang-out', 'stroll', 'sit'].every(v => !verbs.has(v) || f.caps.some(c => c.verb === v))) {menuStats.words.keepWidened++; f = this.bindFocus(soul, {ids: new Set(), verbs, targets: new Set()});}
+    else if (keep) menuStats.words.keepNarrowed++;
     if (this.together.resolve(soul, text, [...f.caps], new Map(f.plans) as Map<string, TogetherPlan>)) return null;
     const pre = this.resolveOnDemand(soul, text, [...f.caps], new Map(f.plans));
     if (pre.v.kind === 'unknown') {menuStats.words.focusUnknown++; return null;}

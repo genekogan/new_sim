@@ -4,9 +4,14 @@
 // names, and the sections that read other offers (a gait copies its walk, `sit:here` points at the nearest free seat)
 // widen the focus to what they read. Pure: no world access.
 
+import type {EdgeCapability} from '../contract.ts';
+
 /** What a focused build must produce: offers with one of these ids, any offer of these verbs, any offer whose target is
  *  one of these ids. */
-export type MenuFocus = {ids: ReadonlySet<string>; verbs: ReadonlySet<string>; targets: ReadonlySet<string>; here?: boolean};
+export type MenuFocus = {ids: ReadonlySet<string>; verbs: ReadonlySet<string>; targets: ReadonlySet<string>; here?: boolean;
+  /** srv-act-words (D): a focused words walk builds only the walk offers `keep` passes (GodNav offerWalk); `sig` names the
+   *  test in the focus's cache key. Never set by bindOne/here. */
+  walkKeep?: {sig: string; keep: (c: Pick<EdgeCapability, 'id' | 'verb' | 'label' | 'aliases' | 'target'>) => boolean}};
 
 /** True when a section must build this offer (always, without a focus). */
 export function wants(f: MenuFocus | null | undefined, id: string, verb?: string, target?: string): boolean {
@@ -22,7 +27,7 @@ export function wantsPrefix(f: MenuFocus | null | undefined, prefix: string, ver
 }
 
 /** A focus as a cache key. */
-export function focusSig(f: MenuFocus): string {return `${[...f.ids].sort().join(',')}|${[...f.verbs].sort().join(',')}|${[...f.targets].sort().join(',')}|${f.here ? 1 : 0}`;}
+export function focusSig(f: MenuFocus): string {return `${[...f.ids].sort().join(',')}|${[...f.verbs].sort().join(',')}|${[...f.targets].sort().join(',')}|${f.here ? 1 : 0}${f.walkKeep ? '|keep:' + f.walkKeep.sig : ''}`;}
 
 /** The offers `here` reads (L3 item 4): every `…:here` offer, invitations, every seat, and the offers whose target is one
  *  of `targets` (the places and things around the Soul, the places its exits lead to). */
