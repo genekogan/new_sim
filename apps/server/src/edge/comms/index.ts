@@ -91,7 +91,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(projectKind);
   objects.register(calendarKind);
   objects.register(rideKind);
-  deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
+  deps.ledger.addCapabilityProvider((soul, only, places) => objects.capabilities(soul, only, places));
   const steward = new Steward(core, options.stewardToken);
   const fading = new Fading(core, steward, options.fading === true, options.beam);
   core.isFaded = id => fading.status(id)?.colour === 'gone';

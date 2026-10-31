@@ -42,3 +42,10 @@ export function focusFor(id: string): MenuFocus {
   if (id === 'sit:here') verbs.add('sit');
   return {ids, verbs, targets};
 }
+
+/** The object ids a focus can name (L3 c): `object:<id>:<action>` ids and every target (a place id names no object). */
+export function focusObjects(f: MenuFocus): Set<string> {
+  const out = new Set(f.targets);
+  for (const id of f.ids) if (id.startsWith('object:')) {const j = id.indexOf(':', 7); out.add(j > 0 ? id.slice(7, j) : id.slice(7));}
+  return out;
+}

@@ -270,12 +270,15 @@ export class Objects {
   }
 
   /** Object actions as capabilities (`object:<id>:<action>`), merged by Ledger. */
-  capabilities(soul: EdgeSoul): EdgeCapability[] {
+  /** `only` (L3): just these objects; `places` (L3, for the listing's page): filled with each offered object's place. */
+  capabilities(soul: EdgeSoul, only?: ReadonlySet<string>, places?: Map<string, string>): EdgeCapability[] {
     const inPlace = this.inPlaceFor(soul.soulId);
-    return this.fresh().flatMap(o => {
+    // L3 (server reliability): a focused menu build names its objects; read and advance just those (as get() does), in all()'s id order
+    const rows = only ? [...only].filter(id => OBJECT_ID.test(id)).sort((a, b) => a < b ? -1 : a > b ? 1 : 0).flatMap(id => {const o = tx(this.core.db, () => {const cur = this.row(id); return cur ? this.advanced(cur) : undefined;}); return o ? [o] : [];}) : this.fresh();
+    return rows.flatMap(o => {
       const kind = this.kinds.get(o.kind);
       if (!kind || !this.visible(o, soul.soulId, kind, inPlace)) return [];
-      const ctx = this.ctx(o, kind, soul, inPlace);
+      const ctx = this.ctx(o, kind, soul, inPlace); places?.set(o.id, o.placeId);
       return this.actionsFor(o, kind, ctx).map(a => ({id: `object:${o.id}:${a.action}`, verb: 'object', label: `${a.label} (${o.name})`, object: o.id, action: a.action,
         target: {id: o.id, kind: o.kind}, available: a.available, ...(a.blocked ? {blocked: a.blocked} : {}), ...(Object.keys(a.params).length ? {params: a.params as Record<string, unknown>} : {})}));
     });

@@ -57,7 +57,7 @@ import {tx,afterCommit} from '../comms/store.ts';
 import {PlaceKnowledge} from '../perception/knowledge.ts';
 import {menuStats, countClear, cpuNow, MENU_ORACLE} from './menu-stats.ts';
 import {pageCapabilities, pageObjects, type LoadLevel, type Omitted, type Where} from './listing.ts';
-import {focusFor, focusSig, wants, wantsPrefix, type MenuFocus} from './focus.ts';
+import {focusFor, focusObjects, focusSig, wants, type MenuFocus} from './focus.ts';
 import {BodyRule, BODY_PATH_SAMPLE_M, type BodyKnobs, type BodySoul, type Posture} from './body-rule.ts';
 
 type Resolved = {from: string; to: string; note: string};
@@ -69,6 +69,20 @@ const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 // MENU_REACH_M covers SPOT_REACH: an activity spot is offered up to 200 m off, and a claim on it (an act whose target it
 // is) bumps the spot's cell, so every Soul that may list it rebuilds
 const MENU_MAX_AGE_TICKS = 2400, MENU_CELL_M = 32, MENU_REACH_M = SPOT_REACH;
+/** L3 item 4 (a): why a focused build was not kept (counters `one.focus*`; key misses by the part of `menuKey` that moved,
+ *  named from the key's end because the static/input parts may themselves hold '|'). */
+const KEY_TAIL = ['near', 'clock', 'faded', 'ride', 'pose', 'cells', 'together', 'menuGen'];
+function countFocusMiss(mine: Map<string, unknown> | undefined, kept: {tick: number; key: string} | undefined, key: string, tick: number, readsHeld: () => boolean) {
+  const c = menuStats.one, inc = (k: string) => {c[k] = (c[k] ?? 0) + 1;};
+  if (!kept) {inc(mine?.size ? 'focusMissSig' : 'focusMissAbsent'); return;}
+  if (kept.key !== key) {
+    const a = kept.key.split('|').reverse(), b = key.split('|').reverse();
+    let part = 'staticOrInputs'; for (let i = 0; i < KEY_TAIL.length; i++) if (a[i] !== b[i]) {part = KEY_TAIL[i]; break;}
+    inc('focusMissKey_' + part); return;
+  }
+  if (tick - kept.tick >= MENU_MAX_AGE_TICKS) {inc('focusMissAge'); return;}
+  if (!readsHeld()) inc('focusMissReads');
+}
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
 /** An object whose place is not known: ranked after everything placed (listed only at green, if the page has room). */
 const FAR: [number, number] = [1e9, 1e9];
@@ -85,7 +99,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   places: PlaceIndex;
   private receiptListeners: ((r: EdgeReceipt) => void)[] = [];
   private placeListeners: ((e: {soulId: string; from: string | null; to: string | null; tick: number}) => void)[] = [];
-  private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
+  private providers: ((s: EdgeSoul, only?: ReadonlySet<string>, places?: Map<string, string>) => EdgeCapability[])[] = [];
+  /** L3: each object offer's place, as the object providers last built it (the listing's page ranks object offers by it). */
+  private objectPlaces = new Map<string, string>();
   /** MW: a world profile (worlds/*: Mars camp work, floater bodies) adds planned capabilities and drops ones its bodies cannot do. */
   /** R4-LIVE (god worlds only): the weather now, for `here` and Eyes; unset on the live worlds (engine env.weather). */
   weatherNow?: () => {clouds: number; rain: number; wind: number; fog: number; kind: string; lightning: number};
@@ -690,9 +706,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (hit?.last?.tick === tick && hit.last.sig === this.sameTickSig()) {menuStats.one.sameTick++; return only(hit.last.value);}
     if (hit && hit.key === this.menuKey(soul, tick) && tick - hit.tick < MENU_MAX_AGE_TICKS && this.readsHold(soul, hit.reads)) {menuStats.one.kept++; return only(this.bindsTail(soul, only(hit.value), focus));}
     // a focused build is kept like a whole menu (same key, same reads), per focus: `here` asks the same one every frame
-    const sig = focusSig(focus), mine = this.focusCache.get(soul.soulId), kept = mine?.get(sig), key = this.menuKey(soul, tick);
-    if (kept && kept.key === key && tick - kept.tick < MENU_MAX_AGE_TICKS && this.readsHold(soul, kept.reads)) {menuStats.one.keptFocus++; return only(this.bindsTail(soul, kept.value, focus));}
-    menuStats.one.built++;
+    const sig = focusSig(focus), mine = this.focusCache.get(soul.soulId), kept = mine?.get(sig), key = this.menuKey(soul, tick, focus);
+    if (kept && kept.key === key && tick - kept.tick < MENU_MAX_AGE_TICKS && this.readsHold(soul, kept.reads)) {
+      menuStats.one.keptFocus++; const value = only(this.bindsTail(soul, kept.value, focus));
+      if (MENU_ORACLE) {const fresh = only(this.bindsTail(soul, only(this.bindsCore(soul, focus)), focus)), a = JSON.stringify([value.caps, [...value.plans]]), b = JSON.stringify([fresh.caps, [...fresh.plans]]); if (a !== b) {menuStats.one.oracleMiss++; let i = 0; while (i < a.length && a[i] === b[i]) i++; console.error('[focus-oracle]', soul.soulId, sig.slice(0, 120), 'kept', a.slice(Math.max(0, i - 80), i + 160), '| fresh', b.slice(Math.max(0, i - 80), i + 160));}}
+      return value;
+    }
+    menuStats.one.built++; countFocusMiss(mine, kept, key, tick, () => this.readsHold(soul, kept!.reads));
     const {core, reads} = this.recordReads(() => only(this.bindsCore(soul, focus)));
     const m = mine ?? new Map(); m.set(sig, {tick, key, reads, value: core}); if (m.size > 8) m.delete(m.keys().next().value!); this.focusCache.set(soul.soulId, m);
     return only(this.bindsTail(soul, core, focus));
@@ -706,7 +726,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     let i = 0; while (i < a.length && a[i] === b[i]) i++;
     return `bindOne ${a.slice(Math.max(0, i - 80), i + 160)} | menu ${b.slice(Math.max(0, i - 80), i + 160)}`;
   }
-  private menuKey(soul: EdgeSoul, tick: number): string {
+  private menuKey(soul: EdgeSoul, tick: number, focus?: MenuFocus): string {
     const me = this.body(soul.entityId); if (!me || isRigidBody(me)) return `tick:${tick}`;
     const [x, y, z] = me.pose.p, h = me.human as {activity?: unknown; baseActivity?: unknown; level?: unknown; seat?: unknown} | undefined;
     const ride = this.aboard(soul.entityId), stepping = ride ? this.stepOutRefusal(soul.entityId) : null;
@@ -720,6 +740,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const dx = ob.pose.p[0] - x, dz = ob.pose.p[2] - z; if (dx * dx + dz * dz > r2) continue;
       // within wave reach the plan faces the exact point where they stand (a 1 cm drift is a different wave): exact there
       const exact = dx * dx + dz * dz <= (NEAR_RADIUS + 1) ** 2;
+      // L3 (a): a focused build keeps only the offers its focus names; another Soul's position is read by the offers aimed
+      // at that Soul (go-near, wave, face, together gestures) and by spot/seat claims (recorded reads; a seat taken changes
+      // its activity). A Soul the focus does not name is keyed by its radius band and activity, not where it stands
+      if (focus && !focus.targets.has(o.soulId) && ![...focus.ids].some(id => id.endsWith(':' + o.soulId))) {near += `${o.soulId}~${exact ? 1 : 2},${String(ob.human?.activity ?? '')};`; continue;}
       near += exact ? `${o.soulId}=${ob.pose.p[0]},${ob.pose.p[1]},${ob.pose.p[2]},${String(ob.human?.activity ?? '')};` : `${o.soulId}@${q(ob.pose.p[0])},${q(ob.pose.p[1])},${q(ob.pose.p[2])},${String(ob.human?.activity ?? '')};`;
     }
     return `${this.staticVersion()}|${this.menuInputs()}|${this.menuGen}|${this.together.version}|${this.cellsNear(x, z)}|${q(x)},${q(y)},${q(z)},${String(h?.activity ?? '')},${String(h?.baseActivity ?? '')},${String(h?.level ?? '')},${JSON.stringify(h?.seat ?? null)}|${ride ? `${ride.id},${ride.phase},${ride.riderPhase},${stepping?.code ?? ''}` : ''}|${this.faded.has(soul.soulId) ? 'f' : ''}|${this.clockMinute(tick)}|${near}`;
@@ -798,7 +822,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const caps = core.caps.slice(), plans = new Map(core.plans), me = this.body(soul.entityId);
     const ride = this.aboard(soul.entityId), stepping = ride ? this.stepOutRefusal(soul.entityId) : null;
     // (a focused build: object offers only when the focus names one, or aboard, where stand:here names the ride's leave)
-    if (!focus || ride || wantsPrefix(focus, 'object:', 'object')) for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
+    // (L3 c: a focus that names objects builds only theirs: the object ids of its ids, and its targets)
+    const objs = !focus || ride || focus.verbs.has('object') ? undefined : focusObjects(focus);
+    if (!focus || ride || focus.verbs.has('object') || objs!.size) for (const p of this.providers) try {caps.push(...p(soul, objs, this.objectPlaces));} catch {/* a provider fault hides only its own entries */}
     if (ride && !stepping) {const seated = this.rideStandRefusal(soul.entityId, caps), i = seated ? caps.findIndex(c => c.id === 'stand:here') : -1; if (i >= 0) caps[i] = {...caps[i]!, available: false, blocked: seated!};}
     shapeRigidCapabilities(me, caps, plans as never, {seconds: {type: 'integer', min: 1, max: 600, default: 60}});
     // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
@@ -971,11 +997,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
   setLoadLevel(level: LoadLevel) {this.loadLevel = level;}
   /** Where a listed offer's target is, for the page (a Soul, a thing, a place, an activity spot, an object's place). */
   private listingWhere(soul: EdgeSoul): (c: EdgeCapability) => Where {
-    let objects: Map<string, {here?: boolean; placeId?: string}> | null = null;
-    const objectsOf = () => objects ??= new Map(((this.comms?.objects.visibleTo(soul) ?? []) as {id: string; here?: boolean; placeId?: string}[]).map(o => [o.id, o]));
+    // L3 (c): an object offer ranks by where its object is (a built thing: its own point; else in a place this Soul is in:
+    // here; else the place's centre), read from what the providers built, never from a listing of every object (visibleTo
+    // advanced and viewed all 8,300 objects of the live Eden 2026 per page, ~55 ms)
+    let path: Set<string> | null = null;
+    const inPath = (id: string) => (path ??= new Set(this.placePathOf(soul.soulId).map(p => p.id))).has(id);
     const placeAt = (id: string | undefined): Where => {const p = id ? this.places.byId.get(id) : undefined; return p?.polygon?.length ? centroid(p.polygon) : null;};
     return c => {
-      if (c.verb === 'object' && c.object) {const o = objectsOf().get(c.object); if (o?.here) return 'here'; const at = placeAt(o?.placeId); if (at) return at; const e = this.host.engine.world.entities[c.object]; return e ? [e.pose.p[0], e.pose.p[2]] : FAR;}
+      if (c.verb === 'object' && c.object) {const e = this.host.engine.world.entities[c.object]; if (e) return [e.pose.p[0], e.pose.p[2]]; const pl = this.objectPlaces.get(c.object); if (pl && inPath(pl)) return 'here'; return placeAt(pl) ?? FAR;}
       const t = c.target;
       if (t?.kind === 'soul') {const m = this.host.minds.get(t.id), e = m ? this.body(m.entityId) : undefined; return e ? [e.pose.p[0], e.pose.p[2]] : null;}
       if (t) {const e = this.host.engine.world.entities[t.id]; if (e) return [e.pose.p[0], e.pose.p[2]]; const at = placeAt(t.id); if (at) return at;}
@@ -1023,7 +1052,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     };
     return engine.readPassV1 ? engine.readPassV1(read) : read();
   }
-  addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
+  addCapabilityProvider(p: (soul: EdgeSoul, only?: ReadonlySet<string>, places?: Map<string, string>) => EdgeCapability[]) {this.providers.push(p);}
 
   /** OWNER-DAY: the world's reason and where the body stood are kept so its owner can read the refusal on the "Today" timeline. */
   recordRefusal(soulId: string, verb: string, capability: string, code: string, reason = '') {
@@ -1762,7 +1791,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // knowledge/1: a secret place this Soul does not know is no name to resolve (nor a "contains it" fallback naming it)
     const known: typeof all = [], withheld: string[] = [];
     for (const p of all) if (p.parent !== null) {if (this.knowledge.knows(soul.soulId, p.id)) known.push(p); else withheld.push(tokens(p.name).join(' '), tokens(p.id).join(' '));}
-    const objects = new Map((this.comms?.objects.all() ?? []).map(o => [o.id, o]));
+    // (L3 c: an object offer's place from what the providers built; every object's row is read only for one they did not)
+    let objects: Map<string, {placeId: string}> | null = null;
+    const objectPlace = (id: string) => this.objectPlaces.get(id) ?? (objects ??= new Map((this.comms?.objects.all() ?? []).map(o => [o.id, o]))).get(id)?.placeId;
     const around = (x: number, z: number) => {const p = this.places.containing(x, z, 0).find(q => q.parent !== null); return p ? [p.id, p.name] : [];};
     const here: [number, number] | null = me ? [me.pose.p[0], me.pose.p[2]] : null;
     // r3 quality (23/29): the nearest spot (or bicycle dock) for a spot-based verb anywhere in this world, beyond offer reach
@@ -1799,7 +1830,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if (t.kind === 'soul') {const m = this.host.minds.get(t.id), e = m ? this.body(m.entityId) : undefined; return {names: m ? [m.name] : [], around: [], at: e ? [e.pose.p[0], e.pose.p[2]] : null};}
         const place = this.places.byId.get(t.id); if (place) return {names: [place.name,place.kind,...(place.semanticKind?[place.semanticKind]:[]),...(place.aliases??[])], around: [], at: centroid(place.polygon)};
         const e = w.entities[t.id]; if (e) return {names: [], around: around(e.pose.p[0], e.pose.p[2]), at: [e.pose.p[0], e.pose.p[2]]};
-        const o = objects.get(t.id), op = o ? this.places.byId.get(o.placeId) : undefined; if (op) return {names: [], around: [op.id, op.name], at: centroid(op.polygon)};
+        const opl = objectPlace(t.id), op = opl ? this.places.byId.get(opl) : undefined; if (op) return {names: [], around: [op.id, op.name], at: centroid(op.polygon)};
         // RESOLVE: a named thing that is no engine body (a horse, a duck: decor), where nav says it stands
         const nt = this.thingAt?.(t.id); if (nt) return {names: [], around: around(nt[0], nt[1]), at: nt};
         const r = (w.regions as Record<string, {polygon: [number, number][]}> | undefined)?.[t.id]; return {names: [], around: [], at: r ? centroid(r.polygon) : null};
