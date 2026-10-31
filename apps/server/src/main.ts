@@ -97,6 +97,7 @@ async function plainFactory() {
 // ground/1 (lane L8): every terrain recipe this entity world logged resolves by hash before the engine replays
 if (config.worldEngine) loadGroundRecipes(db, config.worldId);
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
+{ const at = performance.now(); if (db.vacuumIfBloated()) console.log(`[db] vacuumed at boot in ${Math.round(performance.now() - at)} ms (free pages over 30 %)`); }
 host.snapshotDebtMs = config.snapshotDebtMs; host.snapshotMinGapMs = config.snapshotMinGapMs; host.snapshotAfterReplayTicks = config.snapshotAfterReplayTicks;
 bootAt.open = performance.now();
 const boot = host.boot();
@@ -302,7 +303,8 @@ function pruneBackups() {
 }
 async function backupNow() {
   db.pruneBrainCalls(); db.pruneTalk();
-  if (db.vacuumIfBloated()) console.log('[db] vacuumed');
+  // (lane L5) no VACUUM here: it rewrote the whole file on the tick thread, stalling a serving world for seconds.
+  // SQLite reuses free pages; a bloated file is compacted once at the next boot, before the world serves.
   await db.backupTo(join(config.dataDir, `backup-${new Date().toISOString().slice(0, 13).replace(/[-T:]/g, '')}.db`));
   pruneBackups();
 }
