@@ -10,6 +10,7 @@
 // Created when main's delta first says main has a bridge (`physics` in the ledger env).
 import {EngineBridge, type BridgePhysicsV1} from '../god/engine-bridge.ts';
 import {GodReplica} from './god-replica.ts';
+import {installGroundCapabilities, type GroundEnvV1} from '../god/ground-host.ts';
 import type {ReadOnlyHost} from './read-host.ts';
 import type {EdgeLedger} from '../edge/ledger/ledger.ts';
 import type {WorldHost} from '../world.ts';
@@ -20,13 +21,15 @@ const HELD = new WeakMap<EdgeLedger, Held>();
 /** Create (once main has a bridge) and refresh the read bridge of a worker's ledger; null when main has none. Call
  *  before each read: adopts what the last deltas shipped, then brings the god model to main's last commit. */
 export function readBridgeSync(host: ReadOnlyHost, L: EdgeLedger): EngineBridge | null {
-  const E = host.rw.ledgerEnv as {physics?: unknown}, S = host.rw.R.static as {walkable?: string[]} | undefined;
+  const E = host.rw.ledgerEnv as {physics?: unknown; ground?: unknown}, S = host.rw.R.static as {walkable?: string[]} | undefined;
   let h = HELD.get(L);
   if (!h) {
     if (!('physics' in E)) return null;
     const god = new GodReplica(host.db, host.worldId, () => host.rw.R.pos.tick);
     // the bridge's engine is the worker's MenuWorld; everything else is the read-only host
     const bhost = new Proxy(host, {get: (t, k) => k === 'engine' ? host.rw.mw : Reflect.get(t, k, t)}) as unknown as WorldHost;
+    // main installs the ground's swim and flag offers before its bridge (main.ts): the same order here
+    if ('ground' in E) installGroundCapabilities(L as never, god as never, bhost, () => (host.rw.ledgerEnv as {ground?: GroundEnvV1}).ground);
     const bridge = new EngineBridge({host: bhost, god: god as never, edge: L, read: true, log: (m) => console.log(`[read-bridge] ${m}`)});
     h = {bridge, god, physics: undefined, walkable: undefined}; HELD.set(L, h);
   }

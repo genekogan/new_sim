@@ -15,6 +15,7 @@ import type {Mind} from '../world.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {setMenuWorld} from './menu-world.ts';
 import {lightningFrom} from '../god/lightning.ts';
+import {replicaObjects} from './read-objects.ts';
 type Strike = Parameters<typeof lightningFrom>[0][number];
 import type {ReplicaWorld} from './replica-world.ts';
 import type {MindRow} from './read-model.ts';
@@ -96,7 +97,10 @@ export class ReadOnlyHost {
  *  else derived from the replicated world, as main derives it. */
 export function readLedger(host: ReadOnlyHost, placeData?: unknown, env: NodeJS.ProcessEnv = process.env) {
   const L = new EdgeLedger(host as never, host.db, placeData, {readOnly: true});
-  L.comms = readComms(host, env.EDGE_FADING === '1', env.SIM_BEAM === '1') as never;
+  const comms = readComms(host, L, env.EDGE_FADING === '1', env.SIM_BEAM === '1');
+  L.comms = comms as never;
+  // as registerEdgeComms does on main: the object actions are offers (`object:<id>:<action>`)
+  L.addCapabilityProvider((soul, only, places) => comms.objects.capabilities(soul, only, places));
   // the god-fed reads, from what main's pump shipped (absent key = main has no such provider)
   const E = host.rw.ledgerEnv as {weather?: unknown; strikes?: Strike[] | null; spots?: unknown};
   L.weatherNow = (() => 'weather' in E ? E.weather ?? undefined : undefined) as never;
@@ -107,10 +111,10 @@ export function readLedger(host: ReadOnlyHost, placeData?: unknown, env: NodeJS.
 
 /** The comms reads the read code makes, from the database main writes (edge/comms/fading.ts status()). With the idle
  *  beam-up on, a Soul's colour depends on main's in-memory holds: main answers (MainOnly). */
-function readComms(host: ReadOnlyHost, fading: boolean, beam: boolean) {
+function readComms(host: ReadOnlyHost, L: EdgeLedger, fading: boolean, beam: boolean) {
   const db = host.db.db as DatabaseSync;
   let q: ReturnType<DatabaseSync['prepare']> | null = null;
-  const objs: {gen: number; n: number; list: readonly unknown[]} = {gen: -1, n: -1, list: []};
+  let h: ReturnType<DatabaseSync['prepare']> | null = null;
   return {
     fading: {
       status(soulId: string): {colour: string; idleSeconds: number} | null {
@@ -122,12 +126,16 @@ function readComms(host: ReadOnlyHost, fading: boolean, beam: boolean) {
         return r.colour === 'gone' ? {colour: 'gone', idleSeconds: Math.floor((Date.now() - r.last_at) / 1000)} : {colour: 'green', idleSeconds: 0};
       },
     },
-    get streams(): never {throw new MainOnly('comms.streams');},
-    /** the replicated comms object table (B-delta: L8 table snapshot + changes), in the table's id order */
-    objects: new Proxy({
-      all: () => {const R = host.rw.R; if (objs.gen !== R.objectGen || objs.n !== R.objects.size) {objs.gen = R.objectGen; objs.n = R.objects.size; objs.list = Object.freeze([...R.objects.values()].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0));} return objs.list;},
-      has: (id: string) => host.rw.R.objects.has(id),
-    } as Record<string, unknown>, {get: (t, k) => {if (k in t || typeof k === 'symbol') return t[k as string]; throw new MainOnly(`comms.objects.${String(k)}`);}}),
+    /** a Soul's stream head (observe's streamCursor), from the database main writes; delivering is main's */
+    streams: {
+      head(soulId: string): number {h ??= db.prepare('SELECT head, floor FROM edge_comms_heads WHERE world_id = ? AND soul_id = ?'); return (h.get(host.worldId, soulId) as {head: number} | undefined)?.head ?? 0;},
+      floor(soulId: string): number {h ??= db.prepare('SELECT head, floor FROM edge_comms_heads WHERE world_id = ? AND soul_id = ?'); return (h.get(host.worldId, soulId) as {floor: number} | undefined)?.floor ?? 0;},
+      headCursor(soulId: string): string {return `c_${this.head(soulId)}`;},
+      deliver: (): never => {throw new MainOnly('comms.streams.deliver');},
+    },
+    /** main's object framework over the replicated table (B-delta: L8 snapshot + changes), read-only (split/read-objects.ts) */
+    objects: replicaObjects({db, worldId: host.worldId, tick: () => host.rw.R.pos.tick, ledger: L, src: () => host.rw.R as never,
+      nameOf: (id) => host.minds.get(id)?.name ?? (host.db.soul(id) as {name?: string} | undefined)?.name ?? 'someone', mainOnly: (what) => {throw new MainOnly(what);}}),
     close() {/* nothing held */},
   };
 }

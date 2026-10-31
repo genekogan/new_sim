@@ -109,6 +109,9 @@ export type PlacesHost = {
   engineOwned(e: Entity): boolean;
   levelAt(x: number, z: number, y: number): number;
   log(m: string): void;
+  /** B-facade: a read worker derives the places (ofEntity / placeAt) but never installs them: its ledger's index is main's,
+   *  shipped whole with the delta (a worker that installed its own would run ahead of main while main catches up). */
+  readOnly?: boolean;
   /** LAYERS: schedules (today's slots), ownership and who works/lives there, in each place (layers.ts). */
   layers?: { active(): boolean; dayKey(): string; slotsFor(e: Entity, label: string): NonNullable<Place['schedule']>; tag(e: Entity): string; peopleAt(id: string): string; onNow?(e: Entity): string };
 };
@@ -437,6 +440,7 @@ export class GodPlaces {
   sync(fresh = false) {
     const places = this.h.edge?.places; if (!places) return;
     const want = new Map(this.list(fresh).map((p) => [p.id, p])); this.installedKey = this.cache?.key;
+    if (this.h.readOnly) { this.publishedVersion = this.cache?.publicationVersion; this.published = true; return; }
     for (const id of [...this.installed]) if (!want.has(id)) { places.byId.delete(id); this.installed.delete(id); }
     for (const [id, p] of want) {
       const cur = places.byId.get(id); if (cur && !this.installed.has(id)) continue;   // a boot place keeps its own

@@ -57,12 +57,12 @@ import type {DeltaTap, StreamMessage} from './delta.ts';
 
 export type ReadName = 'here' | 'observe' | 'capabilities' | 'resolve' | 'around';
 export const READS: readonly ReadName[] = ['here', 'observe', 'capabilities', 'resolve', 'around'];
-export type Soak = {startedAt: number; rounds: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number}>; replica: unknown};
+export type Soak = {startedAt: number; rounds: number; skipped: Record<string, number>; reads: Record<ReadName, OracleTally & {mainOnly: Record<string, number>; liveMs: number; replicaMs: number; paths: Record<string, number>}>; replica: unknown};
 
 export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {tap: DeltaTap; init: () => unknown; ask: (m: never[]) => void}, dbPath: string, o: {everyMs?: number; log?: (s: string) => void; logEveryMs?: number} = {}) {
   const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}, {hereFrame}, {aroundFrame}, {readBridgeSync, readBridgeCost}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts'), import('../edge/perception/here.ts'), import('../edge/perception/around.ts'), import('./read-bridge.ts')]);
   const {readFileSync, writeFileSync, mkdirSync} = await import('node:fs');
-  const DUMP = process.env.SIM_READ_ORACLE_DUMP || '', dumped: Record<string, number> = {}; if (DUMP) mkdirSync(DUMP, {recursive: true});
+  const DUMP = process.env.SIM_READ_ORACLE_DUMP || '', DUMP_AFTER = Number(process.env.SIM_READ_ORACLE_DUMP_AFTER ?? 0), dumped: Record<string, number> = {}; if (DUMP) mkdirSync(DUMP, {recursive: true});
   const RW = new ReplicaWorld();
   RW.init(structuredClone(src.init()) as never);
   const H = new ReadOnlyHost(RW, host.worldId, dbPath), RL = readLedger(H, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined);
@@ -70,7 +70,7 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
   /** as a worker does before 'ready': label connectivity outside any read (again after a rebuild) */
   const warm = () => {if (RW.spatial && warmed !== RW.spatial) {warmMs += RW.spatial.warmLabelsV1(); warmed = RW.spatial;}};
   const S: Soak = {startedAt: Date.now(), rounds: 0, skipped: {}, replica: null,
-    reads: Object.fromEntries(READS.map(r => [r, {...tally(), mainOnly: {}, liveMs: 0, replicaMs: 0}])) as Soak['reads']};
+    reads: Object.fromEntries(READS.map(r => [r, {...tally(), mainOnly: {}, liveMs: 0, replicaMs: 0, paths: {}}])) as Soak['reads']};
   const skip = (why: string) => {S.skipped[why] = (S.skipped[why] ?? 0) + 1;};
   src.tap.subscribe((m: StreamMessage) => {
     if ('t' in m || !RW.apply(structuredClone(m) as never)) {RW.init(structuredClone(src.init()) as never); skip('reinit');}
@@ -84,6 +84,15 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
     resolve: (l, s, i) => l.intents.dryRun(s, (i % 2 ? {capability: 'walk to the pond'} : {capability: 'sit on a bench'}) as never),
     around: (l, s) => aroundFrame(l, s),
   };
+  /** the body facts a place answer depends on (dump only) */
+  const diag = (l: EdgeLedger, s: EdgeSoul) => {
+    try {
+      const x = l as unknown as {body(id: string): {pose: {p: number[]}; human?: {level?: number; activity?: string}} | undefined; placeLevel(n?: number): number; places: {byId: Map<string, {level?: number}>}};
+      const b = x.body(s.entityId), lv = b?.human?.level, pl = x.placeLevel(lv), path = l.placePathOf(s.soulId).map(p => p.id);
+      return {p: b?.pose.p, level: lv, placeLevel: pl, activity: b?.human?.activity, path, places: x.places.byId.size, levels: path.map(id => x.places.byId.get(id)?.level ?? 0)};
+    } catch (e) {return {error: String(e)};}
+  };
+  const facts = (l: EdgeLedger, ids: string[]) => ids.map(id => {const p = (l as unknown as {places: {byId: Map<string, {level?: number; carrier?: unknown; parent?: string | null; polygon?: number[][]}>}}).places.byId.get(id); return p ? {id, level: p.level, carrier: !!p.carrier, parent: p.parent, n: p.polygon?.length, poly: JSON.stringify(p.polygon).slice(0, 120)} : {id, missing: true};});
   let next = 0;
   const round = () => {
     if (RW.R.pos.tick !== host.engine.world.tick) {skip('tick'); return;}
@@ -101,9 +110,13 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
       try {b = JSON.parse(JSON.stringify(ask[name](RL, s, S.rounds)));}
       catch (e) {T.replicaMs += performance.now() - t; if (e instanceof MainOnly) {const k = e.message.replace(/^read worker: | is main-only$/g, ''); T.mainOnly[k] = (T.mainOnly[k] ?? 0) + 1; T.reads++; continue;} b = {error: String(e)};}
       T.replicaMs += performance.now() - t;
+      // observe's `at` is the wall clock of the call (two calls, two instants): not a field the replica can differ in
+      if (name === 'observe' && a && b && typeof a === 'object' && typeof b === 'object') {delete (a as {at?: unknown}).at; delete (b as {at?: unknown}).at;}
       const missed = RW.verdicts.missCount > missBefore, diffs = diffFields(a, b);
+      // where the misses are: the first differing path of each, indices dropped (diagnosis)
+      if (diffs.length) {const k = diffs[0].path.replace(/\[\d+\]/g, '[]').split('.').slice(0, 3).join('.'); T.paths[k] = (T.paths[k] ?? 0) + 1;}
       // SIM_READ_ORACLE_DUMP=<dir>: the first three unequal pairs per read, whole (diagnosis; lane only)
-      if (diffs.length && DUMP && (dumped[name] = (dumped[name] ?? 0) + 1) <= 3) writeFileSync(`${DUMP}/${name}-${dumped[name]}.json`, JSON.stringify({soulId: s.soulId, tick: RW.R.pos.tick, live: a, replica: b}));
+      if (diffs.length && DUMP && S.rounds > DUMP_AFTER && (dumped[name] = (dumped[name] ?? 0) + 1) <= 3) {const dl = diag(L, s) as {path?: string[]}, ids = dl.path ?? []; writeFileSync(`${DUMP}/${name}-${dumped[name]}.json`, JSON.stringify({soulId: s.soulId, tick: RW.R.pos.tick, diag: {live: dl, replica: diag(RL, s), placesLive: facts(L, ids), placesReplica: facts(RL, ids)}, live: a, replica: b}));}
       record(T, name, s.soulId, diffs, missed);
     }
     if (RW.verdicts.misses.size) {src.ask([...RW.verdicts.misses.values()] as never[]); RW.verdicts.misses.clear();}

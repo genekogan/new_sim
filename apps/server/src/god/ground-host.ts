@@ -82,8 +82,12 @@ const centroid = (pts: [number, number][]) => { let x = 0, z = 0; for (const p o
 
 /** Offer `walk:flag-<name>` and `swim:<water>` capabilities from the god world (chains any profile already installed). */
 const DEEP_MIDDLE = new Map<string, boolean>();
-export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: WorldHost) {
+/** B-facade (read worker): what main's swim offers read besides the god model, shipped with the delta: the ground recipe
+ *  and the deep-middle answers main's engine gave (static per recipe and outline). */
+export type GroundEnvV1 = { recipe: string | null; middles: Record<string, boolean> };
+export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: WorldHost, read?: () => GroundEnvV1 | undefined) {
   const prev = ledger.worldProfile;
+  if (!read) (ledger as { groundEnvV1?: () => GroundEnvV1 }).groundEnvV1 = () => ({ recipe: (host.engine.world as unknown as { groundV1?: { recipeHash: string } }).groundV1?.recipeHash ?? null, middles: Object.fromEntries(DEEP_MIDDLE) });
   ledger.worldProfile = (soul, caps, plans) => {
     prev?.(soul, caps, plans);
     const me = (host.engine.world.entities as Record<string, { pose: { p: number[] } }>)[soul.entityId];
@@ -95,7 +99,7 @@ export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: Wo
       caps.push({ id, verb: 'walk', label: `Walk to the flag "${label}" (${Math.round(Math.hypot(wp.x - me.pose.p[0], wp.z - me.pose.p[2]))} m)`, available: true, target: { id: e.id, kind: 'object' } });
       plans.set(id, { label: `Walk to ${label}`, steps: [{ verb: 'walk_to', params: { to: [wp.x, wp.z], standoff: 0.8 } }] });
     }
-    const ground=god.model.ground(),recipe=(host.engine.world as unknown as {groundV1?:{recipeHash:string}}).groundV1?.recipeHash,field=recipe?groundFieldOf(recipe):null;
+    const env=read?.(),ground=god.model.ground(),recipe=read?env?.recipe??undefined:(host.engine.world as unknown as {groundV1?:{recipeHash:string}}).groundV1?.recipeHash,field=recipe&&!read?groundFieldOf(recipe):null;
     for (const w of ground.waters) {
       const pts = (w.area ?? w.path) as [number, number][], mid = centroid(pts), named = god.model.entities.get(w.id)?.name ?? w.id, id = `swim:${slug(named)}`;
       if (caps.some((c) => c.id === id)) continue;
@@ -105,7 +109,8 @@ export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: Wo
       plans.set(id, { label: `Swim in ${named}`, steps: [{ verb: 'mars:swim_in', params: { water:w.id } }] });
       // L3 item 4: whether a water's centre is deep is static ground: asked once per recipe and outline, not per menu build
       const mkey=`${recipe}|${w.id}|${mid[0]},${mid[1]}`;let middle=DEEP_MIDDLE.get(mkey);
-      if(middle===undefined){middle=field?.waterId?.(mid[0],mid[1])===w.id&&field.medium(mid[0],mid[1])===2&&(host.engine as unknown as {deepWaterTargetV1?:(x:number,z:number)=>boolean}).deepWaterTargetV1?.(mid[0],mid[1])===true;DEEP_MIDDLE.set(mkey,middle);if(DEEP_MIDDLE.size>4096)DEEP_MIDDLE.delete(DEEP_MIDDLE.keys().next().value!);}
+      if(middle===undefined&&read)middle=env?.middles[mkey]??false;
+      else if(middle===undefined){middle=field?.waterId?.(mid[0],mid[1])===w.id&&field.medium(mid[0],mid[1])===2&&(host.engine as unknown as {deepWaterTargetV1?:(x:number,z:number)=>boolean}).deepWaterTargetV1?.(mid[0],mid[1])===true;DEEP_MIDDLE.set(mkey,middle);if(DEEP_MIDDLE.size>4096)DEEP_MIDDLE.delete(DEEP_MIDDLE.keys().next().value!);}
       caps.push({id:`${id}/middle`,verb:'swim',label:`Swim to the middle of ${named}`,available:middle,target:{id:w.id,kind:'object'},...(!middle?{blocked:{code:'swim.no-deep-middle',reason:'The centre point is not deep water in this body; choose its generic swim action.'}}:{})});
       if(middle)plans.set(`${id}/middle`,{label:`Swim to the middle of ${named}`,steps:[{verb:'mars:swim_in',params:{water:w.id,x:mid[0],z:mid[1]}}]});
     }

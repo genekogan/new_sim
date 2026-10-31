@@ -164,7 +164,7 @@ export type MenuStatics = {regions: unknown; navV1: unknown; rulesVersion: strin
 export type ClaimRow = [slot: string, actor: string];
 /** The ledger's god-fed reads (main-only providers): weatherNow(), the recent lightning strikes, the god's activity spots.
  *  A key present = its new value (null = none); resent when it changed. */
-export type LedgerEnv = {weather?: unknown; strikes?: unknown; spots?: unknown; /** the god bridge's physics facts (engine-bridge readPhysicsV1), when its hash moved */ physics?: unknown};
+export type LedgerEnv = {weather?: unknown; strikes?: unknown; spots?: unknown; /** the god bridge's physics facts (engine-bridge readPhysicsV1), when its hash moved */ physics?: unknown; /** the ground swim offers' recipe and deep-middle answers (ground-host GroundEnvV1) */ ground?: unknown};
 export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics; claims?: ClaimRow[]; env?: LedgerEnv};
 export type MenuDelta = {actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel' | 'names'>; kernel?: unknown; names?: unknown; claims?: ClaimRow[]; env?: LedgerEnv};
 export type VerdictRow = {soulId: string; actor: string; key: string; verdict: Diag | null; tick: number};

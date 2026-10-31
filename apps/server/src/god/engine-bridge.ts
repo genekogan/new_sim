@@ -183,7 +183,7 @@ class BridgeStats {
 }
 
 /** B-facade: the facts of main's entity physics the bridge's listing reads, shipped to read workers. */
-export type BridgePhysicsV1 = { hash: string; levels: Level[]; assets: Record<string, { slots?: { kind: string }[]; surfaceSlots?: { id: string; local?: number[] }[]; category?: string }> };
+export type BridgePhysicsV1 = { hash: string; levels: Level[]; assets: Record<string, { slots?: { kind: string }[]; surfaceSlots?: { id: string; local?: number[] }[]; category?: string }>; /** the floors of upper levels (hasFloorAt: which level a god thing stands on) */ floors?: Record<string, { level: number; obb: OBB2 }[]> };
 export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
@@ -266,7 +266,7 @@ export class EngineBridge {
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, publicationVersion: () => this.godEdits, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, publicationVersion: () => this.godEdits, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers, readOnly: R });
     if (!R) this.god.builds.inventoryContext = () => {
       this.places.sync(true);
       return {
@@ -1649,12 +1649,14 @@ export class EngineBridge {
     const assets: BridgePhysicsV1['assets'] = {};
     for (const [k, a] of Object.entries(p.assets ?? {}) as [string, { slots?: { kind: string }[]; surfaceSlots?: { id: string; local?: number[] }[]; category?: string }][])
       assets[k] = { ...(a.slots ? { slots: a.slots.map((s) => ({ kind: s.kind })) } : {}), ...(a.surfaceSlots ? { surfaceSlots: a.surfaceSlots.map((s) => ({ id: s.id, ...(s.local ? { local: [...s.local] } : {}) })) } : {}), ...(a.category ? { category: a.category } : {}) };
-    return { hash: p.hash ?? '', levels: structuredClone(this.levels), assets };
+    const floors: NonNullable<BridgePhysicsV1['floors']> = {};
+    for (const [id, part] of Object.entries(p.byEntity ?? {}) as [string, Part][]) for (const f of part.surfaces ?? []) if (f.level) (floors[id] ??= []).push({ level: f.level, obb: structuredClone(f.obb) });
+    return { hash: p.hash ?? '', levels: structuredClone(this.levels), assets, floors };
   }
   /** A read worker: adopt main's physics facts and walkable god places; bring the god model to main's last commit
    *  (GodReplica.sync) and catch perception up at once (main does it in slices after its ticks). */
   readAdopt(o: { physics?: BridgePhysicsV1 | null; walkable?: readonly string[] }) {
-    if (o.physics !== undefined) { this.physics = (o.physics ? { hash: o.physics.hash, assets: o.physics.assets, levels: o.physics.levels, byEntity: {} } : undefined) as never; this.levels = o.physics ? structuredClone(o.physics.levels) as Level[] : []; }
+    if (o.physics !== undefined) { this.physics = (o.physics ? { hash: o.physics.hash, assets: o.physics.assets, levels: o.physics.levels, byEntity: Object.fromEntries(Object.entries(o.physics.floors ?? {}).map(([id, fs]) => [id, { surfaces: fs }])) } : undefined) as never; this.floorIndex = null as never; this.levels = o.physics ? structuredClone(o.physics.levels) as Level[] : []; }
     if (o.walkable) this.readWalkable = new Set(o.walkable);
   }
   readSync(): boolean {
