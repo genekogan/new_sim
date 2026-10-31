@@ -334,6 +334,22 @@ test('owner box and edge command need an invited owner (same gate as the central
   }
 });
 
+// #399: the god's presence after a listen hands over a command is 'working' however the clock moves between the
+// middleware's seen stamp and the delivery stamp (it read 'listening' when a millisecond passed in between).
+test('god presence is working right after a listen hands over a command, even if the clock ticks in between', t => {
+  const dir = mkdtempSync(join(tmpdir(), 'sim-godp-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
+  let now = 1000;
+  const db = new Db(join(dir, 'p.db')), inbox = new AgentInbox(db, 'w1', () => now++);   // every read of the clock moves it 1 ms
+  t.after(() => db.close());
+  const g = {scope: 'god', owner: 'alice'};
+  inbox.send(g, 'Put a cottage by the knoll');
+  // what the listen route and the agent middleware do for GET /v1/god/inbox/listen?timeoutMs=0
+  inbox.touch(g); const end = inbox.listening(g); end(); inbox.touch(g); const v = inbox.deliver(g);
+  assert.equal(v.latest!.state, 'delivered');
+  assert.equal(inbox.view(g).presence, 'working');
+  assert.equal(inbox.ownerView(g).presence, 'working');
+});
+
 test('god queue: commands typed while away wait in order; tickets move pending -> in progress -> done/failed/withdrawn', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'sim-godq-')); t.after(() => rmSync(dir, {recursive: true, force: true}));
   let db = new Db(join(dir, 'q.db')), now = 1000, inbox = new AgentInbox(db, 'w1', () => now);

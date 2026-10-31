@@ -189,14 +189,16 @@ export class AgentInbox {
     const q = this.q(s), r = this.db.db.prepare(`SELECT COUNT(*) AS n, MAX(sent_at) AS at FROM ${q.t} WHERE ${q.k} AND acknowledged_at IS NULL AND (sent_at>=? OR delivered_at IS NULL)`).get(...q.a, since) as {n: number; at: number | null};
     return r.n ? {waiting: r.n, newestAt: r.at ?? since} : null;
   }
-  touch(s: InboxScope) {
+  touch(s: InboxScope, at = this.now()) {
     this.db.db.prepare(`INSERT INTO agent_inbox_v1(world_id,scope,owner,last_seen_at) VALUES(?,?,?,?)
-      ON CONFLICT(world_id,scope,owner) DO UPDATE SET last_seen_at=excluded.last_seen_at`).run(this.worldId, s.scope, s.owner, this.now());
+      ON CONFLICT(world_id,scope,owner) DO UPDATE SET last_seen_at=excluded.last_seen_at`).run(this.worldId, s.scope, s.owner, at);
   }
-  /** Called only when a private agent response actually includes this message. */
+  /** Called only when a private agent response actually includes this message. That response is the agent being seen,
+   *  so both stamps share one clock read: the god's `workingUntil` needs last_seen_at >= delivered_at, and a separate
+   *  earlier touch could fall a millisecond behind (#399: the owner saw 'listening' for a command in hand). */
   deliver(s: InboxScope) {
     const head = this.head(s);
-    if (head && head.delivered_at === null) this.set(s, 'delivered_at=?', head.n, this.now());
+    if (head && head.delivered_at === null) { const at = this.now(); this.set(s, 'delivered_at=?', head.n, at); this.touch(s, at); }
     return this.view(s);
   }
   acknowledge(s: InboxScope, id: string, reply: unknown, outcome?: unknown) {
