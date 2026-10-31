@@ -728,21 +728,24 @@ export class Together {
     for (const x of Object.values(this.w.entities)) if (x.support?.kind === 'in-hand' && x.support.by === entityId) return true;
     return false;
   }
-  /** Where the giver stands to hand something over: HANDOVER_GAP from them, facing, with a clear line and room for both,
-   *  nearest to the giver; [] when already about there (the engine settles the last few centimetres and turns). */
+  /** Where the giver stands to hand something over: HANDOVER_GAP in front of the receiver (the way they face, then up to
+   *  45° either side, nearest to the giver), else beside or behind them, with a clear line and room for both; [] when the
+   *  giver already stands about there (the engine settles the last few centimetres and turns). Never at their back while
+   *  a front spot is free (take 1: Ada held the lantern out to Ben's back and he turned half round to take it). */
   private handOverSteps(me: string, other: string): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return null;
     const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
     const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
     const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
     const free = (p: V2) => (e.clearanceAtV1?.(p[0], p[1]) ?? 1) >= 0.34 && people.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) >= 0.8) && this.lineClear(p, at);
-    if (Math.abs(d - HANDOVER_GAP) <= 0.15 && free(from)) return [];
-    const a0 = d > 1e-6 ? Math.atan2(from[1] - at[1], from[0] - at[0]) : 0, spots: {p: V2; d: number}[] = [];
-    for (let k = 0; k < 16; k++) {
-      const ang = a0 + (k === 0 ? 0 : (k % 2 ? 1 : -1) * Math.ceil(k / 2)) * Math.PI / 8, p: V2 = [r2(at[0] + Math.cos(ang) * HANDOVER_GAP), r2(at[1] + Math.sin(ang) * HANDOVER_GAP)];
-      if (free(p)) spots.push({p, d: Math.hypot(p[0] - from[0], p[1] - from[1])});
+    const off = (p: V2) => Math.abs(Math.atan2(Math.sin(Math.atan2(p[1] - at[1], p[0] - at[0]) - ob.pose.yaw), Math.cos(Math.atan2(p[1] - at[1], p[0] - at[0]) - ob.pose.yaw)));
+    if (Math.abs(d - HANDOVER_GAP) <= 0.15 && off(from) <= Math.PI / 4 + 1e-6 && free(from)) return [];
+    const spots: {p: V2; front: boolean; d: number}[] = [];
+    for (let k = -7; k <= 8; k++) {
+      const ang = ob.pose.yaw + k * Math.PI / 8, p: V2 = [r2(at[0] + Math.cos(ang) * HANDOVER_GAP), r2(at[1] + Math.sin(ang) * HANDOVER_GAP)];
+      if (free(p)) spots.push({p, front: Math.abs(k) <= 2, d: Math.hypot(p[0] - from[0], p[1] - from[1])});
     }
-    spots.sort((a, b) => a.d - b.d || a.p[0] - b.p[0] || a.p[1] - b.p[1]);
+    spots.sort((a, b) => Number(b.front) - Number(a.front) || a.d - b.d || a.p[0] - b.p[0] || a.p[1] - b.p[1]);
     return spots.length ? [{verb: 'walk_to', params: {to: spots[0].p, standoff: 0}}] : null;
   }
   private prepareHandOver(soul: EdgeSoul, cap: EdgeCapability, plan: TogetherPlan, params: Record<string, unknown>, steps: Steps, tag: Extract<Tag, {kind: 'hand-over'}>): {code: string; reason: string; did_you_mean?: {id: string; label: string}[]} | {steps: Steps; label?: string; commit?: (receipt: string) => void} {
