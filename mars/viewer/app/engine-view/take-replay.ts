@@ -215,13 +215,7 @@ export class TakePeople {
     this.gaits.clear();
     this.strides.clear();
     this.neighbours = this.adjacent(this.history);
-    for (const [tick, id, field, value] of this.take.changes) {
-      if (field !== 'activity' && field !== 'baseActivity') continue;
-      let a = this.acts.get(id);
-      if (!a) this.acts.set(id, (a = { t: [], v: [], bt: [], bv: [] }));
-      if (field === 'activity') { if (typeof value === 'string' && a.v[a.v.length - 1] !== value) { a.t.push(tick); a.v.push(value); } }
-      else { a.bt.push(tick); a.bv.push(typeof value === 'string' ? value : null); }
-    }
+    this.indexActs();
     this.waterTransition=waterTransitions(this.take);
     this.waterHistoryKey='';
     for (const [id, s] of Object.entries(this.take.tracks)) {
@@ -249,7 +243,7 @@ export class TakePeople {
   setWaterHistory(takes:readonly Take[]){
     // the walk ease reads across the adjacent take windows of the same history (a stop just past a window's edge)
     this.history=takes;const nb=this.adjacent(takes);
-    if(nb.prev!==this.neighbours.prev||nb.next!==this.neighbours.next){this.neighbours=nb;this.gaits.clear();this.strides.clear();}
+    if(nb.prev!==this.neighbours.prev||nb.next!==this.neighbours.next){this.neighbours=nb;this.gaits.clear();this.strides.clear();this.indexActs();}
     const key=this.take.id+'|'+takes.map(t=>t.id).join('|');if(key===this.waterHistoryKey)return;
     this.waterTransition=waterTransitions(this.take,takes);this.waterHistoryKey=key;
   }
@@ -315,6 +309,20 @@ export class TakePeople {
     // before the first change this take records (or none at all): a full stride on the track still restarts it
     const t1 = a && k >= 0 ? a.t[0] : tick, f = seg && seg.t.length ? (a && k >= 0 ? this.stride(`${id}#pre`, () => lastFullStride(seg, seg.t[0], t1, dt, 60, false)) : lastFullStride(seg, seg.t[0], t1, dt, 60, false)) : null;
     return f !== null ? settled(`${id}#pre@${f}`, f) : {};
+  }
+  /** Each body's activity changes on this take's tick axis, the previous adjacent take window's first (entry 36: an
+   *  activity that began in the previous live window, or as this window's first change, has its age and what came before
+   *  it; the singer's hand eased onto the mic, then jumped when the next window arrived with no age). */
+  private indexActs() {
+    this.acts.clear();
+    const prev = this.neighbours.prev, windows: [Take, number][] = [...(prev ? [[prev, prev.startTick - this.take.startTick] as [Take, number]] : []), [this.take, 0]];
+    for (const [take, offset] of windows) for (const [tick, id, field, value] of take.changes) {
+      if (field !== 'activity' && field !== 'baseActivity') continue;
+      let a = this.acts.get(id);
+      if (!a) this.acts.set(id, (a = { t: [], v: [], bt: [], bv: [] }));
+      if (field === 'activity') { if (typeof value === 'string' && a.v[a.v.length - 1] !== value) { a.t.push(tick + offset); a.v.push(value); } }
+      else { a.bt.push(tick + offset); a.bv.push(typeof value === 'string' ? value : null); }
+    }
   }
   private runAt(a: { t: number[] } | undefined, tick: number) {
     if (a) for (let i = a.t.length - 1; i >= 0; i--) if (a.t[i] <= tick) return i;

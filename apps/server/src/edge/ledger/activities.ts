@@ -24,7 +24,9 @@ export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 
   /** E-life: the activity's own title at this spot when the default does not fit ("Feed the ducks and swans"). */
   title?: string;
   /** Bound only by the world adapter for a real painting easel. Never inferred from a label. */
-  paintingTarget?: string};
+  paintingTarget?: string;
+  /** Entry 36: a mic stand's singer sings along with music within this many metres (the pose ends when it stops). */
+  accompany?: number};
 export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2; level?: number};
 /** todo (leisure): a bicycle dock: `bikes` bicycles stand in it; a ride takes one and brings it back. */
 export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: number; label?: string};
@@ -167,9 +169,13 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   const spotSteps = (s: Spot, seconds?: number, activity = s.activity, fromLevel = w.level): Program['steps'] => {
     const def = SPOT_ACTIVITIES[activity], body = def.pose ?? activity, lying = s.base === 'lie', act = lying && !LYING_SPOT.has(body) ? 'lie' : body, prop = s.prop ?? def.prop;
     const reach = s.seat ? {verb: 'sit', params: {on: s.seat, seconds: 1}} : walk(clearAt(s) ?? s.at, s.level, fromLevel);
-    return [...standFirst(w), reach, pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
+    // entry 36: at a mic stand the singer turns to the mic on arrival (the pose's own facing is a one-tick snap)
+    const turn = act === 'sing' && s.accompany && s.faceTo && !s.seat ? [{verb: 'mars:face', params: {target: {point: s.faceTo}}}] : [];
+    return [...standFirst(w), reach, ...turn, pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
       // CN5: lying on furniture (a gym bench) at its top; the instrument played at a music spot
       ...(lying && s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {}), ...(s.instrument && (act === 'play-music' || act === 'play-piano') ? {instrument: s.instrument} : {}), ...(s.faceTo ? {face: s.faceTo} : {}),
+      // entry 36: singing along at a mic stand lasts only while the music plays (refused after 4 s with none)
+      ...(act === 'sing' && s.accompany ? {accompany: {radius: s.accompany, grace: 4}} : {}),
       // leisure: done together (a see-saw): wait for the other end, then the same shared stretch for both
       ...(s.together ? {group: s.together.group, need: s.together.need, waitSeconds: s.together.wait, alone: s.together.alone, seatTogether: true} : {})})];
   };

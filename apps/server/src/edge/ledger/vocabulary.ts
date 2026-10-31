@@ -34,7 +34,7 @@ export type VocabContext = {
   here?: string[];
   /** r3 quality (cases 23/29): where the nearest thing for a spot-based verb (swing, fish, cycle = a bicycle dock…) is anywhere in
    *  this world, ignoring offer reach. `null`: none exists in this world (the refusal is terminal); `undefined`: not spot-based. */
-  elsewhere?: (verb: string) => {label: string; place?: string; placeId?: string; distance: number} | null | undefined;
+  elsewhere?: (verb: string) => {label: string; place?: string; placeId?: string; distance: number; by?: string} | null | undefined;
   /** ROUTE-RECHECK: whether a place (or a place inside it) has a spot for this verb anywhere in the world (a reading spot),
    *  offered or not; unset: unknown (every named place counts). */
   hasSpot?: (verb: string, placeId: string) => boolean;
@@ -663,6 +663,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   if (!pool.length && colon < 0) for (const [re, v] of INTENTS) if (!verbs.has(v) && v in SPOT_ACTIVITIES && re.test(text)) {
     const e = ctx.elsewhere?.(v); if (e === undefined) break;
     // within offer reach but not offered: every such spot is taken (another body is at the gym's dumbbells)
+    if (e && e.distance <= SPOT_REACH && v === 'sing' && e.by) return unknown(`${e.by} is already singing at the nearest microphone, ${e.label}${e.place && !e.label.endsWith(` in ${e.place}`) ? ` in ${e.place}` : ''} (about ${Math.round(e.distance)} m away), and a microphone takes one singer at a time. Ask again when ${e.by} has finished; nothing else was chosen.`);
     if (e && e.distance <= SPOT_REACH) return unknown(`${SPOT_ACTIVITIES[v].label} is not free right now: the nearest, ${e.label}${e.place && !e.label.endsWith(` in ${e.place}`) ? ` in ${e.place}` : ''} (about ${Math.round(e.distance)} m away), is in use by someone. Ask again in a minute or two; nothing else was chosen.`);
     return unknown(elsewhereReason(v, ctx, `${SPOT_ACTIVITIES[v].label} is not offered within reach of where you are.`));
   }

@@ -74,14 +74,20 @@ type Params = { actor: string; activity: string; seconds: number; prop?: string;
   /** CN5: the instrument played (play-music) and a choreographed game (grouped). */
   instrument?: string; game?: { kind: GameKind; jack?: Vec2; net?: [number, number, number, number] };
   /** CN5: keep the scenery seat height when the pose is done together (grouped). */
-  seatTogether?: boolean };
+  seatTogether?: boolean;
+  /** Entry 36 (prospective, set by edge plans for a mic stand): singing along. The pose lasts only while someone plays
+   *  within `radius` m (the piano, or the drums), checked twice a second; it fails after `grace` s with no music at all,
+   *  and ends (completed) 1.5 s after the music it sang along with stops. */
+  accompany?: { radius: number; grace: number } };
 type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw: number | null;
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
   phase?: 'waiting' | 'active'; readyAt?: number; waited?: number; until?: number; mobile?: boolean; close?: boolean;
   /** CN5 games: ticks with nobody to play with, the last petanque end seen and the ends this body won. */
   lonely?: number; end?: number; wins?: number; since?: number;
   /** once-v1: this body arrived after its group's window had closed and does the pose alone. */
-  late?: boolean };
+  late?: boolean;
+  /** Entry 36 accompany: seconds since the last check found music (undefined: none heard yet), and whether any was. */
+  quiet?: number; heard?: boolean };
 /** together/1 public body state while a grouped pose runs (the viewer may draw open arms while waiting). */
 export type TogetherState = { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean; pairedPolicy?: 'ready-v1'; readyAt?: number; windowPolicy?: 'once-v1'; late?: true };
 const issue = (code: string, message: string, subjects: string[]): Diagnostic => ({ code: 'pose.' + code, message, subjects });
@@ -137,6 +143,7 @@ export const poseV1: ActionDef<Params, true, Exec> = {
     group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), pairedPolicy: z.literal('ready-v1').optional(), windowPolicy: z.literal('once-v1').optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
     gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional(),
     instrument: z.enum(POSE_INSTRUMENTS).optional(), seatTogether: z.boolean().optional(),
+    accompany: z.object({ radius: z.number().min(1).max(40), grace: z.number().min(0).max(30) }).strict().optional(),
     game: z.object({ kind: z.enum(Object.keys(GAMES) as [GameKind, ...GameKind[]]), jack: z.tuple([z.number(), z.number()]).optional(), net: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional() }).strict().optional() }).strict()
     .refine(p => !p.pairedPolicy || (!!p.group && p.gap !== undefined && ['hug','high-five','handshake','dance'].includes(p.activity) && !p.game && !p.hold && !p.release), {message:'ready-v1 requires a paired limb gesture with group and gap'})
     .refine((p) => !p.game || (!!p.group && p.activity === 'play-' + p.game.kind), { message: 'a game needs a group and its own play-<game> activity' })
@@ -165,12 +172,31 @@ export const poseV1: ActionDef<Params, true, Exec> = {
     if ((ex.base === 'sit' || LYING.has(ex.p.activity)) && ex.p.seatHeight !== undefined && !held(rt, ex.p.actor)) h.seatHeight = ex.p.seatHeight; else delete h.seatHeight;
     if (ex.p.instrument) h.instrument = ex.p.instrument;
     ex.t += dt;
+    if (ex.p.accompany) { const ended = accompanied(rt, ex, a, dt); if (ended) return ended; }
     if (ex.t + 1e-9 < ex.p.seconds) return { status: 'running', phase: 'posing' };
     return finish(rt, ex);
   },
   cancel(rt, ex) { if(ex.p.pairedPolicy)restorePaired(rt,ex);else restore(rt, ex); return { ok: true }; },
   resumable: true,
 };
+
+/** Entry 36: someone plays music a singer can sing along with (the viewer voices the piano's melody, or the drummer's
+ *  piece on the same grid). Only these are heard in the viewer, so only these count. Read from `human.instrument`, which
+ *  a playing pose sets and its end clears (its `activity` reads `sit` mid-tick, before the seated pose writes it again). */
+const ACCOMPANIES = (h: { instrument?: string }) => h.instrument === 'piano' || h.instrument === 'drums' || h.instrument === 'keyboard';
+const MUSIC_CHECK = 0.5, MUSIC_ENDED = 1.5;
+/** A singing-along pose: every MUSIC_CHECK s, is a musician within the radius? Work only while a body sings. */
+function accompanied(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entities'][string]>, dt: number) {
+  const every = Math.max(1, Math.round(MUSIC_CHECK / dt)), k = Math.round(ex.t / dt);
+  ex.quiet = (ex.quiet ?? 0) + dt;
+  if (k % every === 0) {
+    const { radius } = ex.p.accompany!, lv = a.human?.level ?? 0;
+    for (const o of Object.values(rt.world.entities)) if (o.kind === 'human' && o.id !== a.id && o.human && (o.human.level ?? 0) === lv && ACCOMPANIES(o.human) && hypot(o.pose.p[0] - a.pose.p[0], o.pose.p[2] - a.pose.p[2]) <= radius) { ex.heard = true; ex.quiet = 0; break; }
+  }
+  if (ex.heard && (ex.quiet ?? 0) >= MUSIC_ENDED - 1e-9) { const out = finish(rt, ex); return { ...out, outputs: { ...out.outputs, ended: 'music-stopped' } }; }
+  if (!ex.heard && ex.t + 1e-9 >= ex.p.accompany!.grace) { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('no-music', 'Nothing is playing near the microphone to sing along with (a piano or drums), so the singing did not start.', [ex.p.actor]) }; }
+  return null;
+}
 
 /** Completed: the hand item changes (hold/release), then the base posture returns. */
 function finish(rt: Runtime, ex: Exec) {

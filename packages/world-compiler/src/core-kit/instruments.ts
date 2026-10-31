@@ -25,4 +25,37 @@ export const INSTRUMENTS: DefInput[] = [{
   slots: [{ id: 'stool', kind: 'seat', p: [0, 0.53, 0.58], yaw: Math.PI, height: 0.53, accepts: { tags: ['body'] }, capacity: 1 }],
   components: { instrument: { kind: 'drums' }, seat: { height: 0.53 } } as DefInput['components'],
   size: { box: [1.0, 1.1, 1.0] },
+} as unknown as DefInput,
+// Entry 36: a microphone on a boom stand. "Sing at the microphone" brings a Soul to the singer's place 0.55 m in front of
+// the pole (clear of the base: the place keeps standing room and is never stepped back), facing it; the boom holds the
+// mic out to her, where she takes it in her right hand at the clip (the grip is MIC_GRIP, 1.41 m up) and sings along with
+// the music playing nearby (the voice is synthesized by the viewer on the score clock). One singer per stand.
+{
+  schema: 'def/1', name: 'core-mic-stand', version: 1,
+  description: 'A microphone on a boom stand. A Soul takes hold of the mic and sings along with the music playing nearby (a piano or drums); one singer at a time.',
+  tags: ['furniture', 'music', 'microphone', 'mic-stand'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.004, shapes: [
+    { kind: 'cyl', at: [0, 0.012, 0], r: 0.14, h: 0.024, segments: 28, tint: 'base', collide: false },
+    { kind: 'cyl', at: [0, 0.035, 0], r: 0.03, h: 0.03, segments: 12, tint: 'base', collide: false },
+    { kind: 'cyl', at: [0, 0.54, 0], r: 0.012, h: 1.0, segments: 10, tint: 'stand', collide: false },
+    { kind: 'cyl', at: [0, 1.055, 0], r: 0.02, h: 0.05, segments: 12, tint: 'base', collide: false },
+    { kind: 'cyl', at: [0, 1.15, 0], r: 0.0085, h: 0.19, segments: 8, tint: 'chrome', collide: false },
+    // the boom's swivel, the boom reaching out and up toward the singer, its counterweight behind
+    { kind: 'cyl', at: [0, 1.255, 0], r: 0.018, h: 0.04, segments: 12, tint: 'base', pitch: 1.5708, collide: false },
+    { kind: 'cyl', at: [0, 1.285, 0.045], r: 0.0075, h: 0.31, segments: 8, tint: 'stand', pitch: 1.064, collide: false },
+    { kind: 'cyl', at: [0, 1.205, -0.1], r: 0.022, h: 0.05, segments: 12, tint: 'base', pitch: 1.064, collide: false },
+    // the clip at the boom's end, and the mic in it tilted 35 degrees above level: handle, ring, grille
+    { kind: 'cyl', at: [0, 1.364, 0.186], r: 0.016, h: 0.03, segments: 10, tint: 'base', pitch: 0.96, collide: false },
+    { kind: 'cyl', at: [0, 1.41, 0.252], r: 0.0125, r2: 0.0165, h: 0.16, segments: 14, tint: 'mic', pitch: 0.96, collide: false },
+    { kind: 'cyl', at: [0, 1.453, 0.313], r: 0.0215, h: 0.012, segments: 16, tint: 'chrome', pitch: 0.96, collide: false },
+    { kind: 'sphere', at: [0, 1.47, 0.338], r: 0.027, tint: 'grille', collide: false }],
+    // the body's obstacle is the round base (the boom is overhead, out over the singer's place)
+    box: [0.28, 1.52, 0.28] } } as unknown as DefInput['make'],
+  params: { base: { type: 'color', default: '#1d1e20', doc: 'base, clutch and clip colour' }, stand: { type: 'color', default: '#2a2c2f', doc: 'pole and boom colour' }, chrome: { type: 'color', default: '#b9bec4', doc: 'inner pole and ring colour' }, mic: { type: 'color', default: '#222326', doc: 'microphone handle colour' }, grille: { type: 'color', default: '#8f969c', doc: 'grille colour' } } as DefInput['params'],
+  palette: { base: '#1d1e20', stand: '#2a2c2f', chrome: '#b9bec4', mic: '#222326', grille: '#8f969c' },
+  slots: [{ id: 'singer', kind: 'stand', p: [0, 0, 0.55], yaw: Math.PI, accepts: { tags: ['body'] }, capacity: 1 }],
+  components: { instrument: { kind: 'mic' } } as DefInput['components'],
+  size: { box: [0.28, 1.52, 0.28] },
 } as unknown as DefInput];
+/** Entry 36: the mic stand's grip (the handle by the clip) and grille, in its local frame (+z toward the singer). */
+export const MIC_GRIP = [0, 1.41, 0.252] as const, MIC_GRILLE = [0, 1.47, 0.338] as const, MIC_SINGER_Z = 0.55;
