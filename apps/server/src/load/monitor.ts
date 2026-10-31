@@ -96,7 +96,7 @@ export type MonitorOpts = {
   drill?: Level;
 };
 
-const TICK_MS = 50;
+const TICK_MS = 50, MIN_WINDOW_SAMPLES = 100;
 export class LoadMonitor {
   readonly state = new LevelState();
   readonly baseline: QuietBaseline;
@@ -150,7 +150,11 @@ export class LoadMonitor {
     this.quiet.depth = Math.max(this.quiet.depth, q.depth); this.quiet.service = Math.min(this.quiet.service, service);
     let loopP99 = this.prevLoopP99;
     if (this.hist) {
-      if (this.hist.count > 0) loopP99 = Math.max(loopP99, this.hist.percentile(99) / 1e6);
+      // the open window counts once it has >= 100 samples (~1 s at 10 ms): just after a reset, its p99 is the max of a
+      // handful of samples, so one ordinary heavy tick read as p99 and kept resetting the 30 s calm (live copy: 77 s
+      // at amber with every full window at 65 ms); a stall shows ~1 s later here, at the window's close in any case,
+      // and through tick service and the queue meanwhile
+      if (this.hist.count >= MIN_WINDOW_SAMPLES) loopP99 = Math.max(loopP99, this.hist.percentile(99) / 1e6);
       if (now - this.histAt >= this.windowMs) {
         this.prevLoopP99 = this.hist.count > 0 ? this.hist.percentile(99) / 1e6 : 0;
         this.windowDone(this.prevLoopP99, now);
