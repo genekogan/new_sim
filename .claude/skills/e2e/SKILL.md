@@ -5,14 +5,14 @@ description: Run this repo's end-to-end browser scenarios (e2e/scenarios/*.md) o
 
 # e2e — scenario runner and author for Sim
 
-The repo's contract is `E2E.md` at the root; read it first, it overrides this skill. The pieces:
+The repo's contract is [docs/testing/e2e.md](../../../docs/testing/e2e.md); read it first, it overrides this skill. The pieces:
 
 | Path | What |
 |---|---|
-| `E2E.md` | Boundaries: isolated browsers only, reserved ports, attempt cap, what a run must save |
+| `docs/testing/e2e.md` | Boundaries: isolated browsers only, reserved ports, attempt cap, what a run must save |
 | `e2e/config.mjs` | Paths (`e2e/scenarios`, `.e2e/runs`), reserved ports, iteration cap |
 | `e2e/scenarios/*.md` | Scenarios: front matter + numbered steps with `expect*` and `screenshot` lines |
-| `infra/smoke.mjs` | Route smoke: world list and world pages load and report healthy |
+| `e2e/local-smoke.mjs` | The local smoke (`e2e/scenarios/local-smoke.md`): boots its own instance on a free port, world list → one world → a person drawn, then tears down |
 | `tools/god-skill/dev-world.mjs` | Starts one local world with fake minds, dev auth and its own data dir |
 | `.e2e/` | Gitignored working state: runs, browsers, scratch drivers |
 
@@ -27,16 +27,17 @@ rather than approximating them.
 | `run <scenario-id>` | Run one scenario end to end |
 | `run smoke` | Run every scenario with `tier: smoke` that is runnable here, one after another |
 | `author <description>` | Explore the journey in a browser, then write `e2e/scenarios/<id>.md` |
-| `route smoke` | `node infra/smoke.mjs` against a local server (see `E2E.md` for its env vars) |
+| `local smoke` | `node e2e/local-smoke.mjs [--port N] [--clip]`: the quick "does the app work" check; read its `summary.json` |
 
 ## Pre-flight
 
-1. Read `E2E.md` and `e2e/config.mjs`. Note reserved ports; never use them for your own world.
+1. Read `docs/testing/e2e.md` and `e2e/config.mjs`. Note reserved ports; never use them for your own world.
+   A scenario with a `runner` in its front matter (`local-smoke`) is run by that command, not driven by hand.
 2. Built client: `apps/web/dist/index.html` must exist and match your change. If not:
    `pnpm install --frozen-lockfile && pnpm build`.
 3. Browser: Playwright MCP tools (`mcp__playwright__*`) if listed; otherwise a driver script under `.e2e/` that
    loads Playwright the way the harness does (`tools/playtest/lib/platform.mjs` → `resolvePlaywright`, or
-   `createRequire('mars/viewer/package.json')('@playwright/test')` as `infra/smoke.mjs` does). Browsers come from
+   `createRequire('mars/viewer/package.json')('@playwright/test')`, as `e2e/local-smoke.mjs` does). Browsers come from
    `PLAYWRIGHT_BROWSERS_PATH`, `/opt/pw-browsers` when present, or an explicit `.e2e/browsers` cache:
    `PLAYWRIGHT_BROWSERS_PATH="$PWD/.e2e/browsers" pnpm --filter mars-campus-viewer exec playwright install chromium`.
    Never use a signed-in personal browser profile.

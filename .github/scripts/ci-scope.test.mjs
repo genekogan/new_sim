@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { JOBS, changedFiles, jobsFor } from './ci-scope.mjs';
+import { JOBS, changedFiles, jobsFor, smokeFor } from './ci-scope.mjs';
 
 const names = files => jobsFor(files).include.map(j => j.name);
 
@@ -35,4 +35,10 @@ test('no usable base means run everything', () => {
   assert.equal(changedFiles('0000000000000000000000000000000000000000'), null);
   assert.equal(changedFiles('abc', 'def', () => { throw Error('bad ref'); }), null);
   assert.deepEqual(changedFiles('abc', 'def', () => 'a\nb\n'), ['a', 'b']);
+});
+
+test('the local smoke runs for web, server and e2e changes, or with no base', () => {
+  for (const f of ['apps/web/src/main.ts', 'apps/server/src/world.ts', 'e2e/local-smoke.mjs']) assert.equal(smokeFor([f]), true, f);
+  for (const f of ['docs/testing.md', 'packages/kernel/src/x.ts', 'tools/playtest/x.mjs', 'apps/webby/x']) assert.equal(smokeFor([f]), false, f);
+  assert.equal(smokeFor(null), true);
 });

@@ -7,7 +7,7 @@ needs.
 |---|---|---|
 | Unit and typecheck | `node --test` suites per package, `tsc` per package | your machine, CI |
 | Gates | walk, bundle, conformance | your machine (focused), CI, the remote gate |
-| Browser e2e | Markdown scenarios against an isolated client fixture | your machine, CI |
+| Browser e2e | the local smoke (`node e2e/local-smoke.mjs`) and Markdown scenarios against an isolated client fixture | your machine, CI |
 | Remote gate | the complete suite for a release head, on Modal | the release workflow |
 | Playtests | coding agents play Souls and gods in a fake-mind world, reviewed by agents | a quiet machine or a cloud session |
 
@@ -72,10 +72,20 @@ node packages/conformance/bin/conformance.mjs --shard 1/4 --out .local/conforman
 
 ## Browser e2e
 
-[testing/e2e.md](testing/e2e.md): Markdown scenarios in `e2e/scenarios/` drive an isolated client fixture in headless
-Chromium and write a proof bundle under `.e2e/runs/`. The `e2e` repo skill runs and authors them. Rendering
-diagnostics for camera follow and temporal stability are in `tools/render-checks/`. The engine's own browser tests
-are in `mars/viewer/e2e/`.
+The quick proof that the app works is the local smoke: one command boots an isolated instance (fake minds, dev
+sign-in, a data dir under `.local/e2e/`) on a free port, opens the world list and one world in headless Chromium,
+checks that a person is drawn with no console errors and no failed requests, writes `summary.json` and screenshots
+under `.local/e2e/<timestamp>/`, and stops everything it started.
+
+```sh
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.e2e/browsers" pnpm --filter mars-campus-viewer exec playwright install chromium   # once
+node e2e/local-smoke.mjs --build                 # any free port; --port N or E2E_PORT=N to choose; --clip for a video
+```
+
+[testing/e2e.md](testing/e2e.md#local-smoke) has its checks, output and exit codes. The other scenarios in
+`e2e/scenarios/` drive an isolated client fixture and write a proof bundle under `.e2e/runs/`; the `e2e` repo skill
+runs and authors them. Rendering diagnostics for camera follow and temporal stability are in `tools/render-checks/`.
+The engine's own browser tests are in `mars/viewer/e2e/`.
 
 ## Remote gate
 
@@ -100,7 +110,7 @@ docs/tools-only changes are never gated ([Modal policy](process/modal-policy.md)
 | Docs, tools only | links resolve; the tool's own tests if it has them |
 | Server or package logic | `node --test` on touched files, `tsc -p` of touched packages |
 | Anything that can move geometry, navigation or god builds | add the walk gate |
-| Web app | `pnpm --filter @sim/web build`, the bundle gate, an uncut clip of the changed journey |
+| Web app | `pnpm --filter @sim/web build`, the bundle gate, the local smoke, an uncut clip of the changed journey |
 | Library defs, generators, compiler | conformance, plus a supplement when a revision changes |
 | Soul behaviour, navigation, engines | the above plus a scenario playtest with two repeats per arm |
 | Release head | the remote gate, then the release workflow (live walks and cdn-walk) |
