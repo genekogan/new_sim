@@ -213,7 +213,8 @@ export class WorldHost {
     if(clock&&!this.durableClockV1)throw new Error('clock-frontier.reader-required');
     if(clock&&this.factory.canReplayHistory?.(clock.rulesVersion)===false)throw new Error('clock-frontier.rules-incompatible');
     const tRead = performance.now();
-    const snap = this.db.latestSnapshot(this.worldId);
+    const snapRow = this.db.latestSnapshotText(this.worldId);
+    const snap = snapRow ? { ...snapRow, body: JSON.parse(snapRow.text) as unknown } : null;
     const readMs = performance.now() - tRead;
     // Snapshot rejection is not permission to reinterpret history from genesis.
     // Check both durable identities before constructing or stepping any engine.
@@ -295,7 +296,9 @@ export class WorldHost {
     const canCapture = !this.engine.canSnapshot || this.engine.canSnapshot();
     this.replayDebtMs = 0; this.lastSnapshotWall = performance.now();
     if (this.snapshotAfterReplayTicks > 0 && replayTicks > this.snapshotAfterReplayTicks) this.snapshotSoon = `replayed ${replayTicks} ticks`;
-    if (snap && (lastRepair === null || !canCapture)) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
+    // The snapshot's own text is the baseline (decoded only if a fault needs it): no second decoded copy of the world is
+    // held, and no copy is taken after restore and replay have run over the decoded body's shared parts.
+    if (snapRow && (lastRepair === null || !canCapture)) { const text = snapRow.text; this.recoveryCapture = () => JSON.parse(text) as SnapshotBody; }
     else if (canCapture) this.recoveryBaseline = this.captureBody();
     // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
     if (!this.db.hasVocabulary(this.worldId)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
