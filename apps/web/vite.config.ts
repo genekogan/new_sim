@@ -208,7 +208,9 @@ function vendorGroups() {
 function devProxy() {
   const http = `http://127.0.0.1:${process.env.PORT ?? 4500}`;
   const routes = ['/v1', '/__sim', '/skill.md', '/cards.md', '/mcp', '/healthz', '/modular', '/mars-assets', '/engine', '/models', '/history', '/2020', '/browser', '/data/manifest.json'];
-  return { '^/w/[^/]+/[^?]+': { target: http, ws: true }, ...Object.fromEntries(routes.map((r) => [r, http])), '/ws': { target: http.replace(/^http/, 'ws'), ws: true } };
+  // Whole path segments only (a key starting with ^ is a RegExp): /history/… goes to the server, a page /history-x does not.
+  const segment = (r: string) => `^${r.replace(/[.]/g, '\\.')}(?:[/?]|$)`;
+  return { '^/w/[^/]+/[^?]+': { target: http, ws: true }, ...Object.fromEntries(routes.map((r) => [segment(r), http])), '^/ws(?:[/?]|$)': { target: http.replace(/^http/, 'ws'), ws: true } };
 }
 
 export default defineConfig({

@@ -59,40 +59,41 @@ export function inputStamp(viewer = VIEWER, extra = [join(ROOT, 'pnpm-lock.yaml'
     }
   };
   walk(viewer);
-  for (const p of extra) if (existsSync(p)) { const s = statSync(p); rows.push(`${p}\0${s.size}\0${s.mtimeMs}`); }
+  for (const p of extra) if (existsSync(p)) { const s = statSync(p); rows.push(`${relative(ROOT, p).split(sep).join('/')}\0${s.size}\0${s.mtimeMs}`); }
   return createHash('sha256').update(rows.sort().join('\n')).digest('hex');
 }
 
 const readStamp = out => { try { return JSON.parse(readFileSync(join(out, STAMP), 'utf8')).inputs; } catch { return undefined; } };
 
-function build() {
-  const vite = join(VIEWER, 'node_modules/vite/bin/vite.js');
+function viteBuild(viewer) {
+  const vite = join(viewer, 'node_modules/vite/bin/vite.js');
   if (!existsSync(vite)) throw Error(`mars-web: ${relative(ROOT, vite)} is missing; run pnpm install`);
   // The plain static build: never the Cloudflare release's public dir (CLOUDFLARE_RELEASE) or the /mars-assets/ base.
   const env = { ...process.env }; delete env.CLOUDFLARE_RELEASE; delete env.SIM_STATIC;
-  const r = spawnSync(process.execPath, [vite, 'build', '--logLevel', 'error'], { cwd: VIEWER, env, stdio: 'inherit' });
+  const r = spawnSync(process.execPath, [vite, 'build', '--logLevel', 'error'], { cwd: viewer, env, stdio: 'inherit' });
   if (r.error) throw r.error;
   if (r.status !== 0) throw Error(`mars-web: the viewer build failed (exit ${r.status})`);
 }
 
-export function main(argv = process.argv.slice(2), log = console.log) {
+/** `viewer`, `set`, `extra` and `build` are for tests; the defaults are this checkout's viewer and vite build. */
+export function main(argv = process.argv.slice(2), log = console.log, { viewer = VIEWER, set = characterSet(), extra, build = viteBuild } = {}) {
   const check = argv.includes('--check'), force = argv.includes('--force');
-  const set = characterSet();
+  const out = join(viewer, 'dist/client');
   if (check) {
-    const missing = missingCharacters(OUT, set);
-    if (missing.length) { log(`mars-web: ${missing.length} of ${set.length} character files missing from ${relative(ROOT, OUT)} (first: ${missing.slice(0, 3).join(', ')}); run pnpm build:viewer`); return 1; }
-    log(`mars-web: ${set.length} character files in ${relative(ROOT, OUT)}`); return 0;
+    const missing = missingCharacters(out, set);
+    if (missing.length) { log(`mars-web: ${missing.length} of ${set.length} character files missing from ${relative(ROOT, out)} (first: ${missing.slice(0, 3).join(', ')}); run pnpm build:viewer`); return 1; }
+    log(`mars-web: ${set.length} character files in ${relative(ROOT, out)}`); return 0;
   }
-  const source = missingCharacters(join(VIEWER, 'public'), set);
+  const source = missingCharacters(join(viewer, 'public'), set);
   if (source.length) { log(`warning: ${source.length} character files missing from ${PUBLIC} (people will not render); run pnpm assets:pull`); return 0; }
-  const stamp = inputStamp();
-  if (!force && readStamp(OUT) === stamp && !missingCharacters(OUT, set).length) return 0;
+  const stamp = inputStamp(viewer, extra);
+  if (!force && readStamp(out) === stamp && !missingCharacters(out, set).length) return 0;
   const t0 = Date.now();
-  build();
-  const missing = missingCharacters(OUT, set);
-  if (missing.length) { log(`mars-web: the build left ${missing.length} character files out of ${relative(ROOT, OUT)} (first: ${missing.slice(0, 3).join(', ')})`); return 1; }
-  writeFileSync(join(OUT, STAMP), JSON.stringify({ inputs: stamp }) + '\n');
-  log(`mars-web: built ${relative(ROOT, OUT)} in ${((Date.now() - t0) / 1000).toFixed(1)} s (${set.length} character files)`);
+  build(viewer);
+  const missing = missingCharacters(out, set);
+  if (missing.length) { log(`mars-web: the build left ${missing.length} character files out of ${relative(ROOT, out)} (first: ${missing.slice(0, 3).join(', ')})`); return 1; }
+  writeFileSync(join(out, STAMP), JSON.stringify({ inputs: stamp }) + '\n');
+  log(`mars-web: built ${relative(ROOT, out)} in ${((Date.now() - t0) / 1000).toFixed(1)} s (${set.length} character files)`);
   return 0;
 }
 
