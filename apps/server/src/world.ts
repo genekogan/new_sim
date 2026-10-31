@@ -1638,14 +1638,22 @@ export class WorldHost {
   snapshotView(): Snapshot {
     this.assertClockReady();
     const w = this.engine.world;
-    const paths: PathCommit[] = [];
-    for (const id of Object.keys(w.entities)) { const p = this.engine.currentPath(id); if (p) paths.push(p); }
+    // Lane L5: a reconnect storm after a stall asks for this many times within one tick. The entity copy and the paths
+    // are the same until the engine steps or accepts input (tick, log seq), so they are built once per state. Callers
+    // only read the copy (the hub packs it); it is still a copy, never the live table.
+    let c = this.viewCache;
+    if (!c || c.engine !== this.engine || c.tick !== w.tick || c.seq !== this.seq) {
+      const paths: PathCommit[] = [];
+      for (const id of Object.keys(w.entities)) { const p = this.engine.currentPath(id); if (p) paths.push(p); }
+      c = this.viewCache = { engine: this.engine, tick: w.tick, seq: this.seq, entities: structuredClone(w.entities), paths };
+    }
     return {
       tick: w.tick, seq: this.batchSeq, viewHash: this.viewHash(),
-      entities: structuredClone(w.entities), regions: w.regions, env: w.env, paths,
+      entities: c.entities, regions: w.regions, env: w.env, paths: c.paths,
       souls: [...this.minds.values()].map((m) => this.publicSoul(m)),
     };
   }
+  private viewCache: { engine: Engine; tick: number; seq: number; entities: Snapshot['entities']; paths: PathCommit[] } | null = null;
 
   private kernelSentTick = -1000;
   private resetAcc() { this.acc = { paths: [], changes: [], log: [], dirty: new Set(), removed: [], plays: [], fromTick: this.engine.world.tick }; }
