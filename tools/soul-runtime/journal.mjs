@@ -144,6 +144,7 @@ export function openJournal(directory, {worldId, soulId, now = Date.now,retentio
     openOwnerTasks(options){return transaction(()=>ownerTasks.page(options));},
     ownerTask(options){return ownerTasks.task(options);},
     ownerTaskStats(){return ownerTasks.stats();},
+    ownerTaskTexts(){return ownerTasks.openTexts();},
     closeOwnerTaskFromOperation(fence,id){return ownerTasks.closeFromOperation(fence,id);},
     storageStats(){return transaction(storageStats);},
     /** Compacts only handled payloads; identity/digest/outcome/sequence remain.

@@ -173,6 +173,16 @@ due wake for the immediate next choice. The model still authors goals, activity
 choices and appointments; this timer mechanism does not infer or schedule a
 social plan on its behalf.
 
+A saved wake at or after an explicit wall-clock time in retained owner intent
+(an ISO8601 time with a timezone in the initial instruction or an open owner
+task) would leave no time to act on that commitment, so the saved wake moves
+ahead of it by a lead of 10% of the remaining time, bounded to 120..600 s
+(`deadlineWakeV1` in the checkpoint records the early wake, the commitment and
+the requested wake). When the early wake is consumed, the requested wake is
+restored; a re-request inside the lead window is kept as asked. Null
+(event-only) waits and Souls without dated owner intent are unchanged, and the
+prompt carries no extra text.
+
 An urgent owner/addressed/conversation observation arriving after a prompt, or
 a saved future wake becoming due during that turn, first steers the same host.
 If that obsolete turn remains active for five seconds after the first trigger,

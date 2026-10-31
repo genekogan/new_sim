@@ -86,6 +86,33 @@ export function parseDecision(text,{now=Date.now}={}){
  }
  return {...value,wakeAt,call:{type:call.type,command:call.command,args}};
 }
+// Owner commitments are the explicit wall-clock times (ISO8601 with a timezone)
+// in retained owner intent: the initial instruction and open owner tasks. A
+// saved wake at or after such a time leaves no time to act on it, so the
+// scheduled wake moves ahead by a lead: 10% of the time remaining, at least
+// 120 s (a cross-place walk plus a few decisions and a report) and at most
+// 600 s (a far earlier wake would only be slept through again). The lead is
+// re-derived from the remaining time, so a commitment gets at most two early
+// wakes, and one when it is under 20 minutes away. Scheduling only: the Soul
+// sees the same prompt fields and still decides everything itself.
+export const DEADLINE_LEAD=Object.freeze({minMs:120000,maxMs:600000,fraction:0.1});
+export const deadlineLeadMs=remainingMs=>Math.min(DEADLINE_LEAD.maxMs,Math.max(DEADLINE_LEAD.minMs,Math.round(remainingMs*DEADLINE_LEAD.fraction)));
+const OWNER_TIME=/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})/g;
+export function ownerCommitmentTimes(texts){
+ const times=new Set();
+ for(const text of texts)if(typeof text==='string')for(const m of text.matchAll(OWNER_TIME)){const t=Date.parse(m[0]);if(Number.isFinite(t))times.add(t);}
+ return [...times].sort((a,b)=>a-b);
+}
+export function deadlineWake(wakeAt,commitments,now){
+ if(wakeAt==null)return {wakeAt:null,lead:null};
+ const requested=Date.parse(wakeAt);let best=null;
+ for(const deadline of commitments){
+  if(deadline<=now)continue;
+  const at=deadline-deadlineLeadMs(deadline-now);
+  if(at>now&&at<requested&&(!best||at<best.at))best={at,deadline};
+ }
+ return best?{wakeAt:new Date(best.at).toISOString(),lead:{wakeAt:new Date(best.at).toISOString(),deadlineAt:new Date(best.deadline).toISOString(),requestedWakeAt:wakeAt}}:{wakeAt,lead:null};
+}
 export function retainDecision(journal,fence,decision,{events=[],threadId,initialInstruction,deadlineAt=Infinity}={}){
  const c=journal.control.checkpoint();if(c.value?.pendingDecision)throw Error('Previous decision must be reconciled first');
  // The next choice incorporates the preceding observation. Drop that call/result
@@ -175,13 +202,19 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  // A due wake is consumed only by a committed non-configuration decision that
  // was retained after its deadline. Local listening configuration never consumes
  // it, so the immediate next choice still sees the outstanding reminder.
- const priorWake=latest.value.wakeAt;
- const wakeAt=decision.wakeAt??(call.type==='listen'?priorWake??null:call.type==='wait'&&call.args.cancelWake===true?null:priorWake&&Date.parse(priorWake)>pending.retainedAt?priorWake:null);
+ const priorWake=latest.value.wakeAt,priorLead=latest.value.deadlineWakeV1??null,cancel=call.type==='wait'&&call.args.cancelWake===true;
+ let wakeAt=decision.wakeAt??(call.type==='listen'?priorWake??null:cancel?null:priorWake&&Date.parse(priorWake)>pending.retainedAt?priorWake:null);
+ // Consuming an early deadline wake restores the wake the Soul itself asked for.
+ if(wakeAt===null&&decision.wakeAt==null&&!cancel&&call.type!=='listen'&&priorLead&&priorWake===priorLead.wakeAt&&Date.parse(priorLead.requestedWakeAt)>pending.retainedAt)wakeAt=priorLead.requestedWakeAt;
+ const commitments=ownerCommitmentTimes([latest.value.initialInstruction,...(journal.ownerTaskTexts?.()??[])]);
+ const scheduled=deadlineWake(wakeAt,commitments,pending.retainedAt);
+ const deadlineWakeV1=scheduled.lead??(priorLead&&wakeAt===priorLead.wakeAt?priorLead:null);
+ wakeAt=scheduled.wakeAt;
  // A real applied decision, including an explicit refusal, is the progress
  // boundary. Retention, inference and uncertain effects never refill this budget.
- const {lastResult,urgentRecoveryV1,decisionProgressV1,...previous}=latest.value;
+ const {lastResult,urgentRecoveryV1,decisionProgressV1,deadlineWakeV1:_lead,...previous}=latest.value;
  const listenTo=['listen','wait'].includes(call.type)&&Object.hasOwn(call.args,'listenTo')?listeningScope(call.args.listenTo):latest.value.listenTo??[];
- const finalized={...previous,pendingDecision:null,lastDecisionId:id,lastCall:call,wakeAt,listenTo,lastReceipt:receipt??receiptProjection(latest.value.lastReceipt)??null};
+ const finalized={...previous,pendingDecision:null,lastDecisionId:id,lastCall:call,wakeAt,listenTo,...(deadlineWakeV1?{deadlineWakeV1}:{}),lastReceipt:receipt??receiptProjection(latest.value.lastReceipt)??null};
  // Count the actual surrounding checkpoint, including the lastResult key and
  // comma, before deciding whether this complete observation fits inline.
  const envelopeBytes=Buffer.byteLength(JSON.stringify({...finalized,lastResult:null}))-4;

@@ -65,6 +65,7 @@ export function attachOwnerTasks(db,{now,transaction,control,limits={}}){
  const project=r=>({id:r.id,sourceEventSequence:r.event_seq,text:r.text,sentAt:r.sent_at,intentUnknown:r.unknown_reason!==null,...(r.unknown_reason?{unknownReason:r.unknown_reason}:{})});
  return {
   capture,assertCapacity,stats,
+  openTexts(){return db.prepare('SELECT text FROM owner_tasks_v1 WHERE closed_at IS NULL AND text IS NOT NULL ORDER BY event_seq').all().map(r=>r.text);},
   closeFromOperation(fence,id){return transaction(()=>{control.assertOwner(fence);return close(control.operation(id));});},
   page({after=0,limit=20}={}){
    boundedInteger(after,0,Number.MAX_SAFE_INTEGER,'cursor');boundedInteger(limit,1,20,'page limit');
