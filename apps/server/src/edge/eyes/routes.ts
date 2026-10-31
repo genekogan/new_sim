@@ -45,6 +45,7 @@ export function parseViewQuery(q: (k: string) => string | undefined): ViewReques
 }
 
 export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, options: EyesOptions = {}) {
+  let loadPaused = false;
   const now = options.now ?? Date.now;
   const viewerUrl=eyesViewerUrl(process.env.EDGE_EYES,deps.souls.cfg),problem=viewerUrl?(eyesViewerProblem(viewerUrl,deps.souls.cfg)??eyesWorkerProblem()):null;
   const refused:EyesRenderer={status:()=>({...NO_RENDERER.status(),detail:problem}),render:()=>Promise.reject(new EyesUnavailable(problem!)),close(){}};
@@ -94,6 +95,8 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
       sweep();
       const key = keyOf(s, plan), hit = frames.get(key), t = now();
       if (hit && images.has(hit.img)) return c.json(edgeBody({...base, tick: hit.tick, alt: hit.alt, seen: hit.seen, url: `/v1/edge/view/img/${hit.img}.jpg`, expiresAt: new Date(hit.expires).toISOString(), cached: true, render: {ms: hit.ms, frameTick: hit.frameTick}}));
+      // load dial (LOAD-CONTRACT §1): green/amber draw; red/black pause pictures, as when the worker is down (caption only)
+      if (loadPaused) return fail(c, 503, 'eyes.unavailable', 'No picture right now (the world is busy); the caption below describes the same view.', {...base, url: null});
       const st = renderer.status();
       if (st.state !== 'ready') return fail(c, 503, 'eyes.unavailable', `No picture right now (${st.detail ?? st.state}); the caption below describes the same view.`, {...base, url: null});
       const last = lastRender.get(s.soulId);
@@ -127,5 +130,5 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
   });
   // Public: render worker health (no Soul data).
   app.get('/v1/edge/view/status', c => {c.header('Cache-Control', 'no-store'); return c.json(edgeBody({eyes: renderer.status(), limits: {soulSeconds: soulMs / 1000, globalPerMinute, bucketSeconds: bucketTicks / TPS, urlSeconds: urlMs / 1000}}));});
-  return {renderer, close: () => renderer.close()};
+  return {renderer, close: () => renderer.close(), setLoadLevel: (level: 'green' | 'amber' | 'red' | 'black') => { loadPaused = level === 'red' || level === 'black'; }};
 }

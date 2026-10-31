@@ -93,5 +93,5 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   const reminders=mountPersonalReminders(app,deps,comms);
   mountSchema(app);
   const close = comms.close;
-  return Object.assign(comms, {events, plans, close() { reminders.close(); plans?.close(); events.close(); eyes.close(); close(); }});
+  return Object.assign(comms, {events, plans, eyes, close() { reminders.close(); plans?.close(); events.close(); eyes.close(); close(); }});
 }
