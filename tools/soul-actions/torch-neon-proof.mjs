@@ -9,7 +9,7 @@ const STEPS=JSON.parse(process.env.SOUL_TORCH_STEPS??'null')??[
  {words:'light the wall torch',eye:[-4.2,1.6,5.3],at:[-2.1,1.45,6.6],hold:5000},
  // retest on M04: stand ≥ 10 s at the sign, then on until the idle variety holds a hand up, so the switch-off reach
  // starts out of a gesture (the take-4 pop) on camera
- {words:'switch on the neon sign',eye:[0.4,1.6,3.9],at:[2.2,1.55,6.15],hold:10000,gesture:60000},
+ {words:'switch on the neon sign',eye:[0.4,1.6,3.9],at:[2.2,1.55,6.15],hold:10000,gesture:90000},
  {words:'switch off the neon sign',eye:[0.4,1.6,3.9],at:[2.2,1.55,6.15],hold:4500},
  {words:'put out the wall torch',eye:[-4.2,1.6,5.3],at:[-2.1,1.45,6.6],hold:3500},
  {words:'put out the standing torch',eye:[0.2,1.6,4.7],at:[-2.2,1.3,4.2],hold:3500}];
@@ -30,9 +30,10 @@ function gesture(id,t){const h=hashId(id),out=[];
  {const ph=(h%997)/997,u=((t/25+ph)%1)*25;if(u>=1&&u<6)out.push({kind:'Idle_Neutral',left:6-u});}
  {const ph=((h>>>7)%991)/991,cyc=t/37+ph,u=(cyc%1)*37,clip=['Idle_LookAround_Loop','Idle_FoldArms_Loop'][(Math.floor(cyc)+h)%2];if(u>=1.2&&u<9)out.push({kind:clip,left:9-u});}
  return out.sort((a,b)=>b.left-a.left)[0]??null;}
-/** Wait at most maxMs until the depicted body holds a hand up in a gesture (a palm > 1.05 m above its feet, ≥ 2 s of the
- *  gesture window left); records what it waited for. */
-async function waitGesture(label,maxMs){const t0=Date.now();while(Date.now()-t0<maxMs){const s=samples.filter(Boolean).at(-1),b=s?.bodies[0];if(b){const g=gesture(b.id,s.tick*s.dt),up=Math.max(...b.arms.map(a=>a.palm[1]-b.p[1]));if(g&&g.kind!=='Idle_LookAround_Loop'&&g.left>=2&&up>1.05){marks.push({label,at:Date.now(),tick:s.tick,gesture:g,palmUp:up,variety:b.variety});return g;}}await page.waitForTimeout(100);}marks.push({label,at:Date.now(),tick:samples.at(-1)?.tick,gesture:null,timeout:true});return null;}
+/** Wait at most maxMs until the depicted body plays a hand gesture (Idle_Neutral or folded arms, not look-around) at full
+ *  weight with ≥ 2 s of its window left; records what it waited for. (Take 06: a palm-height test never fired on the
+ *  fem rig, whose gestures hold the hands lower.) */
+async function waitGesture(label,maxMs){const t0=Date.now();while(Date.now()-t0<maxMs){const s=samples.filter(Boolean).at(-1),b=s?.bodies[0];if(b){const g=gesture(b.id,s.tick*s.dt),up=Math.max(...b.arms.map(a=>a.palm[1]-b.p[1]));if(g&&g.kind!=='Idle_LookAround_Loop'&&g.left>=2&&(b.variety??0)>=.95){marks.push({label,at:Date.now(),tick:s.tick,gesture:g,palmUp:up,variety:b.variety});return g;}}await page.waitForTimeout(100);}marks.push({label,at:Date.now(),tick:samples.at(-1)?.tick,gesture:null,timeout:true});return null;}
 const act=async(seat,words)=>{const start=Date.now(),r=await promisify(execFile)(process.execPath,['eden.mjs','act',words,'--wait','120','--json'],{cwd:scene+'/'+seat,timeout:180000}),result=JSON.parse(r.stdout);commands.push({seat,words,start,end:Date.now(),result});writeFileSync(out+'/commands.json',JSON.stringify(commands,null,2));assert.equal(result.accepted,true,JSON.stringify(result));assert.equal(result.receipt.phase,'completed',JSON.stringify(result));return result;};
 try{
  await post('/v1/god/env',{timeOfDay:process.env.SOUL_TORCH_TIME??'20:10',timeScale:0,weather:{kind:'clear'}});
