@@ -136,8 +136,13 @@ export class LifecycleRunner {
     // A changed placement remains pending; it is reclassified only by pump's
     // exact ordinary-unavailable path, never an arbitrary exception handler.
     const guard=()=>{const p=probe();if(p.outcome!=='ready')throw new LifecycleDeferred('Native admission changed');return true as const;};
+    // The journal link runs inside the same host write transaction, synchronously after `guard` above (drainInputs:
+    // BEGIN IMMEDIATE, guard, append, link), with no engine change in between, so it re-checks the identity/authority
+    // (checks) but not the native placement: that second detached-engine probe was a full snapshot+restore of the world
+    // (~0.7 s laptop, ~2 s eden2 per Soul) answering the same question on the same state (lane srv-join-stall).
+    const linkGuard=()=>{checks();return true as const;};
     const payload={soulId:s.soulId,entityId:s.entityId,owner:s.owner,name:op.name,description:op.description,...(near?{near}:{})};
-    this.queue(op,this.host.enqueueChecked('birth',op.native?'world':`soul:${s.soulId}`,payload,guard,e=>this.journal.linkAccepted(s,op.requestId,e,guard,near)));
+    this.queue(op,this.host.enqueueChecked('birth',op.native?'world':`soul:${s.soulId}`,payload,guard,e=>this.journal.linkAccepted(s,op.requestId,e,linkGuard,near)));
   }
   ownerPage(owner:string,cursor:string|null=null,associated:readonly string[]=[]){
     const page=this.journal.ownerPage(this.host.worldId,owner,cursor,associated);
