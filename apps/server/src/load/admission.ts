@@ -56,7 +56,10 @@ export function frameBudgetMs(level: Level, quietTickMs: number): number {
   if (!(quietTickMs > 0) || !Number.isFinite(quietTickMs)) return cap;
   return Math.min(cap, Math.max(FRAME_BUDGET_FLOOR_MS[level], FRAME_SLACK_K[level] * Math.max(0, FRAME_MS - quietTickMs)));
 }
-export const REFILL_X: Record<Level, number> = {green: 1, amber: 0.5, red: 0.25, black: 0.25};
+/** The god's bucket (the reserve, unchanged): 25 % of the green cap's throughput × this multiplier by level. The Souls'
+ *  refill has the level folded into the frame budget instead (refillPerS). */
+export const GOD_REFILL_X: Record<Level, number> = {green: 1, amber: 0.5, red: 0.25, black: 0.25};
+export const SOUL_REFILL_MAX_PER_S = 200;
 const COOL_MS = 60_000, CAPACITY_MS = 2000, GOD_SHARE = 0.25, DEFAULT_EST_MS = 20, ANSWER_MARGIN_MS = 250, ACTIVE_MS = 60_000;
 
 type Job = {key: string; god: boolean; route: RouteClass; arrival: number; deadline: number; closed: () => boolean;
@@ -98,8 +101,12 @@ export class Admission {
   /** Principals (Souls + god) with a heavy request in the last minute: the `awake` of the refill formula. */
   active() { const now = this.now(); let n = 0; for (const b of this.buckets.values()) if (now - b.seen < ACTIVE_MS) n++; return Math.max(1, n); }
   estimate(id: string) { return this.est.get(id) ?? DEFAULT_EST_MS; }
-  /** ms per ms of refill for one principal: min(200, 500/awake) ms/s × the level's dial; the god's bucket is the reserve. */
-  private refill(god: boolean) { const perS = god ? 1000 * GOD_SHARE * FRAME_BUDGET_MS.green / FRAME_MS : Math.min(200, 500 / this.active()); return perS * REFILL_X[this.level] / 1000; }
+  /** Refill of one principal's bucket, ms per s. A Soul: min(200, 20 × frameBudget / awake), so the Souls' buckets together
+   *  refill at the frame budget's own throughput (20 frames/s × budget ms) and a crowd never earns more than the dispatcher
+   *  can serve (srv-admission-calib: the old 500/awake × {1, .5, .25} was the laptop's green budget at every box). The god:
+   *  the reserve, 25 % of the green cap × GOD_REFILL_X (unchanged). */
+  refillPerS(god = false) { return god ? 1000 * GOD_SHARE * FRAME_BUDGET_MS.green / FRAME_MS * GOD_REFILL_X[this.level] : Math.min(SOUL_REFILL_MAX_PER_S, (1000 / FRAME_MS) * this.frameBudget() / this.active()); }
+  private refill(god: boolean) { return this.refillPerS(god) / 1000; }
   private bucket(key: string, god: boolean, now: number) {
     let b = this.buckets.get(key);
     if (!b) { b = {tokens: CAPACITY_MS, at: now, seen: now}; this.buckets.set(key, b); }
@@ -126,7 +133,7 @@ export class Admission {
     if (read && b.tokens < est && this.contended(r.key)) {
       this.shed.slow++; this.shed.reads++; this.strike(r.key, r.god, 'slow', now);
       const rate = this.refill(r.god);
-      return {refusal: {status: 429, code: 'soul.slow-down', retryAfterS: Math.max(1, Math.ceil((est - b.tokens) / Math.max(rate, 1e-6) / 1000)), message: 'this Soul has asked for a lot in a short time; the world can answer it again shortly'}};
+      return {refusal: {status: 429, code: 'soul.slow-down', retryAfterS: Math.min(COOL_MS / 1000, Math.max(1, Math.ceil((est - b.tokens) / Math.max(rate, 1e-6) / 1000))), message: 'this Soul has asked for a lot in a short time; the world can answer it again shortly'}};
     }
     const deadline = now + Math.min(r.route.deadlineMs, r.hintMs && r.hintMs > 0 ? r.hintMs : Infinity);
     // a read that cannot start before its deadline (the time already queued, paid at the frame budget) is answered now,

@@ -228,3 +228,56 @@ test('world-total frame budget follows the quiet tick: at 12 ms and at 35 ms, re
     adm.close();
   }
 });
+
+/** n Souls, each asking a `costMs` read every `periodMs` (staggered) and honouring every Retry-After, for `durMs` of
+ *  fake time on one thread (requests advance the clock by their cost). Counts what each Soul was refused. */
+async function soak(o: {quiet: number; n: number; costMs?: number; periodMs?: number; durMs?: number; level?: Level; polite?: boolean}) {
+  const {quiet, n, costMs = 150, periodMs = 4000, durMs = 240_000, level = 'green', polite = true} = o;
+  let now = 0; const adm = new Admission({now: () => now, yieldTurn: () => new Promise(() => {}), quietTickMs: () => quiet});
+  adm.setLoadLevel(level);
+  const next = Array.from({length: n}, (_, i) => i * periodMs / n), codes: Record<string, number> = {}; let ran = 0;
+  for (; now < durMs; now += 50) {
+    for (let i = 0; i < n; i++) {
+      if (now < next[i] || adm.outstanding.has('S' + i)) continue;
+      const t = adm.request({key: 'S' + i, god: false, route: route('GET', '/v1/edge/here')});
+      if ('refusal' in t) { codes[t.refusal.code] = (codes[t.refusal.code] ?? 0) + 1; next[i] = now + (polite ? t.refusal.retryAfterS * 1000 : 500); continue; }
+      next[i] = now + periodMs;
+      void t.turn.then(v => { if (v === 'run') { now += costMs; ran++; t.done(); } else codes[(v as {code?: string}).code ?? String(v)] = 1 + (codes[(v as {code?: string}).code ?? String(v)] ?? 0); });
+    }
+    await adm.drain(); await Promise.resolve();
+  }
+  adm.close();
+  return {codes, ran, cooled: adm.shed.cooled, adm};
+}
+
+test('per-Soul refill tied to the frame budget: the Souls\' buckets together never refill faster than the budget', () => {
+  for (const quiet of [0, 12, 35, 48]) for (const level of LEVELS4) for (const awake of [1, 2, 3, 6, 12, 24, 50, 100]) {
+    let now = 0; const adm = new Admission({now: () => now, quietTickMs: () => quiet}); adm.setLoadLevel(level);
+    for (let i = 0; i < awake; i++) { const t = adm.request({key: 'S' + i, god: false, route: route('POST', '/v1/edge/act')}); if ('turn' in t) { t.done(); } now += 1; }
+    assert.equal(adm.active(), awake);
+    const each = adm.refillPerS(), budgetPerS = 20 * frameBudgetMs(level, quiet);
+    assert.ok(awake * each <= budgetPerS + 1e-9, `${level}@${quiet} awake ${awake}: ${awake} × ${each} > ${budgetPerS}`);
+    assert.ok(each <= 200);
+    if (awake * 200 >= budgetPerS) assert.ok(Math.abs(awake * each - budgetPerS) < 1e-9, 'a crowd shares the whole budget');
+    adm.close();
+  }
+  const g = new Admission({quietTickMs: () => 35}); assert.equal(g.refillPerS(true), 125, 'the god reserve is unchanged'); g.setLoadLevel('amber'); assert.equal(g.refillPerS(true), 62.5); g.close();
+});
+
+test('production numbers (tick 12 ms): 12 Souls each get a 150 ms read every 4 s at green, never told to slow down', async () => {
+  const at = new Admission({quietTickMs: () => 12}); assert.ok(456 / 12 >= 150 / 4); at.close();
+  const r = await soak({quiet: 12, n: 12});
+  assert.equal(r.codes['soul.slow-down'] ?? 0, 0, JSON.stringify(r.codes)); assert.equal(r.cooled, 0);
+  assert.ok(r.ran >= 12 * 240 / 4 * 0.9, `reads answered: ${r.ran}`);
+});
+
+test('a 35 ms box: 4 Souls fit (budget 9 ms/frame = 180 ms/s); 12 are refused with Retry-After, within the budget, never cooled', async () => {
+  const four = await soak({quiet: 35, n: 4});
+  assert.deepEqual(four.codes, {}, JSON.stringify(four.codes)); assert.ok(four.ran >= 4 * 240 / 4 * 0.9, String(four.ran));
+  // 12 × 37.5 ms/s of demand against 180 ms/s: the buckets refill exactly what the dispatcher can serve, so the honest
+  // capacity shows as the queue's world.busy (Retry-After), not as strikes and not as request time taken from the tick
+  const twelve = await soak({quiet: 35, n: 12});
+  assert.ok(Object.values(twelve.codes).reduce((x, y) => x + y, 0) > 0, 'over capacity: refused with Retry-After ' + JSON.stringify(twelve.codes));
+  assert.equal(twelve.cooled, 0, 'honest Souls are never cooled');
+  assert.ok(twelve.ran * 150 <= 180 * 240 * 1.05 + 2000 * 12, `requests stayed within the budget's throughput: ${twelve.ran} reads`);
+});
