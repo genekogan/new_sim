@@ -42,7 +42,7 @@ const ticks = (s: number) => Math.round(s / DT);
 /** Items this close to a standing person's body axis (m, horizontal) are reached without stepping. */
 export const HERE_REACH = 0.85;
 /** Seconds: reach to an item / back. */
-export const REACH_TIME = ITEM_REACH_SECONDS;
+export const REACH_TIME = 0.4;
 /** Eat cycle phases (s): dip 0.6 → lift to mouth 0.6 → pause 0.4 → return 0.8 = 2.4 s; ready / lower 0.4 s around the cycles. */
 export const EAT_PHASES = { ready: 0.4, dip: 0.6, lift: 0.6, pause: 0.4, return: 0.8, lower: 0.4 } as const;
 export const EAT_CYCLE = EAT_PHASES.dip + EAT_PHASES.lift + EAT_PHASES.pause + EAT_PHASES.return;
@@ -150,6 +150,8 @@ type TransferProgram = { hand: Hand; station?: Station; target: Vec3; dest?: Des
 type TransferExec = {
   id: string; mode: 'take' | 'put'; actor: string; item: string; hand: Hand; station?: Station; target: Vec3; dest?: Dest;
   phase: 'approach' | 'turn' | 'reach' | 'withdraw' | 'cancel-withdraw' | 'recover'; child?: Children; error?: Diagnostic; t: number; from?: Vec3; to?: Vec3;
+  /** Reach / withdraw length (ticks): REACH_TIME, or ITEM_REACH_SECONDS for an opted-in presented item (its body bends on the same clock). */
+  reachTicks?: number;
   /** Item support at plan time (take): the item must still be there when the hand arrives. */
   source?: string;
 };
@@ -252,7 +254,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       { resource: `entity:${p.item}`, mode: 'exclusive' },
       ...(mode === 'put' && p.surfaceSlot !== 'ground' ? [{ resource: `surface-slot:${p.surfaceSlot}`, mode: 'exclusive' as const }] : []),
     ],
-    drivesReservedHands: (record) => record.phase === 'reach' || record.phase === 'withdraw',
+    // an opted-in item's own withdraw-on-cancel and recovery keep the hand until the arm has eased back to the clip
+    drivesReservedHands: (record) => record.phase === 'reach' || record.phase === 'withdraw' || record.phase === 'cancel-withdraw' || record.phase === 'recover',
     plan: (rt, p) => (mode === 'take' ? planTake(rt, p) : planPut(rt, p)),
     start(rt, p, prog, id) {
       const a = rt.world.entities[p.actor];
@@ -263,7 +266,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         else { ex.child = ch; ex.phase = 'approach'; }
       }
       a.human!.task = id;
-      if(rt.world.entities[p.item].tags?.includes('entity-world-item-pose'))a.human!.itemTransferV1={item:p.item,hand:ex.hand,action:id,startTick:rt.tick};
+      if(rt.world.entities[p.item].tags?.includes('entity-world-item-pose')){a.human!.itemTransferV1={item:p.item,hand:ex.hand,action:id,startTick:rt.tick};ex.reachTicks=ticks(ITEM_REACH_SECONDS);}
       return ex;
     },
     step(rt, ex): StepResult {
@@ -273,13 +276,15 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       const it = rt.world.entities[ex.item];
       if(ex.phase==='recover'){
         a.human!.activity='idle';ex.t++;
-        return ex.t<ticks(ITEM_RECOVERY_SECONDS)?{status:'running',phase:'recover'}:{status:'completed',outputs:{item:ex.item,hand:ex.hand,support:it.support}};
+        if(ex.t<ticks(ITEM_RECOVERY_SECONDS))return{status:'running',phase:'recover'};
+        // the released hand stayed at its rest point while the drawn arm eased back to the idle clip
+        if(!inHand(rt.world,ex.actor,ex.hand))setHand(a,ex.hand,undefined);
+        return{status:'completed',outputs:{item:ex.item,hand:ex.hand,support:it.support}};
       }
       if(ex.phase==='cancel-withdraw'){
-        ex.t++;const q=lerp3(ex.from!,ex.to!,smooth(ex.t/ticks(REACH_TIME)));setHand(a,ex.hand,q);a.human!.activity='reach';
+        const R=ex.reachTicks??ticks(REACH_TIME);ex.t++;const q=lerp3(ex.from!,ex.to!,smooth(ex.t/R));setHand(a,ex.hand,q);a.human!.activity='reach';
         if(inHand(rt.world,ex.actor,ex.hand))followHand(it,q,a.pose.yaw);
-        if(ex.t<ticks(REACH_TIME))return{status:'running',phase:'cancel-withdraw'};
-        if(!inHand(rt.world,ex.actor,ex.hand))setHand(a,ex.hand,undefined);
+        if(ex.t<R)return{status:'running',phase:'cancel-withdraw'};
         ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};
       }
       if (ex.phase === 'approach') {
@@ -308,19 +313,21 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         ex.phase = 'reach';
         // This step also advances t to one tick of reach, so the phase origin is
         // the preceding interval boundary (full weight at the actual grasp).
-        if(a.human!.itemTransferV1?.action===ex.id)a.human!.itemTransferV1.reachTick=rt.tick-1;
+        // The fixed grasp / placement point lets the renderer solve one posture for the whole reach.
+        if(a.human!.itemTransferV1?.action===ex.id){a.human!.itemTransferV1.reachTick=rt.tick-1;a.human!.itemTransferV1.target=ex.target.map(x=>Math.round(x*1000)/1000) as [number,number,number];}
         ex.t = 0;
         ex.from = handNow(a, ex.hand, bodyFrame(a));
         ex.to = ex.target;
       }
       a.human!.activity = 'reach';
       ex.t++;
-      const k = smooth(ex.t / ticks(REACH_TIME));
+      const R = ex.reachTicks ?? ticks(REACH_TIME);
+      const k = smooth(ex.t / R);
       const q = lerp3(ex.from!, ex.to!, k);
       setHand(a, ex.hand, q);
       const holding = (ex.mode === 'take') === (ex.phase === 'withdraw');
       if (holding) followHand(it, q, a.pose.yaw);
-      if (ex.t < ticks(REACH_TIME)) return { status: 'running', phase: ex.phase };
+      if (ex.t < R) return { status: 'running', phase: ex.phase };
       if (ex.phase === 'reach') {
         const b = bodyFrame(a);
         if (ex.mode === 'take') {
@@ -360,9 +367,10 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         ex.from = q;
         return { status: 'running', phase: 'withdraw' };
       }
-      if (ex.mode === 'put') setHand(a, ex.hand, undefined);
+      const presented = a.human!.itemTransferV1?.action === ex.id;
+      if (ex.mode === 'put' && !presented) setHand(a, ex.hand, undefined);
       if (a.human!.task === ex.id) { a.human!.task = undefined; a.human!.activity = 'idle'; }
-      if(a.human!.itemTransferV1?.action===ex.id){ex.phase='recover';ex.t=0;a.human!.itemTransferV1.releaseTick=rt.tick;return{status:'running',phase:'recover'};}
+      if(presented){ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};}
       return { status: 'completed', outputs: { item: ex.item, hand: ex.hand, support: rt.world.entities[ex.item].support } };
       };
       const result=advance();

@@ -120,20 +120,16 @@ function reachErr(d: Dims, p: Posture, ts: Target[]) {
 export const kneelDrop = (d: Dims) => Math.max(0, d.hipH - (KNEE_Y + d.thigh));
 
 /** Best posture for `targets` (body frame) under `style`: grid search, deterministic. */
-export function solvePosture(d: Dims, ts: Target[], style: Style, allowFold=false): Posture {
+export function solvePosture(d: Dims, ts: Target[], style: Style): Posture {
   if (!ts.length) return NEUTRAL;
   const st = STYLE[style];
   const dropMax = Math.min(st.dropMax ?? Infinity, Math.max(0, d.hipH - SQUAT_HIP));
   let best = NEUTRAL, bc = Infinity;
-  const itemCandidates:{pose:Posture;cost:number}[]=[];
   const ND = 12, NB = Math.max(1, Math.round(st.bendMax / (5 * DEG)));
   const rises = st.rise ? [0, RISE_MAX / 2, RISE_MAX] : [0];
   const score = (p: Posture, effort: number) => {
     const r = reachErr(d, p, ts);
-    // A small held item may come close to the hip as the elbow folds. Trying to
-    // keep that forearm extended makes the torso jump away during withdrawal.
-    const cost = 40 * r.err + (allowFold?0:30*r.close) + effort;
-    if(allowFold)itemCandidates.push({pose:p,cost});
+    const cost = 40 * r.err + 30 * r.close + effort;
     if (cost < bc - 1e-9) [best, bc] = [p, cost];
   };
   for (let i = 0; i <= ND; i++)
@@ -147,18 +143,10 @@ export function solvePosture(d: Dims, ts: Target[], style: Style, allowFold=fals
     const drop = kneelDrop(d), NK = Math.round(BODY_MODEL.bendMax.kneel / (5 * DEG));
     for (let j = 0; j <= NK; j++) {
       const p = { drop, bend: (BODY_MODEL.bendMax.kneel * j) / NK, rise: 0, kneel: 1 };
-      const highItem=allowFold?5*Math.max(0,Math.min(1,(Math.min(...ts.map(t=>t.up))-.35)/.3)):0;
-      score(p, st.kneel + 0.35 * p.bend + highItem);
+      score(p, st.kneel + 0.35 * p.bend);
     }
   }
-  if(!allowFold)return best;
-  // A withdrawing hand crosses near-equal grid minima. Picking one winner made
-  // the torso jump by20–30degrees between frames. Blend the nearby solutions;
-  // the existing reach margin leaves the arm IK room to retain exact contact.
-  const out:Posture={drop:0,bend:0,rise:0,kneel:0};let total=0;
-  for(const c of itemCandidates){const weight=Math.exp(-(c.cost-bc)/.08);total+=weight;for(const key of ['drop','bend','rise','kneel'] as const)out[key]+=c.pose[key]*weight;}
-  for(const key of ['drop','bend','rise','kneel'] as const)out[key]/=total;
-  return out;
+  return best;
 }
 
 /** Move `cur` toward `goal` at most `rate` × full range per call (drop in m, bend in rad, kneel 0–1). */

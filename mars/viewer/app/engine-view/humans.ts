@@ -142,6 +142,10 @@ type View = {
   since?: number;
   prevAct?: string;
   prevBase?: string;
+  /** Seconds since the body last did something other than stand (idle / reach); undefined: unknown (no ramp). */
+  restAge?: number;
+  /** Replay: the absolute clock (s) at which the current rest began, carried across take windows. */
+  restFrom?: number;
   partner?: string;
   partnerP?: THREE.Vector3;
   dist: number;
@@ -223,6 +227,8 @@ export type SampledHuman = {
   activityAge?: number;
   prevActivity?: string;
   prevBaseActivity?: string;
+  /** Seconds the body has stood (idle / reach) since it last did anything else in this take; absent: unknown. */
+  restAge?: number;
 };
 export type { Hands };
 /** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
@@ -286,6 +292,10 @@ function nearest(list: [number, number, number][], x: number, z: number) {
 const baseOf = (act: string, base?: string) => { if (act === 'cycle') return 'sit'; const b = OVERLAYS.has(act) ? (base ?? 'idle') : act; return b === 'sit-ground' ? 'sit' : b; };
 /** Sitting on the ground (sit-ground, or an overlay layered on it): the seat is the grass. */
 const onGround = (act: string, base?: string) => act === 'sit-ground' || (base === 'sit-ground' && OVERLAYS.has(act));
+/** Idle variety layers fade in over this long (s) after the body comes to rest — the variant's own fade-in. */
+const IDLE_VARIETY_ONSET = 1.2;
+/** Standing activities the idle variety may play through (an opted-in item reach keeps its own handoff clock). */
+export const REST_ACTS = new Set(['idle', 'reach']);
 /** Idle variety: now and then (about 6 s in every 25, per person) the Idle_Neutral clip blends in. */
 function neutralWeight(id: string, t: number) { const ph = (hashId(id) % 997) / 997, u = ((t / 25 + ph) % 1) * 25; return u < 1 ? smooth(u) : u < 6 ? 1 : u < 7 ? 1 - smooth(u - 6) : 0; }
 const handList = (h: Hands): Vec3[] => [h.left, h.right].filter((q): q is Vec3 => !!q);
@@ -420,6 +430,7 @@ export class HumanViews {
       if (act !== v.activity) { v.prevAct = v.activity; v.prevBase = v.base; }
       v.age = act === v.activity ? v.age + 1 : 0;
       v.since = v.age * DT;
+      v.restAge = !REST_ACTS.has(act) ? 0 : v.restAge === undefined ? undefined : v.restAge + DT;
       v.activity = act;
       v.groundSeat = onGround(act, e.human.baseActivity);
       v.partner = (e.human as { partner?: string }).partner;
@@ -520,7 +531,15 @@ export class HumanViews {
         }
       }
     }
-    const pz = solvePosture(d, ts, styleFor(v.activity, walking),!!v.itemPose);
+    if(v.itemPose?.transfer&&!v.handActuator){
+      // Opted-in item transfer: one posture toward the fixed grasp / placement point, on the reach hump; standing
+      // before and after it. Solving against the moving hand hopped between grid minima and popped at its ends.
+      const r=v.itemPose.posture;
+      if(!r)return NEUTRAL;
+      const q=solvePosture(d,[toBody(r.target[0],r.target[1],r.target[2],r.hand==='left'?-1:1)],styleFor('reach',false));
+      return {drop:q.drop*r.k,bend:q.bend*r.k,rise:q.rise*r.k,kneel:q.kneel*r.k};
+    }
+    const pz = solvePosture(d, ts, styleFor(v.activity, walking));
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
     if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
@@ -630,6 +649,11 @@ export class HumanViews {
       v.running = act === 'jog' || act === 'run' || (typeof f.speed === 'number' && f.speed > RUN_SPEED);
       v.speed = typeof f.speed === 'number' ? f.speed : 0;
       v.since = f.activityAge;
+      // A live client's take window slides every second and may drop the moment the body came to rest: carry the
+      // rest clock (absolute seconds) across windows instead of snapping the idle variety to full weight.
+      if (f.restAge !== undefined) v.restFrom = t - f.restAge;
+      else if (!REST_ACTS.has(act)) v.restFrom = t;
+      v.restAge = v.restFrom !== undefined && t >= v.restFrom ? t - v.restFrom : undefined;
       v.prevAct = f.prevActivity;
       v.prevBase = f.prevActivity === undefined ? undefined : baseOf(f.prevActivity, f.prevBaseActivity);
       v.partner = f.partner;
@@ -639,7 +663,7 @@ export class HumanViews {
       const transition=f.waterTransition,targetWeight=transition?.weight??1,priorWater=transition?.origins.reduce((sum,x)=>sum+(x.pose?x.weight:0),0)??0;
       const free=!f.hands?.left&&!f.hands?.right&&!f.grip&&!f.on;
       const waterWeight=free?clamp01((water?targetWeight:0)+(1-targetWeight)*priorWater):0;
-      const walk = SEATED.has(base) ? 0 : f.walk * (1-waterWeight)*(f.itemPose?.walkBlend??1);
+      const walk = SEATED.has(base) ? 0 : f.walk * (1-waterWeight);
       const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose } } as unknown as Entity;
       const snap: Snap = {
         p: [...f.p],
@@ -740,9 +764,12 @@ export class HumanViews {
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
     const idleFree = (v.activity === 'idle'||(!!v.itemPose&&v.activity==='reach')) && b.sitW === 0 && (!engineHands||(v.itemPose?.weight??1)<1) && freeBody && !lib.cur;
     const idleHandoff=v.itemPose?.idleBlend??(v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1);
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff : 0;
+    // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
+    // weight it crossed the arms in one frame whenever a walk ended inside a person's variety window.
+    const restOnset = v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
-    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff : 0;
+    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset : 0;
     const libOn = new Set<THREE.AnimationAction>();
     const libAt = (act: THREE.AnimationAction | null, weight: number, time: number) => {
       if (!act || weight <= 1e-4) return;
@@ -937,7 +964,9 @@ export class HumanViews {
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0 && !seatClip) handOnThigh(v, i, sitW);
       });
-      if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k);
+      // an opted-in item reach bends up to ~60° in 0.8 s: let the free arm hang from the first degree of bend,
+      // not swing down between 30° and 63° in a fifth of a second
+      if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k, v.itemPose?.posture ? 0 : DANGLE_FROM);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
       for(const b of armBase){b.o.quaternion.slerp(b.q,1-weight);b.o.position.lerp(b.p,1-weight);}if(armBase.length)h.updateMatrixWorld(true);
       closeHands(v, k.map((c, i) => weight*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
@@ -1965,8 +1994,9 @@ function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, 
  * down from the shoulder, a little forward — instead of keeping the clip's arm pose, which would
  * point backwards on a torso pitched 80°. Only arms with no contact at all, from ~30° of bend.
  */
-function dangle(v: View, bend: number, contacts: number[]) {
-  const b = smooth((bend - 0.5) / 0.6); // from ~30° of bend, fully by ~63°
+const DANGLE_FROM = 0.5, DANGLE_FULL = 1.1;
+function dangle(v: View, bend: number, contacts: number[], from = DANGLE_FROM) {
+  const b = smooth((bend - from) / (DANGLE_FULL - from)); // from ~30° of bend, fully by ~63°
   if (b <= 0) return;
   v.arms.forEach((arm, i) => {
     if ((contacts[i] ?? 0) > 0) return; // touching (even partly): the reach IK owns the arm
