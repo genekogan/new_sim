@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import { dcos, dsin, type Vec3 } from '../core/math.ts';
-import { bodyFrame, lerp3, restHand, smooth } from './body.ts';
+import { bodyFrame, lerp3, smooth } from './body.ts';
 import { carryPoint, followHand } from './model.ts';
 
 const vec3 = z.tuple([z.number().finite(), z.number().finite(), z.number().finite()]);
@@ -188,7 +188,8 @@ export const watering: ActionDef<WateringParams, true, Exec> = {
     const right = goingOut ? lerp3(carry, hold, f.right) : lerp3(ex.from, hold, f.right);
     h.hands = { ...(h.hands ?? {}), right: [...right] };
     followHand(it, right, a.pose.yaw);
-    if (ex.p.valve && f.left > 1e-4) h.hands.left = [...lerp3(restHand(b, 'left'), ex.p.valve, f.left)];
+    // the free hand's point is the valve itself; the drawn arm blends to it from the clip's pose on `left` (one ease, not two)
+    if (ex.p.valve && f.left > 1e-4) h.hands.left = [...ex.p.valve];
     else delete h.hands.left;
     // 'reach': the drawn posture leans from the hips toward a low hold (a can under a tap), it does not crouch
     h.activity = 'reach';

@@ -584,7 +584,8 @@ export class HumanViews {
     const ts: Target[] = [];
     const hands = e.human?.hands;
     if (hands && (hands.left || hands.right)) {
-      if (hands.left) ts.push(toBody(hands.left[0], hands.left[1], hands.left[2], -1));
+      // Soul Actions 34: the free hand on a tap's valve (chest height) asks nothing of the body; only the can hand leans it
+      if (hands.left && !e.human?.wateringV1) ts.push(toBody(hands.left[0], hands.left[1], hands.left[2], -1));
       if (hands.right) ts.push(toBody(hands.right[0], hands.right[1], hands.right[2], 1));
     } else if (v.grip && v.gripSlot !== STATION_SLOT) {
       const part = world.entities[v.grip];
@@ -724,7 +725,7 @@ export class HumanViews {
       const free=!f.hands?.left&&!f.hands?.right&&!f.grip&&!f.on;
       const waterWeight=free?clamp01((water?targetWeight:0)+(1-targetWeight)*priorWater):0;
       const walk = SEATED.has(base) ? 0 : f.walk * (1-waterWeight);
-      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose } } as unknown as Entity;
+      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose, wateringV1: f.watering } } as unknown as Entity;
       const snap: Snap = {
         p: [...f.p],
         yaw: f.yaw,
