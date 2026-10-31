@@ -59,7 +59,7 @@ Exactly one of `agent:ready` / `needs:gene`, or neither with `status:needs-info`
 ## 4. Try a reproduction (bugs, when feasible here)
 Feasible: the bug is in a journey a local world can show. Not feasible: it needs a production world's data, a
 physical device, a GPU, a specific account, or live model calls; say so in the comment instead.
-1. Build if needed (`pnpm install --frozen-lockfile && pnpm --filter @sim/web build`).
+1. Build if needed (`pnpm install --frozen-lockfile && pnpm build`).
 2. Boot an isolated fake-mind world with the template closest to the report:
    `node tools/god-skill/dev-world.mjs triage-$N 4730 --genesis worlds/templates/<t>.json --fresh`
    (`BRAIN_MODE=fake`, dev auth, its own data dir; it prints the URL and pid).
