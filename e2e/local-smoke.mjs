@@ -255,7 +255,8 @@ export async function run(a) {
       check(st, 'expect-console', errs.length === 0, errs.length ? `${errs.length} error(s): ${errs[0].text.slice(0, 200)}` : 'no console or page errors');
       check(st, 'expect-network', reqs.length === 0, reqs.length ? `${reqs.length} failed request(s): ${reqs[0].url} ${reqs[0].error ?? reqs[0].status}` : 'no failed requests');
     };
-    const shot = async (name) => { const p = join(shots, name); await page.screenshot({ path: p }); summary.screenshots.push(rel(p)); };
+    // A screenshot waits for a fresh frame; software GL on a small CI runner can take tens of seconds for one.
+    const shot = async (name) => { const p = join(shots, name), ts = Date.now(); await page.screenshot({ path: p, timeout: 120_000 }); (summary.timings.screenshotMs ??= {})[name] = Date.now() - ts; summary.screenshots.push(rel(p)); };
 
     s = start('Open the world list');
     let from = since();
