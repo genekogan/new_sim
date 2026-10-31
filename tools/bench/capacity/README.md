@@ -49,3 +49,21 @@ node tools/bench/capacity/bench.mjs --root "$PWD" --fixture genesis:eden-2026 --
 
 `genesis:<template>` boots a fresh world from `worlds/templates/<template>.json` (no history, no real Souls), so it is
 lighter than a compact copy of the live world.
+
+## Through the launcher (`--via-launcher`)
+
+The default boots `apps/server` directly, so the launcher's proxy, its coarse flood guard and (from R1) the Soul API
+ceilings (`flood.mjs soulCeilings`) are not in the path. `--via-launcher` runs the root's own
+`tools/world-launcher/launcher.mjs` on `--port` (children on `--child-range`, default the next two ports) with its data
+dir at `<run>/launcher`: one `worlds.json` row for the fixture (slug = `--world-key`, `worldHeapMb` = `--heap-mb`,
+template of the same key), the fixture copied to `<run>/launcher/worlds/<slug>/sim.db`, `--public-origin
+http://localhost:<port>` so the launcher applies its behind-a-proxy rules as on eden2. Hostile Souls each send their own
+`X-Forwarded-For` (one address per Soul); the CLI Souls send none. The world serves the root's own `eden.mjs` (no
+`--cli`), and the launcher builds the child command, so there is no `--inspect`: heap comes from the world's
+`live.json` when it writes one, else the report shows — (RSS stays). The report adds the launcher's view per run
+(world status, restarts, refusals by code from `/__sim/health?json=1`) and the launcher's own CPU. Not yet combined
+with `--slice`.
+
+```bash
+node tools/bench/capacity/bench.mjs --root <checkout> --fixture <compact copy> --world-key eden-2026 --via-launcher --port 5153 --heap-mb 2048 --arms hostile,incident --out <dir>
+```
