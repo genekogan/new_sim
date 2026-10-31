@@ -21,6 +21,7 @@
 // event clock never fires a backlog of notes when it comes back.
 import type { WorldModel } from '@sim/world-compiler';
 import { pianoNotes } from '../../../../mars/viewer/app/engine-view/piano-score.ts';
+import { RADIO_STATIONS, stationEvents, TUNE, type RadioEvent } from './radio-stations.ts';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
 import { sharedCoverProbe, type CoverProbe } from '../world-env.ts';
@@ -120,6 +121,104 @@ function playJukeboxes(host: Host, x: number, y: number, z: number) {
     }
   }
   for (const [k, t] of jukeboxDone) if (t < now - 2) jukeboxDone.delete(k);
+}
+// Entry 37: radios a Soul works by hand. Each radio plays the station it is tuned to (radio-stations.ts: a pure function of
+// station and depicted world seconds, so everyone near it hears the same station at the same moment) through its own small
+// speaker (a band-limited channel), falling off with distance. A station change (the tuning knob's contact, depicted on the
+// Soul's clock) cross-fades through a burst of static and a sweeping whistle; power on crackles and fades in; power off is
+// silent within a tick. Radios are picked out of the emitter scan like jukeboxes; each tick reads only the known radios'
+// live `on` and `station` (a map lookup each), never a world scan.
+const RADIO_AHEAD = 0.35, RADIO_LINGER_MS = 6000, radioDone = new Map<string, number>();
+type RadioRt = { bus: GainNode; voice: AudioNode; hiss: GainNode; hissSrc: AudioBufferSourceNode; ch: Map<string, GainNode>; station: string; on: boolean; tunedAt: number; prev: string | null; quietSince: number; gain: number; tunes: number };
+const radios = new Map<string, RadioRt>();
+let radioIds = new Set<string>(), radioNear = false;
+function radiosOf(model: WorldModel, list: Emitter[]) {
+  const ids = new Set<string>();
+  for (const e of list) if (e.spec.kind === 'music' && !e.cloud) { const ent = model.entities.get(e.id), def = ent && model.resolvedDef(ent.def); if (def?.tags?.includes('radio') && !def.tags.includes('jukebox') && (def.state as Record<string, unknown> | undefined)?.station) ids.add(e.id); }
+  return ids;
+}
+function radioChannel(c: AudioContext, r: RadioRt, station: string) {
+  let g = r.ch.get(station); if (!g) { g = c.createGain(); g.gain.value = 0; g.connect(r.voice); r.ch.set(station, g); }
+  return g;
+}
+function makeRadio(c: AudioContext, station: string, on: boolean): RadioRt {
+  const bus = c.createGain(); bus.gain.value = 0; bus.connect(master!);
+  // a small cabinet speaker: no deep bass, no air, a little presence
+  const hp = filt(c, 'highpass', 190), lp = filt(c, 'lowpass', 3600), mid = c.createBiquadFilter(); mid.type = 'peaking'; mid.frequency.value = 1300; mid.gain.value = 4; mid.Q.value = 0.8;
+  hp.connect(lp).connect(mid).connect(bus);
+  const hiss = c.createGain(); hiss.gain.value = 0; const hissSrc = noise(c), hf = filt(c, 'bandpass', 2600, 0.45); hissSrc.connect(hf).connect(hiss).connect(bus);
+  const r: RadioRt = { bus, voice: hp, hiss, hissSrc, ch: new Map(), station, on, tunedAt: -1e9, prev: null, quietSince: 0, gain: 0, tunes: 0 };
+  radioChannel(c, r, station).gain.value = 1;
+  return r;
+}
+function dropRadio(id: string, r: RadioRt) { try { r.hissSrc.stop(); } catch { /* stopped */ } r.bus.disconnect(); radios.delete(id); }
+/** Static and a heterodyne whistle over a station change (radio-stations.ts TUNE), and the two channels' cross-fade. */
+function tuneRadio(c: AudioContext, r: RadioRt, from: string, to: string) {
+  const t = c.currentTime, a = radioChannel(c, r, from), b = radioChannel(c, r, to);
+  a.gain.cancelScheduledValues(t); a.gain.setValueAtTime(a.gain.value, t); a.gain.linearRampToValueAtTime(0, t + TUNE.fromOut);
+  b.gain.cancelScheduledValues(t); b.gain.setValueAtTime(0, t); b.gain.setValueAtTime(0, t + TUNE.toIn); b.gain.linearRampToValueAtTime(1, t + TUNE.toLocked);
+  const h = r.hiss.gain; h.cancelScheduledValues(t); h.setValueAtTime(h.value, t); h.linearRampToValueAtTime(0.55, t + TUNE.staticUp); h.setValueAtTime(0.55, t + TUNE.staticHold); h.linearRampToValueAtTime(0, t + TUNE.staticOut);
+  for (let i = 0; i < 9; i++) burst(c, r.bus, t + 0.04 + Math.random() * (TUNE.staticOut - 0.15), 0.012 + Math.random() * 0.02, 0.25 + Math.random() * 0.3, 1800);   // crackle
+  const o = c.createOscillator(), og = c.createGain(); o.type = 'sine';
+  o.frequency.setValueAtTime(2400, t); o.frequency.exponentialRampToValueAtTime(320, t + 0.38); o.frequency.exponentialRampToValueAtTime(1500, t + 0.72);
+  og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.05, t + 0.08); og.gain.setValueAtTime(0.05, t + 0.55); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.78);
+  o.connect(og).connect(r.bus); o.start(t); o.stop(t + 0.82);
+}
+/** Power on: a short crackle as the valves warm, and the station fades in. */
+function warmRadio(c: AudioContext, r: RadioRt) {
+  const t = c.currentTime, g = radioChannel(c, r, r.station);
+  for (const [s, ch] of r.ch) if (s !== r.station) { ch.gain.cancelScheduledValues(t); ch.gain.setValueAtTime(0, t); }
+  g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(0.05, t); g.gain.linearRampToValueAtTime(1, t + 0.3);
+  const h = r.hiss.gain; h.cancelScheduledValues(t); h.setValueAtTime(0.3, t); h.linearRampToValueAtTime(0, t + 0.3);
+}
+function radioEvent(c: AudioContext, out: AudioNode, at: number, n: RadioEvent) {
+  const f = (m: number) => 440 * 2 ** ((m - 69) / 12);
+  if (n.kind === 'key') pianoKey(c, out, at, n.midi, n.vel * 0.5);
+  else if (n.kind === 'bass') { tone(c, out, at, f(n.midi), f(n.midi), 0.42, n.vel * 0.5, 'triangle'); tone(c, out, at, f(n.midi) * 2, f(n.midi) * 2, 0.12, n.vel * 0.12, 'sawtooth'); }
+  else if (n.kind === 'lead') { tone(c, out, at, f(n.midi), f(n.midi) * 0.997, 0.26, n.vel * 0.16, 'square'); tone(c, out, at, f(n.midi), f(n.midi), 0.3, n.vel * 0.2, 'triangle'); }
+  else if (n.kind === 'kick') { tone(c, out, at, 150, 48, 0.16, n.vel * 0.55); }
+  else if (n.kind === 'snare') burst(c, out, at, 0.14, n.vel * 0.22, 1800);
+  else if (n.kind === 'hat') burst(c, out, at, 0.04, n.vel * 0.12, 6500);
+  else if (n.kind === 'syl') voiced(c, out, at, n.f0, n.dur, n.vel * 0.5, n.vowel);
+}
+/** A syllable on the air: a voiced buzz through two vowel formants (deterministic: the station's own vowel and pitch). */
+function voiced(c: AudioContext, out: AudioNode, at: number, f0: number, dur: number, peak: number, vowel: number) {
+  const vowels = [[700, 1200], [400, 2000], [300, 900], [600, 1700], [500, 1000]] as const, [a, b] = vowels[vowel % vowels.length];
+  const o = c.createOscillator(), g = c.createGain(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f0 * 1.04, at); o.frequency.linearRampToValueAtTime(f0 * 0.96, at + dur);
+  const f1 = filt(c, 'bandpass', a, 5), f2 = filt(c, 'bandpass', b, 7), mix = c.createGain(); mix.gain.value = 2.2;
+  g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(peak, at + 0.025); g.gain.setValueAtTime(peak, at + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g); g.connect(f1).connect(mix); g.connect(f2).connect(mix); mix.connect(out); o.start(at); o.stop(at + dur + 0.05);
+}
+function playRadios(host: Host, x: number, y: number, z: number) {
+  radioNear = false;
+  const now = host.worldSeconds, model = host.layer.model, wall = performance.now(); if (typeof now !== 'number' || !ctx || !master || !model) return;
+  const seen = new Set<string>();
+  if (radioIds.size) for (const e of objects) {
+    if (!radioIds.has(e.id)) continue;
+    // live state (a map lookup per radio): the emitter scan can be up to 2 s old after a hand changed it
+    const st = { ...e.state, ...model.entities.get(e.id)?.state }, on = condition(e.spec.when, st, night), station = String(st.station ?? RADIO_STATIONS[0]);
+    const g = falloff(distanceTo(e, x, y, z), e.spec.radius, e.spec.volume);
+    let r = radios.get(e.id);
+    if (!r) { if (!on || g <= 0.001) continue; r = makeRadio(ctx, station, on); radios.set(e.id, r); }
+    seen.add(e.id);
+    const t = ctx.currentTime;
+    if (station !== r.station) { if (on && r.on) { tuneRadio(ctx, r, r.station, station); r.prev = r.station; r.tunedAt = now; r.tunes++; } r.station = station; }
+    if (on && !r.on) warmRadio(ctx, r);
+    r.on = on; r.gain = on ? g : 0;
+    r.bus.gain.setTargetAtTime(r.gain, t, on ? 0.05 : 0.015);
+    if (!on || g <= 0.001) { if (!r.quietSince) r.quietSince = wall; else if (wall - r.quietSince > RADIO_LINGER_MS) dropRadio(e.id, r); continue; }
+    r.quietSince = 0; radioNear = true;
+    const playing = [r.station, ...(r.prev && now - r.tunedAt < TUNE.fromOut + 0.05 ? [r.prev] : [])];
+    for (const s of playing) {
+      const out = radioChannel(ctx, r, s);
+      for (const n of stationEvents(s, now - 0.05, now + RADIO_AHEAD)) {
+        const key = `${e.id}:${s}:${n.t}:${n.kind}`; if (radioDone.has(key)) continue; radioDone.set(key, n.t);
+        radioEvent(ctx, out, t + Math.max(0, n.t - now), n);
+      }
+    }
+  }
+  for (const [id, r] of radios) if (!seen.has(id)) dropRadio(id, r);
+  for (const [k, t] of radioDone) if (t < now - 2) radioDone.delete(k);
 }
 function bell(c: AudioContext, out: AudioNode, at: number, f = 1180, peak = 0.35) {
   for (const [m, a, d] of [[1, 1, 1.4], [2.0, 0.5, 0.9], [2.76, 0.35, 0.6], [5.4, 0.15, 0.3]] as const) tone(c, out, at, f * m, f * m * 0.995, d, peak * a);
@@ -282,7 +381,7 @@ function unlock() {
 function step(host: Host) {
   const model = host.layer.model; if (!model) return;
   const now = performance.now(), seq = (model as unknown as { editSeq?: number }).editSeq ?? -2;
-  if (now - lastScan > 2000 || seq !== lastSeq) { objects = emittersOf(model); jukeboxIds = jukeboxesOf(model, objects); if (seq !== lastSeq || now - lastScan > 10000 || !trees.count) scanWorld(model); lastScan = now; lastSeq = seq; }
+  if (now - lastScan > 2000 || seq !== lastSeq) { objects = emittersOf(model); jukeboxIds = jukeboxesOf(model, objects); radioIds = radiosOf(model, objects); if (seq !== lastSeq || now - lastScan > 10000 || !trees.count) scanWorld(model); lastScan = now; lastSeq = seq; }
   const { x, y, z } = host.camera.position;
   const ground = host.layer.groundAt?.(x, z) ?? null;
   if (now - lastAmb > 500) {
@@ -296,10 +395,10 @@ function step(host: Host) {
     ambient = ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure });
   }
   people = movement.emitters(host.residents?.() ?? [], { x, y, z, ground }, now / 1000);
-  if (!settings.muted) { playPianos(host, x, y, z); playJukeboxes(host, x, y, z); } else pianoNear = jukeboxNear = false;
+  if (!settings.muted) { playPianos(host, x, y, z); playJukeboxes(host, x, y, z); playRadios(host, x, y, z); } else { pianoNear = jukeboxNear = radioNear = false; for (const [id, r] of radios) dropRadio(id, r); }
   const heard: Heard[] = [], playlist = musicPlaying();
   for (const e of [...objects, ...ambient, ...people]) {
-    if (e.spec.kind === 'music' && jukeboxIds.has(e.id)) continue;   // a jukebox plays its song (playJukeboxes)
+    if (e.spec.kind === 'music' && (jukeboxIds.has(e.id) || radioIds.has(e.id))) continue;   // a jukebox plays its song (playJukeboxes), a radio its station (playRadios)
     if (playlist && e.spec.kind === 'music') continue;   // a world's own music things stay quiet under the playlist
     const d = e.follow ? 0 : distanceTo(e, x, y, z);
     if (e.spec.mode === 'change') {
@@ -387,6 +486,7 @@ export function startSoundLayer() {
   const w = window as unknown as { __simEntity?: Host; __edenSound?: unknown };
   w.__edenSound = {
     state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered, piano: { near: pianoNear, scheduled: pianoDone.size }, jukebox: { near: jukeboxNear, ids: jukeboxIds.size, scheduled: jukeboxDone.size },
+      radio: { near: radioNear, ids: radioIds.size, scheduled: radioDone.size, radios: [...radios].map(([id, r]) => ({ id, on: r.on, station: r.station, gain: +r.gain.toFixed(3), tunes: r.tunes, tuning: typeof w.__simEntity?.worldSeconds === 'number' && w.__simEntity.worldSeconds - r.tunedAt < TUNE.toLocked, hiss: +r.hiss.gain.value.toFixed(3) })) },
       world: { trees: trees.count, exposure: +exposure.toFixed(2), night: +night.toFixed(2), typicalGround: +typicalGround.toFixed(1) },
       emitters: [...objects, ...ambient, ...people].map((e) => ({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, when: e.spec.when ?? null, on: condition(e.spec.when, e.state, night) })),
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
@@ -410,7 +510,7 @@ export function startSoundLayer() {
   };
   (window as unknown as { __edenMusic?: unknown }).__edenMusic = { state: musicState, log: musicLog, level: musicLevel, next: nextPiece, trackSeconds: musicTrackSeconds };
   // another tab took the sound, or this one came back: act now, not on the next (throttled, when hidden) tick
-  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' }); });
+  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear || radioNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' }); });
   const gesture = () => { unlock(); musicGesture(); };
   for (const ev of ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'] as const) window.addEventListener(ev, gesture, { capture: true, passive: true });
   // lane W1: the first scan of the world's sound sources (~0.2 s at 2x CPU on Eden 2026) waits until the arrival is over.
@@ -418,7 +518,7 @@ export function startSoundLayer() {
   setInterval(() => {
     if (!arrivalOver() || !document.querySelector('.world-scene canvas')) return;
     mountUi();
-    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
+    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || jukeboxNear || radioNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
     const host = w.__simEntity; if (host?.camera && host.layer) { const t0 = performance.now(); try { step(host); } catch { /* a world mid-reload */ } cost.ticks++; cost.tickMs += performance.now() - t0; }
   }, TICK_MS);
 }

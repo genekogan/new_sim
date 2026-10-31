@@ -7,6 +7,8 @@ import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } f
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionsOf, actuatedState, thenPatch, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
+/** Entry 37: how long the hand stays on a radio's tuning knob after contact while the dial sweeps to the next station. */
+export const TUNE_HOLD_SECONDS = .9;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true };
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
@@ -27,8 +29,13 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     root=actuatorPoint(params.opening,params.opening.from).root;
    }else{
     // A def's part tinted `valve` (a tap handle) is where the hand goes; otherwise the old switch height at the centre.
+    // Entry 37: a radio's tuning knob (tinted `tuner`) is where the hand goes to change the station; she stands where she
+    // works the power knob (the `valve`), so both knobs are worked from one place, and holds the tuning knob while it turns.
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{tint?:string;at?:number[]}[]})?.shapes:undefined,valve=shapes?.find(s=>s.tint==='valve'&&s.at);
-    if(valve?.at){const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[vx,vy,vz]=valve.at.map(v=>v*wp.s);params.at=[wp.x+vx*c+vz*s,wp.y+vy,wp.z-vx*s+vz*c];}
+    const part=action==='change-station'?shapes?.find(s=>s.tint==='tuner'&&s.at)??valve:valve;
+    const placeOf=(at:number[]):[number,number,number]=>{const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[vx,vy,vz]=at.map(v=>v*wp.s);return [wp.x+vx*c+vz*s,wp.y+vy,wp.z-vx*s+vz*c];};
+    if(valve?.at)params.at=placeOf(valve.at);
+    if(part&&part!==valve&&part.at)params.hold=TUNE_HOLD_SECONDS;
     const dx=me[0]-params.at[0],dz=me[2]-params.at[2],n=Math.hypot(dx,dz)||1;root=[params.at[0]+dx/n*.5,wp.y,params.at[2]+dz/n*.5];
     if(valve?.at){
      // Stand beside the valve, clear of the thing's own footprint (a basin, a tray) by a body radius: of eight
@@ -36,9 +43,15 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
      const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[hx,,hz]=def.size.box.map(v=>v*wp.s/2),outside=(p:number[])=>{const lx=(p[0]-wp.x)*c-(p[2]-wp.z)*s,lz=(p[0]-wp.x)*s+(p[2]-wp.z)*c;return Math.abs(lx)>hx+HUMAN_RADIUS||Math.abs(lz)>hz+HUMAN_RADIUS;};
      const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).sort((p,q)=>p[3]-q[3])[0];
      if(best)root=[best[0],best[1],best[2]];
+     // Entry 37: a panel of knobs (a def with a tuning knob as well as the power knob) is worked from straight in front of
+     // the panel, centred between the knobs, from wherever the Soul comes: never from the side or a diagonal, and never a
+     // shuffle between the two knobs.
+     const tuner=shapes?.find(s=>s.tint==='tuner'&&s.at);
+     if(tuner?.at&&valve.at){const mid=placeOf(valve.at.map((v,i)=>(v+tuner.at![i])/2));root=[mid[0]+s*.55,wp.y,mid[2]+c*.55];}
      // Entry 33 (take 4): a stand point beside the valve can leave the body ~40° off the valve when it arrives (a wall
      // torch approached along its wall); the Soul turns to face the valve on arrival, before the arm comes up, so the
      // reach is never added to a body turn (the hand actuator's own turn is then ~0).
+     if(part?.at)params.at=placeOf(part.at);
      face=[params.at[0],params.at[2]];
     }}
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:{})};
@@ -46,9 +59,11 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),key=def&&contactStateKey(def);
-   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean>={};
+   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean|string>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
+   // Entry 37: a radio that is on says which station it plays ("radio: on, quiet piano"); off, only that it is off.
+   if(state.on===true&&typeof state.station==='string')facts.station=state.station;
    return facts;
   },
   prepare(soul:EdgeSoul,target:string,action:string):ContactActuatorIntent|null{
