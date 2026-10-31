@@ -31,8 +31,9 @@ export interface EdgeLedgerHooks {
   onPlaceChange(listener: (e: {soulId: string; from: string | null; to: string | null; tick: number}) => void): void;
   /** Opaque capability providers (Comms objects) are merged into capabilities. */
   /** `only`: the object ids a focused menu build names (L3); absent: every object. `places`: filled with each offered
-   *  object's place id (the listing's page ranks object offers by it). */
-  addCapabilityProvider(p: (soul: EdgeSoul, only?: ReadonlySet<string>, places?: Map<string, string>) => EdgeCapability[]): void;
+   *  object's place id (the listing's page ranks object offers by it). `projection.exactWalk`: 'objects-only' = its
+   *  offers are read-only object offers that can never replace a walk (continuity exact walk). */
+  addCapabilityProvider(p: (soul: EdgeSoul, only?: ReadonlySet<string>, places?: Map<string, string>) => EdgeCapability[], projection?: {exactWalk:'objects-only'}): void;
   /** Persist a refusal for measurement (no text from agents). */
   recordRefusal?(soulId: string, verb: string, capability: string, code: string, reason?: string): void;
   /** carrier/1: a native ride's public state, for ride objects (null when there is no such carrier). */

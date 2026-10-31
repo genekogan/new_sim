@@ -1,0 +1,317 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {mkdtempSync,lstatSync,readFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createHash} from 'node:crypto';
+import {createManagedRestartObserver,readManagedRestartSnapshot,baselineAutomaticRestartCapability} from './continuity-restart.mjs';
+
+const sha=s=>createHash('sha256').update(s).digest('hex');
+const identity=(pid,ppid,pgid,startToken=String(pid))=>({pid,ppid,pgid,startToken});
+const row=(state,controllerPid,at,extra={})=>({state,actorId:'reader-b',worldId:'world-1',soulId:'s_reader',controllerPid,at,evidence:['controller.ndjson:10'],...extra});
+function fixture(overrides={}){
+ let time=100000,current={journalIdentity:sha('original-file'),worldId:'world-1',soulId:'s_reader',checkpoint:{revision:10,at:99000,threadId:'thread-1',pendingDecision:false,wakeAt:new Date(160000).toISOString(),lastCallType:'wait',lastDecisionId:'decision-1',initialInstructionSha256:sha('mission'),planSha256:sha('private plan')},controller:{generation:1,ownerSha256:sha('owner-1'),expiresAt:115000},operations:[],startupResponseId:'startup-1'};
+ const launcher=identity(1000,999,900),controller=identity(1001,1000,900),host=identity(1100,1001,1100),tool=identity(1200,1100,1200);
+ const processes=new Map([launcher,controller,host,tool].map(p=>[p.pid,p]));const calls=[],signalled=new Set(),postProbeErrors=new Map(),postProbeDelays=new Map();let sticky=false,inspectDelay=0,denied=false,refresh=null,postDispatchDelay=0;
+ const inspect=p=>{time+=inspectDelay;return processes.get(p)??null;};
+ const kill=(target,signal)=>{
+  calls.push({target,signal,at:time});const present=target>0?processes.has(target):[...processes.values()].some(p=>p.pgid===-target);
+  if(denied&&signal===0)throw Object.assign(Error('denied'),{code:'EPERM'});
+  if(signal===0&&signalled.has(target)&&postProbeDelays.has(target)){time+=postProbeDelays.get(target);postProbeDelays.delete(target);}
+  const probe=postProbeErrors.get(target);
+  if(signal===0&&signalled.has(target)&&probe?.codes.length){const code=probe.repeatLast&&probe.codes.length===1?probe.codes[0]:probe.codes.shift();throw Object.assign(Error('private injected error text'),{code});}
+  if(!present)throw Object.assign(Error('absent'),{code:'ESRCH'});
+  if(signal==='SIGKILL'){
+   signalled.add(target);
+   if(target>0){processes.delete(target);for(const p of processes.values())if(p.ppid===target)p.ppid=1;}
+   else if(!sticky)for(const [key,p] of processes)if(p.pgid===-target)processes.delete(key);
+   if(target===-1200)time+=postDispatchDelay;
+  }
+ };
+ const ownership={actorId:'reader-b',setupId:'setup-1',worldId:'world-1',soulId:'s_reader',descendantsComplete:true,evidence:['owned-spawn-registry:1'],launcher:structuredClone(launcher),controller:structuredClone(controller),groups:[{pgid:1100,members:[structuredClone(host)]},{pgid:1200,members:[structuredClone(tool)]}]};
+ const config={actorId:'reader-b',setupId:'setup-1',journalPath:'/synthetic/continuity.sqlite',worldId:'world-1',soulId:'s_reader',originalInstructionSha256:sha('mission'),cutoffAt:200000,...overrides};
+ const observer=createManagedRestartObserver(config,{now:()=>time,readSnapshot:()=>structuredClone(current),inspectProcess:inspect,killProcess:kill,preDispatch:()=>refresh?refresh():{at:time,evidence:['synthetic-host-tail:1']}});
+ const arm=()=>{
+  observer.registerOwnership(ownership);
+  observer.observeLifecycle(row('session-created',1001,98000,{threadId:'thread-1',hostPid:1100,resumed:false}));
+  observer.observeLifecycle(row('startup-reconciled',1001,98100,{generation:1,checkpointRevision:1,threadId:'thread-1',initialInstructionSha256:sha('mission'),wakeAt:null,pendingDecision:false,unreconciledOperations:0,startupResponseId:'startup-1'}));
+  observer.observeLifecycle(row('running',1001,98200,{threadId:'thread-1'}));
+  observer.observeLifecycle(row('turn-started',1001,98500,{turnId:'turn-1'}));observer.observeLifecycle(row('turn-completed',1001,98800,{turnId:'turn-1'}));
+ };
+ const recover=({omitOwner=false}={})=>{
+  time=104000;current={...current,checkpoint:{...current.checkpoint,revision:11,at:102100},controller:{generation:2,ownerSha256:sha('owner-2'),expiresAt:119000},startupResponseId:'startup-2'};
+  const c=identity(2001,1000,900),h=identity(2100,2001,2100);processes.set(c.pid,c);processes.set(h.pid,h);
+  const owned={...ownership,controller:c,groups:[{pgid:2100,members:[h]}]};observer.registerOwnership(owned);
+  observer.observeLifecycle(row('controller-started',2001,101500));
+  observer.observeLifecycle(row('session-created',2001,102000,{threadId:'thread-1',hostPid:2100,resumed:true}));
+  observer.observeLifecycle(row('startup-reconciled',2001,102100,{generation:2,checkpointRevision:11,threadId:'thread-1',initialInstructionSha256:sha('mission'),wakeAt:current.checkpoint.wakeAt,pendingDecision:false,unreconciledOperations:0,startupResponseId:'startup-2'}));
+  observer.observeLifecycle(row('running',2001,102500,{threadId:'thread-1'}));
+  observer.observeLifecycle(row('receiver-ready',2001,103000,{source:'world',successful:true}));
+  if(!omitOwner)observer.observeLifecycle(row('receiver-ready',2001,103500,{source:'owner',successful:true}));
+ };
+ return {observer,arm,recover,calls,ownership,processes,get current(){return current;},set current(v){current=v;},setTime:n=>{time=n;},setSticky:value=>{sticky=value;},setInspectDelay:n=>{inspectDelay=n;},setDenied:value=>{denied=value;},setPreDispatch:value=>{refresh=value;},setPostProbeErrors:(target,codes,repeatLast=false)=>postProbeErrors.set(target,{codes:[...codes],repeatLast}),setPostDispatchDelay:value=>{postDispatchDelay=value;},setPostProbeDelay:(target,delay)=>postProbeDelays.set(target,delay)};
+}
+
+test('wait trigger kills exact controller then identified host/tool groups once; launcher survives',()=>{
+ const f=fixture();f.arm();const result=f.observer.tick();
+ assert.equal(result.state,'recovering');assert.equal(result.triggerAt,100000);assert.equal(result.deathAt,100000);assert.equal(result.controllerExitAt,100000);assert.equal(result.oldGroupsAbsentAt,100000);
+ assert.deepEqual(f.calls.filter(c=>c.signal==='SIGKILL').map(c=>c.target),[1001,-1100,-1200]);assert(f.processes.has(1000));
+ f.observer.tick();assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3,'no replayed disturbance');
+ assert.equal(result.before.checkpoint.initialInstructionSha256,sha('mission'));assert(!JSON.stringify(result).includes('private plan'));
+});
+
+test('explicit fresh fence/startup reconciliation and successful receivers establish actual readiness',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.recover();const result=f.observer.tick();
+ assert.equal(result.state,'ready');assert.equal(result.recoveryStartedAt,101500);assert.equal(result.readyAt,103500);assert.equal(result.recoveryLatencyMs,3500);assert.equal(result.threadResumed,true);assert.equal(result.after.journalIdentity,result.before.journalIdentity);
+ assert.equal(result.contract.cutoffAt,200000);assert.equal(result.contract.dispatcherRestarts,false);assert.equal(result.contract.baselineAssistedResume,false);
+});
+
+test('a new action before observer polling does not erase source-proved startup reconciliation or readiness',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.recover();f.current.checkpoint.revision=12;f.current.checkpoint.pendingDecision=true;f.current.operations=[{id:'new-operation',status:'dispatching',generation:2}];
+ const result=f.observer.tick();assert.equal(result.state,'ready');assert.equal(result.readyAt,103500);assert.equal(result.postStartupWork.pendingDecision,true);assert.equal(result.postStartupWork.unsettledOperations[0].id,'new-operation');
+ const g=fixture();g.arm();g.observer.tick();g.recover();g.current.checkpoint.pendingDecision=true;assert.equal(g.observer.tick().failure.code,'RESTART_STARTUP_PROOF_CONTRADICTION');
+});
+
+test('spawn/session/running alone, pre-request receiving and missing source success never mean ready',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.recover();
+ const g=fixture();g.arm();g.observer.tick();g.setTime(104000);
+ for(const state of ['controller-started','receiving'])g.observer.observeLifecycle(row(state,2001,103000));
+ assert.equal(g.observer.tick().state,'recovering');assert.equal(g.observer.finish().failure.code,'RESTART_READINESS_UNPROVEN');
+ const h=fixture();h.arm();h.observer.tick();h.observer.observeLifecycle(row('receiver-ready',2001,101000,{source:'world'}));assert.equal(h.observer.snapshot().failure.code,'RESTART_LIFECYCLE_INVALID');
+});
+
+test('only committed wait, future20s timer, no pending effects and full original cutoff margin qualify',()=>{
+ for(const change of [s=>s.checkpoint.lastCallType='listen',s=>s.checkpoint.pendingDecision=true,s=>s.checkpoint.wakeAt=null,s=>s.checkpoint.wakeAt=new Date(119999).toISOString(),s=>s.controller.expiresAt=100000,s=>s.operations.push({id:'operation-1',status:'uncertain',generation:1})]){
+  const f=fixture();change(f.current);f.arm();assert.equal(f.observer.tick().state,'watching');assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,0);assert.equal(f.observer.finish().state,'unexercised');
+ }
+ const f=fixture({cutoffAt:124999});f.arm();assert.equal(f.observer.tick().state,'watching');assert.equal(f.observer.snapshot().triggerExercised,false);
+});
+
+test('changed process birth identity/ancestry, shared groups and incomplete inventory cannot be signalled',()=>{
+ const f=fixture();f.processes.get(1001).startToken='reused';f.arm();assert.equal(f.observer.snapshot().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED');assert.equal(f.calls.length,0);
+ const g=fixture();g.ownership.groups[0].pgid=900;g.arm();assert.equal(g.observer.snapshot().failure.code,'RESTART_GROUP_UNSAFE');
+ const h=fixture();h.ownership.descendantsComplete=false;h.arm();assert.equal(h.observer.snapshot().failure.code,'RESTART_OWNERSHIP_UNPROVEN');
+ const i=fixture();i.ownership.groups[0].members[0].ppid=999;i.arm();assert.equal(i.observer.snapshot().failure.code,'RESTART_DESCENDANT_UNPROVEN');
+});
+
+test('PID reuse after registration is rechecked immediately before destructive dispatch',()=>{
+ const f=fixture();f.arm();f.processes.get(1100).startToken='replacement';assert.equal(f.observer.tick().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED');assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,0);
+});
+
+test('an old committed wait cannot trigger while a newer host turn is active or owns a different fence',()=>{
+ const f=fixture();f.arm();f.observer.observeLifecycle(row('turn-started',1001,99500,{turnId:'turn-2'}));assert.equal(f.observer.tick().state,'watching');assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,0);
+ const g=fixture();g.arm();g.current.controller.generation=2;g.current.controller.ownerSha256=sha('another-owner');assert.equal(g.observer.tick().state,'watching');assert.equal(g.calls.filter(c=>c.signal==='SIGKILL').length,0);
+});
+
+test('five-second trigger bound is rechecked after ownership inspection, before any destructive signal',()=>{
+ const f=fixture();f.arm();f.setInspectDelay(1500);const result=f.observer.tick();assert.equal(result.failure.code,'RESTART_DISPATCH_LATE');assert.equal(result.triggerExercised,false);assert.equal(result.deathAt,null);assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,0);
+});
+
+test('permission-denied group checks preserve unknown absence instead of declaring old writers gone',()=>{
+ const f=fixture();f.arm();f.setDenied(true);const result=f.observer.tick();assert.equal(result.failure.code,'RESTART_ABSENCE_UNKNOWN');assert.equal(result.state,'unknown');assert.equal(result.oldGroupsAbsentAt,null);assert.equal(result.signals[0].target,1001);
+});
+
+test('post-dispatch transient group absence errors retry without another destructive signal',()=>{
+ const f=fixture();f.setPostProbeErrors(-1100,['EPERM']);f.arm();
+ let result=f.observer.tick();assert.equal(result.state,'recovering');assert.equal(result.failure,null);assert.equal(result.controllerExitAt,100000);assert.equal(result.oldGroupsAbsentAt,null);
+ assert.deepEqual(result.absenceProbes.find(p=>p.target===-1100),{target:-1100,role:'host-or-tool-group',status:'unknown',errno:'EPERM',attempts:1,firstAt:100000,lastAt:100000,unknownCount:1,firstUnknownAt:100000,lastUnknownAt:100000,lastUnknownErrno:'EPERM'});
+ f.setTime(100026);result=f.observer.tick();assert.equal(result.state,'recovering');assert.equal(result.oldGroupsAbsentAt,100026,'first actual ESRCH proof is never backdated to SIGKILL');
+ const probe=result.absenceProbes.find(p=>p.target===-1100);assert.equal(probe.status,'absent');assert.equal(probe.errno,'ESRCH');assert.equal(probe.attempts,2);assert.equal(probe.unknownCount,1);assert.equal(probe.lastUnknownAt,100000);
+ f.recover();result=f.observer.tick();assert.equal(result.state,'ready');assert.equal(result.readyAt,103500);
+ assert.deepEqual(f.calls.filter(c=>c.signal==='SIGKILL').map(c=>c.target),[1001,-1100,-1200]);
+});
+
+test('post-dispatch controller absence is unknown until its own ESRCH despite absent groups and leader inspection',()=>{
+ const f=fixture();f.setPostProbeErrors(1001,['EPERM']);f.arm();let result=f.observer.tick();
+ assert.equal(f.processes.has(1001),false);assert.equal(result.state,'recovering');assert.equal(result.controllerExitAt,null);assert.equal(result.oldGroupsAbsentAt,null);
+ assert.equal(result.absenceProbes.find(p=>p.target===1001).status,'unknown');assert(result.absenceProbes.filter(p=>p.target<0).every(p=>p.status==='absent'));
+ f.setTime(100040);result=f.observer.tick();assert.equal(result.controllerExitAt,100040);assert.equal(result.oldGroupsAbsentAt,100040);
+ assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+});
+
+test('post-dispatch persistent unknown stays unknown at the unchanged five-second deadline',()=>{
+ const f=fixture();f.setPostProbeErrors(-1100,['EPERM'],true);f.arm();assert.equal(f.observer.tick().state,'recovering');
+ f.setTime(105000);assert.equal(f.observer.tick().state,'recovering','existing deadline remains strictly greater than five seconds');
+ f.setTime(105001);const result=f.observer.tick();assert.equal(result.state,'unknown');assert.equal(result.failure.code,'RESTART_ABSENCE_UNKNOWN');assert.equal(result.oldGroupsAbsentAt,null);assert.equal(result.readyAt,null);
+ const probe=result.absenceProbes.find(p=>p.target===-1100);assert.equal(probe.attempts,2);assert.equal(probe.unknownCount,2);assert.equal(probe.lastUnknownAt,105000);
+ const calls=f.calls.length;f.setPostProbeErrors(-1100,[]);assert.deepEqual(f.observer.tick(),result);assert.equal(f.calls.length,calls,'terminal unknown is never retroactively repaired');
+ assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+});
+
+test('post-dispatch unknown cannot obtain its first absence proof on a poll after the existing deadline',()=>{
+ const f=fixture();f.setPostProbeErrors(-1100,['EPERM']);f.arm();assert.equal(f.observer.tick().state,'recovering');
+ const probes=f.calls.filter(c=>c.signal===0).length;f.setTime(105001);const result=f.observer.tick();
+ assert.equal(result.state,'unknown');assert.equal(result.failure.code,'RESTART_ABSENCE_UNKNOWN');assert.equal(result.oldGroupsAbsentAt,null);
+ assert.equal(f.calls.filter(c=>c.signal===0).length,probes,'no new probe retries after the unknown retry budget expires');
+ assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+});
+
+test('post-dispatch unknown then present cannot obtain first absence at six seconds',()=>{
+ const f=fixture();f.setSticky(true);f.setPostProbeErrors(-1100,['EPERM']);f.arm();assert.equal(f.observer.tick().state,'recovering');
+ f.setTime(104000);let result=f.observer.tick();assert.equal(result.state,'recovering');assert.equal(result.absenceProbes.find(p=>p.target===-1100).status,'present');
+ f.processes.delete(1100);f.processes.delete(1200);const probes=f.calls.filter(c=>c.signal===0).length;
+ f.setTime(106000);result=f.observer.tick();assert.equal(result.state,'fail');assert.equal(result.failure.code,'RESTART_OLD_WRITERS_REMAIN');assert.equal(result.oldGroupsAbsentAt,null);
+ assert.equal(f.calls.filter(c=>c.signal===0).length,probes,'a newer known-present observation does not reset the first-proof deadline');
+ assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+});
+
+test('post-dispatch first observation after five seconds is unknown without earlier absence evidence',()=>{
+ const f=fixture();f.setPostDispatchDelay(5001);f.arm();const result=f.observer.tick();
+ assert.equal(result.state,'unknown');assert.equal(result.failure.code,'RESTART_ABSENCE_UNKNOWN');assert.equal(result.controllerExitAt,null);assert.equal(result.oldGroupsAbsentAt,null);assert.deepEqual(result.absenceProbes,[]);
+ assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+});
+
+test('post-dispatch synchronous absence probes crossing five seconds cannot backdate first proof',()=>{
+ const f=fixture();f.setPostProbeDelay(-1200,5001);f.arm();const result=f.observer.tick();
+ assert.equal(result.state,'unknown');assert.equal(result.failure.code,'RESTART_ABSENCE_UNKNOWN');assert.equal(result.oldGroupsAbsentAt,null);assert.equal(result.readyAt,null);
+ assert(result.absenceProbes.every(p=>p.status==='absent'));assert.equal(result.absenceProbes.find(p=>p.target===-1200).lastAt,105001);
+ assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+});
+
+test('already proved old-writer absence still permits readiness inside the original twenty-five seconds',()=>{
+ const f=fixture();f.arm();f.observer.tick();assert.equal(f.observer.snapshot().oldGroupsAbsentAt,100000);
+ f.recover({omitOwner:true});f.current.controller.expiresAt=140000;f.setTime(124999);f.observer.observeLifecycle(row('receiver-ready',2001,124999,{source:'owner',successful:true}));
+ const result=f.observer.tick();assert.equal(result.state,'ready');assert.equal(result.oldGroupsAbsentAt,100000);assert.equal(result.readyAt,124999);assert.equal(result.recoveryLatencyMs,24999);
+ assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+});
+
+test('post-dispatch error metadata is bounded and does not retain arbitrary error text',()=>{
+ const f=fixture();const privateCode='PRIVATE_ERROR_'+ 'x'.repeat(1000);f.setPostProbeErrors(-1100,[privateCode]);f.arm();const result=f.observer.tick();
+ assert.equal(result.state,'recovering');assert.equal(result.absenceProbes.length,3);assert.equal(result.absenceProbes.find(p=>p.target===-1100).errno,'UNKNOWN');
+ assert.equal(JSON.stringify(result).includes(privateCode),false);assert.equal(JSON.stringify(result).includes('private injected error text'),false);
+ assert.equal(f.observer.finish().state,'unknown');assert.equal(f.observer.snapshot().oldGroupsAbsentAt,null);
+});
+
+test('remaining/unknown old writer groups cannot be called recovered or repeatedly killed',()=>{
+ const f=fixture();f.setSticky(true);f.arm();assert.equal(f.observer.tick().state,'recovering');f.setTime(105001);assert.equal(f.observer.tick().failure.code,'RESTART_OLD_WRITERS_REMAIN');assert.equal(f.calls.filter(c=>c.signal==='SIGKILL').length,3);
+ const result=f.observer.snapshot();assert.equal(result.controllerExitAt,100000);assert.equal(result.oldGroupsAbsentAt,null);assert(result.absenceProbes.filter(p=>p.target<0).every(p=>p.status==='present'));
+});
+
+test('new thread, journal replacement and contradictory original timer cannot pass recovery',()=>{
+ for(const mutate of [s=>s.checkpoint.threadId='new-thread',s=>s.journalIdentity=sha('replaced')]){
+  const f=fixture();f.arm();f.observer.tick();f.recover();mutate(f.current);assert.equal(f.observer.tick().failure.code,'RESTART_DURABLE_IDENTITY_CHANGED');
+ }
+ const f=fixture();f.arm();f.observer.tick();f.recover();f.observer.observeLifecycle(row('startup-reconciled',2001,102100,{generation:2,checkpointRevision:11,threadId:'thread-1',initialInstructionSha256:sha('mission'),wakeAt:new Date(170000).toISOString(),pendingDecision:false,unreconciledOperations:0,startupResponseId:'startup-2'}));assert.equal(f.observer.tick().failure.code,'RESTART_STARTUP_PROOF_CONTRADICTION');
+});
+
+test('missing one successful receiver adoption remains unready; late observation retains source ready time',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.recover();f.current.controller.expiresAt=140000;f.setTime(125100);const result=f.observer.tick();assert.equal(result.state,'ready');assert.equal(result.readyAt,103500);assert.equal(result.recoveryLatencyMs,3500);
+ const g=fixture();g.arm();g.observer.tick();g.recover({omitOwner:true});assert.equal(g.observer.tick().state,'recovering');assert.equal(g.observer.finish().failure.code,'RESTART_READINESS_UNPROVEN');
+});
+
+test('recovery timeout is a capability failure; missing readiness at final stop remains unknown',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.setTime(125001);const result=f.observer.tick();assert.equal(result.state,'fail');assert.equal(result.failure.code,'RESTART_RECOVERY_TIMEOUT');
+ const g=fixture();g.arm();g.observer.tick();assert.equal(g.observer.finish().state,'unknown');
+ const baseline=baselineAutomaticRestartCapability();assert.equal(baseline.status,'fail');assert.equal(baseline.supported,false);assert.equal(baseline.triggerExercised,false);assert.equal(baseline.assistedResume,false);
+});
+
+test('a launcher exit after death and before readiness is named at once; before death, after ready or at cutoff it changes nothing',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.setTime(101000);const result=f.observer.launcherExited({exit:{code:1,signal:null},failureCode:'not a code;'});
+ assert.equal(result.state,'fail');assert.equal(result.failure.code,'RESTART_LAUNCHER_ENDED_BEFORE_READY');assert.equal(result.failure.at,101000);assert.deepEqual(result.launcherEnded,{at:101000,beforeCutoff:true,code:1,signal:null,failureCode:null});
+ const g=fixture();g.arm();assert.equal(g.observer.launcherExited({exit:{code:0}}).launcherEnded,null);assert.equal(g.observer.finish().state,'unexercised');
+ const h=fixture();h.arm();h.observer.tick();h.recover();assert.equal(h.observer.tick().state,'ready');assert.equal(h.observer.launcherExited({exit:{code:0}}).state,'ready');
+ const late=fixture({cutoffAt:130000});late.arm();late.observer.tick();late.setTime(130001);const after=late.observer.launcherExited({exit:{code:null,signal:'SIGTERM'}});assert.equal(after.failure,null);assert.equal(after.launcherEnded.beforeCutoff,false);assert.equal(late.observer.tick().failure.code,'RESTART_RECOVERY_TIMEOUT');
+});
+
+test('terminal measurement never rearms or changes an already proved outcome on later runtime events',()=>{
+ const f=fixture();f.arm();f.observer.tick();f.recover();f.observer.tick();const before=f.observer.snapshot();f.observer.observeLifecycle(row('startup-reconciled',2001,104000,{initialInstructionSha256:'unsafe'}));f.observer.registerOwnership({});assert.deepEqual(f.observer.tick(),before);
+ const g=fixture();g.observer.finish();g.arm();assert.equal(g.observer.tick().state,'unexercised');assert.equal(g.calls.filter(c=>c.signal==='SIGKILL').length,0);
+});
+
+test('read-only journal snapshot is bounded, scoped and hashes private intent without migrations',t=>{
+ const directory=mkdtempSync(join(tmpdir(),'continuity-restart-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));const path=join(directory,'continuity.sqlite');const db=new DatabaseSync(path);
+ db.exec("CREATE TABLE identity(singleton INTEGER PRIMARY KEY,world TEXT,soul TEXT);CREATE TABLE checkpoint(singleton INTEGER PRIMARY KEY,revision INTEGER,payload TEXT,at INTEGER);CREATE TABLE controller(singleton INTEGER PRIMARY KEY,owner TEXT,generation INTEGER,expires_at INTEGER);CREATE TABLE operations(id TEXT,status TEXT,generation INTEGER,at INTEGER);CREATE TABLE startup_response_v1(singleton INTEGER PRIMARY KEY,id TEXT);");
+ db.prepare('INSERT INTO identity VALUES(1,?,?)').run('world-1','s_reader');db.prepare('INSERT INTO checkpoint VALUES(1,1,?,99000)').run(JSON.stringify({threadId:'thread-1',initialInstruction:'SECRET_PRIVATE_MISSION',plan:'SECRET_PRIVATE_PLAN',lastCall:{type:'wait'},wakeAt:new Date(160000).toISOString(),pendingDecision:null,lastDecisionId:'decision-1'}));db.prepare('INSERT INTO controller VALUES(1,?,1,115000)').run('owner-1');db.exec("INSERT INTO startup_response_v1 VALUES(1,'startup-1')");db.close();
+ const bytes=readFileSync(path),before=lstatSync(path);const result=readManagedRestartSnapshot(path);const after=lstatSync(path);
+ assert.equal(result.worldId,'world-1');assert.equal(result.checkpoint.initialInstructionSha256,sha('SECRET_PRIVATE_MISSION'));assert(!JSON.stringify(result).includes('SECRET_PRIVATE'));assert.equal(after.ino,before.ino);assert.deepEqual(readFileSync(path),bytes);
+ const check=new DatabaseSync(path,{readOnly:true});assert.equal(check.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='table'").get().n,5);check.close();
+});
+
+
+test('real initial journal without a decision plan stays observable until a committed wait',t=>{
+ const directory=mkdtempSync(join(tmpdir(),'continuity-startup-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));const path=join(directory,'continuity.sqlite');const db=new DatabaseSync(path);t.after(()=>db.close());
+ db.exec("CREATE TABLE identity(singleton INTEGER PRIMARY KEY,world TEXT,soul TEXT);CREATE TABLE checkpoint(singleton INTEGER PRIMARY KEY,revision INTEGER,payload TEXT,at INTEGER);CREATE TABLE controller(singleton INTEGER PRIMARY KEY,owner TEXT,generation INTEGER,expires_at INTEGER);CREATE TABLE operations(id TEXT,status TEXT,generation INTEGER,at INTEGER);CREATE TABLE startup_response_v1(singleton INTEGER PRIMARY KEY,id TEXT);");
+ db.exec("INSERT INTO identity VALUES(1,'world-1','s_reader');INSERT INTO controller VALUES(1,'owner-1',1,115000);INSERT INTO startup_response_v1 VALUES(1,'startup-1');");
+ const startup={threadId:'thread-1',initialInstruction:'mission'};
+ db.prepare('INSERT INTO checkpoint VALUES(1,1,?,99000)').run(JSON.stringify(startup));
+ const initial=readManagedRestartSnapshot(path);assert.equal(initial.checkpoint.planSha256,null);assert.equal(initial.checkpoint.lastCallType,null);
+ const f=fixture();f.current=initial;f.arm();assert.equal(f.observer.tick().state,'watching');assert.equal(f.calls.length,0);
+ const wait={...startup,plan:'private plan',lastCall:{type:'wait'},wakeAt:new Date(160000).toISOString(),lastDecisionId:'decision-1',pendingDecision:null};
+ const save=value=>db.prepare('UPDATE checkpoint SET revision=2,payload=?').run(JSON.stringify(value));
+ save(wait);f.current=readManagedRestartSnapshot(path);assert.equal(f.observer.tick().triggerExercised,true);
+ for(const invalid of [{...wait,plan:undefined},{...startup,plan:null},{...startup,pendingDecision:{id:'decision-1'}},{...startup,wakeAt:wait.wakeAt}]){
+  save(invalid);assert.throws(()=>readManagedRestartSnapshot(path),{code:'RESTART_CHECKPOINT_INVALID'});
+ }
+});
+
+test('pre-dispatch refresh after process validation rejects a newly active host turn',()=>{
+ const f=fixture();f.arm();f.setPreDispatch(()=>{f.observer.observeLifecycle(row('turn-started',1001,100000,{turnId:'urgent-new-turn'}));return {at:100000,evidence:['host-tail:99']};});
+ const result=f.observer.tick();assert.equal(result.failure.code,'RESTART_TRIGGER_CHANGED');assert.equal(result.triggerExercised,false);assert.equal(result.dispatchAttempted,false);assert.equal(f.calls.some(c=>c.signal==='SIGKILL'),false);assert.match(result.preDispatchObservation.semantics,/not atomic/);
+});
+test('fresh checkpoint changes and malformed/asynchronous refresh cannot dispatch a stale wait',()=>{
+ for(const mode of ['checkpoint','async','bad-host-proof']){
+  const f=fixture();f.arm();f.setPreDispatch(()=>{
+   if(mode==='async')return Promise.resolve({at:100000,evidence:['host-tail:99']});
+   if(mode==='checkpoint')f.current={...f.current,checkpoint:{...f.current.checkpoint,revision:11,lastDecisionId:'new-decision'}};
+   else f.observer.observeLifecycle(row('turn-completed',1001,100000,{turnId:'unobserved-start'}));
+   return {at:100000,evidence:['host-tail:99']};
+  });
+  const result=f.observer.tick();assert.equal(result.triggerExercised,false);assert.equal(result.dispatchAttempted,false);assert.equal(f.calls.some(c=>c.signal==='SIGKILL'),false);
+ }
+});
+test('successful dispatch records the refreshed sampled boundary without an atomic-idle claim',()=>{
+ const f=fixture();f.arm();f.observer.tick();const sample=f.observer.snapshot().preDispatchObservation;assert.equal(sample.sampledAt,100000);assert.equal(sample.hostTailRefreshedAt,100000);assert.equal(sample.checkpointRevision,10);assert.deepEqual(sample.evidence,['synthetic-host-tail:1']);assert.match(sample.semantics,/not atomic/);
+});
+
+// reading-candidate-9 (c9-review-local/REVIEW.md): a short-lived host-group
+// child enumerated by `ps -g` exited before the observer's `ps -p` re-check.
+const withShortLivedMember=f=>{const child=identity(1101,1100,1100);f.ownership.groups[0].members.push(child);return child;};
+
+test('a non-leader group member that exits between enumeration and validation is a stale snapshot entry, not an identity change',()=>{
+ const f=fixture();withShortLivedMember(f);f.arm();
+ const registered=f.observer.snapshot();
+ assert.equal(registered.failure,null);assert.equal(registered.state,'watching');
+ assert.equal(registered.staleMembers.count,1);assert.deepEqual(registered.staleMembers.recorded[0],{phase:'registration',at:100000,pid:1101,ppid:1100,pgid:1100,startToken:'1101'});
+ const result=f.observer.tick();
+ assert.equal(result.state,'recovering');assert.deepEqual(f.calls.filter(c=>c.signal==='SIGKILL').map(c=>c.target),[1001,-1100,-1200],'whole groups are still killed');
+ assert.deepEqual(result.oldOwnership.groups[0].members.map(m=>m.pid),[1100,1101],'the registered inventory is kept unchanged');
+ f.observer.tick();assert.equal(f.observer.snapshot().staleMembers.count,1,'one note per stale identity');
+ f.recover();assert.equal(f.observer.tick().state,'ready');
+});
+
+test('a non-leader member that exits after registration is skipped at the pre-dispatch recheck; the kill still requires ESRCH for leader and group',()=>{
+ const f=fixture();withShortLivedMember(f);f.processes.set(1101,identity(1101,1100,1100));f.arm();
+ assert.equal(f.observer.snapshot().staleMembers.count,0);f.processes.delete(1101);
+ const result=f.observer.tick();assert.equal(result.state,'recovering');assert.equal(result.staleMembers.recorded[0].phase,'pre-dispatch');
+ assert.deepEqual(f.calls.filter(c=>c.signal==='SIGKILL').map(c=>c.target),[1001,-1100,-1200]);
+ const g=fixture();withShortLivedMember(g);g.processes.set(1101,identity(1101,1100,1100));g.setSticky(true);g.arm();g.processes.delete(1101);g.observer.tick();g.setTime(105001);
+ assert.equal(g.observer.tick().failure.code,'RESTART_OLD_WRITERS_REMAIN','surviving group members still block an absence proof');
+});
+
+test('leader identity changes and present non-leader mismatches still fail closed',()=>{
+ const cases={
+  'group leader exited':f=>f.processes.delete(1100),
+  'group leader reused':f=>{f.processes.get(1100).startToken='reused';},
+  'controller reused':f=>{f.processes.get(1001).startToken='reused';},
+  'controller moved group':f=>{f.processes.get(1001).pgid=901;},
+  'launcher exited':f=>f.processes.delete(1000),
+  'launcher reused':f=>{f.processes.get(1000).startToken='reused';},
+  'present member reused':f=>{f.processes.set(1101,identity(1101,1100,1100,'reused'));},
+  'present member moved group (setpgid)':f=>{f.processes.set(1101,identity(1101,1100,1300));},
+  'present member reparented':f=>{f.processes.set(1101,identity(1101,1,1100));},
+ };
+ for(const [name,mutate]of Object.entries(cases)){
+  const f=fixture();withShortLivedMember(f);mutate(f);f.arm();
+  assert.equal(f.observer.snapshot().failure?.code,'RESTART_PROCESS_IDENTITY_CHANGED',name);assert.equal(f.calls.length,0,name);
+ }
+ const g=fixture();withShortLivedMember(g);g.arm();g.processes.delete(1100);
+ assert.equal(g.observer.tick().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED','leader exit before dispatch');assert.equal(g.calls.filter(c=>c.signal==='SIGKILL').length,0);
+});
+
+test('a stale parent of a retained member and an all-stale leaderless group fail closed',()=>{
+ const f=fixture();withShortLivedMember(f);const grandchild=identity(1102,1101,1100);f.ownership.groups[0].members.push(grandchild);f.processes.set(1102,structuredClone(grandchild));f.arm();
+ assert.equal(f.observer.snapshot().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED');
+ const g=fixture();const orphan=identity(1201,1100,1200);g.ownership.groups[1].members=[orphan];g.arm();
+ assert.equal(g.observer.snapshot().failure.code,'RESTART_PROCESS_IDENTITY_CHANGED');assert.equal(g.calls.length,0);
+});

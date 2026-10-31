@@ -327,3 +327,32 @@ one scripted request, one shot, and tears down (≈ 2 min; run manually).
   builds the overlay from sim.eden.art URLs, and `provision.mjs` finds it beside the server root (`../mars-web`).
 - `tools/playtest/frozen/frozen.json` (`playtest.mjs freeze-bundle`) carries the frozen scenarios and baseline measures
   so `replay-set` runs without the run folders. `cloud/run-replay.sh` is the one-shot runner; see `cloud/README.md`.
+
+## 9d. Request ceilings on local test worlds (release 402, LOAD-CONTRACT v1 §2b; 2026-10-31, continuity-on-402)
+
+How callers launch test worlds: exactly as `arena/provision.mjs` `startWorld` does, `node apps/server/src/main.ts` directly
+on `127.0.0.1:<port>` with the release defaults. Set no load variables: no `SIM_ADMISSION`, `SIM_FLOOD`, `SIM_LOAD_*` or
+`SIM_WAKING_LIMIT`. The world then admits like production, and a test world measures what the live one does. What applies there:
+
+- **No per-address limit.** The world's flood guard (`apps/server/src/flood.ts`) and the launcher's address ceilings
+  (`tools/world-launcher/flood.mjs` `SOUL_CEILINGS.ipPer10s/ipConcurrent/ipListen`) both key on `x-forwarded-for`, which
+  only Caddy sets. A caller on 127.0.0.1 is never limited by address.
+- **No listener caps.** `soulListen` 4 / `accountListen` 12 / `ipListen` 8 (R2) are launcher ceilings. A world started
+  directly has none. Long-polls and streams (`/v1/edge/wait`, `/v1/edge/inbox/listen`, `/v1/edge/events`) are C0 in the
+  world and are never queued or refused.
+- **In-world admission (L2) stays on.** It allows one heavy (C1/C2) request in flight per Soul token. A second one at
+  once gets `429 soul.busy` with Retry-After 1. Twenty such overlaps in a minute, or the CPU budget overrun three times,
+  give that Soul 60 s of `soul.slow-down`, its acts included. A driver must therefore keep one heavy request in flight per
+  Soul. Harness observation goes through the owner and public routes (`arena/owner.mjs`), which the admission does not count.
+- Measured on a copy of the r9 bandstand Eden 2026 DB, 6 Souls, laptop 2. Each Soul held an SSE events stream, a wait
+  long-poll and an inbox listen (18 held in all) and ran sequential here/observe/capabilities reads, about 1.5 a second
+  per Soul, for 60 s, alongside the public Soul reads. All 538 heavy reads and all held requests were answered 200. Two
+  concurrent `here` reads per Soul gave 5 `soul.busy` out of 12. Evidence:
+  `<team>/scratch/continuity-20261029/on-402-warm-measure-20261031/run-limits/`.
+- **Only when a test world runs behind the launcher**, with Souls that share one owner account, raise that world's account
+  ceilings, never the address ones. Use the registry `limits` in worlds.json, or
+  `op.mjs set-limits --port <launcher port> --slug <slug> --limits '{"accountListen":24,"accountHeavyPerMin":600,"worldBudgetRps":30}'`.
+  At 3 held per Soul plus a thin `listen`, five Souls on one account pass `accountListen` 12. The default 120 heavy a
+  minute per account is about 24 per Soul.
+- A `429 client.rate` / `soul.busy` / `account.rate` from our own driver means a ceiling is working, not a server bug.
+  Fix the driver.

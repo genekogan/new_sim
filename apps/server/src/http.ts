@@ -1,3 +1,4 @@
+import {mountSoulRuntimePublication} from './soul-runtime-publication.ts';
 import {mountContextViews} from './god/context-views.ts';
 import {AutoPortraits} from './portrait/auto-portraits.ts';
 import {SoulProfiles} from './soul-profile.ts';
@@ -97,7 +98,7 @@ export function buildApp(d: Deps) {
   // Travel (M3, travel/): a Soul whose body is in another world acts there; here only its travel calls answer.
   let travel: Travel | undefined;
   const travelGate = (resolve: ReturnType<typeof edgeSoulResolver>) => (c: Context) => { const s = resolve(c), t = travel?.inc(s.soulId); if (t && (t.state === 'away' || t.state === 'departing')) throw new EdgeError(409, t.state === 'away' ? 'travel.away' : 'travel.departing', `${s.name} is ${t.state === 'away' ? 'in' : 'on the way to'} ${t.at}: act there, or travel home (POST /v1/edge/travel {"to":"home"})`); return s; };
-  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: travelGate(edgeSoulResolver(d.host, d.souls, bearer)), ledger: d.edge, ownerInbox, ownerSoul: async (c, id) => { try { const {u} = await profileIdentity(c); const s = ownSoul(u, id); return {soulId: s.id, entityId: s.entity_id, name: s.name, owner: s.owner}; } catch (e) { if (e instanceof ApiError) throw new EdgeError(e.status, e.code, e.message); throw e; } } }); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); d.load?.monitor.register('eyes', l => comms.eyes.setLoadLevel(l)); d.hub?.joinMessages?.push(() => comms.spectatorJoin()); d.hub?.upgradeHandlers?.push((req, socket, head) => comms.events.upgrade(req, socket, head)); }
+  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: travelGate(edgeSoulResolver(d.host, d.souls, bearer)), ledger: d.edge, ownerInbox, ownerSoul: async (c, id) => { try { const {u} = await profileIdentity(c); const s = ownSoul(u, id); return {soulId: s.id, entityId: s.entity_id, name: s.name, owner: s.owner}; } catch (e) { if (e instanceof ApiError) throw new EdgeError(e.status, e.code, e.message); throw e; } } }, {evidenceCapture:process.env.SIM_CONTINUITY_EVIDENCE_CONFIG?{configPath:process.env.SIM_CONTINUITY_EVIDENCE_CONFIG,devAuth:d.auth.devAuth,bindHost:d.cfg.host}:undefined}); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); d.load?.monitor.register('eyes', l => comms.eyes.setLoadLevel(l)); d.hub?.joinMessages?.push(() => comms.spectatorJoin()); d.hub?.upgradeHandlers?.push((req, socket, head) => comms.events.upgrade(req, socket, head)); }
   if (d.edge && d.god) {
     const comms = (d.edge as unknown as {comms?: {fading?: ConstructorParameters<typeof Travel>[0]['fading']}}).comms, god = d.god;
     travel = new Travel({ host: d.host, db: d.db, souls: d.souls, fading: comms?.fading ?? null, slug: d.cfg.worldKey, name: process.env.WORLD_NAME?.slice(0, 60) || d.cfg.worldKey,
@@ -264,6 +265,7 @@ export function buildApp(d: Deps) {
   });
   app.get('/eden-agent.mjs', c => { if (!d.cfg.cliFile) throw new ApiError(404, 'not-found', 'no agent CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.cliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'agent CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });
   app.get('/eden.mjs', c => { if (!d.cfg.controllerCliFile) throw new ApiError(404, 'not-found', 'no controller CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.controllerCliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'controller CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });
+  mountSoulRuntimePublication(app,()=>d.cfg.controllerCliFile);
   app.get('/v1/skill.md', skill);
   // Selected-world text producer, before the SPA fallback. Origin/prefix come
   // from approved server configuration, never forwarded or caller headers.

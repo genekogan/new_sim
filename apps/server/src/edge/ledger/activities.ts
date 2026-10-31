@@ -116,6 +116,8 @@ export type ActivityWorld = {
   placeName(id: string | undefined): string | null;
   /** Place ids containing a spot's place (for read:<place> on the building as well as the room). */
   ancestors(id: string): string[];
+  /** READ-DISPLACEMENT: the outline of the innermost room (an enclosed or `room` place) holding a point on a level, if any. */
+  room?(at: V2, level: number): V2[] | null;
   /** CN5: how many bodies are playing (or waiting to play) in this game group now. */
   groupSize(group: string): number;
   /** leisure: the world clock now (null/absent: this world keeps no day), for stargazing after dark. */
@@ -192,7 +194,14 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   const readAt = (s: Spot): Program['steps'] => {
     // Omitted shelf levels mean ground. Fetch starts on the body's current floor; return starts on the reading spot's
     // floor, which may differ. A plain walk_to would otherwise retain that upper floor when targeting a ground shelf.
-    const shelf = shelfNear(s.at), browse = (sec: number, from: number) => shelf ? [walk(shelfStand(shelf)!, shelf.level ?? 0, from), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
+    // READ-DISPLACEMENT (continuity C13): each browse walk is `free: 'goal/1'` (engine freeGoalV1): when it begins with
+    // another body on the shelf point it ends at a free point within 1.5 m in the shelf's own room (`freeWithin`), or the
+    // browse happens where the reader stands; a bystander is never moved
+    const shelf = shelfNear(s.at), browseWalk = (from: number) => {
+      const to = shelfStand(shelf!)!, st = walk(to, shelf!.level ?? 0, from), room = w.room?.(to, shelf!.level ?? 0);
+      return {...st, params: {...st.params, free: 'goal/1', ...(room ? {freeWithin: room.map(v => [v[0], v[1]])} : {})}};
+    };
+    const browse = (sec: number, from: number) => shelf ? [browseWalk(from), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
     const reading = spotSteps({...s, level: s.level ?? 0}, undefined, s.activity, shelf ? shelf.level ?? 0 : w.level);
     return [...standFirst(w), ...browse(4, w.level ?? 0), ...reading.filter(x => x.verb !== 'stand'), ...(s.seat && shelf ? [{verb: 'stand', params: {}}] : []), ...browse(3, s.level ?? 0)];
   };

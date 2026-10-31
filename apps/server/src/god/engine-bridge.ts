@@ -21,6 +21,7 @@ import { reachProviders, seatProviders, syncProviders, usesProviders, type Reach
 import { GodNav } from './nav.ts';
 import { hasStraightLandings, railRaster } from './rail-raster.ts';
 import { tokenHit } from '../edge/ledger/vocabulary.ts';
+import {outdoorRegionExclusions} from '../edge/ledger/region-arrival.ts';
 import { doorInGap, freeDoorOpening, isDoorDef, isShut } from './doors.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
@@ -261,8 +262,12 @@ export class EngineBridge {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.readSide = !!o.read; const R = this.readSide; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     this.initialEngine = this.host.engine;
     engineBridges.set(this.god.model, this);
-    this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
-    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
+    this.nav = new GodNav({ model: this.god.model, serviceStandingPoints: () => this.activitySpots?.serviceStandingPoints(), outdoorRegionExclusions: ref => {const id = this.places.forRef(ref)?.id;return this.edge && id ? outdoorRegionExclusions(this.edge.places, id) : undefined;}, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), authoredPlaceRef: id => {
+      if(!this.edge||!this.places.walkable(id))return undefined;
+      const ref=(this.edge.places.byId.get(id) as {ref?:unknown}|undefined)?.ref;
+      return typeof ref==='string'&&this.places.forRef(ref)?.id===id?ref:undefined;
+    }, calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
@@ -1564,21 +1569,57 @@ export class EngineBridge {
     L.nativeUseRefusal = (capability, steps) => priorUseRefusal?.(capability, steps) ?? this.bedUseRefusal(capability, steps);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
     L.placeWalkable = (id) => this.readSide ? this.readWalkable.has(id) : this.places.walkable(id);
-    // a far named place asked for by name ("go to the big top" from across town): its walk, offered for that act only
-    L.gaitOnDemand = (soul, id, gait, caps, plans) => { let added = false; try { const go = () => { added = this.nav.gaitOnDemand(soul, id, gait, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`gait on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
-    L.walkOnDemand = (soul, id, caps, plans) => { let added = false; try { const go = () => { added = this.nav.walkOnDemand(soul, id, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`walk on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
-    // RESOLVE: a named thing beyond the listing (the horse, a boat), a building's floor ("go upstairs"), and the words of
-    // named things for reading a misspelt name; offered for that resolution only, like walkOnDemand
+    // On-demand plans are appended after the full profile's layer pass. Apply
+    // the same admission to just those new offers, with no economy enumeration.
+    // Keep blocked offers and the builder's result: resolution must report that
+    // exact refusal rather than silently try another destination.
     const pass = <T>(what: string, f: () => T, none: T): T => { let out = none; try { const go = () => { out = f(); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`${what}: ${(e as Error).message}`); } releaseBigScratch(); return out; };
-    L.thingOnDemand = (soul, ask, caps, plans) => pass('thing on demand', () => this.nav.thingOnDemand(soul, ask, caps, plans, tokenHit), null);
-    L.walkRefOnDemand = (soul, ref, caps, plans) => pass('walk ref on demand', () => this.nav.walkRefOnDemand(soul, ref, caps, plans), false);
-    L.floorOnDemand = (soul, q, caps, plans) => pass('floor on demand', () => this.nav.floorOnDemand(soul, q, caps, plans, tokenHit), null);
+    const offer = <T>(what:string,soul:EdgeSoul,caps:EdgeCapability[],plans:Parameters<GodNav['walkOnDemand']>[3],f:()=>T,none:T):T => pass(what,()=>{
+      const start=caps.length;
+      try {
+        const out=f();
+        if(caps.length>start&&this.layers.active())this.layers.capabilities(soul,caps.slice(start),plans as never,null);
+        return out;
+      } catch(error) {
+        // A failed admission pass cannot leave an unmasked offer reachable by
+        // the resolver's later exact-ID or vocabulary fallback.
+        for(const c of caps.splice(start))plans.delete(c.id);
+        throw error;
+      }
+    },none);
+    // A far named place asked for by name, by exact ID/ref, as a floor or
+    // a named thing gets one ordinary offer with the same layer admission.
+    L.gaitOnDemand = (soul,id,gait,caps,plans) => offer('gait on demand',soul,caps,plans,()=>this.nav.gaitOnDemand(soul,id,gait,caps,plans),false);
+    L.walkOnDemand = (soul,id,caps,plans) => offer('walk on demand',soul,caps,plans,()=>this.nav.walkOnDemand(soul,id,caps,plans),false);
+    L.thingOnDemand = (soul,ask,caps,plans) => offer('thing on demand',soul,caps,plans,()=>this.nav.thingOnDemand(soul,ask,caps,plans,tokenHit),null);
+    L.walkRefOnDemand = (soul,ref,caps,plans) => offer('walk ref on demand',soul,caps,plans,()=>this.nav.walkRefOnDemand(soul,ref,caps,plans),false);
+    L.floorOnDemand = (soul,q,caps,plans) => offer('floor on demand',soul,caps,plans,()=>this.nav.floorOnDemand(soul,q,caps,plans,tokenHit),null);
     L.floorsNear = (at, radius) => pass('floors near', () => this.floorsNear(at, radius), []);
     L.thingAt = (id) => { const t = this.nav.thingById(id); return t ? [t.at[0], t.at[1]] : null; };
     L.thingWords = () => pass('thing words', () => this.nav.thingWords(), [] as string[]);
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
+    L.exactAuthoredWalkRef=ref=>this.nav.exactPlaceWalkRef(ref);
+    // Match resolveOnDemand's exact place-ID precedence, before its by-ref
+    // fallback. A colliding native/authored place ID must keep full resolution.
+    const exactAreaPlace=(ref:string)=>[ref,'g-'+ref].find(id=>L.places.byId.has(id));
+    L.exactAuthoredAreaWalkRef=ref=>{const id=exactAreaPlace(ref);return !!id&&this.places.forRef(ref)?.of==='area'&&this.nav.exactAreaWalkRef(ref,id);};
+    L.registerExactWalkProfile(L.worldProfile,prev,(soul,asked,caps,plans)=>{
+      let selected=false;
+      const read=()=>{
+        // Native bindings/profile precede GodNav exactly as in the full list.
+        const ref=asked.slice(5),areaPlace=exactAreaPlace(ref);
+        selected=caps.some(c=>c.id===asked)||this.nav.exactListedWalk(soul,ref,caps,plans)
+          || (!!areaPlace&&L.exactAuthoredAreaWalkRef!(ref)&&this.nav.exactAreaWalkOnDemand(soul,ref,areaPlace,caps,plans));
+        if(!selected)return;
+        const me=this.engine.world.entities[soul.entityId];
+        if(this.layers.active())this.layers.capabilities(soul,caps,plans as never,me?[me.pose.p[0],me.pose.p[2]]:null);
+      };
+      const eng=this.engine as unknown as {readPassV1?:(f:()=>void)=>void};
+      try{if(eng.readPassV1)eng.readPassV1(read);else read();}finally{releaseBigScratch();}
+      return selected;
+    });
     if (this.readSide) return;   // a worker never acts: main does
     const act = L.act.bind(L), self = this;
     (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {

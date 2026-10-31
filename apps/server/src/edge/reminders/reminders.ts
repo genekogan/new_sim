@@ -61,6 +61,13 @@ export class PersonalReminders{
   const rows=this.db.prepare(`SELECT * FROM edge_personal_reminders_v1 WHERE world_id=? AND soul_id=? ${predicate} AND id>? ORDER BY id LIMIT 101`).all(...args,after??'') as Row[];
   return {items:rows.slice(0,100).map(r=>this.view(r)),total,nextCursor:rows.length>100?rows[99].id:null,order:'id'};
  }
+ /** Durable readback, including delivered/cancelled reminders, without replaying create. */
+ byClientRef(soulId:string,clientRef:string){
+  if(!/^[A-Za-z0-9._:-]{1,100}$/.test(clientRef))throw error('reminder.invalid','Use the original stable clientRef.');
+  const row=this.db.prepare('SELECT * FROM edge_personal_reminders_v1 WHERE world_id=? AND soul_id=? AND client_ref=?').get(this.worldId,soulId,clientRef) as Row|undefined;
+  if(!row)throw error('not-found','No retained personal reminder with this clientRef.',404);
+  return {reminder:this.view(row)};
+ }
  cancel(soulId:string,id:string){
   if(!ID.test(id))throw error('not-found','No such personal reminder.',404);
   return tx(this.db,()=>{const row=this.own(soulId,id);if(!row)throw error('not-found','No such personal reminder.',404);

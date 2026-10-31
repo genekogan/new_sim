@@ -10,7 +10,8 @@ const SEARCH_SLICE_MS=8;
 /** Load lane L4: one `[l4] punt search …` line a minute (ms spent, slices, searches finished, misses). */
 const STATS=process.env.SIM_L4_STATS==='1';
 
-export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:string)=>void=()=>{}){
+/** `onInstalled` runs after an install run that added at least one punt (and published its ride). */
+export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:string)=>void=()=>{},onInstalled?:()=>void){
   const current=()=>host.engine as typeof host.engine&{puntCandidatesV1?():CarrierInstallSpec[];puntCandidatesJobV1?():SearchJob;carriers?():{id:string;def:string;label:string;state:{bank?:{door:number[]}}}[];staticEpochV1?():number};
   if(!current().puntCandidatesV1)return {close(){}};
   /** What a finished search depends on: the water source, the static epoch and which punts exist. */
@@ -35,9 +36,9 @@ export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:s
     // Host owns sequencing and durable publication. Never mutate engine entities from a presentation hook.
     // Both host preview and engine fold still validate against live geometry after this speculative search.
     let refused=false;
-    void (async()=>{for(const spec of missing){if(closed||host.engine!==engine)break;try{await host.installCarrierV1(spec);log(`rowing punt installed: ${spec.id}`);}catch(error){refused=true;log(`rowing punt refused: ${error instanceof Error?error.message:String(error)}`);}}if(host.engine===engine)publish();
+    void (async()=>{let added=0;for(const spec of missing){if(closed||host.engine!==engine)break;try{await host.installCarrierV1(spec);added++;log(`rowing punt installed: ${spec.id}`);}catch(error){refused=true;log(`rowing punt refused: ${error instanceof Error?error.message:String(error)}`);}}if(host.engine===engine)publish();
       // a refused install is retried later and later (1, 2, 4 … 20 min) while the statics stay the same; none refused: settled
-      if(refused){refusals++;retryAt=engine.world.tick+Math.min(20*60*20,20*60*2**(refusals-1));}else{settled=keyOf(engine);refusals=0;}})()
+      if(refused){refusals++;retryAt=engine.world.tick+Math.min(20*60*20,20*60*2**(refusals-1));}else{settled=keyOf(engine);refusals=0;}if(added&&!closed)onInstalled?.();})()
       .finally(()=>{busy=false;});
   };
   const reconcile=()=>{

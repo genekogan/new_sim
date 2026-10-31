@@ -47,6 +47,8 @@ export interface MenuWorld {
   placeLevelV1?(level: number): number;
   bodyUsesV1?(id: string): {body: string; how: 'occupied' | 'held'} | null;
   seatOccupantsV1?(id: string, kind?: string): {slot: string; body: string}[];
+  /** The actor's native seat holds (here.ts seat(): the exact slot it sits in; continuity hereMe). */
+  nativeSeatHoldsV1?(actor: string): {action: string; slot: string}[];
   // (b) the engine's spatial service (B-spatial mirrors these names in split/spatial-replica.ts)
   withFeasibilityRead?<T>(read: () => T): T;
   readPassV1?<T>(fn: () => T): T;
@@ -131,6 +133,8 @@ export class LiveMenuWorld implements MenuWorld {
   describeVerbs() {return this.engine.describeVerbs();}
   anchors() {return this.engine.anchors();}
   programOf(actor: string) {return this.engine.programOf(actor);}
+  /** Looked up per read, not bound at construction: the engine's own (possibly replaced) method, or absent. */
+  get nativeSeatHoldsV1(): MenuWorld['nativeSeatHoldsV1'] {const f = (this.engine as {nativeSeatHoldsV1?: MenuWorld['nativeSeatHoldsV1']}).nativeSeatHoldsV1; return typeof f === 'function' ? f.bind(this.engine) : undefined;}
 }
 export interface LiveMenuWorld extends Pick<MenuWorld, typeof OPTIONAL[number]> {}
 
@@ -204,6 +208,7 @@ export type ReplicaSources = {
   placeLevelV1?(level: number): number;
   bodyUsesV1?(id: string): {body: string; how: 'occupied' | 'held'} | null;
   seatOccupantsV1?(id: string, kind?: string): {slot: string; body: string}[];
+  nativeSeatHoldsV1?(actor: string): {action: string; slot: string}[];
   movementVerb?(actor: string, x: number, z: number): string;
   bodyWaterDepthV1?(actor: string): number;
   routeEstimateV1?(actor: string, to: V2, level?: number): {ok: true; metres: number} | {ok: false; code: string; message: string};
@@ -223,7 +228,7 @@ export class ReplicaMenuWorld implements MenuWorld {
     for (const k of Object.keys(sp)) if (typeof sp[k] === 'function') self[k] = (sp[k] as (...a: unknown[]) => unknown).bind(s.spatial);
     if (s.carriers) self.carriers = s.carriers; if (s.carrierOf) self.carrierOf = s.carrierOf;
     if (s.placeLevelV1) self.placeLevelV1 = s.placeLevelV1; if (s.bodyUsesV1) self.bodyUsesV1 = s.bodyUsesV1;
-    if (s.seatOccupantsV1) self.seatOccupantsV1 = s.seatOccupantsV1; if (s.movementVerb) self.movementVerb = s.movementVerb; if (s.bodyWaterDepthV1) self.bodyWaterDepthV1 = s.bodyWaterDepthV1; if (s.routeEstimateV1) self.routeEstimateV1 = s.routeEstimateV1;
+    if (s.seatOccupantsV1) self.seatOccupantsV1 = s.seatOccupantsV1; if (s.nativeSeatHoldsV1) self.nativeSeatHoldsV1 = s.nativeSeatHoldsV1; if (s.movementVerb) self.movementVerb = s.movementVerb; if (s.bodyWaterDepthV1) self.bodyWaterDepthV1 = s.bodyWaterDepthV1; if (s.routeEstimateV1) self.routeEstimateV1 = s.routeEstimateV1;
     if ('newcomer' in s.statics) self.commonsNewcomerResourcesV1 = () => structuredClone(s.statics.newcomer);
     if ('deliveries' in s.statics) self.commonsFoodDeliveriesV1 = () => structuredClone(s.statics.deliveries);
   }
