@@ -14,8 +14,7 @@ test('historical idle displays retain their own dated content through program an
  for(const year of [2020,2021,2022,2023,2024,2025]){
   const k=new Kit(year),g=k.assembly('display-test','source display');k.screen(g,0,1,0);const r=k.finalize();
   const display=r.getObjectByName('display content'),original=display.material.map,colour=display.material.color.clone();
-  if(year===2020)assert.equal(original.userData.sourceUrl,'/2020/screens/portal-screen-02.webp');
-  else{assert.equal(original,null,'later years must not borrow Portal2020 artwork');assert.equal(colour.getHexString(),'17232b');}
+  assert.equal(original,null,'idle displays start unlit (the Portal 2020 photo is not distributed)');assert.equal(colour.getHexString(),'17232b');
   const screens=createHistoricalScreens(r),id=display.userData.screen_id;
   const state=(program,enabled=true,brightness=1)=>({screens:{[id]:{program,enabled,brightness,title:'Mars'}}});
   screens.update(null,0,'complete');assert.equal(display.material.map,original);assert.ok(display.material.color.equals(colour));

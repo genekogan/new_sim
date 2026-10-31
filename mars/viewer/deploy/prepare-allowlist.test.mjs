@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
-const NAMESPACES = ['engine', 'modular', 'browser', 'data', 'history', '2020', 'models'];
+// /history and /2020 (the Mars archive photos) are not distributed; app/history/archive-photos.ts stands in for them.
+const NAMESPACES = ['engine', 'modular', 'browser', 'data', 'models'];
 const NS = NAMESPACES.join('|');
 // '…' / "…" literals, and `…` template literals whose ${…} parts become one-segment wildcards
 const QUOTED = new RegExp(`(['"])(/(?:${NS})/[^'"\\s]*)\\1`, 'g');
@@ -90,7 +91,7 @@ test('engine/** is a directory rule, so new engine assets ship without editing p
     assert.ok(staged.has(path.relative(PUBLIC, f).split(path.sep).join('/')), `${f} not staged`);
 });
 
-test('every /engine|modular|browser|data|history|2020|models/ URL in app/ and engine/ is staged by deploy/prepare.py', () => {
+test('every /engine|modular|browser|data|models/ URL in app/ and engine/ is staged by deploy/prepare.py', () => {
   const problems = [];
   for (const { url, at } of references()) {
     if (!url.includes(HOLE)) {

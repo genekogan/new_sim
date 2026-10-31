@@ -11,7 +11,7 @@ for (const path of [
   '/studio/',
   '/studio/2020',
   '/studio/2020/',
-  ...[2021,2022,2023,2024,2025,2026,2027].flatMap(y => [`/studio/${y}`, `/studio/${y}/`]),
+  ...[2021,2022,2023,2024,2025,2026].flatMap(y => [`/studio/${y}`, `/studio/${y}/`]),
   '/simulation-guide',
   '/simulation-guide/',
 ]) {

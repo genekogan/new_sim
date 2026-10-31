@@ -53,7 +53,7 @@ test('entry point normalization preserves selected paths, old aliases and reserv
   assert.equal(stripWorldRequestPath('/w/eden','/w/eden'),'/');
   assert.equal(stripWorldRequestPath('/llms.txt','/w/eden'),'/llms.txt');
   assert.equal(stripWorldRequestPath('/w/mars/llms.txt','/w/eden'),'/w/mars/llms.txt');
-  for(let year=2020;year<=2027;year++)assert.equal(stripWorldRequestPath(`/w/mars/${year}/llms.txt`,'/w/mars'),`/w/mars/${year}/llms.txt`);
+  for(let year=2020;year<=2026;year++)assert.equal(stripWorldRequestPath(`/w/mars/${year}/llms.txt`,'/w/mars'),`/w/mars/${year}/llms.txt`);
   assert.equal(stripWorldRequestPath(undefined,'/w/eden'),undefined);
 });
 

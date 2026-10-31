@@ -28,22 +28,14 @@ def scrub(value):
 # `*` = within one path segment); a whole asset namespace that the app loads by
 # convention (engine/**) must be a glob, not a per-file list, so new files ship
 # without edits here. deploy/prepare-allowlist.test.mjs scans app/ and engine/ for
-# /engine|modular|browser|data|history|2020|models/ URL literals and fails if one is not
+# /engine|modular|browser|data|models/ URL literals (the Mars archive photos under /history and /2020 are not
+# distributed, so they are never staged) and fails if one is not
 # covered by `python3 deploy/prepare.py --list`.
 GLOBS = [
     'engine/**',
     'modular/references/**', 'modular/textures/**', 'modular/environment/**',
-    '2020/screens/*.webp',
-    'history/**/*.webp', 'history/**/*.json', 'history/**/*.html',
 ]
 FILES = {
-    'history': ['2025/c538-freeside-source.jpg', '2025/c509-roof-source.jpg',
-        '2023/review5-rear-c6656-t80.jpg', '2024/review5-north-access-c42733.jpg'],
-    '2020': ['evidence/site-march4.webp', 'evidence/forest-march9.webp',
-        'evidence/portal-march17.webp', 'evidence/forest-march30.webp',
-        'evidence/portal-depth-march9.webp', 'evidence/climbing-wall-2020.webp',
-        'evidence/rv-ring-march9.webp', 'evidence/front-alignment-march17.webp',
-        'evidence/side-stairs-march17.webp', 'evidence/portal-screens-2020.webp'],
     'browser': ['campus.glb'],
     # Only the selected workstation and its attribution; never publish the model archive.
     'models': ['retro-computer-monitor.glb', 'retro-computer-monitor.credit.json'],

@@ -400,79 +400,6 @@
   letter-spacing: 0.4px;
   color: #d8e1c4;
 }
-.evidence-frames {
-  display: flex;
-  gap: 9px;
-  overflow: auto;
-  scrollbar-width: thin;
-  height: 94px;
-}
-.evidence-frames button {
-  position: relative;
-  padding: 0;
-  flex: 0 0 146px;
-  border: 1px solid #4a5b42;
-  overflow: hidden;
-  border-radius: 3px;
-}
-.evidence-frames button.active {
-  border-color: #d9e6ac;
-}
-.evidence-frames img {
-  width: 146px;
-  height: 91px;
-  object-fit: cover;
-  opacity: 0.78;
-}
-.evidence-frames span {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(transparent, #09150df2);
-  padding: 16px 7px 6px;
-  font-size: 9px;
-  text-align: left;
-  color: #eef1e5;
-}
-.studio-photo {
-  width: 37%;
-  padding: 16px;
-  background: #101d17;
-  border-left: 1px solid #4b5a40;
-  overflow: auto;
-}
-.studio-photo > button {
-  font-size: 11px;
-  padding: 0 0 12px;
-  color: #d4dfbd;
-}
-.studio-photo img {
-  width: 100%;
-  max-height: 70%;
-  object-fit: contain;
-  background: #09110c;
-}
-.studio-photo h2 {
-  font-size: 18px;
-  font-weight: 400;
-  margin: 16px 0 8px;
-}
-.studio-photo p {
-  font-size: 12px;
-  line-height: 1.6;
-  color: #b6c4ac;
-}
-.studio-photo details {
-  font-size: 10px;
-  color: #91a387;
-}
-.studio-photo code {
-  font-size: 9px;
-  display: block;
-  overflow-wrap: anywhere;
-  margin-top: 9px;
-}
 @media (max-width: 1100px) {
   .studio-sidebar {
     width: 210px;
@@ -587,15 +514,6 @@
     width: 200px;
     right: 8px;
     padding: 12px;
-  }
-  .studio-photo {
-    position: absolute;
-    left: 165px;
-    right: 0;
-    top: 65px;
-    bottom: 136px;
-    width: auto;
-    z-index: 3;
   }
   .studio-evidence > div:first-child > span {
     font-size: 8px;
@@ -858,9 +776,6 @@
     z-index: 10;
     background: #172820;
     box-shadow: 6px 0 22px #0008;
-  }
-  .studio-photo {
-    left: 0;
   }
 }
 

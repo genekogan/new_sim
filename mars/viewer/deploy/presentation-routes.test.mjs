@@ -43,7 +43,7 @@ function renderRoute(path, origin = 'https://mars.example') {
 }
 
 test('presentation root validates query years and photo aliases preserve reconstruction', () => {
-  for (let year = 2020; year <= 2027; year++) {
+  for (let year = 2020; year <= 2026; year++) {
     const root = renderRoute(`/?year=${year}`);
     assert.equal(root.type, 'Studio');
     assert.equal(root.props.year, year);
@@ -72,7 +72,6 @@ test('museum, lab, guide and unknown route behavior is retained', () => {
     assert.equal(route.props.year, path.includes('2020') ? 2020 : 2026);
     assert.equal(route.props.presentation, undefined);
   }
-  assert.equal(renderRoute('/studio/2027').props.year, 2027);
   assert.equal(renderRoute('/lab/').type, 'Lab');
   assert.equal(renderRoute('/simulation-guide/').type, 'Guide');
   for (const path of [
@@ -124,7 +123,6 @@ test('generated Worker admits photo/presentation routes and retains method/unkno
     '/studio',
     '/studio/2020/',
     '/studio/2026',
-    '/studio/2027',
     '/lab/',
     '/simulation-guide/',
   ]) {
