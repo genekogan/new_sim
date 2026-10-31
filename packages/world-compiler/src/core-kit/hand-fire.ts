@@ -68,13 +68,14 @@ const campfire: DefInput = {
   actions: fireActions('Light the campfire', 'Put out the campfire') as DefInput['actions'],
 } as DefInput;
 
-// Torches (Soul Actions entry 33): the same hand-lit fire. The hand goes to the charred top of the fuel head (tinted `valve`),
+// Torches (Soul Actions entry 33): the same hand-lit fire (each ≤ 400 tris, the point-fixture budget; thin bands are
+// short cylinders, not tori). The hand goes to the charred top of the fuel head (tinted `valve`),
 // raised a little above the shoulder; the flame (role flame, drawn only while lit) burns on the head and its warm,
 // flickering light pools on the ground (night map, flicker pattern for any def named torch). One mechanism, two mounts.
 const torchHead = (y: number, z = 0): Shape[] => [
-  { kind: 'lathe', at: [0, y - 0.16, z], profile: [[0.018, 0], [0.04, 0.05], [0.056, 0.115], [0.058, 0.13], [0.052, 0.135]], segments: 12, tint: 'iron' },
+  { kind: 'lathe', at: [0, y - 0.16, z], profile: [[0.018, 0], [0.04, 0.05], [0.056, 0.115], [0.058, 0.13], [0.052, 0.135]], segments: 10, tint: 'iron' },
   { kind: 'cyl', at: [0, y - 0.05, z], r: 0.041, h: 0.1, segments: 12, tint: 'wrap' },
-  { kind: 'torus', at: [0, y - 0.075, z], r: 0.043, r2: 0.005, segments: 10, tint: 'iron', pitch: Math.PI / 2 },
+  { kind: 'cyl', at: [0, y - 0.075, z], r: 0.046, h: 0.01, segments: 10, tint: 'iron' },   // iron band round the wrap
   { kind: 'cyl', at: [0, y + 0.006, z], r: 0.03, h: 0.012, segments: 10, tint: 'valve' },
   { kind: 'cone', at: [0, y + 0.17, z], r: 0.066, h: 0.32, segments: 7, tint: 'flame', glow: 1, role: 'flame', pivot: [0, y, z], when: '@on' }];
 const torchLook = { iron: { type: 'color', default: '#2b2724', doc: 'iron colour' }, pole: { type: 'color', default: '#6b5034', doc: 'pole colour' }, wrap: { type: 'color', default: '#3a2a1e', doc: 'fuel wrap colour' }, valve: { type: 'color', default: '#1f1712', doc: 'charred top of the head (the hand goes here)' }, flame: { type: 'color', default: '#ff9a3c', doc: 'flame colour' } };
@@ -88,7 +89,7 @@ const standingTorch: DefInput = {
     { kind: 'cyl', at: [0, 0.02, 0], r: 0.12, h: 0.04, segments: 10, tint: 'iron' },
     { kind: 'cyl', at: [0, 0.075, 0], r: 0.03, h: 0.07, segments: 8, tint: 'iron' },
     { kind: 'cyl', at: [0, 0.68, 0], r: 0.02, h: 1.2, segments: 8, tint: 'pole' },
-    { kind: 'torus', at: [0, 0.5, 0], r: 0.022, r2: 0.005, segments: 8, tint: 'iron', pitch: Math.PI / 2 },
+    { kind: 'cyl', at: [0, 0.5, 0], r: 0.026, h: 0.012, segments: 8, tint: 'iron' },   // iron collar on the pole
     ...torchHead(1.44)] } } as unknown as DefInput['make'],
   params: torchLook as DefInput['params'], palette: torchPalette,
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
@@ -104,8 +105,8 @@ const wallTorch: DefInput = {
   tags: ['lighting', 'torch', 'fire', 'wall', 'hand-operated', 'local-fixture'], form: 'point',
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [
     { kind: 'box', at: [0, 1.24, -0.12], size: [0.09, 0.26, 0.016], tint: 'iron' },
-    { kind: 'box', at: [0, 1.22, -0.06], size: [0.022, 0.022, 0.11], tint: 'iron' },
-    { kind: 'box', at: [0, 1.3, -0.075], size: [0.016, 0.016, 0.12], tint: 'iron', pitch: -0.75 },
+    { kind: 'box', at: [0, 1.22, -0.06], size: [0.022, 0.022, 0.11], tint: 'iron', round: 0 },
+    { kind: 'box', at: [0, 1.3, -0.075], size: [0.016, 0.016, 0.12], tint: 'iron', pitch: -0.75, round: 0 },
     { kind: 'cyl', at: [0, 1.225, 0.02], r: 0.03, h: 0.05, segments: 10, tint: 'iron' },
     { kind: 'cyl', at: [0, 1.2, 0.02], r: 0.02, h: 0.36, segments: 8, tint: 'pole' },
     ...torchHead(1.52, 0.02)] } } as unknown as DefInput['make'],
@@ -128,14 +129,14 @@ const neonSign: DefInput = {
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.008, shapes: [
     ...[-0.8, 0.8].flatMap((x) => [
       { kind: 'box', at: [x, 1.1, 0], size: [0.05, 2.2, 0.05], tint: 'frame' },
-      { kind: 'box', at: [x, 0.015, 0], size: [0.12, 0.03, 0.34], tint: 'frame' }]),
+      { kind: 'box', at: [x, 0.015, 0], size: [0.12, 0.03, 0.34], tint: 'frame', round: 0 }]),
     { kind: 'box', at: [0, 1.78, -0.005], size: [1.7, 0.74, 0.04], tint: 'board' },
     { kind: 'box', at: [0, 2.165, -0.005], size: [1.74, 0.03, 0.06], tint: 'frame' },
     { kind: 'box', at: [0, 1.395, -0.005], size: [1.74, 0.03, 0.06], tint: 'frame' },
-    { kind: 'box', at: [0.35, 1.62, -0.07], size: [0.26, 0.13, 0.08], tint: 'frame' },
+    { kind: 'box', at: [0.35, 1.62, -0.07], size: [0.26, 0.13, 0.08], tint: 'frame', round: 0 },
     // the switch box on the outer side of the right-hand post (seen from the front), its lever facing out
     { kind: 'box', at: [0.855, 1.2, 0], size: [0.06, 0.12, 0.08], tint: 'valve' },
-    { kind: 'box', at: [0.892, 1.215, 0], size: [0.016, 0.034, 0.014], tint: 'lever' },
+    { kind: 'box', at: [0.892, 1.215, 0], size: [0.016, 0.034, 0.014], tint: 'lever', round: 0 },
     { kind: 'cyl', at: [0.84, 1.33, 0], r: 0.009, h: 0.14, segments: 6, tint: 'frame' }],
     faces: [{ neon: true, at: [0, 1.78, 0.022], w: 1.56, h: 0.62 }] } } as unknown as DefInput['make'],
   params: { frame: { type: 'color', default: '#1c1d21', doc: 'posts and frame colour' }, board: { type: 'color', default: '#121318', doc: 'backboard colour' },
