@@ -623,6 +623,7 @@ export async function openLauncher(cfg = {}) {
   // apply to a read the workers answer while their lag is ≤ READ_SHED_LAG_GENS (cfg.readShedLagGens, default 2).
   const READ_TIMEOUT_MS = 2000, READ_LIVE_MS = 1000, READ_LIVE_MAX_AGE_MS = 10_000, READ_SHED_LAG_GENS = cfg.readShedLagGens ?? 2;
   const READ_GET = /^\/v1\/edge\/(here|observe|capabilities|view)$/;
+  const captionOnly = (search) => { const q = new URLSearchParams(search ?? ''); return ['only', '1', 'true'].includes(q.get('alt') ?? '') && !q.has('gaze'); };
   const readStats = new Map();   // slug -> { routed, fallback, lastFallback }
   const readLives = new Map();   // slug -> { at, pid, live, rr }
   function readTarget(slug, w, rest, method, search, { maxLagGens = Infinity } = {}) {
@@ -639,6 +640,9 @@ export async function openLauncher(cfg = {}) {
     const r = e.live?.read, ports = Array.isArray(r?.ports) ? r.ports.filter((x) => Number.isInteger(x) && x > 0) : [];
     if (!r || !ports.length || now - e.live.at > READ_LIVE_MAX_AGE_MS) return null;
     if (name !== 'healthz' && (!r.routes?.includes(name) || (r.subset && search))) return null;
+    // a view's picture is drawn by main's render worker (and served from main), a gaze is an attention write: main's.
+    // The workers compute the caption (?alt=only) only (lane B-serve)
+    if (name === 'view' && !captionOnly(search)) return null;
     if (!(Number(r.lagGens) <= maxLagGens)) return null;
     return ports[e.rr++ % ports.length];
   }

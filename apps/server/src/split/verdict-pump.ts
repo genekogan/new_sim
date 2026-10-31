@@ -10,6 +10,7 @@
 // (scope-'' keys, e.g. a seat taken), under a CPU budget per tick, so a verdict is never older than its inputs for long.
 import type {Program, RuntimeView} from '@sim/engine-contract';
 import {CATALOG} from '../../../../mars/viewer/engine/world/catalog.ts';
+import {livePlatforms} from '../edge/eyes/platforms.ts';
 import {LiveFeasibility, planKey, type ActionRow, type ClaimRow, type LedgerEnv, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow, type VerdictRow, type MenuWorld} from './menu-world.ts';
 
 /** The record verbs the read code reads from `runtime.records` (held seats, berths, slots). */
@@ -92,8 +93,23 @@ export class VerdictPump {
     if (bc) {const j = JSON.stringify([...bc]); if (all || j !== this.envKeys.boarding) {this.envKeys.boarding = j; out.boarding = Object.fromEntries(JSON.parse(j));}}
     // the ground swim offers' recipe and deep-middle answers (main's engine answers each once per water)
     if (L.groundEnvV1) {const v = tryOr(() => L.groundEnvV1!(), null), j = JSON.stringify(v); if (all || j !== this.envKeys.ground) {this.envKeys.ground = j; out.ground = JSON.parse(j);}}
+    // Eyes (lane B-serve): the render platforms' answer (edge/eyes/platforms.ts livePlatforms), recomputed only when
+    // its inputs move (the engine's accepted render fact, the nav, the base scene); null = no render fact (the worker
+    // derives the current-live-activities answer from the shipped spots, as main does)
+    {const e = (this.mw as {engine?: {renderPlatformMetadata?: unknown; renderPlatformsV1?: () => unknown; world?: {navV1?: unknown; base?: {staticHash?: string}}}}).engine;
+      if (e && typeof e.renderPlatformsV1 === 'function') {
+        // (a MarsEngine keeps the fact by reference; any other engine is keyed by its answer's JSON)
+        const fact = 'renderPlatformMetadata' in e ? e.renderPlatformMetadata : JSON.stringify(tryOr(() => e.renderPlatformsV1!(), null) ?? null);
+        const refs = [fact, e.world?.navV1, e.world?.base?.staticHash];
+        if (all || refs.some((r, i) => r !== this.platformRefs[i])) {
+          this.platformRefs = refs;
+          const v = this.L ? tryOr(() => livePlatforms(this.L as never), null) : null;
+          out.platforms = v && (v as {source?: string}).source === 'accepted-render-fact' ? structuredClone(v) : null;
+        }
+      }}
     return Object.keys(out).length ? out : undefined;
   }
+  private platformRefs: unknown[] = [];
   /** What the engine's movementVerb / placeLevelV1 read besides the shipped world: groundV1, the physical-shore mode, upper floors. */
   private movement() {
     const e = (this.mw as {engine?: {physical?: unknown}}).engine, w = this.mw.world as unknown as {groundV1?: unknown; upperFloorsV1?: unknown};

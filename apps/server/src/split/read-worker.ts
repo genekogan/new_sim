@@ -51,7 +51,7 @@ const R2 = wd.mode >= 2 && wd.world ? await (async () => {
 let RW: RWT | null = null, RH: RHT | null = null, RL: EdgeLedger | null = null, ready2 = false;
 /** A static edit moved the scene: connectivity relabels in slices between messages; reads go to main meanwhile. */
 let relabel: {since: number; rebuilds: number} | null = null;
-const c2 = {warmMs: 0, relabels: 0, relabelMs: 0, maxRelabelMs: 0, served: 0, cpuMs: 0, maxCpuMs: 0, fallbacks: {} as Record<string, number>, asks: 0, syncMs: 0, slow: [] as {ms: number; soul: string; nth: number; tick: number}[]};
+const c2 = {warmMs: 0, relabels: 0, relabelMs: 0, maxRelabelMs: 0, served: 0, cpuMs: 0, maxCpuMs: 0, fallbacks: {} as Record<string, number>, asks: 0, syncMs: 0, slow: [] as {ms: number; soul: string; nth: number; tick: number; read: string}[]};
 const servedBy = new Map<string, number>();
 const fallback = (why: string) => {c2.fallbacks[why] = (c2.fallbacks[why] ?? 0) + 1;};
 function relabelSlice() {
@@ -108,35 +108,61 @@ function askMisses() {
 }
 const tickNow = () => R2 ? (RW?.R.pos.tick ?? -1) : M.tick;
 const LAG_GENS = 40;   // 2 s of ticks behind main: main answers instead
-/** The frame main's /v1/edge/here answers (edge/routes.ts), computed here; null = main should answer (counted). */
-function here2(soulId: string, query: string): {body: object; cpuMs: number} | null {
+/** The Soul reads this worker computes (mode 2), by route: the body main's route answers (edge/routes.ts, edge/eyes/
+ *  routes.ts), from the same read code over the read-only host. `world`: main's wrap adds the load block (view's route
+ *  does not). A query the worker does not answer itself returns null with the reason (main answers, counted). */
+type Read2 = 'here' | 'observe' | 'capabilities' | 'view';
+const READ2: Record<string, Read2> = {'/v1/edge/here': 'here', '/v1/edge/observe': 'observe', '/v1/edge/capabilities': 'capabilities', '/v1/edge/view': 'view'};
+const byRead: Record<Read2, {served: number; cpuMs: number; maxCpuMs: number}> = {here: {served: 0, cpuMs: 0, maxCpuMs: 0}, observe: {served: 0, cpuMs: 0, maxCpuMs: 0}, capabilities: {served: 0, cpuMs: 0, maxCpuMs: 0}, view: {served: 0, cpuMs: 0, maxCpuMs: 0}};
+function body2(kind: Read2, soul: EdgeSoul, q: URLSearchParams): {body: object; world: boolean} | string {
+  const L = RL!, M2 = read2.mods!;
+  if (kind === 'here') {
+    const modern = (q.get('include') ?? '').split(',').includes('doHere');
+    return {body: {tick: RW!.mw.world.tick, here: M2.hereFrame(L, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {}), ...(read2.debug ? {_debug: read2.debug.fireFacts(L, soul)} : {})}, world: true};
+  }
+  if (kind === 'observe') return {body: L.observe(soul, new Set((q.get('include') ?? '').split(',').filter(Boolean))) as object, world: true};
+  if (kind === 'capabilities') return {body: {tick: RW!.mw.world.tick, ...L.capabilitiesPage(soul, {all: q.get('all') === '1'})}, world: true};
+  // view: the caption (?alt=only) only; a picture is drawn by main's one render worker and served from main's memory,
+  // and a gaze is an attention write (intents.attend): both main's
+  const v = M2.parseViewQuery(k => q.get(k) ?? undefined);
+  if (!v.altOnly) return 'view-picture';
+  if (v.gaze !== undefined) return 'view-gaze';
+  return {body: {...M2.viewSummary(M2.planView(L, soul, v)), url: null, image: 'not requested (alt=only)'}, world: false};
+}
+/** A read computed here; null = main should answer (counted by reason). */
+function read2(kind: Read2, soulId: string, query: string): {body: object; world: boolean; cpuMs: number} | null {
   if (!RW || !RL || !RH || !ready2) {fallback('not-ready'); return null;}
   if (relabel) {fallback('relabel'); return null;}
   if (lag[0] - gen > LAG_GENS) {fallback('lag'); return null;}
   const m = RH.minds.get(soulId); if (!m || !RW.R.entities.has(m.entityId)) {fallback('unknown-soul'); return null;}
   const soul: EdgeSoul = {soulId, entityId: m.entityId, name: m.name, owner: m.owner};
-  const modern = (new URLSearchParams(query).get('include') ?? '').split(',').includes('doHere');
   const c = cpuMs();
   try {
-    const {hereFrame} = here2.mod!;
-    R2!.readBridgeSync(RH, RL);   // the god layer's reads (split/read-bridge.ts), current to main's last god commit
-    const body = {tick: RW.mw.world.tick, here: hereFrame(RL, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {}), ...(here2.debug ? {_debug: here2.debug.fireFacts(RL, soul)} : {})};
+    // the god layer's reads (split/read-bridge.ts), current to main's last god commit, at main's load level (its
+    // perception dial: main's monitor sets it on main's bridge; the level is the shared one main publishes)
+    R2!.readBridgeSync(RH, RL)?.setLoadLevel(level());
+    const out = body2(kind, soul, new URLSearchParams(query));
+    if (typeof out === 'string') {fallback(out); return null;}
     const ms = cpuMs() - c; c2.served++; c2.cpuMs += ms; c2.maxCpuMs = Math.max(c2.maxCpuMs, ms);
+    const r = byRead[kind]; r.served++; r.cpuMs += ms; r.maxCpuMs = Math.max(r.maxCpuMs, ms);
     // the slowest reads (diagnosis): which Soul, its how-many-th read here, the tick
     const nth = (servedBy.get(soulId) ?? 0) + 1; servedBy.set(soulId, nth);
-    if (c2.slow.length < 5 || ms > c2.slow[c2.slow.length - 1].ms) {c2.slow.push({ms: Math.round(ms), soul: soulId.slice(-6), nth, tick: RW.R.pos.tick}); c2.slow.sort((a, b) => b.ms - a.ms); c2.slow.length = Math.min(5, c2.slow.length);}
+    if (c2.slow.length < 5 || ms > c2.slow[c2.slow.length - 1].ms) {c2.slow.push({ms: Math.round(ms), soul: soulId.slice(-6), nth, tick: RW.R.pos.tick, read: kind}); c2.slow.sort((a, b) => b.ms - a.ms); c2.slow.length = Math.min(5, c2.slow.length);}
     askMisses();
-    return {body, cpuMs: ms};
+    return {...out, cpuMs: ms};
   } catch (e) {
-    fallback(e instanceof (R2!.MainOnly as typeof MOT) ? (e as Error).message.replace(/^read worker: | is main-only$/g, '') : 'error');
-    if (!(e instanceof (R2!.MainOnly as typeof MOT))) console.error('[read-worker] here', wd.index, e instanceof Error ? (e.stack ?? e.message).split('\n').slice(0, 4).join(' | ') : e);
+    // MainOnly: a reach into main-only state; any other error (an EdgeError's 4xx included) is main's to answer as well
+    fallback(e instanceof (R2!.MainOnly as typeof MOT) ? (e as Error).message.replace(/^read worker: | is main-only$/g, '') : `${kind}-error`);
+    if (!(e instanceof (R2!.MainOnly as typeof MOT)) && !(e instanceof Error && 'status' in e && 'code' in e)) console.error('[read-worker]', kind, wd.index, e instanceof Error ? (e.stack ?? e.message).split('\n').slice(0, 4).join(' | ') : e);
     return null;
   }
 }
-here2.mod = null as null | typeof import('../edge/perception/here.ts');
-if (R2) here2.mod = await import('../edge/perception/here.ts');
-here2.debug = null as null | typeof import('./read-debug.ts');
-if (R2 && process.env.SIM_READ_DEBUG === '1') here2.debug = await import('./read-debug.ts');
+read2.mods = R2 ? await (async () => {
+  const [{hereFrame}, {planView}, {parseViewQuery, viewSummary}] = await Promise.all([import('../edge/perception/here.ts'), import('../edge/eyes/view.ts'), import('../edge/eyes/routes.ts')]);
+  return {hereFrame, planView, parseViewQuery, viewSummary};
+})() : null;
+read2.debug = null as null | typeof import('./read-debug.ts');
+if (R2 && process.env.SIM_READ_DEBUG === '1') read2.debug = await import('./read-debug.ts');
 
 parentPort!.on('message', (m: ToWorker) => {
   if (m.t === 'init') {
@@ -204,7 +230,7 @@ function health(res: ServerResponse) {
   const mainGen = lag[0];
   const tick = tickNow();
   send(res, tick >= 0 ? 200 : 503, {ok: tick >= 0, worker: wd.index, gen, lagGens: Math.max(0, mainGen - gen), tick, subset: wd.mode === 1, mode: wd.mode, served: cost.served, forwarded: cost.forwarded,
-    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, cpuMs: Math.round(c2.cpuMs), threadCpuMs: Math.round(cpuMs()), bg: {...bg, cpuMs: Math.round(bg.cpuMs)}, ingest: {deltas: cost.deltas, cpuMs: Math.round(cost.ingestCpuMs), maxCpuMs: Math.round(cost.maxIngestCpuMs)}, verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null, god: RL ? R2.readBridgeCost(RL) : null}} : {})});
+    ...(R2 ? {read: {ready: ready2, relabeling: !!relabel, ...c2, byRead: Object.fromEntries(Object.entries(byRead).map(([k, v]) => [k, {...v, cpuMs: Math.round(v.cpuMs * 10) / 10, maxCpuMs: Math.round(v.maxCpuMs)}])), cpuMs: Math.round(c2.cpuMs), threadCpuMs: Math.round(cpuMs()), bg: {...bg, cpuMs: Math.round(bg.cpuMs)}, ingest: {deltas: cost.deltas, cpuMs: Math.round(cost.ingestCpuMs), maxCpuMs: Math.round(cost.maxIngestCpuMs)}, verdicts: RW ? {hits: RW.verdicts.hits, misses: RW.verdicts.missCount} : null, replica: RW?.cost ?? null, god: RL ? R2.readBridgeCost(RL) : null}} : {})});
 }
 const HOP = new Set(['connection', 'keep-alive', 'transfer-encoding', 'content-length', 'upgrade', 'expect']);
 /** Ask the main thread (through Admission) and relay its answer. */
@@ -238,15 +264,18 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = stripWorldRequestPath(req.url, wd.worldPath) ?? '/', q = url.indexOf('?'), path = q < 0 ? url : url.slice(0, q);
   if (req.method === 'GET' && (path === '/healthz' || path === '/healthz/read')) return health(res);
   const token = bearer(req);
-  if (R2 && req.method === 'GET' && path === '/v1/edge/here' && token?.startsWith('sim_')) {
+  const kind = R2 && req.method === 'GET' ? READ2[path] : undefined;
+  if (kind && token?.startsWith('sim_')) {
     const who = await soulOf(token);
     if (who.soulId) {
-      const r = here2(who.soulId, q < 0 ? '' : url.slice(q + 1));
+      const r = read2(kind, who.soulId, q < 0 ? '' : url.slice(q + 1));
       if (r) {
         const lv = level(), acct: Record<string, string> = who.account ? {'x-sim-account': who.account} : {};
         const inbox = await inboxOf(who.soulId, RH!.minds.get(who.soulId)?.owner ?? '');
         cost.served++;
-        return send(res, 200, {contract: CONTRACT, ...r.body, ...(lv !== 'green' ? {world: worldBlock(lv)} : {}), ...(inbox ? {inbox} : {})}, {...acct, 'x-sim-read-cpu-ms': r.cpuMs.toFixed(3)});
+        // as main's wrap: the load block at amber and above unless the frame has its own `world` (observe does)
+        const world = r.world && lv !== 'green' && !('world' in r.body) ? {world: worldBlock(lv)} : {};
+        return send(res, 200, {contract: CONTRACT, ...r.body, ...world, ...(inbox ? {inbox} : {})}, {...acct, 'x-sim-read-cpu-ms': r.cpuMs.toFixed(3), 'x-sim-read-kind': kind});
       }
     }
     return forward(req, res, url, path, token);

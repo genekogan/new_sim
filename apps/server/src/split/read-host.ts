@@ -92,6 +92,8 @@ export class ReadOnlyHost {
     return k?.things?.[id]?.name ?? w.entities[id]?.label ?? w.regions?.[id]?.label ?? id;
   }
   nowOf() {return null;}
+  /** Eyes (edge/eyes/platforms.ts livePlatforms): main's answer as its pump shipped it (null: no render fact). */
+  livePlatformsV1() {const E = this.rw.ledgerEnv as {platforms?: unknown}; if (!('platforms' in E)) throw new MainOnly('render platforms (not shipped yet)'); return E.platforms ?? null;}
   close() {setMenuWorld(this, null); try {(this.db.db as DatabaseSync).close();} catch {/* closed */}}
 }
 
@@ -139,6 +141,7 @@ function readComms(host: ReadOnlyHost, L: EdgeLedger, fading: boolean, beam: boo
   const db = host.db.db as DatabaseSync;
   let q: ReturnType<DatabaseSync['prepare']> | null = null;
   let h: ReturnType<DatabaseSync['prepare']> | null = null;
+  const heads = () => {try {return db.prepare('SELECT head, floor FROM edge_comms_heads WHERE world_id = ? AND soul_id = ?');} catch {return null;}};
   return {
     fading: {
       status(soulId: string): {colour: string; idleSeconds: number} | null {
@@ -152,8 +155,9 @@ function readComms(host: ReadOnlyHost, L: EdgeLedger, fading: boolean, beam: boo
     },
     /** a Soul's stream head (observe's streamCursor), from the database main writes; delivering is main's */
     streams: {
-      head(soulId: string): number {h ??= db.prepare('SELECT head, floor FROM edge_comms_heads WHERE world_id = ? AND soul_id = ?'); return (h.get(host.worldId, soulId) as {head: number} | undefined)?.head ?? 0;},
-      floor(soulId: string): number {h ??= db.prepare('SELECT head, floor FROM edge_comms_heads WHERE world_id = ? AND soul_id = ?'); return (h.get(host.worldId, soulId) as {floor: number} | undefined)?.floor ?? 0;},
+      // (no table yet: main's comms has written no head, so every Soul's is 0, as a Soul without a row)
+      head(soulId: string): number {h ??= heads(); return (h?.get(host.worldId, soulId) as {head: number} | undefined)?.head ?? 0;},
+      floor(soulId: string): number {h ??= heads(); return (h?.get(host.worldId, soulId) as {floor: number} | undefined)?.floor ?? 0;},
       headCursor(soulId: string): string {return `c_${this.head(soulId)}`;},
       deliver: (): never => {throw new MainOnly('comms.streams.deliver');},
     },

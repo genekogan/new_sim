@@ -44,6 +44,13 @@ export function parseViewQuery(q: (k: string) => string | undefined): ViewReques
   const alt = q('alt'); return {mode, w, h, fov, gaze: q('gaze') ?? undefined, altOnly: alt === 'only' || alt === '1' || alt === 'true'};
 }
 
+/** The view's caption body (every answer but the picture's own fields); a read worker answers ?alt=only with it too. */
+export const viewSummary = (p: ViewPlan) => ({tick: p.tick, heading: p.sight.heading, gaze: p.sight.gaze, mode: p.request.mode, fov: Math.round(p.sight.pose.hfov * 180 / Math.PI), size: [p.request.w, p.request.h],
+  where: p.sight.where, light: p.sight.light, alt: p.sight.alt,
+  seen: {souls: p.sight.souls.map(o => ({soulId: o.soulId, name: o.name, distance: o.distance, side: o.side, doing: o.state, activity: o.activity, facingYou: o.facingYou})),
+    things: p.sight.things.map(t => ({id: t.id, name: t.name, kind: t.kind, distance: t.distance, side: t.side, ...(t.count ? {count: t.count} : {})}))},
+  untrusted: true});
+
 export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, options: EyesOptions = {}) {
   let loadPaused = false;
   const now = options.now ?? Date.now;
@@ -65,11 +72,6 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
   };
   const fail = (c: Context, status: number, code: string, message: string, extra: object = {}, detail: object = {}) => {c.header('Cache-Control', 'no-store'); return c.json({contract: EDGE_CONTRACT, error: {code, message, ...detail}, ...extra}, status as 400);};
   const limit = (s: EdgeSoul, key: string, n: number) => {const r = deps.souls.limits.allow(`edge-${key}:${s.soulId}`, n, 60_000); if (!r.ok) throw new EdgeError(429, 'rate-limited', 'too many requests; slow down');};
-  const summary = (p: ViewPlan) => ({tick: p.tick, heading: p.sight.heading, gaze: p.sight.gaze, mode: p.request.mode, fov: Math.round(p.sight.pose.hfov * 180 / Math.PI), size: [p.request.w, p.request.h],
-    where: p.sight.where, light: p.sight.light, alt: p.sight.alt,
-    seen: {souls: p.sight.souls.map(o => ({soulId: o.soulId, name: o.name, distance: o.distance, side: o.side, doing: o.state, activity: o.activity, facingYou: o.facingYou})),
-      things: p.sight.things.map(t => ({id: t.id, name: t.name, kind: t.kind, distance: t.distance, side: t.side, ...(t.count ? {count: t.count} : {})}))},
-    untrusted: true});
   /** Cache key: same Soul, same tick bucket, same gaze and size, and (coarsely) the same pose. */
   const keyOf = (s: EdgeSoul, p: ViewPlan) => {
     const e = p.render.pose;
@@ -90,7 +92,7 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
         await deps.ledger.intents.attend(s, `look:${q.gaze || 'ahead'}`, {at,until:deps.host.engine.world.tick+200,kind:'look'}, undefined, {direction:q.gaze || 'ahead',seconds:10});
         plan = planView(deps.ledger,s,q);
       }
-      const base = summary(plan);
+      const base = viewSummary(plan);
       if (q.altOnly) { return c.json(edgeBody({...base, url: null, image: 'not requested (alt=only)'}));}
       sweep();
       const key = keyOf(s, plan), hit = frames.get(key), t = now();
