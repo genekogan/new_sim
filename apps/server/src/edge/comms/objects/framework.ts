@@ -73,7 +73,10 @@ export class Objects {
   ofKind(kind: string): ObjectRecord[] { return this.table.ofKind(kind) as ObjectRecord[]; }
   /** The object table's generation: moves on every change (L9 Stage B: `table.snapshot()` / `table.changes(gen)`). */
   generation(): number { return this.table.generation; }
-  /** L3 seam: the write-version of the objects near a point (table.ts `generationNear`). */
+  /** L3 seam: the write-version of the objects near a point (table.ts `generationNear`). NOT a cache key for object offers:
+   *  it moves only once an advance is written, and time-driven advances (a calendar item starting, a ride's phase) are
+   *  written by fresh() when something lists them, so a key on it would keep an offer past its moment. No menu keys on it:
+   *  object offers are rebuilt every tick in the ledger's `bindsTail` (whole, kept, words and focused menus alike). */
   generationNear(at: readonly [number, number], radius: number): number { return this.table.generationNear(at, radius); }
   /** L9 Stage B: the table's snapshot and its ordered delta stream (see table.ts). */
   objectTable() { return this.table; }
@@ -303,12 +306,15 @@ export class Objects {
   }
 
   /** Object actions as capabilities (`object:<id>:<action>`), merged by Ledger. */
-  capabilities(soul: EdgeSoul): EdgeCapability[] {
+  /** `only` (L3): just these objects; `places` (L3, for the listing's page): filled with each offered object's place. */
+  capabilities(soul: EdgeSoul, only?: ReadonlySet<string>, places?: Map<string, string>): EdgeCapability[] {
     const inPlace = this.inPlaceFor(soul.soulId);
-    return this.fresh().flatMap(o => {
+    // L3 (server reliability): a focused menu build names its objects; read and advance just those (as get() does), in all()'s id order
+    const rows = only ? this.freshList([...only].flatMap(id => {const o = OBJECT_ID.test(id) ? this.row(id) : undefined; return o ? [o] : [];}).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0), false) : this.fresh();
+    return rows.flatMap(o => {
       const kind = this.kinds.get(o.kind);
       if (!kind || NO_ACTIONS(kind) || !this.visible(o, soul.soulId, kind, inPlace)) return [];
-      const ctx = this.ctx(o, kind, soul, inPlace);
+      const ctx = this.ctx(o, kind, soul, inPlace); places?.set(o.id, o.placeId);
       return this.actionsFor(o, kind, ctx).map(a => ({id: `object:${o.id}:${a.action}`, verb: 'object', label: `${a.label} (${o.name})`, object: o.id, action: a.action,
         target: {id: o.id, kind: o.kind}, available: a.available, ...(a.blocked ? {blocked: a.blocked} : {}), ...(Object.keys(a.params).length ? {params: a.params as Record<string, unknown>} : {})}));
     });

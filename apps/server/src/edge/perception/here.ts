@@ -90,10 +90,10 @@ export class Perception {
     if (this.menuMemo) return this.menuMemo;
     const targets = new Set(this.L.placePathOf(this.soul.soulId).map(p => p.id));
     for (const id of exitCandidates(this.L, targets, this.pos)) targets.add(id);
-    let objects = false;
-    for (const t of this.unseated(OBJECT_RADIUS)) {targets.add(t.id); if (t.kind === 'object') objects = true;}
+    // (an object near is a target: its offers are built for that object alone, L3 c)
+    for (const t of this.unseated(OBJECT_RADIUS)) targets.add(t.id);
     for (const o of this.souls(8)) targets.add(o.soulId);
-    const f = hereFocus(targets), b = this.L.bindFocus(this.soul, objects ? {...f, verbs: new Set([...f.verbs, 'object'])} : f);
+    const b = this.L.bindFocus(this.soul, hereFocus(targets));
     return this.menuMemo = {caps: this.L.listed(b.caps), plans: b.plans};
   }
   private unseatedMemo = new Map<number, Located[]>();

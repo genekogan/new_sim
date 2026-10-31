@@ -3,7 +3,7 @@
 // the public map, the Soul's own knowledge (a secret place it has not found is no answer) and public body positions; it
 // never moves anyone. A Soul elsewhere is placed by its building or outdoor place, never by the room it is in.
 import type {EdgeLedger} from '../ledger/ledger.ts';
-import type {EdgeSoul} from '../contract.ts';
+import type {EdgeCapability, EdgeSoul} from '../contract.ts';
 import {exploreDiscovery} from '../intents/semantic-discovery.ts';
 import {knownPart} from '../intents/resolved-parts.ts';
 import {tokens} from '../ledger/vocabulary.ts';
@@ -63,13 +63,13 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     if(tied.length>1)return{query,found:false,code:'place.ambiguous',reason:'Several named parts match; choose one by its owner and name.',candidates:tied.slice(0,5).map(({p,part})=>({name:part.title,in:p.name,walk:part.walk}))};
     const {p,part}=parts[0],target=part.target,at=target?.point?[target.point[0],target.point[2]] as V2:target?.entity?ledger.thingAt?.(target.entity):null;
     if(!part.walk||!at)return{query,found:true,part:{id:part.id,name:part.title,in:p.name},what:part.what,navigable:false,reason:'This is a descriptive part without an actionable spatial binding.'};
-    const l=leg(at,false),bound=ledger.coreA.binds(soul),resolved=ledger.resolveOnDemand(soul,part.walk,bound.caps,bound.plans).v,cap=resolved.kind!=='unknown'&&resolved.cap.id===part.walk?resolved.cap:undefined;
+    const l=leg(at,false),cap=offeredExactly(ledger,soul,part.walk);
     return{query,found:true,part:{id:part.id,name:part.title,in:p.name},what:part.what,...l,walk:part.walk,...(part.sit?{sit:part.sit}:{}),...(cap?.available?{reachable:true}:{reachable:false,why:cap?.blocked?.code??'part.not-offered',via:`walk:${p.id}`}),say:`${part.title} in ${p.name}: ${l.m} m ${l.dir}. ${part.what??''}`.trim()};
   }
   const tied=scored.filter(x=>x.tier===scored[0]?.tier);
   if(tied.length>1)return{query,found:false,code:'place.ambiguous',reason:'Several places match; choose one by its exact id.',candidates:tied.slice(0,5).map(({p,at})=>({id:p.id,name:p.name,...leg(at,false)}))};
   if (!scored.length) {
-    const bound=ledger.coreA.binds(soul),discovery=exploreDiscovery(ledger,soul,query,bound.caps,bound.plans);
+    const bound=ledger.coreA.wordsMenu(soul),discovery=exploreDiscovery(ledger,soul,query,[...bound.caps],new Map(bound.plans));
     if(discovery?.kind==='unknown')return {query,found:discovery.didYouMean.length>0,code:discovery.code,reason:discovery.reason,...discovery.discovery};
     return {query, found: false, reason: `No place or Soul you know is called "${query}". Try a word from its name; explore shows what is close by.`};
   }
@@ -79,4 +79,8 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
   const also = scored.slice(1).filter(x => x.tier <= scored[0]!.tier + 0.5).slice(0, 3).map(x => {const o = leg(x.at, x.d === 0); return `${x.p.name} · ${o.m} m ${o.dir}`;});
   return {query, found: true, place: {id: p.id, name: p.name}, ...l, ...(lm ? {[lm.how]: lm.name} : {}), ...(inside ? {here: true} : {walk, ...(problem ? {reachable: false, why: problem.code} : {})}),
     say: inside ? `You are at ${p.name} now.` : `${p.name}: ${l.m} m ${l.dir} (${l.eta})${lm ? `, ${lm.how} ${lm.name}` : ''}. To go: act ${walk}.`, ...(also.length ? {also} : {})};
+}
+/** L3 (b): an exact capability id as offered now (resolveIdV1: the one offer, else on demand), or undefined. */
+export function offeredExactly(ledger:EdgeLedger,soul:EdgeSoul,id:string):EdgeCapability|undefined{
+  const r=ledger.resolveIdV1(soul,id);return r.kind!=='unknown'&&r.cap.id===id?r.cap:undefined;
 }

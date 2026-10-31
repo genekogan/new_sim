@@ -93,7 +93,9 @@ export const tokens = (s: string): string[] => {
   const t = s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
   if (TOKEN_MEMO.size >= TOKEN_MEMO_MAX) TOKEN_MEMO.clear(); TOKEN_MEMO.set(s, t); return t.slice();
 };
-const norm = (s: string) => tokens(s).join(' ');
+// (L3 b: norm is asked for every offer's and place's names on every resolve; same bounded memo as tokens)
+const NORM_MEMO = new Map<string, string>();
+const norm = (s: string): string => {let n = NORM_MEMO.get(s); if (n === undefined) {if (NORM_MEMO.size >= TOKEN_MEMO_MAX) NORM_MEMO.clear(); n = tokens(s).join(' '); NORM_MEMO.set(s, n);} return n;};
 // D3b (cloud fix-r3 basics-1 pip-010: "walk to the kitchen in eden-house-2" walked to eden-house-1/kitchen-chair-2, its
 // "chair-2" holding the 2): a number names the word right before it ("house 2", "house two"). A name that numbers that word
 // only otherwise ("house 1") is not what the words say; a name without such a number is unaffected.
@@ -697,23 +699,38 @@ function elsewhereReason(verb: string, ctx: VocabContext, here: string, none?: s
 }
 export function placeMatch(words: string[], places: VocabPlace[], withheld: readonly string[] = []): VocabPlace[] {return placeMatchTier(words, places, withheld).found;}
 /** placeMatch, and which tier matched: 0 own name exactly, 1 own name/id words, 2 everyday synonyms, 3 description words. */
+/** L3 (b): what placeMatchTier reads of a place, derived once per VocabPlace object (vocabularyOf keeps them while the
+ *  places, their aliases and what this Soul knows do not change). VocabPlaces are never written after they are built. */
+type PlaceWords = {ids: string[]; name: string; aliases: string[]; nameT: string[]; kindT: string[]; descT: string[]; numberNames: string[][]};
+const PLACE_WORDS = new WeakMap<VocabPlace, PlaceWords>();
+function placeWords(p: VocabPlace): PlaceWords {
+  let w = PLACE_WORDS.get(p); if (w) return w;
+  const aliases = (p.aliases ?? []).filter(a => !p.genericAliases?.includes(a));
+  w = {ids: [norm(p.id), ...(p.ref ? [norm(p.ref)] : [])], name: norm(p.name), aliases: aliases.map(norm),
+    nameT: [...tokens(p.name), ...tokens(p.id), ...aliases.flatMap(tokens)], kindT: [...tokens(p.kind ?? ''), ...(p.genericAliases ?? []).flatMap(tokens)],
+    descT: tokens(p.description ?? ''), numberNames: [tokens(p.name), tokens(p.id)]};
+  PLACE_WORDS.set(p, w); return w;
+}
 export function placeMatchTier(words: string[], places: VocabPlace[], withheld: readonly string[] = []): {found: VocabPlace[]; tier: number} {
   if (!words.length) return {found: [], tier: -1};
   const q=words.join(' ');
-  const aliases=(p:VocabPlace)=>(p.aliases??[]).filter(a=>!p.genericAliases?.includes(a));
-  for(const found of [places.filter(p=>norm(p.id)===q||p.ref&&norm(p.ref)===q),places.filter(p=>norm(p.name)===q),places.filter(p=>aliases(p).some(a=>norm(a)===q))])if(found.length)return {found,tier:0};
-  const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id), ...aliases(p).flatMap(tokens)], descT = (p: VocabPlace) => tokens(p.description ?? '');
-  const hit = (w: string, set: string[]) => tokenHit(w, set) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, set));
+  const W = placeWords;
+  for(const found of [places.filter(p=>W(p).ids.includes(q)),places.filter(p=>W(p).name===q),places.filter(p=>W(p).aliases.includes(q))])if(found.length)return {found,tier:0};
+  const hitAll = (w: string, a: string[], b: string[]) => tokenHit(w, a) || tokenHit(w, b) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, a) || tokenHit(s, b));
+  const noConflict = (p: VocabPlace) => !numberConflict(words, W(p).numberNames);
   const tiers = [
-    places.filter(p => norm(p.name) === q || aliases(p).some(a=>norm(a)===q)),
-    places.filter(p => words.every(w => tokenHit(w, nameT(p))) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
-    places.filter(p => words.every(w => hit(w, [...nameT(p),...tokens(p.kind??''),...(p.genericAliases??[]).flatMap(tokens)])) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
-    places.filter(p => words.every(w => hit(w, [...nameT(p), ...descT(p)])) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
+    places.filter(p => W(p).name === q || W(p).aliases.includes(q)),
+    places.filter(p => words.every(w => tokenHit(w, W(p).nameT)) && noConflict(p)),
+    places.filter(p => words.every(w => hitAll(w, W(p).nameT, W(p).kindT)) && noConflict(p)),
+    places.filter(p => words.every(w => hitAll(w, W(p).nameT, W(p).descT)) && noConflict(p)),
   ];
   // knowledge/1: a withheld place's own name is not an everyday word for some other place (the grove is not the orchard)
   if (!tiers[0].length && !tiers[1].length && withheld.includes(words.join(' '))) return {found: [], tier: -1};
   const tier = tiers.findIndex(t => t.length), found = tiers[tier] ?? [];
-  const depth = (p: VocabPlace) => {let n = 0; const seen=new Set<string>(); for (let q: VocabPlace | undefined = p; q?.parent && !seen.has(q.id); q = places.find(x => x.id === q!.parent)) {seen.add(q.id);n++;} return n;};
+  if (found.length < 2) return {tier, found: [...found]};
+  // (the parent chain within `places`, as places.find walked it: the first place with each id)
+  const byId = new Map<string, VocabPlace>(); for (const x of places) if (!byId.has(x.id)) byId.set(x.id, x);
+  const depthOf = new Map<VocabPlace, number>(), depth = (p: VocabPlace) => {let d = depthOf.get(p); if (d !== undefined) return d; d = 0; const seen=new Set<string>(); for (let q: VocabPlace | undefined = p; q?.parent && !seen.has(q.id); q = byId.get(q.parent)) {seen.add(q.id);d++;} depthOf.set(p, d); return d;};
   return {tier, found: [...found].sort((a, b) => Number(!!b.walkable) - Number(!!a.walkable) || Number(a.kind === 'water') - Number(b.kind === 'water') || depth(a) - depth(b) || a.id.localeCompare(b.id))};
 }
 
