@@ -33,7 +33,7 @@ rather than approximating them.
 
 1. Read `E2E.md` and `e2e/config.mjs`. Note reserved ports; never use them for your own world.
 2. Built client: `apps/web/dist/index.html` must exist and match your change. If not:
-   `pnpm install --frozen-lockfile && pnpm --filter @sim/web build`.
+   `pnpm install --frozen-lockfile && pnpm build`.
 3. Browser: Playwright MCP tools (`mcp__playwright__*`) if listed; otherwise a driver script under `.e2e/` that
    loads Playwright the way the harness does (`tools/playtest/lib/platform.mjs` → `resolvePlaywright`, or
    `createRequire('mars/viewer/package.json')('@playwright/test')` as `infra/smoke.mjs` does). Browsers come from

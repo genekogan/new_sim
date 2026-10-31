@@ -8,8 +8,9 @@
   "scripts": {
     "predev": "node deploy/prepare-camera-demo.mjs",
     "dev": "vite",
-    "prebuild": "node deploy/prepare-camera-demo.mjs --for-build",
-    "build": "vite build && node deploy/configure.mjs",
+    "build": "vite build",
+    "prebuild:cloudflare": "node deploy/prepare-camera-demo.mjs --for-build",
+    "build:cloudflare": "vite build && node deploy/configure.mjs",
     "preview": "vite preview",
     "start": "wrangler dev --config dist/server/cloudflare.json",
     "typecheck": "tsc --noEmit",
@@ -24,8 +25,7 @@
     "pree2e": "node ../../tools/assets/pull.mjs --check --quiet --only 'mars/viewer/**,worlds/**'",
     "e2e": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright test -c e2e/playwright.config.ts",
     "e2e:update-baselines": "E2E_UPDATE_BASELINES=1 PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright test -c e2e/playwright.config.ts",
-    "e2e:install": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright install chromium",
-    "build:static": "vite build"
+    "e2e:install": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright install chromium"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",

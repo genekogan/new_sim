@@ -86,7 +86,7 @@ lightning, 12 uploads (`packages/generators` creation limits). Each world's edit
 A world from nothing on one machine, with fake Soul minds; nothing costs model money except the agent you bring.
 
 ```sh
-pnpm --filter @sim/web build                 # the web app the launcher serves
+pnpm build                                   # the web app the launcher serves, and the people's character set
 node tools/world-launcher/launcher.mjs       # http://127.0.0.1:4980 (dev sign-in when no --auth-env is given)
 ```
 

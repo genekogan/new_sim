@@ -201,6 +201,18 @@ function vendorGroups() {
   ];
 }
 
+// `pnpm dev` (issue #395): Vite serves the page and hands the server's routes to the server on PORT (the server's own
+// variable, default 4500; WEB_PORT moves Vite off :5173). Under a world's path (/w/toy/) everything but the page itself is
+// the server's: /w/toy/v1/config, the socket. At the root: the API, and the Mars web assets the server serves from
+// mars/viewer/dist/client (src/mars-static.ts), among them the people's character set under /modular.
+function devProxy() {
+  const http = `http://127.0.0.1:${process.env.PORT ?? 4500}`;
+  // One RegExp key (a key starting with ^ is one) matching whole path segments: /history/… goes to the server, a page
+  // /history-x stays with Vite.
+  const roots = 'v1|__sim|skill\\.md|cards\\.md|mcp|healthz|modular|mars-assets|engine|models|history|2020|browser|data/manifest\\.json';
+  return { '^/w/[^/]+/[^?]+': { target: http, ws: true }, [`^/(?:${roots})(?:[/?]|$)`]: http, '^/ws(?:[/?]|$)': { target: http.replace(/^http/, 'ws'), ws: true } };
+}
+
 export default defineConfig({
   plugins: [snapshotPrefetch(), cdnPreconnect(), pwa(), phasedEntry(), checkChunks(), changelogPage(), react()],
   define: { __BUILD__: JSON.stringify(process.env.BUILD_ID ?? 'dev'), __SIM_ARRIVAL_ENABLED__: process.env.SIM_ARRIVAL_UI_ENABLED==='1', __SIM_GOATCOUNTER__: JSON.stringify(process.env.SIM_GOATCOUNTER ?? 'simeden'),
@@ -208,7 +220,7 @@ export default defineConfig({
     // CDN4: god uploads via the pull-through Worker on assets.eden.art/w/* (default on; needs the CDN switch above)
     __SIM_GOD_UPLOADS_CDN__: process.env.SIM_GOD_UPLOADS_CDN!=='0',
     __SIM_ASSETS_CDN_ORIGIN__: JSON.stringify(process.env.SIM_ASSETS_CDN_ORIGIN ?? 'https://assets.eden.art') },
-  server: { port: 5173, proxy: { '/v1': 'http://127.0.0.1:4500', '/skill.md': 'http://127.0.0.1:4500', '/cards.md': 'http://127.0.0.1:4500', '/mcp': 'http://127.0.0.1:4500', '/healthz': 'http://127.0.0.1:4500', '/ws': { target: 'ws://127.0.0.1:4500', ws: true } } },
+  server: { port: Number(process.env.WEB_PORT ?? 5173), proxy: devProxy() },
   // W1: standalone world-free studio, served by /god/workbench.
   // chunkSizeWarningLimit (kB, lane BUDGET 2026-10-22): just above the largest legitimate chunk, core-kit (1,491 kB raw /
   // 221 kB gzip on 3.62: the shared three.js + catalogue kit every world loads), so any chunk past it warns at build time.
