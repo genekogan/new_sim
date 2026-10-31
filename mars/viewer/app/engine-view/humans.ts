@@ -355,6 +355,8 @@ function neutralWeight(id: string, t: number) { const ph = (hashId(id) % 997) / 
 const handList = (h: Hands): Vec3[] => [h.left, h.right].filter((q): q is Vec3 => !!q);
 const copyHands = (h?: Hands): Hands => ({ ...(h?.left ? { left: [...h.left] as Vec3 } : {}), ...(h?.right ? { right: [...h.right] as Vec3 } : {}) });
 
+/** Entry 42: clip time advanced under a fade-out of length f, r s in: ∫0^r (1 − smoothstep(u/f)) du (f/2 once the fade is over). */
+const heldClip = (r: number, f: number) => { const x = Math.min(1, Math.max(0, r / f)); return Math.max(0, Math.min(r, f)) - f * (x * x * x - x * x * x * x / 2); };
 export class HumanViews {
   readonly group = new THREE.Group();
   private stationBeat:DepictionBeat|null=null;
@@ -865,11 +867,15 @@ export class HumanViews {
     };
     if (lib.cur) libAt(lib.cur.act, curW, lib.cur.time);
     if (lib.prev) libAt(lib.prev.act, prevW, lib.prev.time);
-    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, tSec + (hashId(h.name) % 7));
+    // entry 42 (take 6): a gesture fading out under a hand actuator's reach also slows its own clip to a stop over the fade:
+    // a look-around raising the hand kept moving it at its own speed while the arm reached for a drawer knob (0.095 m per 50 ms
+    // together). Clip time = the reach start + ∫(1 − fade) — the same pose and speed at the reach start, at rest by its end.
+    const gestureT = reachFade > 0 ? tSec - reachS + heldClip(reachS, GESTURE_FADE) : tSec;   // (weight 0 once the fade is over: back on tSec unseen)
+    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, gestureT + (hashId(h.name) % 7));
     if (neutralW > 0) libAt(gestureAction(v.rig, 'Idle_Neutral'), neutralW, tSec);
     if (neutralW + variantW > 1e-4) libAt(idleBodyAction(v.rig), neutralW + variantW, b.idleT);
     if (armsN > 0) libAt(armsAction(v.rig, 'Idle_Neutral'), armsN, tSec);
-    if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, tSec + (hashId(h.name) % 7));
+    if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, gestureT + (hashId(h.name) % 7));
     if (jog) { const sp = jog.getClip().name === 'Sprint_Loop' ? v.rig.template.sprintSpeed : v.rig.template.jogSpeed; libAt(jog, runW, sp ? v.dist / sp : tSec); }
     for (const x of v.libOn) if (!libOn.has(x)) x.stop();
     v.libOn = libOn;
