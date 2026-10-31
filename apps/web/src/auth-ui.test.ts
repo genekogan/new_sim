@@ -17,7 +17,7 @@ await test('bootstrap preserves actual world prefix and display name across worl
 await test('only trusted authentication origin initializes Clerk; unsigned preview has no token or dev identity',async()=>{
  const origin='https://sim.eden.art',path='/w/eden';
  assert.equal(clerkOriginRoute(origin,origin,path).initialize,true);
- for(const current of ['https://example.trycloudflare.com','http://localhost:4970','http://127.0.0.1:4970','https://<eden2-sslip-host>']){
+ for(const current of ['https://example.trycloudflare.com','http://localhost:4970','http://127.0.0.1:4970','https://sim-staging.example.test']){
   const route=clerkOriginRoute(origin,current,path);assert.equal(route.initialize,false);assert.equal(route.signInUrl,origin+path+'#watch');
   let navigations=0;const auth=unsignedPreviewAuth(route.signInUrl,()=>navigations++);assert.equal(auth.ready,true);assert.equal(auth.authed,false);assert.equal(await auth.getToken(),null);assert.equal(navigations,0);auth.login();assert.equal(navigations,1);
  }
@@ -38,7 +38,7 @@ await test('new worlds: only trusted authentication origin initializes Clerk on 
  const origin='https://sim.eden.art';
  for(const path of ['/w/eden','/w/willow-hollow','/w/meetup-hollow-2/']){
   assert.equal(clerkOriginRoute(origin,origin,path).initialize,true);
-  for(const current of ['https://example.trycloudflare.com','http://localhost:4970','http://127.0.0.1:4970','https://<eden2-sslip-host>']){
+  for(const current of ['https://example.trycloudflare.com','http://localhost:4970','http://127.0.0.1:4970','https://sim-staging.example.test']){
    const route=clerkOriginRoute(origin,current,path);assert.equal(route.initialize,false);assert.equal(route.signInUrl,origin+path.replace(/\/$/,'')+'#watch');
    let navigations=0;const auth=unsignedPreviewAuth(route.signInUrl,()=>navigations++);assert.equal(auth.ready,true);assert.equal(auth.authed,false);assert.equal(await auth.getToken(),null);assert.equal(navigations,0);auth.login();assert.equal(navigations,1);
   }

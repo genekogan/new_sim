@@ -14,7 +14,9 @@ for(const [model,suffix] of [['dog',''],['cat','_1']]){const src=gltf.scene.getO
  assert.ok(count>200);animalReport.push({model,actualForward:original.toArray(),movingSamples:count});
 }
 assert.equal(animalFacingYaw('pug',.4),.4,'unrelated +Z pack model unchanged');
-const proofDir='<team>/scratch/viewer-app/graphics-followup-20261009/';
+// The graphics-followup proof inputs (public-scene-650.json, regions-boundaries.json) are not in the repo.
+if(!process.env.EDEN_DRAWING_PROOF_DIR){console.log('skip: set EDEN_DRAWING_PROOF_DIR to the graphics-followup proof dir for the region checks');process.exit(0);}
+const proofDir=process.env.EDEN_DRAWING_PROOF_DIR.replace(/\/?$/,'/');
 const info=parseSceneInfo(JSON.parse(readFileSync(proofDir+'public-scene-650.json','utf8'))),native=publishedGroundSampler(info),ground=(x,z)=>native(x,z)??(x>=-30&&x<=30&&z>=-30&&z<=30?0:expansionHeight(x,z));
 const owner=createEdenRegions(ground);assert.ok(owner);const boundaryFile=process.env.EDEN_DRAWING_BOUNDARY_FILE??proofDir+'regions-boundaries.json';const boundaryBytes=readFileSync(boundaryFile);if(process.env.EDEN_DRAWING_BOUNDARY_FILE){assert.match(process.env.EDEN_DRAWING_BOUNDARY_SHA256??'',/^[a-f0-9]{64}$/);assert.equal(createHash('sha256').update(boundaryBytes).digest('hex'),process.env.EDEN_DRAWING_BOUNDARY_SHA256,'selected external declaration byte pin');}const original=JSON.parse(boundaryBytes.toString('utf8'));const declaration=authoredBoundaryDeclarationV1(original.sourceRevision,owner.authoredBoundaries);assert.equal(createHash('sha256').update(JSON.stringify(declaration.boxes)).digest('hex'),createHash('sha256').update(JSON.stringify(original.boxes)).digest('hex'),'all selected canonical boundary prisms identical, including explicit solid policy');
 const landing=owner.group.userData.edenBalloonLanding;assert.deepEqual(landing,[295,2,62]);for(const dx of [-1,0,1])for(const dz of [-1,0,1])assert.ok(Math.abs(owner.sampleVisualGround(295+dx,62+dz)-landing[1])<1e-5,'actual drawn triangles support full basket footprint');

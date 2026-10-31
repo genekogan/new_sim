@@ -8,7 +8,9 @@ import {spawn} from 'node:child_process';
 import {mkdirSync,readFileSync,writeFileSync,statSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const root=process.cwd(),explore=process.argv.includes('--explore'),webArg=process.argv.indexOf('--web'),candidate=webArg>0?process.argv[webArg+1]:null;
-const PM='<worktrees>/pm-preview',DESC='<team>/pm-integration/p0-interaction-broadcast-20261006/candidate-descriptor-p0a3.json';
+// Private inputs (not in the repo): the installed pm-preview checkout, its p0a3 candidate descriptor and the Mars static dir.
+const need=(k,what)=>{if(!process.env[k])throw new Error(`set ${k} to ${what}`);return process.env[k];};
+const PM=need('FIRST_USER_PM_DIR','the installed pm-preview checkout'),DESC=need('FIRST_USER_DESCRIPTOR','candidate-descriptor-p0a3.json'),MARS_STATIC=need('FIRST_USER_MARS_WEB','the Mars static asset dir');
 const run=root+'/.e2e/runs/first-user-fake0-'+new Date().toISOString().replaceAll(':','-');mkdirSync(run+'/data',{recursive:true});
 const require=createRequire(new URL('../../../mars/viewer/package.json',import.meta.url)),{chromium,devices}=require('@playwright/test');
 const port=4965,base=`http://127.0.0.1:${port}/w/eden`,d=JSON.parse(readFileSync(DESC,'utf8'));
@@ -16,7 +18,7 @@ const port=4965,base=`http://127.0.0.1:${port}/w/eden`,d=JSON.parse(readFileSync
 const keep=['PREVIEW_INPUT','PREVIEW_INPUT_MANIFEST_SHA256','PREVIEW_SOUL_LIMIT','PREVIEW_HUMAN_REST','PREVIEW_INTENT_SEQUENCES','PREVIEW_INTENT_APPROACH_RETENTION','PREVIEW_CLOSED_HUMAN_GOALS'];
 const flags=Object.fromEntries(keep.filter(k=>k in d.previewFlags).map(k=>[k,d.previewFlags[k]]));
 const env={PATH:process.env.PATH,HOST:'127.0.0.1',PORT:String(port),WORLD_KEY:'eden',WORLD_ID:d.worldId,WORLD_PATH:'/w/eden',WORLD_OWNER_ID:'dev:admin',PUBLIC_URL:base,ENGINE:'mars',ENABLE_LIVING_WORLD:'1',
- BRAIN_MODE:'fake',PREVIEW_BUDGET_USD_PER_DAY:'0',DEV_AUTH:'1',ARCHIVE_TAKES:'0',BUILD_ID:'local-app-first-user-fake0',SEED_NATIVES:'0',WEB_DIR:candidate??PM+'/apps/web/dist',MARS_WEB_DIR:'<team>/previews/20261004/mars-static',DATA_DIR:run+'/data',...flags};
+ BRAIN_MODE:'fake',PREVIEW_BUDGET_USD_PER_DAY:'0',DEV_AUTH:'1',ARCHIVE_TAKES:'0',BUILD_ID:'local-app-first-user-fake0',SEED_NATIVES:'0',WEB_DIR:candidate??PM+'/apps/web/dist',MARS_WEB_DIR:MARS_STATIC,DATA_DIR:run+'/data',...flags};
 for(const k of Object.keys(env))assert.ok(!/CREDENTIAL|KEY$/.test(k)||k==='WORLD_KEY','no credentials');
 const dist=readFileSync((candidate??PM+'/apps/web/dist')+'/index.html','utf8'),bundle=dist.match(/assets\/((?:preview|index)-[A-Za-z0-9_-]+\.js)/)?.[1];
 // Copy PM's launcher unchanged except its port guard, which only admits 4950-4959/4970; App's range is 4960-4969.

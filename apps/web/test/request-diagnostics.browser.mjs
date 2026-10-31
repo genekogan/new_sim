@@ -7,7 +7,8 @@ import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const root=process.cwd(),stamp=new Date().toISOString().replaceAll(':','-'),run=root+'/.e2e/runs/request-diagnostics-'+stamp;mkdirSync(run,{recursive:true});
 const require=createRequire(new URL('../../../mars/viewer/package.json',import.meta.url)),{build}=require('esbuild'),{chromium}=require('@playwright/test');
-const origin='http://127.0.0.1:4966',saved=JSON.parse(readFileSync('<team>/pm-integration/p0-interaction-broadcast-20261006/EXACT-SAVED-REQUESTS.json','utf8'));
+if(!process.env.SIM_SAVED_REQUESTS){console.log('skip: set SIM_SAVED_REQUESTS to the saved p0 receipts (EXACT-SAVED-REQUESTS.json, not in the repo)');process.exit(0);}
+const origin='http://127.0.0.1:4966',saved=JSON.parse(readFileSync(process.env.SIM_SAVED_REQUESTS,'utf8'));
 const classroom=saved.find(r=>r.request.words==='go to the classroom').receipt,swim=saved.find(r=>r.request.words==='go for a swim in the pond').receipt;
 const entry=`import {StrictMode} from 'react';import {createRoot} from 'react-dom/client';import {IntentDirection} from './IntentDirection.tsx';
 const calls=[];window.calls=calls;

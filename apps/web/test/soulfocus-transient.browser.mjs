@@ -10,7 +10,8 @@ import {createHash} from 'node:crypto';
 const root=process.cwd(),run=root+'/.e2e/runs/soulfocus-transient-'+new Date().toISOString().replaceAll(':','-');mkdirSync(run,{recursive:true});
 const require=createRequire(new URL('../../../mars/viewer/package.json',import.meta.url)),{build}=require('esbuild'),{chromium}=require('@playwright/test');
 const origin='http://127.0.0.1:4967',baselinePin='562870fa',id='7d411406-a83c-4a69-a0f9-0baf94082190';
-const saved=JSON.parse(readFileSync('<team>/pm-integration/p0-interaction-broadcast-20261006/EXACT-SAVED-REQUESTS.json','utf8')),classroom=saved.find(r=>r.requestId===id).receipt;
+if(!process.env.SIM_SAVED_REQUESTS){console.log('skip: set SIM_SAVED_REQUESTS to the saved p0 receipts (EXACT-SAVED-REQUESTS.json, not in the repo)');process.exit(0);}
+const saved=JSON.parse(readFileSync(process.env.SIM_SAVED_REQUESTS,'utf8')),classroom=saved.find(r=>r.requestId===id).receipt;
 const entry=`import {StrictMode} from 'react';import {createRoot} from 'react-dom/client';import {SoulFocus} from './SoulFocus.tsx';
 const W='pm-preview-eden-20261005',S='s_4158faee14';window.mode='ok';
 const status={id:S,name:'Alice',description:'Fixture',in_world:true,tick:1,time:'day',position:{x:0,y:0,z:0},activity:'seated',doing:'sit on fire bench',mood:'calm',energy:'ok',wants_company:0.5,needs:{},journal:'',reflected_day:0,customs:[],mandate:[],intent:null,intent_text:'',agenda:[],recent:[],nearby:[],happening:'',storyteller_suggests:null,next_think_in_s:10,available_now:[]};
