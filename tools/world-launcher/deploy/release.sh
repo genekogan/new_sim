@@ -7,7 +7,8 @@
 #   tools/world-launcher/deploy/release.sh legacy [--no-activate|--local <dir>]   the original worlds at the site root (old-worlds/
 #        README.md): web built for / (no prefix), build we-<sha12>-root, uploaded to /srv/sim-old/releases/ (never pruned by
 #        a /worlds release); activation is the kit's (cutover.sh), so legacy is never activated from here
-# Run from a clean worktree. The release: `git archive HEAD` (committed files only, so no .env, data or keys),
+# Run from a clean worktree. The release: `git archive HEAD` (committed files only, so no .env, data or keys) plus the
+# media git does not carry (tools/assets/pull.mjs: the web and runtime sets from the asset CDN, sha256-checked),
 # the web app built with --base /worlds/ (every URL under the launcher's prefix), the Mars web assets the worlds
 # read (.lane/mars-web, dereferenced) and BUILD. Dependencies are installed on the box for Linux.
 # Activation is deploy/activate.sh on the box: `systemctl reload` hands the worlds over without closing the port (keeper.mjs).
@@ -15,7 +16,8 @@
 # (restart instead of reload if the keeper is not running; settings in /etc/sim-worlds/<stage>.conf change only on restart).
 # Take it away entirely: remove the Caddy routes, then systemctl disable --now sim-worlds@<stage> (data stays in /srv/sim-worlds-data/<stage>).
 set -euo pipefail
-HOST="${SIM_WORLDS_HOST:-root@eden2}"
+# The box: [SIM_DEPLOY_USER@]SIM_DEPLOY_HOST from the environment or deploy.env (deploy.env.example); only needed to upload.
+. "$(dirname "$0")/deploy-env.sh"
 STAGE=staging; ACTIVATE=1; LOCAL=""; RESTART=""; HOW=""; BASE="${SIM_WORLDS_BASE:-/worlds}"
 while [ $# -gt 0 ]; do case "$1" in staging|production|legacy) STAGE="$1";; --no-activate) ACTIVATE=0;; --restart) RESTART=1; HOW=--restart;; --reload) HOW=--reload;; --local) LOCAL="$2"; shift;; *) echo "usage: $0 [staging|production|legacy] [--no-activate] [--restart|--reload] | --local <dir>"; exit 2;; esac; shift; done
 # CDN1: the asset CDN switch (default on; SIM_ASSETS_CDN_ENABLED=0 turns it off for one release), see the web build below.
@@ -30,8 +32,8 @@ RELROOT=/srv/sim-worlds/releases
 if [ "$STAGE" = legacy ]; then BASE=""; BUILD="$BUILD-root"; RELROOT=/srv/sim-old/releases; ACTIVATE=0; fi
 OUT="$ROOT/.lane/release/$BUILD"
 MARS_WEB_SRC="${MARS_WEB_SRC:-$ROOT/.lane/mars-web}"
-[ -d "$MARS_WEB_SRC" ] || { echo "no Mars web assets at $MARS_WEB_SRC (see team/lanes/COMMON.md setup)"; exit 1; }
-[ -f apps/web/src/base-path.ts ] || { echo "this commit's web app cannot run under a prefix (apps/web/src/base-path.ts missing: team/lanes/deploy-patches/web-base-path.diff)"; exit 1; }
+[ -d "$MARS_WEB_SRC" ] || { echo "no Mars web assets at $MARS_WEB_SRC (build them with tools/playtest/arena/assets-overlay.mjs, or set MARS_WEB_SRC)"; exit 1; }
+[ -f apps/web/src/base-path.ts ] || { echo "this commit's web app cannot run under a prefix (apps/web/src/base-path.ts missing)"; exit 1; }
 if [ -n "$LOCAL" ]; then
   case "$LOCAL" in /*) ;; *) echo "--local needs an absolute path"; exit 2;; esac
   if [ -e "$LOCAL" ] && ! grep -qs "^we-" "$LOCAL/BUILD"; then echo "$LOCAL exists and is not an earlier launcher release: refusing to replace it"; exit 1; fi
@@ -50,6 +52,10 @@ trash_existing() {
 echo "== assemble $BUILD"
 trash_existing "$OUT"; mkdir -p "$OUT"
 git archive HEAD | tar -x -C "$OUT"
+# Media: the web build below reads apps/web from this worktree (the web set), and the release serves the runtime set
+# (worlds, /modular, the Mars viewer's models and takes) from $OUT. Both come from the shared asset cache or the CDN.
+node tools/assets/pull.mjs --quiet --set web
+node tools/assets/pull.mjs --quiet --set web,runtime --dest "$OUT"
 echo "$BUILD" > "$OUT/BUILD"
 # The Eden experience (connected growing world, atmosphere, presets) is pinned to the qualified Eden world id, exactly as
 # the laptop's old-world build pins it (hotfix-integration-00x WEB-MANIFEST.json flags); the /worlds/w/eden fork runs that
@@ -89,10 +95,11 @@ du -sh "$OUT" | sed 's/^/   size /'
 echo "   retained all local releases (no automatic pruning)"
 node "$ROOT/tools/world-launcher/deploy/release-manifest.mjs" snapshot "$OUT" > "$OUT/RELEASE-MANIFEST.json"
 if [ -n "$LOCAL" ]; then
-  echo "assembled $BUILD in $OUT (run pnpm install --offline --frozen-lockfile --filter @sim/server... there; command in team/lanes/deploy.md)"; exit 0
+  echo "assembled $BUILD in $OUT (run pnpm install --offline --frozen-lockfile --filter @sim/server... there)"; exit 0
 fi
 
 REL="$RELROOT/$BUILD"
+HOST="$(deploy_target)"
 echo "== upload to $HOST:$REL"
 PREV="$(ssh "$HOST" "readlink /srv/sim-worlds/$STAGE 2>/dev/null || true")"
 # A repeated exact build may be reused only after inventory/content verification. Never delete stale remote files.

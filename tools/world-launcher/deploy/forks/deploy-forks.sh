@@ -9,11 +9,11 @@
 # registered world, auto-rollback; /worlds restarts for a few seconds) · 3 register the three forks (operator, loopback)
 # · 4 public checks.
 # UNDO (order matters: unregister forks BEFORE any code rollback, or an older launcher would boot them as new worlds):
-#   ssh root@eden2 'cd /srv/sim-worlds/production && for w in eden mars littlemartians; do sudo -u simworlds node tools/world-launcher/op.mjs remove-fork --port 4620 --base /worlds --slug $w; done'
-#   ssh root@eden2 'ln -sfn /srv/sim-worlds/releases/we-2375f5cc0b06 /srv/sim-worlds/production && systemctl restart sim-worlds@production'
-#   ssh root@eden2 'rm -rf /srv/sim-worlds-data/production/worlds/{eden,mars,littlemartians} /srv/sim-worlds-data/production/forks'
+#   ssh "$(deploy_target)" 'cd /srv/sim-worlds/production && for w in eden mars littlemartians; do sudo -u simworlds node tools/world-launcher/op.mjs remove-fork --port 4620 --base /worlds --slug $w; done'
+#   ssh "$(deploy_target)" 'ln -sfn /srv/sim-worlds/releases/we-2375f5cc0b06 /srv/sim-worlds/production && systemctl restart sim-worlds@production'
+#   ssh "$(deploy_target)" 'rm -rf /srv/sim-worlds-data/production/worlds/{eden,mars,littlemartians} /srv/sim-worlds-data/production/forks'
 set -euo pipefail
-E2=root@eden2; F=<team>/runtime/forks-data; D=/srv/sim-worlds-data/production; A=/srv/sim-old/current
+. "$(dirname "$0")/../deploy-env.sh"; E2="$(deploy_target)"; F=<team>/runtime/forks-data; D=/srv/sim-worlds-data/production; A=/srv/sim-old/current
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"; cd "$ROOT"
 say() { echo "[$(date -u +%T)] $*"; }
 

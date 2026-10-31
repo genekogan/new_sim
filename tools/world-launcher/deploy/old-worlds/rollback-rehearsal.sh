@@ -112,7 +112,7 @@ S7() { scenario S7 "#1 RB_* set without RB_LAPTOP_ROOT (would be the real rollba
   done_s S7; }
 S8() { scenario S8 "#2 test mode refuses real units, a real eden2 host, or real Caddy commands"; reset 4670
   run S8a -u RB_UNITS; ok "RB_UNITS unset -> refused" '[ $RC = 2 ] && has "needs RB_UNITS set and empty"'
-  run S8b RB_E2=root@eden2; ok "RB_E2=root@eden2 -> refused" '[ $RC = 2 ] && has "needs RB_E2=local"'
+  run S8b RB_E2=root@box.example; ok "RB_E2=root@box.example -> refused" '[ $RC = 2 ] && has "needs RB_E2=local"'
   run S8c "RB_CADDY_RELOAD=echo would-reload"; ok "non-stand-in reload command -> refused" '[ $RC = 2 ] && has "true/false stand-ins"'
   ok "nothing changed" '[ "$(caddy_now)" = "reverse_proxy 127.0.0.1:4670" ] && [ "$(sums)" = "$sums_before" ]'; done_s S8; }
 S9() { scenario S9 "#3 a hung writer that starts listening during the wait is not killed"; reset 4670

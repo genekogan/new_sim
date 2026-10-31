@@ -55,7 +55,8 @@ const afterMs = Number(flag('after-s', 60)) * 1000;   // watch this long after <
 const expectBuild = flag('expect-build', null);
 const keepEdits = argv.includes('--keep-edits');
 const cliEvery = Number(flag('cli-every', 1)) * 1000;   // one edit per second per god, under the world's edit rate limit
-const leasePath = flag('lease', existsSync('<team>/ops/chrome-lease.mjs') ? '<team>/ops/chrome-lease.mjs' : null);
+const sharedLease = process.env.SIM_CHROME_LEASE;   // optional machine-wide lease module (see ship/browser.mjs)
+const leasePath = flag('lease', sharedLease && existsSync(sharedLease) ? sharedLease : null);
 if (!origin || !pages.length || !out) { console.error('usage: release-probe.mjs --origin <url> --pages <path,…> --out <dir> [--phone-pages …] [--cli <dir,…>]'); process.exit(2); }
 mkdirSync(out, { recursive: true });
 const STOP = join(out, 'stop'), RELEASED = join(out, 'released');

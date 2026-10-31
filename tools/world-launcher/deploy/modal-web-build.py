@@ -49,6 +49,9 @@ def build():
            'SIM_GOATCOUNTER': 'simeden', 'SIM_ARRIVAL_UI_ENABLED': '0',
            'VITE_EDEN_EXPERIENCE_WORLD_IDS': 'pm-preview-eden-20261005'}
     ok = run('install', ['pnpm', 'install', '--frozen-lockfile'], env)
+    # media the web build bundles (tools/assets, not in git): the web set from the asset CDN, sha256-checked
+    if ok and (source / 'tools/assets/manifest.json').exists():
+        ok = run('assets', ['node', 'tools/assets/pull.mjs', '--set', 'web', '--quiet'], env)
     for suffix, base in [('', '/worlds/'), ('-root', '/')]:
         if not ok:
             break

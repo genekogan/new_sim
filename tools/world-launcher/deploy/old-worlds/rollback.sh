@@ -30,7 +30,7 @@ set -uo pipefail
 TS=${1:?usage: rollback.sh <cutover-TS>}; H=<team>/runtime/sim-old-cloud; NOW=$(date -u +%Y%m%d-%H%M%S)
 KITBIN=${RB_KITBIN:-$H/bin}; N=${RB_NODE:-~/.nvm/versions/node/v22.20.0/bin/node}
 ENV=${RB_ENV:-<team>/pm-integration/auth-account-20261009/clerk-publication-types-003/STAGED-PUBLIC-SETTINGS.env}
-E2=${RB_E2:-root@eden2}; RDATA=${RB_RDATA:-/srv/sim-worlds-data/legacy}; RBIN=${RB_RBIN:-/srv/sim-worlds/legacy/tools/world-launcher/deploy/old-worlds}
+. "$(dirname "$0")/../deploy-env.sh"; E2="${RB_E2:-$(deploy_target)}" || exit 2; RDATA=${RB_RDATA:-/srv/sim-worlds-data/legacy}; RBIN=${RB_RBIN:-/srv/sim-worlds/legacy/tools/world-launcher/deploy/old-worlds}
 CADDY=${RB_CADDY:-/etc/caddy/sites/sim.caddy}
 CVALIDATE=${RB_CADDY_VALIDATE:-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile}; CRELOAD=${RB_CADDY_RELOAD:-systemctl reload caddy}
 UNITS=${RB_UNITS-sim-worlds@legacy sim-worlds-backup@legacy.timer}

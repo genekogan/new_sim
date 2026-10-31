@@ -10,8 +10,8 @@
 #     Other names (so-* kit releases) are never touched.
 # DRY RUN IS THE DEFAULT: it only lists what --apply would delete and the bytes freed. --apply deletes (rm -rf); the first real
 # prune on eden2 needs Gene's typed yes.
-#   tools/world-launcher/deploy/retention.sh --host root@eden2                 dry run on the box (read-only)
-#   tools/world-launcher/deploy/retention.sh --host root@eden2 --apply         delete (Gene's yes first)
+#   tools/world-launcher/deploy/retention.sh --host <user@box>                 dry run on the box (read-only)
+#   tools/world-launcher/deploy/retention.sh --host <user@box> --apply         delete (Gene's yes first)
 #   tools/world-launcher/deploy/retention.sh --root <fake-tree> --proc <fake-proc>   local test (paths are <root>/srv/...)
 set -euo pipefail
 KEEP_BACKUPS=10; KEEP_RELEASES=5; APPLY=0; HOST=""; R=""; PROC=/proc

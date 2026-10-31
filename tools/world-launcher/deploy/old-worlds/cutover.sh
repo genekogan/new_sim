@@ -13,7 +13,7 @@
 # /worlds (Caddy -> :4620, sim-worlds@production); /opt/eden3; the mars user; DNS; firewall. No force kill, no lock deletion
 # on the laptop.
 set -euo pipefail
-H=<team>/runtime/sim-old-cloud; E2=root@eden2; TS=$(date -u +%Y%m%d-%H%M%S); LOG=$H/logs/cutover-$TS.log
+H=<team>/runtime/sim-old-cloud; . "$(dirname "$0")/../deploy-env.sh"; E2="${RB_E2:-$(deploy_target)}" || exit 2; TS=$(date -u +%Y%m%d-%H%M%S); LOG=$H/logs/cutover-$TS.log
 GO=""; [ "${1:-}" = "--go" ] && GO="${2:?--go needs a name}"
 RUNNER=<team>/reviews/convergence-world-run.mjs
 ACC=<team>/runtime/production-accounts/accounts.sqlite

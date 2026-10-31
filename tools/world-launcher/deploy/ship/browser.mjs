@@ -6,11 +6,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
-const TEAM_LEASE = '<team>/ops/chrome-lease.mjs';
+// SIM_CHROME_LEASE: a machine-wide lease module shared by several checkouts (optional).
+const TEAM_LEASE = process.env.SIM_CHROME_LEASE || '';
 
 /** Take a Chrome slot; returns release(). The team's shared lease when it exists, else this checkout's (same slots). */
 export async function lease(label) {
-  if (existsSync(TEAM_LEASE)) return (await import(TEAM_LEASE)).chromeLease(label);
+  if (TEAM_LEASE && existsSync(TEAM_LEASE)) return (await import(TEAM_LEASE)).chromeLease(label);
   return (await import('../../../god-skill/lib/chrome-lease.mjs')).chromeLease(label, { waitMs: 45 * 60_000 });
 }
 

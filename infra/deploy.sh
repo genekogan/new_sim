@@ -2,13 +2,14 @@
 # Prepare + browser-qualify staging, then promote that exact release.
 # infra/deploy.sh --stage ; infra/deploy.sh --promote <build>
 set -euo pipefail
-HOST="${SIM_HOST:-root@eden2}"
+. "$(dirname "$0")/../tools/world-launcher/deploy/deploy-env.sh"
+HOST="${SIM_HOST:-$(deploy_target)}"
 cd "$(dirname "$0")/.."
 MODE="${1:---stage}"
 BUILD="${2:-$(git rev-parse --short=12 HEAD)}"
 [[ "$BUILD" =~ ^[a-f0-9]{7,40}$ ]] || { echo "invalid build"; exit 1; }
 REL="/srv/sim/releases/$BUILD"
-STAGING=https://<staging-host>
+STAGING="${SIM_STAGING_ORIGIN:?set SIM_STAGING_ORIGIN (environment or deploy.env, see deploy.env.example)}"
 
 if [ "$MODE" = --stage ]; then
   [ -z "$(git status --porcelain)" ] || { echo "commit the reviewed release first"; exit 1; }
@@ -30,7 +31,7 @@ if [ "$MODE" = --stage ]; then
     install -d -o root -g sim -m 750 /home/sim/worlds;
     systemctl daemon-reload"
   # Resolve the one existing admin owner from the toy DB without logging it.
-  ssh "$HOST" python3 - <<'PYREMOTE'
+  ssh "$HOST" "SIM_STAGING_ORIGIN='$STAGING' python3 -" <<'PYREMOTE'
 import sqlite3, pathlib, os, grp
 # Toy now records through the same observer. Use its existing scoped Sim R2
 # credentials; preserve every other setting and never log environment values.
@@ -50,7 +51,7 @@ for key,liveport in [('mars',4502),('littlemartians',4503),('eden',4504)]:
  for stage in [False,True]:
     port=liveport+(10 if stage else 0)
     data=f'/srv/sim-data{"-staging" if stage else ""}/{key}'
-    origin='https://<staging-host>' if stage else 'https://sim.eden.art'
+    origin=os.environ['SIM_STAGING_ORIGIN'] if stage else 'https://sim.eden.art'
     path=pathlib.Path('/home/sim/worlds')/(('staging-' if stage else '')+key+'.env')
     text=f'WORLD_KEY={key}\nWORLD_ID={key}-1\nENGINE=mars\nPORT={port}\nDATA_DIR={data}\nPUBLIC_URL={origin}/w/{key}\nWORLD_OWNER_ID={owner}\nMAX_SOULS_PER_USER=8\n'
     if stage: text+='BRAIN_MODE=fake\nR2_PREFIX=sim/staging\n'
