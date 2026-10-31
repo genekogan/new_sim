@@ -4,8 +4,9 @@ import { chmod, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 
 import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { BR_PARAMS, CACHE, DEFAULT_SOURCES, brKeyFor, brotli, encodedCopy, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, readServed, shaFile } from './inventory.mjs';
+import { BR_PARAMS, CACHE, DEFAULT_SOURCES, ROOT, brKeyFor, brotli, encodedCopy, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, readServed, shaFile } from './inventory.mjs';
 import { brotliDecompressSync } from 'node:zlib';
+import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { buildRecords, modularRecords } from './served-public.mjs';
 import { ENDPOINT, loadCredentials, publish, signRequest, sigv4Headers } from './publish.mjs';
@@ -18,8 +19,10 @@ const credentials = { accessKeyId: 'SYNTHETIC_TEST_KEY', secretAccessKey: 'SYNTH
 const object = { key: keyFor(sha256, '.glb'), sha256, bytes: data.length, contentType: 'model/gltf-binary', cacheControl: CACHE, licence: 'CC0-1.0' };
 const objectHeaders = { 'content-length': String(data.length), 'content-type': object.contentType, 'cache-control': CACHE, 'x-amz-meta-sha256': sha256, 'x-amz-meta-licence': object.licence };
 const publicHeaders = { ...objectHeaders, 'access-control-allow-origin': 'https://sim.eden.art', etag: '"fixture"' };
+// The canonical licence evidence (SOURCES.csv) is private and lives outside the repo (EDEN_ASSETS_SOURCES).
+const NO_SOURCES = existsSync(DEFAULT_SOURCES) ? false : 'needs the private SOURCES.csv (EDEN_ASSETS_SOURCES)';
 async function fixture(fn) {
-  const base = '<team>/scratch/cdn/tests'; await mkdir(base, { recursive: true });
+  const base = join(ROOT, '.local/cdn/tests'); await mkdir(base, { recursive: true });
   const dir = await mkdtemp(join(base, 'case-'));
   try {
     const file = join(dir, 'asset.glb'), sources = join(dir, 'SOURCES.csv');
@@ -198,7 +201,7 @@ test('new upload uses HEAD then conditional PUT and byte/SHA readback', async ()
   assert.equal(result.sources, sources); assert.equal(result.sourcesSha256, hash(await readFile(sources)));
 }));
 
-test('a forged plan CSV cannot authorize an object; apply CLI rejects a sources override', async () => fixture(async ({ plan, sources, dir }) => {
+test('a forged plan CSV cannot authorize an object; apply CLI rejects a sources override', { skip: NO_SOURCES }, async () => fixture(async ({ plan, sources, dir }) => {
   const canonicalRows = parseCsv(await readFile(DEFAULT_SOURCES, 'utf8'));
   assert.ok(licenceEvidence(canonicalRows, sha256, data.length).reason, 'synthetic fixture is absent from trusted sources');
   await assert.rejects(publish(plan, { credentials, fetcher: async () => assert.fail('forged CSV must not enable network access') }), /allowlisted SOURCES.csv/);
@@ -206,7 +209,7 @@ test('a forged plan CSV cannot authorize an object; apply CLI rejects a sources 
   assert.equal(cli.status, 1); assert.match(cli.stderr, /dry-run only/);
 }));
 
-test('publish uses canonical sources despite a forged or absent plan.sources and receipts its exact raw CSV hash', async () => fixture(async ({ plan, sources }) => {
+test('publish uses canonical sources despite a forged or absent plan.sources and receipts its exact raw CSV hash', { skip: NO_SOURCES }, async () => fixture(async ({ plan, sources }) => {
   const reviewed = await readReviewed(), d = reviewed.derivatives[0];
   const file = new URL('../../' + d.path, import.meta.url), body = await readFile(file);
   const headers = { ...objectHeaders, 'content-length': String(d.bytes), 'x-amz-meta-sha256': d.sha256 };

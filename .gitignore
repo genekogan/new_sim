@@ -3,13 +3,89 @@ dist
 .env
 .env.*
 !.env.example
+deploy.env
+/data/
+/apps/server/data/
+.DS_Store
+.claude/settings.local.json
+
+# --- local agent identity files (Soul / god credentials)
+.eden-agent.json
+.eden-god.json
+
+# --- databases: worlds, fixtures and backups never go into git
 *.db
 *.db-wal
 *.db-shm
-data/
-.DS_Store
-BUILD
-.e2e/
+*.db.gz
+*.sqlite*
 
-# root world-engine lane scratch (local servers, logs)
-.lane/
+# --- binary media lives on the asset CDN, not in git. tools/assets/manifest.json lists every file and
+#     `pnpm assets:pull` fetches them into these paths. To add one: tools/assets/README.md.
+*.glb
+*.gltf
+*.bin
+*.drc
+*.ktx2
+*.basis
+*.hdr
+*.exr
+*.fbx
+*.obj
+*.blend
+*.usdz
+*.[pP][nN][gG]
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[wW][eE][bB][pP]
+*.avif
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.heic
+*.psd
+*.mp3
+*.ogg
+*.oga
+*.wav
+*.flac
+*.m4a
+*.aac
+*.opus
+*.mp4
+*.m4v
+*.webm
+*.mov
+*.mkv
+*.zip
+*.tar
+*.tgz
+*.tar.gz
+*.7z
+*.pdf
+/mars/viewer/public/engine/takes/
+/worlds/littlemartians/buildings/previews/
+/mars/scripts/reconstruct
+/mars/docs/engineering/data/campus-2026-frames.svg
+# dropped, never published or committed
+/mars/viewer/public/history/
+/mars/viewer/public/2020/
+# the small own-work binaries that stay in git (tools/assets/manifest.test.mjs holds the same list)
+!/apps/web/pwa/icon-*.png
+!/apps/web/src/media/gallery-loop.mp4
+!/tools/god-skill/reference/kit-primitives.png
+!/tools/playtest/review/fixtures/runs/**/*.png
+
+# --- local scratch: servers, runs, logs, test output
+/.local/
+/.lane/
+/.e2e/
+/BUILD
+/results/
+/run[0-9]*/
+/t-*/
+/t2-*/
+coverage/
+test-results/
+playwright-report/

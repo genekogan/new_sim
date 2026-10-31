@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // verify-worker.mjs — post-deploy proof of the god-uploads Worker on assets.eden.art/w/* (lane CDN4, 2026-10-20).
 //
-//   node tools/cdn/worker/verify-worker.mjs --god <team>/runtime/t4-bench/bench-hamlet --out <receipt.json>
+//   node tools/cdn/worker/verify-worker.mjs --god <god folder> --out <receipt.json>
 //   node tools/cdn/worker/verify-worker.mjs --self-test [--out <receipt.json>]   (loopback stand-ins, no network)
 //
 // With --god it uploads ONE fresh, never-seen GLB (a single triangle with random vertices, so its sha is new) to that

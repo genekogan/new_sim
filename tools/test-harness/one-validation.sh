@@ -46,6 +46,10 @@ busy() { lsof -nP -iTCP:5400-5449 -sTCP:LISTEN 2>/dev/null | tail -n +2; }
 { echo "HEAD $(git rev-parse HEAD)"; git status --porcelain --untracked-files=no; echo "main $(git rev-parse main) ancestor-of-HEAD:$(git merge-base --is-ancestor main HEAD && echo yes || echo NO)";
   echo "range 5400-5449 listeners:"; busy; echo "production listeners (must be present, never touched):"; lsof -nP -iTCP:4950 -iTCP:4963 -iTCP:4964 -iTCP:4970 -sTCP:LISTEN | tail -n +2; } > "$OUT/V0-preflight.log" 2>&1
 cat "$OUT/V0-preflight.log"; [ -z "$(busy)" ] || { echo "ports 5400-5449 busy: stop and investigate"; exit 1; }
+# V0 media: every file of tools/assets/manifest.json in place (the Modal containers pull before the suite; locally: pnpm assets:pull)
+if [ -f tools/assets/manifest.json ]; then
+  node tools/assets/pull.mjs --check --quiet > "$OUT/V0-assets.log" 2>&1 || { cat "$OUT/V0-assets.log"; echo "media missing or wrong: pnpm assets:pull"; exit 1; }
+fi
 
 # V1 types (all packages); known main-only errors: apps/server/src/edge-comms-manual-replay.test.ts (MERGE-GUIDE F5)
 step V1-types 1200 pnpm -r exec tsc --noEmit -p .

@@ -31,7 +31,7 @@ import { FakeR2 } from './fake-r2.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = process.argv.slice(2), mode = args[0];
 const opt = (name, fallback) => { const i = args.indexOf('--' + name); return i < 0 ? fallback : args[i + 1]; };
-const out = resolve(opt('out', '<team>/scratch/t4/cdn4/browser-proof'));
+const out = resolve(opt('out', resolve(dirname(fileURLToPath(import.meta.url)), '../../../.local/cdn/browser-proof-uploads')));
 const WORLD = 6560, CDN = 6561, PAGE = 6562, slug = 'upload-proof', prefix = '/worlds';
 const page = `http://127.0.0.1:${PAGE}`, cdnBase = `http://127.0.0.1:${CDN}`;
 const sha = (b) => createHash('sha256').update(b).digest('hex');

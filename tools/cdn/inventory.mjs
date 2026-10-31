@@ -7,10 +7,12 @@ import { promisify } from 'node:util';
 import { brotliCompress, brotliDecompress, constants as zlib } from 'node:zlib';
 import { dirname, extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { deployEnv } from '../world-launcher/deploy/deploy-env.mjs';
 import { coreSet } from './served-public.mjs';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-export const DEFAULT_SOURCES = '<team>/asset-scouting/SOURCES.csv';
+// The licence evidence CSV (asset scouting, kept outside the repo): EDEN_ASSETS_SOURCES in the environment or deploy.env.
+export const DEFAULT_SOURCES = deployEnv('EDEN_ASSETS_SOURCES') || join(ROOT, '.local/cdn/SOURCES.csv');
 export const CACHE = 'public, max-age=31536000, immutable';
 export const TYPES = { '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.avif': 'image/avif', '.ktx2': 'image/ktx2', '.hdr': 'image/vnd.radiance', '.exr': 'image/x-exr' };
 const SOURCE_LICENCES = new Set(['CC0-1.0', 'CC0 1.0', 'CC0-1.0 sources', 'own work']);

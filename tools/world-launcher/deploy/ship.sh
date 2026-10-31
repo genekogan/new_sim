@@ -9,10 +9,10 @@
 #     --from     resume at <step> after a stop (same --label, so the same <out>); earlier steps are skipped
 #     --no-probe skip the live release probe (probe-start, released, probe-check)
 #     --exclude-world <slug>  omit an explicitly excluded /worlds/w/<slug>/ from arrival walks; repeatable
-#     --out      outputs (default <team>/scratch/ship/<label>)
+#     --out      outputs (default .local/ship/<label>)
 #
 # Run it from the release worktree, clean, at the exact gated head (release.sh ships HEAD). Steps, in order:
-#   preflight        local only: clean tree, Mars web assets, tools, probe god folder, outputs folder
+#   preflight        local only: clean tree, Mars web assets, media (tools/assets), tools, probe god folder, outputs folder
 #   backup           row-verified compact copies of every production + legacy world db on eden2; quick_check each = ok
 #   legacy-upload    release.sh legacy: build + upload the root build we-<sha12>-root (never activates)
 #   probe-start      release-probe.mjs in the background (desktop + phone /worlds/w/eden-2026/ and /w/eden/, CLI edits in
@@ -34,15 +34,18 @@
 # commands; SHIP_TEST=1 (only with all five set) takes the build id from SHIP_BUILD instead of git.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; SHIPD="$HERE/ship"; ROOT="$(cd "$HERE/../../.." && pwd)"
-HOST="${SIM_WORLDS_HOST:-root@eden2}"
+# The box ([SIM_DEPLOY_USER@]SIM_DEPLOY_HOST) and the operator paths below come from the environment or the untracked
+# deploy.env (template: deploy.env.example).
+. "$HERE/deploy-env.sh"
+HOST="$(deploy_target)" || exit 2
 ORIGIN="${SHIP_ORIGIN:-https://sim.eden.art}"
 # lane OPS2: the probe's CLI edits go to the dedicated release-probe world (an unlisted scratch test world, RELEASES.md
 # "Release-probe world"). Missing setup fails preflight; never fall back to a person's world.
-PROBE_CLI_DEFAULT="<team>/runtime/t4-bench/release-probe"
+PROBE_CLI_DEFAULT="$ROOT/.local/release-probe"
 PROBE_CLI="${SHIP_PROBE_CLI:-$PROBE_CLI_DEFAULT}"
-LEGACY_FILE="${SHIP_LEGACY_RELEASE_FILE:-<team>/runtime/sim-old-cloud/bin/LEGACY-RELEASE}"
-LOCK_FILE="${SHIP_DEPLOY_LOCK:-<team>/lanes/DEPLOY.lock}"
-OUT_ROOT="${SHIP_OUT_ROOT:-<team>/scratch/ship}"
+LEGACY_FILE="${SHIP_LEGACY_RELEASE_FILE:-$ROOT/.local/ship/LEGACY-RELEASE}"
+LOCK_FILE="${SHIP_DEPLOY_LOCK:-$ROOT/.local/ship/DEPLOY.lock}"
+OUT_ROOT="${SHIP_OUT_ROOT:-$ROOT/.local/ship}"
 PROBE_READY_S="${SHIP_PROBE_READY_S:-600}"
 SSH="${SHIP_SSH:-ssh}"; SCP="${SHIP_SCP:-scp}"; NODE="${SHIP_NODE:-node}"; PY="${SHIP_PYTHON:-python3}"; RELEASE="${SHIP_RELEASE_SH:-$HERE/release.sh}"
 # the walks (as r8/walks.sh): desktop worlds (=<Explore pick>), phone worlds; the probe and CDN pages
@@ -144,6 +147,9 @@ if step preflight "local checks (nothing on eden2)"; then
     [ -z "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ] || pf "uncommitted changes: the release is exactly HEAD ($BUILD)"
     say "   HEAD $(git -C "$ROOT" rev-parse --abbrev-ref HEAD) @ $(git -C "$ROOT" rev-parse --short=9 HEAD)"
     [ -d "$ROOT/node_modules" ] || pf "no node_modules in $ROOT (pnpm install --frozen-lockfile)"
+    # release.sh pulls the web + runtime media; fetch them now (shared cache) so a missing object stops before eden2 is touched
+    if [ "$DRY" = 1 ]; then (cd "$ROOT" && "$NODE" tools/assets/pull.mjs --check --quiet --set web,runtime) || pf "media not in place (pnpm assets:pull)"
+    else (cd "$ROOT" && "$NODE" tools/assets/pull.mjs --quiet --set web,runtime) || pf "media could not be pulled (tools/assets/pull.mjs): release.sh needs it"; fi
   fi
   [ -d "${MARS_WEB_SRC:-$ROOT/.lane/mars-web}" ] || pf "no Mars web assets at ${MARS_WEB_SRC:-$ROOT/.lane/mars-web} (release.sh needs them)"
   for f in "$RELEASE" "$HERE/release-probe.mjs" "$ROOT/tools/cdn/cdn-walk.mjs" "$SHIPD/compact-backup.sh" "$SHIPD/quick-check.mjs" "$SHIPD/walk.mjs" "$SHIPD/poster.mjs" "$SHIPD/poster-count.py" "$SHIPD/stall.mjs" "$SHIPD/checks.mjs"; do

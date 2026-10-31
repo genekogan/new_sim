@@ -40,6 +40,13 @@ git -C "$ROOT" archive --format=tar.gz -o "$STAGE/harness.tgz" "$HARNESS" tools/
 mkdir -p "$STAGE/deps"
 git -C "$ROOT" show "$REF:pnpm-lock.yaml" > "$STAGE/deps/pnpm-lock.yaml"
 git -C "$ROOT" show "$REF:pnpm-workspace.yaml" > "$STAGE/deps/pnpm-workspace.yaml"
+# Media (tools/assets, not in git): the source ref's manifest and puller key modal_suite.py's cached asset layer, and every
+# extracted tree pulls its own manifest from that cache before the suite. Refs without a manifest carry their media in git.
+if git -C "$ROOT" cat-file -e "$REF:tools/assets/manifest.json" 2>/dev/null; then
+  mkdir -p "$STAGE/assets"
+  git -C "$ROOT" show "$REF:tools/assets/manifest.json" > "$STAGE/assets/manifest.json"
+  git -C "$ROOT" show "$REF:tools/assets/pull.mjs" > "$STAGE/assets/pull.mjs"
+fi
 # Z3: the gitignored inputs of the full campus re-extraction (V3-mars-engine, CAMPUS_FULL=1), as the exact bytes the
 # harness pins in campus-assets.json; one-validation.sh copies them into each tree. Missing or different bytes stop here.
 if CAMPUS_PINS="$(git -C "$ROOT" show "$HARNESS:tools/test-harness/campus-assets.json" 2>/dev/null)"; then

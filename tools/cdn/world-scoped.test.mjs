@@ -3,7 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { CACHE } from './inventory.mjs';
+import { existsSync } from 'node:fs';
+import { CACHE, DEFAULT_SOURCES } from './inventory.mjs';
 import { ENDPOINT, publish } from './publish.mjs';
 import { LICENCE, ORIGIN, evidence, mergeManifest, plan, publishScoped, readRecords, scopedKey, validateRecords } from './world-scoped.mjs';
 import { verify } from './verify.mjs';
@@ -127,7 +128,9 @@ test('files the origin does not serve, or serves differently, are never uploaded
   assert.equal(report.ok, false); assert.equal(report.results[0].served, false);
 });
 
-test('tampered plans and receipts stop before any request; shared publisher refuses scoped objects', async () => {
+// The canonical licence evidence (SOURCES.csv) is private and lives outside the repo (EDEN_ASSETS_SOURCES).
+const NO_SOURCES = existsSync(DEFAULT_SOURCES) ? false : 'needs the private SOURCES.csv (EDEN_ASSETS_SOURCES)';
+test('tampered plans and receipts stop before any request; shared publisher refuses scoped objects', { skip: NO_SOURCES }, async () => {
   const { calls, fetcher } = world();
   for (const edit of [o => { o.paths.push('/browser/other.glb'); }, o => { o.key = o.key.replace('/w/mars/', '/w/eden/'); }, o => { o.licence = 'CC0-1.0'; }, o => { o.bytes += 1; }, o => { o.world = '/w/littlemartians'; }]) {
     const p = await planned(); edit(p.objects[0]);

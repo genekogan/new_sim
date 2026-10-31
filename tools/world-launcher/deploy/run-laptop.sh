@@ -15,7 +15,7 @@
 set -euo pipefail
 PRINT=0; [ "${1:-}" = --print ] && { PRINT=1; shift; }
 STAGE="${1:-}"; REL="${2:-}"
-RUNTIME="${SIM_WORLDS_RUNTIME:-<team>/runtime/world-launcher}"
+RUNTIME="${SIM_WORLDS_RUNTIME:-$(git -C "$(dirname "$0")" rev-parse --show-toplevel)/.local/runtime/world-launcher}"
 NODE="${SIM_WORLDS_NODE:-/opt/homebrew/bin/node}"
 case "$STAGE" in
   production) PORT=5340; RANGE=5341-5369; DATA="$RUNTIME/data"; MAXW=60; MAXR=16

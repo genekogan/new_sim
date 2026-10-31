@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node ../../tools/assets/pull.mjs --check --quiet --only 'apps/web/**'",
     "build": "vite build",
     "preview": "vite preview"
   },
