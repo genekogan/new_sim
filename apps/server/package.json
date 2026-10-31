@@ -20,7 +20,7 @@
     "hono": "^4.13.11",
     "jose": "^6.2.12",
     "ws": "^8.22.0",
-    "zod": "^4.6.5",
+    "zod": "^4.6.6",
     "@sim/kernel": "workspace:*",
     "@sim/world-compiler": "workspace:*",
     "@sim/ground": "workspace:*",
