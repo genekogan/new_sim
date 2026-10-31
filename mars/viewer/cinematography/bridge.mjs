@@ -2,7 +2,8 @@
 import { createServer } from 'node:http';
 import { loadEnvFile } from 'node:process';
 import { JevProvider } from './jev-server.ts';
-loadEnvFile('<typesafe-repo>/.env');
+// TYPESAFE_API_KEY from the environment, or from the .env file TYPESAFE_ENV_FILE names.
+if (process.env.TYPESAFE_ENV_FILE) loadEnvFile(process.env.TYPESAFE_ENV_FILE);
 const provider = new JevProvider(process.env.TYPESAFE_API_KEY, {
   maxCalls: 12,
   budgetUSD: 0.01,

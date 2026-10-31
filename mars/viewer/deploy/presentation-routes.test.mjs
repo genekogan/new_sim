@@ -165,7 +165,7 @@ test('generated Worker admits photo/presentation routes and retains method/unkno
 test('simulation domain keeps the campus homepage at root and Lab on its explicit route', () => {
   for (const origin of [
     'https://sim.mars.college',
-    'https://mars-campus-2026.<workers-subdomain>.workers.dev',
+    'https://campus.example.test',
     'http://127.0.0.1:5391',
   ]) {
     for (const [path, year] of [

@@ -3,7 +3,8 @@ import { loadEnvFile } from 'node:process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Director } from './director.ts';
 import { JevProvider, JEV_MODEL } from './jev-server.ts';
-loadEnvFile('<typesafe-repo>/.env');
+// TYPESAFE_API_KEY from the environment, or from the .env file TYPESAFE_ENV_FILE names.
+if (process.env.TYPESAFE_ENV_FILE) loadEnvFile(process.env.TYPESAFE_ENV_FILE);
 const input = 'e2e/artifacts/codex-autonomous-camera-comparison/sequence.json';
 const sequence = JSON.parse(readFileSync(input, 'utf8'));
 const provider = new JevProvider(process.env.TYPESAFE_API_KEY, {
