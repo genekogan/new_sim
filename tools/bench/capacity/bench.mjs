@@ -17,12 +17,16 @@ import { cpus, homedir, loadavg, release, hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { report } from './report.mjs';
+const ROOT0 = resolve((() => { const i = process.argv.indexOf('--root'); return i < 0 ? new URL('../../..', import.meta.url).pathname : process.argv[i + 1]; })());
+const { defaultCommand } = await import(pathToFileURL(join(ROOT0, 'tools/world-launcher/children.mjs')).href);
+const { decorateCommand } = await import(pathToFileURL(join(ROOT0, 'tools/world-launcher/production.mjs')).href);
 
 const argv = process.argv.slice(2), opt = (k, d) => { const i = argv.indexOf(`--${k}`); return i < 0 ? d : argv[i + 1]; }, flag = (k) => argv.includes(`--${k}`);
 const ROOT = resolve(opt('root', new URL('../../..', import.meta.url).pathname)), OUT = resolve(opt('out', 'bench-out'));
 const FIXTURE = opt('fixture', 'genesis:eden-2026'), ARMS = opt('arms', 'n1,n6,n12,n24,incident,hostile').split(','), REPEATS = Number(opt('repeats', 2));
 const PORT = Number(opt('port', 5151)), INSPECT = PORT + 1, HEAP_MB = Number(opt('heap-mb', 768)), HOST_LABEL = opt('host-label', 'laptop');
 const SLICE = opt('slice', ''), WORLD_USER = opt('world-user', ''), SLUG = opt('world-key', 'eden-2026'), SHORT = flag('short'), ENGINE = opt('engine', 'mars');
+const MARS_WEB = opt('mars-web', join(ROOT, 'mars/viewer/dist'));
 const CLI_FILE = resolve(opt('cli', join(ROOT, 'tools/world-launcher/soul/eden.mjs')));
 const PH = SHORT ? { warm: 10, idle: 10, active: 20, calib: 5 } : { warm: 60, idle: 30, active: 120, calib: 20 };
 const TICK_HZ = 20, BUSY = /\b(world\.busy|world\.crowded|world\.starting|soul\.busy|soul\.slow-down|rate-limited)\b/;
@@ -77,26 +81,33 @@ async function inspector() {   // Runtime.getHeapUsage only
   return { heapMb: async () => { const d = await call('Runtime.getHeapUsage'); return d?.result ? d.result.usedSize / 2 ** 20 : null; }, close: () => ws.close() };
 }
 
-async function bootWorld(dir) {
+async function bootWorld(dir, { settle = true } = {}) {
   const data = join(dir, 'data'); mkdirSync(data, { recursive: true });
   if (!genesis) copyFileSync(fixtureFile, join(data, 'sim.db'));
   if (WORLD_USER) sh('chown', ['-R', `${WORLD_USER}:${WORLD_USER}`, dir]);
+  // the launcher's own world command and production decoration, from the checkout under test (never a hand-made env):
+  // ENGINE, ENABLE_WORLD_ENGINE, SOUL_LIFECYCLE, fading, unwatched pace, malloc env, fake brain, no model keys
   const soul = (f) => join(ROOT, 'tools/world-launcher/soul', f);
-  const env = { ...process.env, INVITE_REQUIRED: '0', EDGE_CONTROLLER_CLI_FILE: CLI_FILE, EDGE_CLI_FILE: soul('eden-agent.mjs'), EDGE_SKILL_FILE: soul('skill.md'),
-    EDGE_INSTRUCTIONS_FILE: soul('instructions.md'), WORLD_KEY: SLUG, WORLD_ID, ENGINE, PORT: String(PORT), DEV_AUTH: '1', BRAIN_MODE: 'fake', MIND_DRIVER: 'edge',
-    ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '', SEED_NATIVES: '0', EDGE_FADING: '1', DATA_DIR: data, PUBLIC_URL: `http://127.0.0.1:${PORT}`,
-    NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`, MALLOC_ARENA_MAX: '2', MALLOC_MMAP_THRESHOLD_: '262144', MALLOC_TRIM_THRESHOLD_: '1048576' };
-  if (genesis) env.GENESIS_FILE = genesis;
-  const cmd = [...(SLICE ? SLICE.split(/\s+/) : []), process.execPath, `--inspect=127.0.0.1:${INSPECT}`, 'apps/server/src/main.ts'];
+  // GENESIS_FILE as on the live world (the template of the same key), library dir in the run's scratch
+  const template = genesis ?? (existsSync(join(ROOT, 'worlds/templates', `${SLUG}.json`)) ? join(ROOT, 'worlds/templates', `${SLUG}.json`) : undefined);
+  const library = join(dir, 'library'); mkdirSync(library, { recursive: true });
+  const base = defaultCommand({ slug: SLUG, dataDir: data, name: 'Capacity bench', ...(template ? { templateFile: template } : {}) }, PORT,
+    { publicOrigin: `http://127.0.0.1:${PORT}`, marsWebDir: MARS_WEB, root: ROOT, libraryDir: library, soulControllerCliFile: CLI_FILE, soulCliFile: soul('eden-agent.mjs'), soulSkillFile: soul('skill.md'), soulInstructionsFile: soul('instructions.md') });
+  const { cmd: node, args, env } = decorateCommand(base, { devAuth: true, publicOrigin: `http://127.0.0.1:${PORT}`, base: '', worldHeapMb: HEAP_MB, build: 'dev' });
+  if (WORLD_ID) env.WORLD_ID = WORLD_ID;
+  Object.assign(env, { MIND_DRIVER: 'edge', BRAIN_MODE: 'fake' });
+  for (const k of Object.keys(env)) if (k.startsWith('EDGE_EYES')) delete env[k];   // no renders in the bench (Eyes off)
+  const cmd = [...(SLICE ? SLICE.split(/\s+/) : []), node, `--inspect=127.0.0.1:${INSPECT}`, ...args];
+  writeFileSync(join(dir, 'world-command.json'), JSON.stringify({ cmd, env: Object.fromEntries(Object.entries(env).filter(([k]) => !/KEY|TOKEN|SECRET/.test(k))) }, null, 1));
   const child = spawn(cmd[0], cmd.slice(1), { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   let wlog = ''; const wl = (b) => { wlog = (wlog + b).slice(-20000); appendFileSync(join(dir, 'world.log'), b); };
   child.stdout.on('data', wl); child.stderr.on('data', wl);
   const t0 = now(); let up = false;
-  while (!up && now() - t0 < 900_000) { if (child.exitCode != null) throw new Error(`world exited at boot (${child.exitCode}); see ${dir}/world.log`); up = (await healthz()).ok; if (!up) await sleep(1000); }
+  while (!up && now() - t0 < 900_000) { if (child.exitCode != null) throw new Error(`world exited at boot (${child.exitCode}); ${dir}/world.log ends:\n${wlog.trim().split('\n').slice(-12).join('\n')}`); up = (await healthz()).ok; if (!up) await sleep(1000); }
   if (!up) throw new Error('world did not answer /healthz in 15 min');
   const bootS = (now() - t0) / 1000, tc = now();
   // settled = the boot's perceive catch-up logged, or (it logs only when slow) 30 s up with three calm ticks; cap 300 s
-  for (let calm = 0; !/perceive catch-up/.test(wlog) && now() - tc < 300_000 && !(now() - tc > 30_000 && calm >= 3); ) { await sleep(1000); const x = await healthz(); calm = x.ok && x.tickMs?.avg < 25 ? calm + 1 : 0; }
+  for (let calm = 0; settle && !/perceive catch-up/.test(wlog) && now() - tc < 300_000 && !(now() - tc > 30_000 && calm >= 3); ) { await sleep(1000); const x = await healthz(); calm = x.ok && x.tickMs?.avg < 25 ? calm + 1 : 0; }
   const pids = (sh('pgrep', ['-f', `inspect=127.0.0.1:${INSPECT}`]) ?? '').split('\n').map(Number).filter(Boolean);
   const pid = pids.find((x) => /node/.test(sh('ps', ['-o', 'comm=', '-p', String(x)]) ?? '')) ?? child.pid;   // the node process, not systemd-run
   return { child, pid, data, bootS, catchUpS: (now() - tc) / 1000 };
@@ -313,6 +324,17 @@ function summarize({ arm, rep, N, w, windows, cmds, health, proc, run, calibrati
 const startup = []; for (let i = 0; i < 10; i++) { const t = now(); execFileSync(process.execPath, [CLI_FILE, 'version'], { stdio: 'ignore' }); startup.push(now() - t); }
 host.cliStartupMedianMs = pct(startup, 0.5);
 log(`bench: ${ARMS.join(',')} x${REPEATS} on ${HOST_LABEL}${host.indicative ? ' (INDICATIVE)' : ''}, source ${host.sourceSha?.slice(0, 9)}, fixture ${host.fixtureSha256.slice(0, 12)}, world ${WORLD_ID}`);
+// preflight: boot the fixture once, 10 s up and answering, so a bad setup fails in seconds, not after every arm
+{
+  const dir = join(OUT, 'preflight'); mkdirSync(dir, { recursive: true });
+  let w;
+  try {
+    const t = now(); w = await bootWorld(dir, { settle: false }); await sleep(10_000);
+    const h = await healthz(); if (!h.ok || w.child.exitCode != null) throw new Error(`world not answering 10 s after boot; ${dir}/world.log`);
+    log(`preflight ok: up ${w.bootS.toFixed(1)} s, tick ${h.tick}, ${((now() - t) / 1000).toFixed(0)} s`);
+  } catch (e) { log(`PREFLIGHT FAILED: ${e.message}`); if (w) await stopWorld(w); process.exit(1); }
+  await stopWorld(w);
+}
 const results = [];
 for (let rep = 1; rep <= REPEATS; rep++) for (const arm of ARMS) {
   try { results.push(await oneRun(arm, rep)); } catch (e) { log(`${arm} r${rep}: FAILED ${e.message}`); results.push({ arm, rep, failed: String(e.message) }); }

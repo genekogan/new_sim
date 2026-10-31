@@ -26,6 +26,11 @@ compact copy, made once, read-only to the bench).
 cd /srv/sim-bench/src && node /srv/sim-bench/bench/bench.mjs --root /srv/sim-bench/src --fixture /srv/sim-bench/fixtures/eden-2026.db --world-key eden-2026 --out /srv/sim-bench/runs/baseline-da5269cd0 --host-label eden2-slice --world-user simworlds --slice "systemd-run --quiet --scope -p AllowedCPUs=6-7 -p MemoryMax=4G --uid=simworlds --gid=simworlds" --heap-mb 768 --repeats 2 > /srv/sim-bench/runs/baseline-da5269cd0.log 2>&1
 ```
 
+   The world's command and env come from the checkout's own `tools/world-launcher/children.mjs` `defaultCommand` +
+   `production.mjs` `decorateCommand` (ENGINE, ENABLE_WORLD_ENGINE, SOUL_LIFECYCLE, fading, unwatched pace, malloc env,
+   heap), Eyes off; each run writes `world-command.json` (no secrets). A 10 s **preflight** boot of the fixture runs first
+   and stops the bench in seconds with the `world.log` tail if the world does not come up (`--arms none --repeats 0`
+   runs the preflight alone).
    About 2 h for six arms × two repeats (boot + join + 60 s warm-up + 30 s idle + 2 × 120 s per run). Background it
    (`nohup … &`); judge by `receipt.json`, never by the shell's exit code.
 4. **After**: copy `REPORT.md` + `receipt.json` (not `commands.jsonl`, not `souls/`) back to
