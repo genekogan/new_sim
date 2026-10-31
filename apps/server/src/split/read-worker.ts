@@ -8,7 +8,8 @@
 // Everything else (a C1 sent here by mistake, any other read, a query it does not serve, an unknown token) goes to the
 // main thread as a job over its `intents` MessagePort (load/admission.ts admissionPort: the same Admission.request as
 // the HTTP middleware, closed() through the port) and the answer (an act's receipt) comes back the same way.
-// Tokens: the main thread says which Soul a token is (and its account tag); the answer is kept 30 s.
+// Tokens: the main thread says which Soul a token is (and its account tag); fresh 30 s, then re-asked in the background
+// and still used up to 10 min (a revoked token can read its own Soul's subset that long while main is too busy to say).
 import {parentPort, workerData, type MessagePort} from 'node:worker_threads';
 import {createServer, type IncomingMessage, type ServerResponse} from 'node:http';
 import {threadCpuUsage} from 'node:process';
@@ -24,7 +25,7 @@ export type Forward = {method: string; url: string; headers: [string, string][];
 export type Forwarded = {status: number; headers: [string, string][]; body: ArrayBuffer};
 
 const wd = workerData as ReadWorkerData, M = new ReadModel(), lag = new Float64Array(wd.lag), load = wd.load ? new Float64Array(wd.load) : null;
-const AUTH_MS = wd.authMs ?? 30_000, CONTRACT = 'eden-edge/1';
+const AUTH_MS = wd.authMs ?? 30_000, AUTH_STALE_MS = 10 * 60_000, CONTRACT = 'eden-edge/1';
 const cpuMs = () => {const u = threadCpuUsage(); return (u.user + u.system) / 1000;};
 const cost = {deltas: 0, ingestCpuMs: 0, maxIngestCpuMs: 0, queries: 0, queryCpuMs: 0, maxQueryCpuMs: 0, initCpuMs: 0, served: 0, forwarded: 0};
 let gen = 0;
@@ -47,14 +48,30 @@ const port = wd.intents;
 let seq = 0;
 const waiting = new Map<number, (m: PortDone | AuthAnswer) => void>();
 port.on('message', (m: PortDone | AuthAnswer) => {const f = waiting.get(m.id); if (f) {waiting.delete(m.id); f(m);}});
-const tokens = new Map<string, {soulId: string | null; account?: string | null; at: number}>();
+const tokens = new Map<string, {soulId: string | null; account?: string | null; at: number}>(), checking = new Map<string, Promise<{soulId: string | null; account?: string | null}>>();
+/** Ask main who a token is (one question per token at a time); a token main no longer knows is forgotten. */
+function check(token: string) {
+  let p = checking.get(token);
+  if (!p) {
+    p = new Promise(res => {
+      const id = ++seq; waiting.set(id, (m) => {
+        const a = m as AuthAnswer; checking.delete(token);
+        if (a.soulId) {tokens.set(token, {soulId: a.soulId, account: a.account, at: Date.now()}); if (tokens.size > 50_000) tokens.clear();} else tokens.delete(token);
+        res(a);
+      });
+      port.postMessage({t: 'auth', id, token});
+    });
+    checking.set(token, p);
+  }
+  return p;
+}
+/** Fresh for AUTH_MS; then still used for up to AUTH_STALE_MS while main is asked again in the background (so a busy
+ *  main does not stall a Soul's reads), after which the Soul waits for main's answer. */
 function soulOf(token: string): Promise<{soulId: string | null; account?: string | null}> {
-  const hit = tokens.get(token), now = Date.now();
-  if (hit && now - hit.at < AUTH_MS) return Promise.resolve(hit);
-  return new Promise(res => {
-    const id = ++seq; waiting.set(id, (m) => {const a = m as AuthAnswer; if (a.soulId) {tokens.set(token, {soulId: a.soulId, account: a.account, at: Date.now()}); if (tokens.size > 50_000) tokens.clear();} res(a);});
-    port.postMessage({t: 'auth', id, token});
-  });
+  const hit = tokens.get(token), age = hit ? Date.now() - hit.at : Infinity;
+  if (hit && age < AUTH_MS) return Promise.resolve(hit);
+  if (hit && age < AUTH_STALE_MS) {void check(token); return Promise.resolve(hit);}
+  return check(token);
 }
 
 const level = (): Level => (load ? LEVELS[load[S.level]] : undefined) ?? 'green';

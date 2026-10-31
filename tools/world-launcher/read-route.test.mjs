@@ -113,7 +113,9 @@ test('full mode (B-facade route set): observe and view to the worker too, with q
     for (const p of ['/v1/edge/here?include=doHere', '/v1/edge/observe', '/v1/edge/view', '/v1/edge/capabilities?all=1']) assert.equal((await call(slug, p)).body.from, 'worker', p);
     assert.equal((await call(slug, '/v1/edge/around')).body.from, 'main');
     const off = await make('Off');
-    L.registry.update(off, { readWorkers: 0 });
+    const op = await fetch(`http://127.0.0.1:5240/__sim/op/set-read-workers`, { method: 'POST', body: JSON.stringify({ slug: off, readWorkers: 0 }) });
+    assert.equal(op.status, 200); assert.equal((await op.json()).readWorkers, 0);
+    assert.equal((await fetch(`http://127.0.0.1:5240/__sim/op/set-read-workers`, { method: 'POST', body: JSON.stringify({ slug: off, readWorkers: 7 }) })).status, 400);
     assert.equal(readWorkersOf(L.registry.get(off), { SIM_READ_WORKER: '1' }), 0);
     assert.equal((await call(off, '/v1/edge/here')).body.from, 'main', 'off from the registry: routed to main at once');
   } finally { await L.close(); }
