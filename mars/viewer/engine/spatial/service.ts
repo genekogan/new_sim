@@ -225,6 +225,69 @@ export class Spatial {
   }
 
   /**
+   * Stage B (lane B-spatial): the surfaces that are the ground field's own (not floors laid on it), when this service was
+   * built from a static scene export (fromStaticScene): its base then holds every composed surface. Absent: the source
+   * scene's (or base's) surfaces, as always.
+   */
+  ownSurfaces?: Set<string>;
+
+  /**
+   * Stage B (lane B-spatial): what the planner sees of the static world at the current navigation epoch, as plain data —
+   * the composed scene lists in the planner's order (base, static entities in world order, contributions), the base
+   * levels, and the ids of the ground's own surfaces. `Spatial.fromStaticScene` builds a service over exactly these
+   * lists that needs no world entities. Syncs first. Pure read (the lists are shared, not copied: never mutate them).
+   */
+  staticScene(world: WorldState): StaticSceneV1 {
+    this.sync(world);
+    const sc = this.pages?.all ?? this.scene;
+    return {
+      v: 1, cell: this.cell, planner: this.planner, baseId: this.baseId, navEpoch: this.epoch, bounds: this.base.bounds,
+      baseLevels: this.base.levels, levels: sc.levels, surfaces: sc.surfaces, obstacles: sc.obstacles, links: sc.links,
+      own: [...(this.ownSurfaces ?? new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id)))],
+      ground: this.ground ? { paged: this.ground.paged } : null,
+    };
+  }
+
+  /**
+   * Stage B (lane B-spatial): a service over a static scene export, with no world entities behind it (the read worker's
+   * replica). Ground worlds pass the field the export names (the caller resolves its recipe). Sync it with a world that
+   * holds bodies only: its composed lists are the export's, in the same order.
+   */
+  static fromStaticScene(s: StaticSceneV1, world: WorldState, field?: GroundField): Spatial {
+    const sp = new Spatial(staticBase(s), { cell: s.cell, baseId: s.baseId, planner: s.planner });
+    sp.ownSurfaces = new Set(s.own);
+    if (s.ground) {
+      if (!field) throw new Error('spatial.static-scene: a ground scene needs its field');
+      sp.setGround(field, world, [], { paged: s.ground.paged });
+    } else sp.sync(world);
+    sp.epoch = s.navEpoch;
+    return sp;
+  }
+
+  /**
+   * Stage B (lane B-spatial): take a newer export of the same world in place (an epoch change): the next sync rebuilds
+   * the scene, and the ground's tiles are rebuilt only where their content changed (tile caches are keyed by content).
+   * The service's epoch becomes the export's. A different cell, planner or ground mode is not a rebase (false): build anew.
+   */
+  rebaseStatic(s: StaticSceneV1, world: WorldState): boolean {
+    if (s.cell !== this.cell || s.planner !== this.planner || !s.ground !== !this.ground || (s.ground && s.ground.paged !== this.ground!.paged)) return false;
+    this.base = staticBase(s);
+    this.baseId = s.baseId;
+    this.ownSurfaces = new Set(s.own);
+    this.raster = new StaticRaster(this.base.obstacles, this.base.bounds, this.cell);
+    this.scene = undefined as unknown as SpatialScene;
+    this.pages = null;
+    this.snaps = [];
+    this.trustToken = -1;
+    this.aroundCache.clear();
+    this.narrowCache.clear();
+    this.outside.clear();
+    this.sync(world);
+    this.epoch = s.navEpoch;
+    return true;
+  }
+
+  /**
    * Enter (or leave, with null) ground mode on `field`, the window covering `points` (bodies, active goals). The next sync
    * rebuilds the grids and advances the navigation epoch, so walkers replan on the new ground.
    */
@@ -355,7 +418,7 @@ export class Spatial {
     }
     this.scene = { bounds: g.bounds(), levels, surfaces, obstacles, links };
     // level-0 floors laid on the ground (not the source scene's own flat field): they raise the standing height
-    const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
+    const own = this.ownSurfaces ?? new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
     g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
     g.setSolids(obstacles);
     const grids = () => g.grids(this.scene);
@@ -377,7 +440,7 @@ export class Spatial {
     const changed = this.navChanged(world, (e) => clip(rectOf([[e.pose.p[0], e.pose.p[2]]]))) || !this.scene;
     for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
     if (!units.length) clip(rectOf([[0, 0]]));
-    const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    const rects = this.pinnedPages ?? clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
     this.stats.pagedSyncs++;
     if (!changed && this.pages && this.pages.key === key) return false;
     const t0 = performance.now();
@@ -406,7 +469,7 @@ export class Spatial {
     }
     const all: SpatialScene = { bounds: g.boundsOf(rects[0]), levels, surfaces, obstacles, links };
     if (changed) {
-      const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
+      const own = this.ownSurfaces ?? new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
       g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
       g.setSolids(obstacles);
     }
@@ -529,6 +592,20 @@ export class Spatial {
     return built;
   }
   private outside = new Map<string, LevelGrid | null>();
+
+  /**
+   * Stage B (lane B-spatial), paged ground: the windows the service faces now (shared: never mutate), or null. A read near
+   * a window's edge answers from that window's grid (the parts of a ring search beyond it read as blocked), so a replica
+   * holds the same windows to give the same answers.
+   */
+  pageRectsV1(): TileRect[] | null { return this.pages?.rects ?? null; }
+  /** Stage B (lane B-spatial), paged ground: hold exactly these windows (another service's pageRectsV1) instead of the
+   *  bodies' clusters; null returns to the clusters. Grids of windows whose rect is unchanged are kept. */
+  pinPagesV1(rects: TileRect[] | null, world: WorldState): void {
+    this.pinnedPages = rects ? rects.map((r) => [...r] as TileRect) : undefined;
+    if (this.ground?.paged) this.sync(world);
+  }
+  private pinnedPages?: TileRect[];
 
   /** Paged ground diagnostics: the windows (tile rects) and the bytes their built grids hold. */
   pagesInfo(): { rects: TileRect[]; built: number; bytes: number } | null {
@@ -810,3 +887,26 @@ export function narrowComponents(cl: Float32Array, nx: number, nz: number, r: nu
   return lab;
 }
 let narrowStack = new Int32Array(0);
+
+/** Stage B (lane B-spatial): a synced service's static products at one navigation epoch (Spatial.staticScene). Plain
+ *  data (structured-clone it: obstacle heights may be infinite). */
+export type StaticSceneV1 = {
+  v: 1; cell: number; planner: 'exact' | 'corridor'; baseId: string; navEpoch: number;
+  bounds: SpatialScene['bounds']; baseLevels: SpatialScene['levels'];
+  levels: SpatialScene['levels']; surfaces: Surface[]; obstacles: Obstacle[]; links: Link[];
+  own: string[]; ground: { paged: boolean } | null;
+};
+/** The base a static export stands for: every composed list (the export's base levels stay separate, for levelOf reads). */
+function staticBase(s: StaticSceneV1): SpatialScene {
+  return { bounds: s.bounds, levels: s.levels, surfaces: s.surfaces, obstacles: s.obstacles, links: s.links };
+}
+/** Stage B (lane B-spatial): the engine's static scene export (MarsEngine.exportStaticScene): the service's static
+ *  products plus what the engine adds — its static epoch counter (staticEpochV1), the ground recipe the field is baked from
+ *  (opaque here; the replica registers it), the connectivity anchor (the world's arrival point on the ground), whether
+ *  the engine is a physical binding (whose dry-ground read needs world state), the defs with seats, and the entity-physics hash the scene
+ *  lists were collected under (they can change with it without a navigation epoch). */
+export type StaticExportV1 = StaticSceneV1 & {
+  epoch: number; recipeHash: string | null; recipe: unknown; arrival: Vec2; physical: boolean; physicsHash: string | null;
+  /** Catalogue defs with a seat slot (god defs register into the catalogue at run time, so the worker cannot read it). */
+  seatDefs: string[];
+};
