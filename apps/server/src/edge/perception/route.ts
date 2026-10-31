@@ -30,7 +30,8 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     .filter(p => p.parent !== null && !p.carrier && p.kind !== 'sleeping-mat' && !/(^|-)mat-\d+$/.test(p.id) && K.knows(soul.soulId, p.id));
   const placeAt = (p: Place) => centroid(p.polygon) as V2;
   const leg = (to: V2, inside: boolean) => {const m = inside ? 0 : Math.round(dist2(pos, to)); return {m, dir: compassWord(compassOf(to[0] - pos[0], to[1] - pos[1])), eta: '~' + durationWord(walkSeconds(m * 1.25)) + ' walk'};};
-  const mine = new Set(ledger.placePathOf(soul.soulId).map(p => p.id));
+  const path = ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier'), currentPlace = path[0];
+  const mine = new Set(path.map(p => p.id));
   // a landmark along the way (between 15% and 85% of the line, close to it), else the nearest landmark to where you are going
   const landmark = (to: V2, skip: Set<string>) => {
     const len = dist2(pos, to); if (len < 12) return null;
@@ -43,9 +44,17 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     }
     return best ? {how: best.how, name: best.p.name, id: best.p.id} : null;
   };
+  // Names/aliases are authored vocabulary; shared aliases return a bounded choice rather than a silent nearest.
+  const ask=tokens(query),matches=(names:string[])=>{const exact=names.some(n=>tokens(n).join(' ')===ask.join(' '));const all=names.flatMap(tokens);return exact?0:ask.length&&ask.every(w=>all.includes(w))?1:9;};
+  const scored=known.map(p=>{const tier=matches([p.name,p.id,...(p.aliases??[]),...(p.semanticKind?[p.semanticKind]:[])]),at=placeAt(p);return{p,at,exact:tier===0,tier:tier+(p.name.includes('/')?0.5:0),d:inPoly(pos[0],pos[1],p.polygon)?0:dist2(pos,at)};}).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier||a.d-b.d);
+  const parts=known.flatMap(p=>(p.parts??[]).filter(part=>knownPart(ledger,soul,ledger.places.byId.get(p.id)!,part)).map(part=>{const named=matches([part.title,...(part.aliases??[])]);return{p,part,exact:named===0,tier:named<9?named:matches([part.title,...(part.aliases??[]),p.name,...(p.aliases??[])])+0.5};})).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier);
+  // Keep exact Soul lookup, but a known exact destination must not be stolen by
+  // a Soul whose longer name merely contains it. Withheld places/parts do not
+  // participate in this choice; their names must not change a visible result.
+  const souls = [...ledger.host.minds.values()].filter(m => m.soulId !== soul.soulId);
+  const exactDestination=scored.some(x=>x.exact)||parts.some(x=>x.exact);
+  const soulHit = souls.find(m=>norm(m.name)===q) ?? (!exactDestination&&q.length>=4?souls.find(m=>norm(m.name).includes(q)):undefined);
   // a Soul by name: where it is (its building or outdoor place, never the room)
-  const soulHit = [...ledger.host.minds.values()].filter(m => m.soulId !== soul.soulId && norm(m.name) === q || (q.length >= 4 && m.soulId !== soul.soulId && norm(m.name).includes(q)))
-    .sort((a, b) => Number(norm(b.name) === q) - Number(norm(a.name) === q))[0];
   if (soulHit) {
     const b = P.w.entities[soulHit.entityId]; if (!b) return {query, found: false, reason: `${soulHit.name} is not in the world right now.`};
     const at: V2 = [b.pose.p[0], b.pose.p[2]], where = ledger.placePathOf(soulHit.soulId).find(p => p.kind !== 'occupier' && p.kind !== 'room' && plainName(p.name) && !K.isSecret(p.id))
@@ -54,10 +63,6 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     return {query, found: true, soul: {id: soulHit.soulId, name: soulHit.name}, at: where?.name ?? 'out in the open', ...l, ...(lm ? {[lm.how]: lm.name} : {}),
       say: `${soulHit.name} is at ${where?.name ?? 'an open spot'}, ${l.m} m ${l.dir} of you (${l.eta})${lm ? `, ${lm.how} ${lm.name}` : ''}.`};
   }
-  // Names/aliases are authored vocabulary; shared aliases return a bounded choice rather than a silent nearest.
-  const ask=tokens(query),matches=(names:string[])=>{const exact=names.some(n=>tokens(n).join(' ')===ask.join(' '));const all=names.flatMap(tokens);return exact?0:ask.length&&ask.every(w=>all.includes(w))?1:9;};
-  const scored=known.map(p=>{const tier=matches([p.name,p.id,...(p.aliases??[]),...(p.semanticKind?[p.semanticKind]:[])]),at=placeAt(p);return{p,at,tier:tier+(p.name.includes('/')?0.5:0),d:inPoly(pos[0],pos[1],p.polygon)?0:dist2(pos,at)};}).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier||a.d-b.d);
-  const parts=known.flatMap(p=>(p.parts??[]).filter(part=>knownPart(ledger,soul,ledger.places.byId.get(p.id)!,part)).map(part=>({p,part,tier:matches([part.title,...(part.aliases??[])])<9?matches([part.title,...(part.aliases??[])]):matches([part.title,...(part.aliases??[]),p.name,...(p.aliases??[])])+0.5}))).filter(x=>x.tier<9).sort((a,b)=>a.tier-b.tier);
   if(parts.length&&(!scored.length||parts[0].tier<scored[0].tier)){
     const tied=parts.filter(x=>x.tier===parts[0].tier);
     if(tied.length>1)return{query,found:false,code:'place.ambiguous',reason:'Several named parts match; choose one by its owner and name.',candidates:tied.slice(0,5).map(({p,part})=>({name:part.title,in:p.name,walk:part.walk}))};
@@ -74,11 +79,12 @@ export function routeFrame(ledger: EdgeLedger, soul: EdgeSoul, query: string) {
     return {query, found: false, reason: `No place or Soul you know is called "${query}". Try a word from its name; explore shows what is close by.`};
   }
   const walks = new Map(ledger.capabilities(soul).filter(c => c.verb === 'walk' && c.target?.kind === 'place').map(c => [c.target!.id, c.id]));
-  const {p, at, d} = scored[0]!, inside = mine.has(p.id), l = leg(at, inside || d === 0), lm = landmark(at, new Set([p.id]));
+  const {p, at, d} = scored[0]!, within = mine.has(p.id), inside = currentPlace?.id === p.id, ancestor = within && !inside;
+  const l = leg(at, inside || !ancestor && d === 0), lm = landmark(at, new Set([p.id]));
   const walk = walks.get(p.id) ?? `walk:${p.id}`, problem = inside ? null : ledger.routeProblem(soul, walk);
   const also = scored.slice(1).filter(x => x.tier <= scored[0]!.tier + 0.5).slice(0, 3).map(x => {const o = leg(x.at, x.d === 0); return `${x.p.name} · ${o.m} m ${o.dir}`;});
-  return {query, found: true, place: {id: p.id, name: p.name}, ...l, ...(lm ? {[lm.how]: lm.name} : {}), ...(inside ? {here: true} : {walk, ...(problem ? {reachable: false, why: problem.code} : {})}),
-    say: inside ? `You are at ${p.name} now.` : `${p.name}: ${l.m} m ${l.dir} (${l.eta})${lm ? `, ${lm.how} ${lm.name}` : ''}. To go: act ${walk}.`, ...(also.length ? {also} : {})};
+  return {query, found: true, place: {id: p.id, name: p.name}, ...l, ...(currentPlace ? {currentPlace: {id: currentPlace.id, name: currentPlace.name}} : {}), ...(within ? {within: true} : {}), ...(lm ? {[lm.how]: lm.name} : {}), ...(inside ? {here: true} : {walk, ...(problem ? {reachable: false, why: problem.code} : {})}),
+    say: inside ? `You are at ${p.name} now.` : ancestor ? `You are in ${currentPlace!.name}, within ${p.name}. To go to ${p.name}'s destination: act ${walk}.` : `${p.name}: ${l.m} m ${l.dir} (${l.eta})${lm ? `, ${lm.how} ${lm.name}` : ''}. To go: act ${walk}.`, ...(also.length ? {also} : {})};
 }
 /** L3 (b): an exact capability id as offered now (resolveIdV1: the one offer, else on demand), or undefined. */
 export function offeredExactly(ledger:EdgeLedger,soul:EdgeSoul,id:string):EdgeCapability|undefined{

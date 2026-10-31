@@ -68,6 +68,8 @@ export class ReplicaWorld {
       placeLevelV1: level => placeLevelOf({upperFloorsV1: this.statics.upperFloors ?? undefined} as never, level),
       bodyUsesV1: id => this.bodyUsesV1(id),
       seatOccupantsV1: (id, kind) => this.seatOccupantsV1(id, kind),
+      // B-delta's HoldRow (re-read when a tick names the body): the exact native seat slot here.ts seat() reports
+      nativeSeatHoldsV1: actor => (this.R.holds.get(actor)?.[1] ?? []).map(h => ({action: h.action, slot: h.slot})),
       movementVerb: (actor, x, z) => this.movementVerb(actor, x, z),
       bodyWaterDepthV1: actor => this.bodyWaterDepthV1(actor),
       routeEstimateV1: (actor, to, level) => this.routeEstimateV1(actor, to, level),

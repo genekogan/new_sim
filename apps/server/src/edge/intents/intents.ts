@@ -342,12 +342,34 @@ export class Intents {
     }
   }
 
+  /** A dry run's answer for one resolved capability (the full path below and the exact-walk fast path share it). */
+  private capabilityWould(soul: EdgeSoul, cap: EdgeCapability, asked: string, params: Record<string, unknown>, note: string, extra?: Record<string, unknown>): Record<string, unknown> {
+    const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, cap);
+    return {ok: true, would: {capability: cap.id, label: cap.label, available: cap.available, ...(cap.blocked ? {blocked: cap.blocked} : {}), ...(Object.keys(params).length ? {params} : {}), channel: cap.verb === 'face' ? 'attention' : 'body',
+      ...resolvedParts(this.L,soul,cap,asked), ...(note ? {resolved: note + (extra?.with ? `. Act it with these params (act ${cap.id} '${JSON.stringify(extra)}'), or act the same words; an act without "with" is solo.` : '')} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
+  }
+  /** Latency only (continuity r3, 2026-10-30: two concurrent `resolve walk:<ref>` each built the whole-world menu and
+   *  stalled Eden 2026 ~1.9 s). A listed exact walk act would take its fast path for resolves over act's narrow bindings
+   *  (exactWalkBindings, then explicitPlaceCapability over them), never the whole menu. For such an offer the full path
+   *  below has a fixed course (no place, attention, class, strict or social rewrite: the listing holds the exact id) and
+   *  ends in capabilityWould with the same capability, so the answer is identical. Null means: take the full path. */
+  private exactWalkDryRun(soul: EdgeSoul, capability: string, params: unknown): Record<string, unknown> | null {
+    if (this.L.bodyVerbProblem(soul, capability.split(/[:\s]/)[0]!)) return null;   // as act: body refusals first
+    const exact = this.L.coreA.exactListedWalk(soul, {capability, params}); if (!exact) return null;
+    const asked = capability.trim();
+    if (explicitPlaceCapability(this.L, soul, asked, exact.caps)) return null;
+    const v = this.L.resolveOnDemand(soul, asked, exact.caps, exact.plans).v;
+    if (v.kind !== 'exact' || v.cap.id !== asked) return null;
+    return this.capabilityWould(soul, v.cap, asked, {}, '');
+  }
+
   /** POST /v1/edge/resolve: what act would do, without doing anything. */
   dryRun(soul: EdgeSoul, input: IntentInput & {capability?: unknown}): Record<string, unknown> {
     if (typeof input.capability === 'string' && input.verb === undefined) {
       const walk=walkWithDestinationWords(input.capability,[...this.L.host.minds.values()].map(m=>m.name));if(walk){const out=this.dryRun(soul,{...walk,...(input.params?{params:input.params}:{})});if(out.ok!==false)return out;
         // quality case 27: an ambiguous destination name ("the library") falls back to the walk the plain words resolve to, still inviting the companions
         const alt=walkWithFallback(this.L,soul,walk);return alt?{ok:true,would:{capability:alt.cap.id,label:alt.cap.label,available:alt.cap.available,params:{with:walk.with},channel:'body',resolved:`${input.capability} is ${alt.cap.id} with ${(walk.with as string[]).join(', ')} invited ({"with": ${JSON.stringify(walk.with)}}); they join if they accept.`}}:out;}
+      const exact = this.exactWalkDryRun(soul, input.capability, input.params); if (exact) return exact;
       // Social approaches may add an on-demand plan. Keep the dry run's additions local, just as act does.
       // L3 (b): words resolve on the words menu; resolveText / exactWords rebuild the chosen offer exactly
       const bound = this.L.coreA.wordsMenu(soul), caps = [...bound.caps], plans = new Map(bound.plans), asked = input.capability.trim();
@@ -365,9 +387,7 @@ export class Intents {
       const r = text === asked ? this.L.coreA.resolveText(soul, asked, caps) : caps.some(c => c.id === text) ? this.L.coreA.exactWords(soul, bound, text, {kind: 'exact' as const, cap: caps.find(c => c.id === text)!}) : this.L.coreA.resolveText(soul, text, caps);
       if (r.kind === 'unknown') return {ok: false, code: (r as {code?: string}).code ?? 'capability.unknown', reason: r.reason, did_you_mean: r.didYouMean,...(r.discovery?{discovery:r.discovery}:{})};
       const params = {...(r.kind === 'alias' && r.params ? r.params : {}), ...(extra ?? {})};
-      const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, r.cap), note = [social?.note, r.kind === 'alias' ? r.note : null].filter(Boolean).join('; ');
-      return {ok: true, would: {capability: r.cap.id, label: r.cap.label, available: r.cap.available, ...(r.cap.blocked ? {blocked: r.cap.blocked} : {}), ...(Object.keys(params).length ? {params} : {}), channel: r.cap.verb === 'face' ? 'attention' : 'body',
-        ...resolvedParts(this.L,soul,r.cap,asked), ...(note ? {resolved: note + (extra?.with ? `. Act it with these params (act ${r.cap.id} '${JSON.stringify(extra)}'), or act the same words; an act without "with" is solo.` : '')} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
+      return this.capabilityWould(soul, r.cap, asked, params, [social?.note, r.kind === 'alias' ? r.note : null].filter(Boolean).join('; '), extra);
     }
     const r = this.resolve(soul, input);
     if (!r.ok) return {...r};

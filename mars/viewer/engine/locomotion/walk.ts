@@ -132,6 +132,12 @@ type Exec = {
   /** The temporary obstacles the current route was planned with (routeAround); its legs are smoothed on those grids. */
   around?: AroundPerson[];
   peopleReplans: number;
+  /** occupied-link-routing/1: stable far-landing obstruction, observed only
+   * while still supported at the flight entry. Plain state survives snapshots. */
+  linkWait?: { link: string; blocker: string; at: Vec2; still: number; lastTry: number };
+  /** concurrent-link-egress/1: at most one courtesy search per unchanged
+   * climber/blocker/geometry episode. Never replan the between-floor body. */
+  linkYield?: {link:string;blocker:string;epoch:number;at:number[];other:number[];nearby:Record<string,number[]>};
   /**
    * Head-on encounter decision, latched for the whole encounter (hysteresis): `room` = both walkers'
    * passing spots have clearance, so both keep walking at PASS_SPEED on PASS_OFFSET (side +1 = right)
@@ -147,7 +153,9 @@ type Exec = {
    * `makeWay` with `clearOf`): walk to `spot`, wait there until `clearOf(goal)` holds (the formation no
    * longer needs the goal), then replan to the goal.
    */
-  detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf?: (q: Vec2) => boolean; landing?: {y:number;radius:number}; stage: 'pending' | 'going' | 'waiting'; faceoff?: boolean };
+  detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf?: (q: Vec2) => boolean; landing?: {y:number;radius:number}; stage: 'pending' | 'going' | 'waiting'; faceoff?: boolean;
+    /** A validated short courtesy route; avoids repeating its budgeted search. */
+    planned?:{epoch:number;route:Route;around:AroundPerson[]};egress?:true};
   /** Entity worlds: the walker this one has stood face to face with (each blocked by the other) since `since`, as of `tick`. */
   faceoff?: { id: string; since: number; tick: number };
   /** BS3 watchdog: where (and on which level) the walk last made progress, its own ticks since, and whether it replanned. */
@@ -511,7 +519,7 @@ function tryEnter(rt: Runtime, ex: Exec, n: Narrow): string | null {
 }
 
 /** Existing person/load recovery path, shared with the bounded persistent-wait request. */
-function retryPeople(rt: Runtime, ex: Exec, a: Entity): boolean {
+function retryPeople(rt: Runtime, ex: Exec, a: Entity, landingPeople: AroundPerson[] = []): boolean {
   // Do not substitute a snapped safe endpoint for a destination inside a sleeper.
   if (!ex.cancelTo && occupant(rt, a, ex.goal.p, ex.profile.radius, true, ex.goal.level)) return false;
   const sp = spatial(rt,ex.actor);
@@ -526,6 +534,7 @@ function retryPeople(rt: Runtime, ex: Exec, a: Entity): boolean {
   const blockers = Object.entries(ex.block!.at).sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0)).filter(([id]) => rt.world.entities[id]?.kind === 'human').map(([id, p]) => ({ id, p }));
   let others = [...standingPeople(rt, a), ...loads];
   for (const b of blockers) if (!others.some((o) => o.id === b.id)) others.push(b);
+  for (const b of landingPeople) if (!others.some((o) => o.id === b.id)) others.push(b);
   const from = { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] as Vec2 };
   // a failure's diagnostic is only read below, for subjects among `others`: an unfinished-stairs
   // explanation (a second, successful search naming links) can matter only for a link with such an id
@@ -601,22 +610,27 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     return stepLink(rt, ex, a, activeLeg, dt);
   }
   if (ex.detour?.stage === 'pending') {
-    const by = ex.detour.faceoff ? rt.world.entities[ex.detour.by] : undefined;
-    const r = by ? sp.routeAround(rt.world, ex.profile, { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] }, { level: ex.detour.level, p: ex.detour.spot }, [{ id: by.id, p: [by.pose.p[0], by.pose.p[2]] }])
-      : planWalk(rt, a, { level: ex.detour.level, p: ex.detour.spot }, ex.profile);
-    if (r.ok) {
-      releaseAll(rt, ex);
-      ex.route = r.route;
-      ex.around = undefined;
-      ex.leg = 0;
-      ex.replans++;
-      ex.stuck = 0;
-      ex.v = 0;
-      ex.detour.stage = 'going';
-      enterLeg(rt, ex);
-      return { status: 'running', phase: 'step-aside' };
+    const planned=ex.detour.planned;
+    if(planned&&planned.epoch!==sp.epoch){ex.detour=undefined;}
+    else {
+      const by = ex.detour.faceoff ? rt.world.entities[ex.detour.by] : undefined;
+      const r = planned?{ok:true as const,route:planned.route}:by ? sp.routeAround(rt.world, ex.profile, { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] }, { level: ex.detour.level, p: ex.detour.spot }, [{ id: by.id, p: [by.pose.p[0], by.pose.p[2]] }])
+        : planWalk(rt, a, { level: ex.detour.level, p: ex.detour.spot }, ex.profile);
+      if (r.ok) {
+        releaseAll(rt, ex);
+        ex.route = r.route;
+        ex.around = planned?.around;
+        delete ex.detour.planned;
+        ex.leg = 0;
+        ex.replans++;
+        ex.stuck = 0;
+        ex.v = 0;
+        ex.detour.stage = 'going';
+        enterLeg(rt, ex);
+        return { status: 'running', phase: 'step-aside' };
+      }
+      ex.detour = undefined;
     }
-    ex.detour = undefined;
   }
   if (ex.detour?.stage === 'waiting') {
     // walk on once the goal and the first stretch of the way back to it are clear of the formation
@@ -628,6 +642,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
       a.human!.activity = 'wait';
       return blockedWait(rt, ex.id, ex.actor, d.blockers ?? [], { code: 'traffic.stepped-aside', message: `${ex.actor} stepped aside for ${d.by} and waits for it to pass before walking on`, subjects: [ex.actor, d.by] });
     }
+    const resetPeople=ex.detour.egress===true;
     ex.detour = undefined;
     releaseAll(rt, ex);
     ex.route = r.route;
@@ -635,6 +650,10 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     ex.leg = 0;
     ex.replans++;
     ex.stuck = 0;
+    // The bounded courtesy actually reached another supported spot and waited
+    // for the dependency to clear. Its old blocked episode must not exhaust
+    // avoidance of a different person later along the original route.
+    if(resetPeople)ex.peopleReplans=0;
     enterLeg(rt, ex);
     return { status: 'running', phase: 'replan' };
   }
@@ -1322,6 +1341,9 @@ function resolveFaceoff(rt: Runtime, ex: Exec, who: string) {
   if (waited < FACEOFF_TICKS) return;
   const ot = rt.world.entities[who]?.human?.task, orec = ot ? rt.records.get(ot) : undefined, oex = ot ? walkExecs(rt).get(ot) : undefined;
   if (!oex || orec?.status !== 'blocked' || !orec.diagnostic?.subjects?.includes(ex.actor) || oex.detour || ex.detour) return;
+  // The prospective landing rule handles this cross-phase case. The old
+  // floor faceoff's clearOfWay/pointAt requires two actual walk legs.
+  if(rt.services.concurrentLinkEgressV1===true&&oex.route.legs[oex.leg]?.kind!=='walk')return;
   const first = orec.diagnostic.code === 'traffic.yield' || ex.actor < who ? who : ex.actor;
   const mover = waited < 3 * FACEOFF_TICKS ? first : first === who ? ex.actor : who;
   const forEx = mover === who ? ex : oex, moverEx = mover === who ? oex : ex;
@@ -1574,6 +1596,48 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
   // a turning flight (Link.faceAlong, upper-floors/1) is entered and climbed facing along its steps
   const face = link.faceAlong ? alongYaw(linkGeometry(leg), ex.phase === 'align' ? 0 : ex.climbT, a.pose.yaw) : leg.ascending ? link.heading : wrapAngle(link.heading + Math.PI);
   if (ex.phase === 'align') {
+    if (rt.services.occupiedLinkRoutingV1 === true && !ex.cancelTo && !ex.detour && ex.climbT <= 1e-9) {
+      const exit = leg.ascending ? link.to : link.from;
+      const stationary = entitiesOf(rt).filter(o => o.id !== a.id && o.kind === 'human' && !isActiveWalker(rt, o));
+      const atLanding = (o: Entity, end: LinkLeg['link']['from']) => {
+        const dy = Math.abs(o.pose.p[1] - end.y), dx = o.pose.p[0] - end.p[0], dz = o.pose.p[2] - end.p[1];
+        // Same physical separation as stairBlocker; a different level label
+        // does not let a seated body at the far landing disappear from view.
+        return (a.body?.family === 'floater' && dy <= 1.1 ? hypot(dx, dz) : hypot(dx, dy * .5, dz)) < 2 * ex.profile.radius - .02;
+      };
+      const blocker = stationary.find(o => atLanding(o, exit));
+      if (blocker) {
+        const p: Vec2 = [blocker.pose.p[0], blocker.pose.p[2]], old = ex.linkWait;
+        if (!old || old.link !== link.id || old.blocker !== blocker.id)
+          ex.linkWait = {link: link.id, blocker: blocker.id, at: p, still: 1, lastTry: rt.tick};
+        else if (dist2(old.at, p) >= .1) { old.at = p; old.still = 0; }
+        else old.still++;
+        const wait = ex.linkWait!;
+        // retryPeople adds the named blocker explicitly, including one on a
+        // different floor; its normal standingPeople scan covers our plane.
+        ex.block = {id: blocker.id, at: {[blocker.id]: p}, s0: ex.s, leg: ex.leg};
+        ex.v = 0; a.human!.activity = 'wait';
+        const entry = leg.ascending ? link.from : link.to, sp = spatial(rt, ex.actor), here: Vec2 = [a.pose.p[0], a.pose.p[2]];
+        const floor = sp.levelAt(entry.level, here), y = entry.level === 0 && sp.ground ? sp.ground.standY(...here) : floor?.y;
+        const supported = a.human!.level === entry.level && floor && y !== undefined && Math.abs(a.pose.p[1] - y) <= .03 && clearanceAt(floor, here) >= ex.profile.radius;
+        const delay = DECIDE_TICKS * (1 << Math.min(ex.peopleReplans, 5));
+        if (supported && wait.still >= delay && rt.tick - wait.lastTry >= delay && ex.peopleReplans < MAX_PEOPLE_REPLANS && takeReplan(rt, false)) {
+          wait.lastTry = rt.tick;
+          // Include other occupied landings too: choosing another already
+          // blocked flight would spend the retry budget walking between them.
+          const people = stationary.filter(o => sp.scene.links.some(l => atLanding(o, l.from) || atLanding(o, l.to)))
+            .map(o => ({id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2}));
+          const before = ex.peopleReplans, rerouted = retryPeople(rt, ex, a, people);
+          // A newly occupied sleep goal can refuse before retryPeople starts
+          // its search; that decision still consumes this bounded attempt.
+          if (ex.peopleReplans === before) ex.peopleReplans++;
+          if (rerouted) { delete ex.linkWait; return {status: 'running', phase: 'replan'}; }
+        }
+        return blockedWait(rt, ex.id, ex.actor, [blocker.id], {code: 'traffic.person',
+          message: `${ex.actor} waits before ${link.id}: ${blocker.id} occupies its far landing`, subjects: [ex.actor, blocker.id, link.id]});
+      }
+      if (ex.linkWait) { delete ex.linkWait; ex.block = undefined; ex.stuck = 0; ex.still = 0; }
+    }
     // a walk leg ends within 5 cm of the flight's standing entry point (its settle tolerance): step onto
     // it at walking pace first, so the climb starts from where the body is (no jump onto the first step)
     const en = leg.ascending ? link.from : link.to;
@@ -1617,6 +1681,7 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
   // someone standing on / at the end of the stair: wait rather than pass through them
   const blocker = stairBlocker(rt, a, a.pose.p, next, ex.profile.radius);
   if (blocker) {
+    if(rt.services.concurrentLinkEgressV1===true)yieldLinkLanding(rt,ex,a,leg,blocker);
     if(a.body?.family==='floater')makeWay(rt,blocker,[next[0],next[2]],{by:a.id,subjects:[a.id],landing:{y:rt.world.entities[blocker].pose.p[1],radius:2*ex.profile.radius+.3}});
     ex.climbT = Math.max(0, ex.climbT - CLIMB_SPEED * dt);
     a.human!.activity = 'climb-wait'; // still on the stair: stair geometry, not the floor grid, applies
@@ -1639,6 +1704,54 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     return { status: 'running', phase: ex.phase };
   }
   return { status: 'running', phase: 'climb' };
+}
+
+/** A supported walker can clear a climber while retaining its own departure.
+ * Only an actual reciprocal passage wait admits this short physical courtesy;
+ * idle/held bodies and arbitrary active programs never become its subjects. */
+function yieldLinkLanding(rt:Runtime,ex:Exec,a:Entity,leg:LinkLeg,who:string){
+  if(ex.cancelTo||ex.detour||!['traffic.yield','traffic.person'].some(code=>publishedWaitsFor(rt,who,a.id,code)))return;
+  const other=rt.world.entities[who],task=other?.human?.task,walker=task?walkExecs(rt).get(task):undefined,record=task?rt.records.get(task):undefined;
+  if(!other?.human||other.human.grip||other.human.on||other.human.riding||other.human.sleepPose||!walker||record?.verb!=='walk_to'||record.status!=='blocked'||walker.phase!=='walk'||walker.route.legs[walker.leg]?.kind!=='walk'||walker.detour||walker.cancelTo)return;
+  const sp=spatial(rt,who),from:Vec2=[other.pose.p[0],other.pose.p[2]],level=other.human.level,g=sp.levelAt(level,from);
+  const floorY=level===0&&sp.ground?sp.ground.standY(...from):g?.y;
+  if(!g||floorY===undefined||Math.abs(other.pose.p[1]-floorY)>.03)return;
+  const prior=ex.linkYield,moved=(p:number[],q:number[])=>hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2])>=.1;
+  // A third body leaving a candidate pocket changes its availability even if
+  // the two waiting bodies and static geometry have not changed. Retain local
+  // anchors, not a periodic retry or an ever-growing observation history.
+  const nearby=Object.fromEntries(entitiesOf(rt).filter(o=>o.id!==who&&o.id!==a.id&&o.kind==='human'&&sameBodyPlane(other,o)&&dist2(from,[o.pose.p[0],o.pose.p[2]])<=3).map(o=>[o.id,[...o.pose.p]]));
+  const samePeople=prior?.nearby&&Object.keys(prior.nearby).length===Object.keys(nearby).length&&Object.entries(nearby).every(([id,p])=>prior.nearby[id]&&!moved(prior.nearby[id],p));
+  if(prior&&prior.link===leg.link.id&&prior.blocker===who&&prior.epoch===sp.epoch&&samePeople&&!moved(prior.at,a.pose.p)&&!moved(prior.other,other.pose.p))return;
+  if(!takeReplan(rt,false))return;
+  ex.linkYield={link:leg.link.id,blocker:who,epoch:sp.epoch,at:[...a.pose.p],other:[...other.pose.p],nearby};
+  const radius=walker.profile.radius,need=radius+ex.profile.radius+.1,geo=linkGeometry(leg);
+  // Clear the whole flight, not only the climber's present centre. Vertical
+  // weighting matches the existing stair-person separation; no level snap.
+  const clearFlight=(q:Vec2)=>geo.path.slice(1).every((p,i)=>{
+    const start=geo.path[i],dx=p[0]-start[0],dy=(p[1]-start[1])*.5,dz=p[2]-start[2],n=dx*dx+dy*dy+dz*dz;
+    const qx=q[0]-start[0],qy=(floorY-start[1])*.5,qz=q[1]-start[2],t=n?clamp((qx*dx+qy*dy+qz*dz)/n,0,1):0;
+    return hypot(qx-t*dx,qy-t*dy,qz-t*dz)>=need;
+  });
+  const away=norm2(sub2(from,[a.pose.p[0],a.pose.p[2]])),base=len2(away)>0?away:[1,0] as Vec2;
+  let spot:Vec2|undefined;
+  // A narrow landing can have a genuine sub-metre pocket while all of the
+  // older 1.2m+ make-way candidates lie beyond its floor. Search remains finite.
+  for(const distance of [.4,.6,.8,1,1.2,1.6]){
+    for(let k=0;k<16;k++){
+      const q=add2(from,scale2(rot2(base,k*Math.PI/8),distance)),floor=sp.levelAt(level,q);
+      const y=level===0&&sp.ground?sp.ground.standY(...q):floor?.y;
+      if(!floor||y===undefined||Math.abs(y-floorY)>.03||clearanceAt(floor,q)<radius+PLAN_MARGIN||occupant(rt,other,q,radius+.1)||!clearFlight(q)||!stepAwayClear(rt,other,from,q))continue;
+      spot=q;break;
+    }
+    if(spot)break;
+  }
+  if(!spot)return;
+  const around=[{id:a.id,p:[a.pose.p[0],a.pose.p[2]] as Vec2}],route=sp.routeAround(rt.world,walker.profile,{level,p:from},{level,p:spot},around);
+  if(!route.ok||route.route.length>3||route.route.legs.some(l=>l.kind!=='walk'||l.level!==level))return;
+  // The existing faceoff detour leaves the contended passage without queuing
+  // on it; static and body collision checks still apply to every actual step.
+  walker.detour={spot,level,by:a.id,blockers:[a.id],landing:{y:floorY,radius:need},stage:'pending',faceoff:true,egress:true,planned:{epoch:sp.epoch,route:route.route,around}};
 }
 
 type LinkGeometry = { entry: LinkLeg['link']['from']; exit: LinkLeg['link']['from']; path: [number, number, number][]; lens: number[]; total: number };

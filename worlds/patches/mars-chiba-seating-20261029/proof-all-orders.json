@@ -1,0 +1,1234 @@
+{
+  "schema": "mars-chiba-seating-proof/1",
+  "policy": "occupied-link-routing/1",
+  "sourceHashes": {
+    "mars/viewer/engine/locomotion/walk.ts": "10f7eba3feeb3c34007e491ab6a37c96aa86e362759964214d5b7d3595f9b220",
+    "packages/engine-mars/src/engine.ts": "6fa4888bb8f509a1fd3c3b819ac3469c56844dec891e97d1e3e6ed21fa8df46c",
+    "packages/engine-contract/src/engine.ts": "c9410c84d7b94a040225a9e7c530235938328fde594eca179f155ea268b2ca6b",
+    "worlds/templates/mars-two.json": "73601d6d0a05f4566071ecb362a61fc1542aaf6b18b497a9ac18059ca276e7c8",
+    "worlds/patches/mars-chiba-seating-20261029/layout.json": "7c4fc1718d6db363eaeb49ff98f134d02c47da82d3c86f033eac78ee2b550436",
+    "worlds/patches/mars-chiba-seating-20261029/patch.mjs": "913f9fc173439fdb53343d608ff848b73fde9576a2d292cf871d91909b60cc0d",
+    "worlds/patches/mars-chiba-seating-20261029/geometry.mjs": "5cd75d6ff807c6654c69a4b93784456cc5180c66804a25ab9e82802f7238ef00",
+    "worlds/patches/mars-chiba-seating-20261029/native.test.mjs": "c7675d96aa464b6aea28e7a607ffeb30f9118f568baf221ba934046b48fd7281"
+  },
+  "geometry": {
+    "schema": "mars-chiba-seating-geometry/1",
+    "source": {
+      "name": "chiba",
+      "ref": "mars-fidelity-chiba@1",
+      "hash": "0df8a713c1acd95d1a53316e84488eba5f308a772adad4c038b9d621b219ad2f",
+      "p": [
+        -14.643,
+        0,
+        -28.174
+      ],
+      "r": -1.431,
+      "mesh": "99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af",
+      "footprint": "81961faa571d8311fdb4689c50eeb6d325856ba8ef1b578b258d112c0a57dca0"
+    },
+    "movingBodyRadius": 0.28,
+    "planMargin": 0.06,
+    "requiredCentralEntryClearance": 0.6200000000000001,
+    "seats": [
+      {
+        "name": "tier",
+        "level": 1,
+        "sourceLevel": 1,
+        "slot": [
+          -12.705,
+          -19.9641
+        ],
+        "support": {
+          "id": "e_2333a04e#f48",
+          "edge": 0.45
+        },
+        "centralEntryClearance": 1.003,
+        "redundantGroundEntryClearance": 0.2051,
+        "nearestThinSolidClearance": 0.8712,
+        "native": {
+          "id": "e_51e1d24f#seat",
+          "of": "e_51e1d24f",
+          "kind": "seat",
+          "level": 1,
+          "ok": true,
+          "at": [
+            -13.180341995858987,
+            -19.897183715792643
+          ]
+        }
+      },
+      {
+        "name": "tier-2",
+        "level": 2,
+        "sourceLevel": 2,
+        "slot": [
+          -12.852,
+          -21.0031
+        ],
+        "support": {
+          "id": "e_2333a04e#f49",
+          "edge": 0.45
+        },
+        "centralEntryClearance": 1.0014,
+        "redundantGroundEntryClearance": null,
+        "nearestThinSolidClearance": 1.3587,
+        "native": {
+          "id": "e_3f7ef968#seat",
+          "of": "e_3f7ef968",
+          "kind": "seat",
+          "level": 2,
+          "ok": true,
+          "at": [
+            -13.327341995858987,
+            -20.93618371579264
+          ]
+        }
+      },
+      {
+        "name": "tier-3",
+        "level": 3,
+        "sourceLevel": 3,
+        "slot": [
+          -13.018,
+          -22.1061
+        ],
+        "support": {
+          "id": "e_2333a04e#f50",
+          "edge": 0.3849
+        },
+        "centralEntryClearance": 0.989,
+        "redundantGroundEntryClearance": null,
+        "nearestThinSolidClearance": 0.8981,
+        "native": {
+          "id": "e_42944776#seat",
+          "of": "e_42944776",
+          "kind": "seat",
+          "level": 3,
+          "ok": true,
+          "at": [
+            -13.493341995858987,
+            -22.039183715792642
+          ]
+        }
+      },
+      {
+        "name": "tier-4",
+        "level": 5,
+        "sourceLevel": 5,
+        "slot": [
+          -13.28,
+          -24.0481
+        ],
+        "support": {
+          "id": "e_2333a04e#f52",
+          "edge": 0.525
+        },
+        "centralEntryClearance": 0.9994,
+        "redundantGroundEntryClearance": null,
+        "nearestThinSolidClearance": null,
+        "native": {
+          "id": "e_0bea861b#seat",
+          "of": "e_0bea861b",
+          "kind": "seat",
+          "level": 5,
+          "ok": true,
+          "at": [
+            -13.755341995858986,
+            -23.981183715792643
+          ]
+        }
+      },
+      {
+        "name": "presenter-timber-box",
+        "level": 0,
+        "sourceLevel": 0,
+        "slot": [
+          -14.511,
+          -18.4331
+        ],
+        "support": {
+          "id": "e_2333a04e#f93",
+          "edge": 1.5861
+        },
+        "centralEntryClearance": null,
+        "redundantGroundEntryClearance": null,
+        "nearestThinSolidClearance": 0.8173,
+        "native": {
+          "id": "e_466e5b4b#seat",
+          "of": "e_466e5b4b",
+          "kind": "seat",
+          "level": 0,
+          "ok": true,
+          "at": [
+            -14.406521094251076,
+            -17.69038217535199
+          ]
+        }
+      }
+    ]
+  },
+  "access": [
+    {
+      "order": [
+        "tier",
+        "tier-2",
+        "tier-3",
+        "tier-4"
+      ],
+      "arrivals": [
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier",
+        "tier-2",
+        "tier-4",
+        "tier-3"
+      ],
+      "arrivals": [
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier",
+        "tier-3",
+        "tier-2",
+        "tier-4"
+      ],
+      "arrivals": [
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier",
+        "tier-3",
+        "tier-4",
+        "tier-2"
+      ],
+      "arrivals": [
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier",
+        "tier-4",
+        "tier-2",
+        "tier-3"
+      ],
+      "arrivals": [
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier",
+        "tier-4",
+        "tier-3",
+        "tier-2"
+      ],
+      "arrivals": [
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-2",
+        "tier",
+        "tier-3",
+        "tier-4"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-2",
+        "tier",
+        "tier-4",
+        "tier-3"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-2",
+        "tier-3",
+        "tier",
+        "tier-4"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-2",
+        "tier-3",
+        "tier-4",
+        "tier"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-2",
+        "tier-4",
+        "tier",
+        "tier-3"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-2",
+        "tier-4",
+        "tier-3",
+        "tier"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-3",
+        "tier",
+        "tier-2",
+        "tier-4"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-3",
+        "tier",
+        "tier-4",
+        "tier-2"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-3",
+        "tier-2",
+        "tier",
+        "tier-4"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-4",
+          "ticks": 853
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-4",
+          "ticks": 635
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-3",
+        "tier-2",
+        "tier-4",
+        "tier"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-3",
+        "tier-4",
+        "tier",
+        "tier-2"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-3",
+        "tier-4",
+        "tier-2",
+        "tier"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-4",
+        "tier",
+        "tier-2",
+        "tier-3"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-4",
+        "tier",
+        "tier-3",
+        "tier-2"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-4",
+        "tier-2",
+        "tier",
+        "tier-3"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-3",
+          "ticks": 715
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-3",
+          "ticks": 497
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-4",
+        "tier-2",
+        "tier-3",
+        "tier"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-4",
+        "tier-3",
+        "tier",
+        "tier-2"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        },
+        {
+          "name": "tier-2",
+          "ticks": 624
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier-2",
+          "ticks": 408
+        },
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        }
+      ]
+    },
+    {
+      "order": [
+        "tier-4",
+        "tier-3",
+        "tier-2",
+        "tier"
+      ],
+      "arrivals": [
+        {
+          "name": "tier-4",
+          "ticks": 601
+        },
+        {
+          "name": "tier-3",
+          "ticks": 463
+        },
+        {
+          "name": "tier-2",
+          "ticks": 372
+        },
+        {
+          "name": "tier",
+          "ticks": 261
+        }
+      ],
+      "exits": [
+        {
+          "name": "tier",
+          "ticks": 264
+        },
+        {
+          "name": "tier-2",
+          "ticks": 356
+        },
+        {
+          "name": "tier-3",
+          "ticks": 445
+        },
+        {
+          "name": "tier-4",
+          "ticks": 583
+        }
+      ]
+    }
+  ],
+  "elapsedMs": 18348,
+  "pending": [
+    "root-owned isolated-world semantic receipt confirmation",
+    "visual support and aisle review",
+    "release-owner live patch"
+  ]
+}

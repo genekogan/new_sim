@@ -112,7 +112,9 @@ test('live seat, door and position queries stay current while architectural capt
     const atSeat = await here();
     assert.equal(atSeat.posture, 'seated');
     assert.ok(occupancy().some(entry => entry.body === soul.entityId));
-    assert.equal(atSeat.seat, chair, 'direct fixture seating reports the actual native chair, not an arbitrary completed receipt');
+    // continuity 1a3d81241: `seat` is the actor-owned native seat slot (`<chair>#seat`), so two Souls on one sofa differ
+    assert.equal(atSeat.seat, (host.engine as any).nativeSeatHoldsV1(soul.entityId)[0]?.slot, 'direct fixture seating reports the native slot this body holds');
+    assert.equal(String(atSeat.seat).split('#')[0], chair, 'direct fixture seating reports the actual native chair, not an arbitrary completed receipt');
     assert.equal((await querySeat()).slots.filter((slot: any) => slot.kind === 'seat').reduce((n: number, slot: any) => n + slot.used, 0), 1);
     const caps = (await http('/v1/edge/capabilities')).capabilities;
     assert.equal(caps.find((cap: any) => cap.id === `sit:${chair}`)?.blocked?.code, 'seat.yours');
@@ -123,7 +125,7 @@ test('live seat, door and position queries stay current while architectural capt
     for (const state of ['open', 'closed']) {
         edit([{ op: 'set', id: hall, state: { doors: { 'front-door': state } } }]);
         assert.equal(bridge.contextReady(), false);
-        assert.equal((await here()).seat, chair, 'live body query remains current before committed-edit publication catches up');
+        assert.equal((await here()).seat, atSeat.seat, 'live body query remains current before committed-edit publication catches up');
         assert.equal((await querySeat()).slots.filter((slot: any) => slot.kind === 'seat').reduce((n: number, slot: any) => n + slot.used, 0), occupancy().length);
         await settleProjection();
         const liveDoor = (await http('/v1/god/query', { describe: hall })).describe;

@@ -50,14 +50,15 @@ export function offeredWalkObject(L:EdgeLedger,soul:EdgeSoul,input:string){
  const cap=objects[0];if(!cap.available)return {ok:false as const,code:cap.blocked?.code??'physical.unavailable',reason:cap.blocked?.reason??'The current native destination capability is unavailable.',did_you_mean:[]};
  return {ok:true as const,cap,matchedBy:exact.length?'name' as const:'alias' as const};
 }
-export function explicitPlaceCapability(L:EdgeLedger,soul:EdgeSoul,asked:string){
+export function explicitPlaceCapability(L:EdgeLedger,soul:EdgeSoul,asked:string,currentCaps?:EdgeCapability[]){
  const i=asked.indexOf(':');if(i<=0)return null;const verb=asked.slice(0,i),target=asked.slice(i+1);
  if(target==='here')return null;
  // Never route a Soul, fixture, spot, item or object ID through place matching.
  if(!['walk','stroll','hang-out','gather','swim','read','lie','nap','sit-ground'].includes(verb))return null;
  // L3 (b): an offered id is that one offer (bindOne), not the whole menu (every act by id built it here: wave:here 34 ms)
- let menu:EdgeCapability[]|null=null;const caps=()=>menu??=L.coreA.binds(soul).caps;
- if(typeof L.bindOne==='function'?L.bindOne(soul,asked):caps().some(c=>c.id===asked))return null;
+ // currentCaps: the caller's already-built menu (continuity exact walk) is the offer set itself.
+ let menu:EdgeCapability[]|null=currentCaps??null;const caps=()=>menu??=L.coreA.binds(soul).caps;
+ if(currentCaps?currentCaps.some(c=>c.id===asked):typeof L.bindOne==='function'?L.bindOne(soul,asked):caps().some(c=>c.id===asked))return null;
  // A qualified entity/room/semantic-part ref is not a Place identity. Its exact
  // on-demand binding must reach the same normal admission path as a listed offer.
  if(verb==='walk'&&target.includes('/')&&L.onDemandId?.(soul,asked))return null;

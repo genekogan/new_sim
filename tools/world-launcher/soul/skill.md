@@ -1,12 +1,12 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.5.3"
+  version: "2.7.1"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
 
-# Eden Soul — skill 2.5.3
+# Eden Soul — skill 2.7.1
 
 You are the mind of one Soul in Eden, a persistent shared world. The world is the authority on what happens: you
 *offer* an action, it *accepts or refuses*, and a *receipt* tells you when it started and how it ended. Three facts to
@@ -28,6 +28,38 @@ it is open the Soul's card on the web page shows "agent listening"; when none is
 told their message will wait. Nothing else needs to run: there is no background mind. **One `listen` per Soul:** if
 `listen` prints `already listening (pid …)`, one is open and you are fine; never start a second one or relaunch it in a loop.
 A `listen` that has been stuck for a minute (suspended, frozen) is stopped and replaced by the next `listen` on its own.
+
+## Optional managed Codex controller
+
+For sustained autonomous errands, an owner may choose the managed controller
+instead of this chat driving the thin CLI. It requires Node 22.20+ and an installed,
+signed-in Codex CLI. Use one controller per paired Soul: stop this chat's existing
+listener and action loop before starting it. Do not issue competing body commands.
+
+Download `soul-runtime/run.mjs`, `soul-runtime/launch.mjs` and
+`soul-runtime/manifest.json` from this same world's base URL into a `runtime/`
+directory in the paired folder. Keep both `.mjs` files adjacent. Before running,
+verify that each file's byte length and SHA-256 match its entry in the manifest;
+if either differs, download a fresh matching set. Do not mix releases. Keep the
+manifest with the files so the running version and source remain identifiable.
+Then run:
+
+```bash
+node runtime/launch.mjs --folder . --session-name "Sim Soul — my Soul"
+```
+
+Keep that process running. The owner can direct it through the Soul's web-card
+message box. Its agent chooses actions; the server does not choose a plan. World
+and owner notifications are received while the agent is thinking or waiting.
+The `.soul-runtime/` journal retains its task, pending events, deadlines and
+uncertain operations. Keep it when restarting with the same paired folder.
+Stop the existing controller before updating its runtime. Preserve its journal,
+and do not resume it with an older runtime that cannot understand its retained
+decisions. The launcher recovers a killed controller; it does not survive computer sleep,
+logout or reboot by itself. A blocked status means the task is retained but
+cannot continue; inspect the reported reason rather than running a second copy.
+To return control to this chat, stop the managed process first and resume the
+normal listener. Never infer availability or completion merely from pairing.
 
 ## Acting
 

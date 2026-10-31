@@ -15,13 +15,15 @@ test('intents: nearest free seat near a Soul, front row, go, swim, approach, tur
   const dry = async (s: typeof a, body: object) => (await w.http(s, 'POST', '/v1/edge/resolve', body)).body.resolve;
   const finish = async (s: typeof a, out: any, n = 8000) => {assert.equal(out.accepted, true, JSON.stringify(out)); await w.ticks(n, () => !w.open(s, out.receipt.id)); return w.receipt(s, out.receipt.id);};
   const seatOf = (s: typeof a) => new Perception(w.ledger, s).seat();
+  // here.me.seat is the native seat slot (`<entity>#<slot>`, matching a receipt's chosen.slot); compare the entity part to menu targets.
+  const seatEntity = (s: typeof a) => { const slot = seatOf(s); assert.match(String(slot), /#/); return String(slot).split('#')[0]; };
   // B stands by the dining table; C takes the chair nearest to B first
   await w.put(b, [21.6, 3.6]);
   const bAt = w.pos(b), chairs = w.ledger.capabilities(c).filter(x => x.verb === 'sit' && x.id.startsWith('sit:social-eden-dining-chair'));
   const dist = (id: string) => {const e = (w.engine.world.entities as any)[id]; return Math.hypot(e.pose.p[0] - bAt[0], e.pose.p[2] - bAt[1]);};
   const nearest = [...chairs].sort((x, y) => dist(x.target!.id) - dist(y.target!.id) || x.id.localeCompare(y.id));
   const cs = await finish(c, await act(c, {capability: nearest[0].id})); assert.equal(cs.phase, 'completed', JSON.stringify(cs));
-  assert.equal(seatOf(c), nearest[0].target!.id);
+  assert.equal(seatEntity(c), nearest[0].target!.id);
   // dry run first: no receipt, no event, no movement
   const before = {receipts: (w.f.db.db.prepare('SELECT COUNT(*) n FROM edge_receipts_v1').get() as any).n, events: w.f.db.events(w.f.host.worldId).length, at: w.pos(a)};
   const r1 = await dry(a, {verb: 'sit', target: {nearest: 'seat', near: b.soulId, free: true}});
@@ -33,14 +35,14 @@ test('intents: nearest free seat near a Soul, front row, go, swim, approach, tur
   const s1 = await act(a, {verb: 'sit', target: {nearest: 'seat', near: b.name}});
   assert.equal(s1.chosen.seat, nearest[1].target!.id, JSON.stringify(s1)); assert.equal(s1.chosen.near.name, b.name);
   assert.deepEqual((w.receipt(a, s1.receipt.id) as any).chosen.seat, nearest[1].target!.id, 'chosen is kept on the receipt');
-  const s1d = await finish(a, s1); assert.equal(s1d.phase, 'completed'); assert.equal(seatOf(a), nearest[1].target!.id); assert.equal((s1d.endedAt as any).posture, 'seated');
+  const s1d = await finish(a, s1); assert.equal(s1d.phase, 'completed'); assert.equal(seatEntity(a), nearest[1].target!.id); assert.equal((s1d.endedAt as any).posture, 'seated');
   // look keeps posture and seat; attention receipts never replace the body's act
   const lk = await act(a, {verb: 'look', target: c.soulId}); assert.equal(lk.accepted, true, JSON.stringify(lk)); assert.equal(lk.channel, 'attention'); assert.equal(lk.chosen.turned, 'head');
-  assert.equal(seatOf(a), nearest[1].target!.id); assert.equal(w.body(a).human.gaze?.target, c.entityId); assert.deepEqual(w.body(a).human.attention, [w.body(c).pose.p[0], w.body(c).pose.p[2]]);
+  assert.equal(seatEntity(a), nearest[1].target!.id); assert.equal(w.body(a).human.gaze?.target, c.entityId); assert.deepEqual(w.body(a).human.attention, [w.body(c).pose.p[0], w.body(c).pose.p[2]]);
   // front row of the classroom: a centre seat in the row nearest the lectern; the second Soul gets the other centre seat
   const f1 = await act(d, {verb: 'sit', target: {in: 'eden-classroom-1', row: 'front'}}); assert.equal(f1.chosen.row, 1, JSON.stringify(f1));
   assert.ok(['eden-classroom-seat-02', 'eden-classroom-seat-03'].includes(f1.chosen.seat), f1.chosen.seat);
-  await finish(d, f1, 12000); assert.equal(seatOf(d), f1.chosen.seat);
+  await finish(d, f1, 12000); assert.equal(seatEntity(d), f1.chosen.seat);
   const f2 = await dry(b, {verb: 'sit', target: {in: 'eden-classroom-1', row: 'front'}}); assert.equal(f2.would.chosen.row, 1);
   assert.ok(['eden-classroom-seat-02', 'eden-classroom-seat-03'].includes(f2.would.chosen.seat) && f2.would.chosen.seat !== f1.chosen.seat, JSON.stringify(f2));
   const back = await dry(b, {verb: 'sit', target: {in: 'eden-classroom-1', row: 'back'}}); assert.equal(back.would.chosen.row, back.would.chosen.rows);
