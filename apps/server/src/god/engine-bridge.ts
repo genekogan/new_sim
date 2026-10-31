@@ -133,6 +133,30 @@ export function helixEnds(path: Vec2[]): { foot: Vec2; head: Vec2; stepFrom: Vec
 
 export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** Highest level id levelFor hands out (default and most: MAX_LEVEL_ID; tests use fewer to reach the reuse path) */ maxLevel?: number; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
 
+/** Load lane L4: per-step ms of the bridge's tick work, the tick-ms distribution and the derived-work counters since the
+ *  last line. Only built with SIM_L4_STATS=1. */
+class BridgeStats {
+  private steps = new Map<string, { n: number; ms: number; max: number }>();
+  private last = { spatial: { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0 }, perceive: 0, spots: 0, wall: performance.now(), cpu: process.cpuUsage() };
+  /** A line is due a minute of wall time after the last (ticks may run slow). */
+  due(): boolean { return performance.now() - this.last.wall >= 60_000; }
+  add(name: string, t0: number): number {
+    const now = performance.now(), ms = now - t0; let s = this.steps.get(name); if (!s) this.steps.set(name, (s = { n: 0, ms: 0, max: 0 }));
+    s.n++; s.ms += ms; if (ms > s.max) s.max = ms; return now;
+  }
+  line(b: EngineBridge): string {
+    const sp = ((b.host.engine as unknown as { rt?: { services?: { spatial?: unknown } } }).rt?.services?.spatial as { stats?: BridgeStats['last']['spatial'] } | undefined)?.stats, now = performance.now(), cpu = process.cpuUsage();
+    const wallS = (now - this.last.wall) / 1000, cpuS = ((cpu.user - this.last.cpu.user) + (cpu.system - this.last.cpu.system)) / 1e6;
+    const ticks = [...b.host.tickMs].sort((x, y) => x - y), q = (f: number) => ticks.length ? Math.round(10 * ticks[Math.min(ticks.length - 1, Math.floor(f * ticks.length))]) / 10 : 0;
+    const steps = [...this.steps].filter(([, v]) => v.ms >= 1).sort((x, y) => y[1].ms - x[1].ms).map(([k, v]) => `${k}=${Math.round(v.ms)}/${v.n}/${Math.round(v.max)}`).join(' ');
+    const d = (k: keyof BridgeStats['last']['spatial']) => Math.round((sp?.[k] ?? 0) - this.last.spatial[k]);
+    const pr = b.perceive.stats.runs - this.last.perceive, ds = b.activitySpots.stats.derives - this.last.spots;
+    const out = `[l4] cpu ${(cpuS / wallS).toFixed(3)} core over ${Math.round(wallS)} s; tick p50 ${q(.5)} p99 ${q(.99)} max ${q(1)} ms (n ${ticks.length}); paged syncs ${d('pagedSyncs')} moved ${d('pagedMoved')} changed ${d('pagedChanged')} ${d('pagedMs')} ms, grids ${d('gridBuilds')} ${d('gridMs')} ms; perceive runs ${pr} (last ${b.perceive.stats.lastIds}${b.perceive.stats.lastFull ? ' whole' : ''} ${b.perceive.stats.lastMs} ms); spots derives ${ds} (last ${b.activitySpots.stats.ms} ms); steps ms/n/max ${steps}`;
+    if (sp) this.last.spatial = { ...sp }; this.last.perceive = b.perceive.stats.runs; this.last.spots = b.activitySpots.stats.derives; this.last.wall = now; this.last.cpu = cpu; this.steps.clear();
+    return out;
+  }
+}
+
 export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
@@ -214,7 +238,7 @@ export class EngineBridge {
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick, context) => { try { if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; } else { this.flush(); this.projectedEdits = this.godEdits; if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(context?.startedAtMs); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } } catch (error) { this.failProjection(error); throw error; } },
+      afterTick: (tick, context) => { try { this.afterTickWork(tick, context?.startedAtMs); } catch (error) { this.failProjection(error); throw error; } },
       onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
       afterTickComplete: () => { this.completedTicks++; this.completedEdits = this.projectedEdits; this.checkProjectionSoon(); },
       onClockUnavailable: () => this.failProjection(new Error('bridge.readiness.clock-unavailable')),
@@ -762,6 +786,23 @@ export class EngineBridge {
     }
   }
 
+  /** The bridge's per-tick work (each step on its own cadence). With SIM_L4_STATS=1 every step is timed and one
+   *  `[l4] …` line a minute says where the tick thread went (load lane L4 measurements; off: no clock reads). */
+  private afterTickWork(tick: number, startedAtMs?: number) {
+    if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; return; }
+    const S = this.loadStats; let t = S ? performance.now() : 0;
+    this.flush(); this.projectedEdits = this.godEdits; if (S) t = S.add('flush', t);
+    if (tick % 10 === 0 || this.writeBackPass) { this.writeBack(WRITE_BACK_SLICE_MS); if (S) t = S.add('writeBack', t); }
+    this.perceiveStep(tick); if (S) t = S.add('perceive', t);
+    if (tick % 5 === 4) { this.spotsStep(); if (S) t = S.add('spots', t); }
+    if (tick % 40 === 7 || this.layerPlacesPending !== null) { this.layersStep(tick % 40 === 7); if (S) t = S.add('layers', t); }
+    if (tick % 20 === 13) { this.flushMapNotices(); if (S) t = S.add('mapNotices', t); }
+    if (!this.navWarm || this.navPending) { this.navStep(startedAtMs); if (S) t = S.add('nav', t); }
+    if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); if (S) t = S.add('evacuate', t); }
+    if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); if (S) t = S.add('rescue', t); }
+    if (S && S.due()) this.log(S.line(this));
+  }
+  private loadStats = process.env.SIM_L4_STATS === '1' ? new BridgeStats() : null;
   private perceiveSync(now = false) { try { if (now) this.perceive.sync(); else this.perceive.ensure(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
   /** G1 (tranche 2026-10-19): what Souls perceive of god edits (built objects, the places layer) catches up off the
    *  request path. An edit only notes what changed; the catch-up starts a second after the last edit, or ~2 s after the

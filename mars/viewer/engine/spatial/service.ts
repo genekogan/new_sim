@@ -144,6 +144,9 @@ export class Spatial {
   private gridsNow?: GridSet;
   private gridsLater: (() => GridSet) | null = null;
   epoch = 0;
+  /** Paged-ground counters (cheap integers, read by the server's load stats): syncs, rebuilds because only the windows
+   *  moved / because the static world changed, the ms those rebuilds took, and window grids built (and their ms). */
+  readonly stats = { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0 };
   /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
   prof?: Profiler;
   /** Navigation-relevant snapshot of the static entities (in world order) at the last rebuild. */
@@ -355,7 +358,9 @@ export class Spatial {
     for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
     if (!units.length) clip(rectOf([[0, 0]]));
     const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    this.stats.pagedSyncs++;
     if (!changed && this.pages && this.pages.key === key) return false;
+    const t0 = performance.now();
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
     const links: Link[] = [...this.base.links];
@@ -390,6 +395,8 @@ export class Spatial {
     // corridor, smoothing and single-file passages (narrowId: window-independent names) stay valid when windows move
     if (changed) { this.epoch++; this.aroundCache.clear(); }
     this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
+    if (changed) this.stats.pagedChanged++; else this.stats.pagedMoved++;
+    this.stats.pagedMs += performance.now() - t0;
     return true;
   }
 
@@ -411,8 +418,9 @@ export class Spatial {
     this.focusIdx = i;
     let set = pg.sets[i];
     if (!set) {
-      const build = () => this.ground!.gridsOver(pg.rects[i], pg.all);
+      const build = () => this.ground!.gridsOver(pg.rects[i], pg.all), t0 = performance.now();
       set = pg.sets[i] = this.prof ? this.prof.time('spatial.sync.grids', build) : build();
+      this.stats.gridBuilds++; this.stats.gridMs += performance.now() - t0;
       if (this.planner === 'corridor') prepareCorridor(set);
     }
     this.scene = pg.scenes[i];

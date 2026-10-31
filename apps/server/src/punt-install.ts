@@ -7,6 +7,8 @@ import type {CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carr
 type SearchResult={state:'pending'}|{state:'cancelled'}|{state:'done';candidates:CarrierInstallSpec[]};
 type SearchJob={advance(budgetMs:number):SearchResult;cancel():unknown};
 const SEARCH_SLICE_MS=8;
+/** Load lane L4: one `[l4] punt search …` line a minute (ms spent, slices, searches finished, misses). */
+const STATS=process.env.SIM_L4_STATS==='1';
 
 export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:string)=>void=()=>{}){
   const current=()=>host.engine as typeof host.engine&{puntCandidatesV1?():CarrierInstallSpec[];puntCandidatesJobV1?():SearchJob;carriers?():{id:string;def:string;label:string;state:{bank?:{door:number[]}}}[]};
@@ -52,7 +54,7 @@ export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:s
       if(result.state==='pending')return;
       pending=null;
       if(result.state==='cancelled'){restart=true;return;}
-      lastSource=work.source;retryAt=work.started+20*60;
+      lastSource=work.source;retryAt=work.started+20*60;stats.searches++;if(!result.candidates.length)stats.misses++;
       install(result.candidates,work.engine);
     }catch(error){
       pending?.job.cancel();pending=null;restart=false;lastSource=source;retryAt=tick+20;
@@ -63,11 +65,16 @@ export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:s
   // waits 10 s of world time after boot (lane P5). Once started, each completed tick advances one short slice: a
   // once-a-second slice would turn a bounded search into a minute-long wait. Manually stepped worlds start at once.
   let first=-1;
+  const stats={n:0,ms:0,max:0,searches:0,misses:0,at:performance.now()};
   const listener={afterTick:(tick:number)=>{
     if(first<0)first=host.running?tick:-Infinity;
     if(closed)return;
     if(tick%20===0)publish();
-    if(pending||restart||host.engine!==lastEngine||tick%20===0&&tick-first>=200)reconcile();
+    if(pending||restart||host.engine!==lastEngine||tick%20===0&&tick-first>=200){
+      if(!STATS){reconcile();return;}
+      const t0=performance.now();reconcile();const ms=performance.now()-t0;stats.n++;stats.ms+=ms;if(ms>stats.max)stats.max=ms;
+    }
+    if(STATS&&performance.now()-stats.at>=60_000){stats.at=performance.now();log(`[l4] punt search ${Math.round(stats.ms)} ms in ${stats.n} slices (max ${Math.round(stats.max)} ms), searches ${stats.searches}, misses ${stats.misses}`);stats.n=0;stats.ms=0;stats.max=0;}
   }};
   host.listeners.push(listener);
   return {close(){closed=true;pending?.job.cancel();pending=null;const at=host.listeners.indexOf(listener);if(at>=0)host.listeners.splice(at,1);}};
