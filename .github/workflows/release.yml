@@ -1,0 +1,255 @@
+# One production release of the current main head:
+#   preflight  required secrets/vars exist (fails fast, naming what is missing), the head is main, inputs are sane
+#   gate       the full Modal release gate (tools/test-harness/release-gate.sh) against the last release tag
+#   ship       waits for the `production` environment's required reviewer, then tools/world-launcher/deploy/ship.sh
+#              over SSH (backup, upload, activate, probe, walks, poster, stall, cdn-walk), then healthz
+#   publish    compiles changes/ into CHANGELOG.md, tags v<version> on the shipped commit, creates the GitHub Release
+#
+# Secrets: MODAL_TOKEN_ID, MODAL_TOKEN_SECRET (repo); DEPLOY_SSH_KEY, SIM_DEPLOY_KNOWN_HOSTS (production environment);
+#          optional SIM_PROBE_GOD_JSON (the release-probe world's god file; without it the probe is skipped).
+# Vars or secrets: SIM_DEPLOY_HOST, SIM_DEPLOY_USER. Optional vars: SIM_ORIGIN (default https://sim.eden.art),
+#          MODAL_CLIENT_VERSION (pip pin for the modal client).
+# Safe to commit before any of these exist: preflight fails with the list of what to add.
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version for the changelog and tag (e.g. 4.0.1)
+        required: true
+      label:
+        description: ship.sh --label (backup/output prefix); default is the version without dots
+        required: false
+      baseline:
+        description: Gate baseline ref; default is the newest v* tag
+        required: false
+      no_probe:
+        description: Skip ship.sh's live release probe
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
+env:
+  SIM_ORIGIN: ${{ vars.SIM_ORIGIN || 'https://sim.eden.art' }}
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.refs.outputs.sha }}
+      baseline: ${{ steps.refs.outputs.baseline }}
+      label: ${{ steps.refs.outputs.label }}
+    steps:
+      - name: Required secrets and variables
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          # Environment secrets are not visible outside the production job, so only repo-level presence is checked
+          # here for them; the ship job checks again inside the environment.
+          SIM_DEPLOY_HOST: ${{ vars.SIM_DEPLOY_HOST || secrets.SIM_DEPLOY_HOST }}
+          SIM_DEPLOY_USER: ${{ vars.SIM_DEPLOY_USER || secrets.SIM_DEPLOY_USER }}
+        run: |
+          missing=()
+          for name in MODAL_TOKEN_ID MODAL_TOKEN_SECRET SIM_DEPLOY_HOST SIM_DEPLOY_USER; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Release is not configured. Missing: ${missing[*]}. Add them under Settings > Secrets and variables > Actions (SIM_DEPLOY_HOST/SIM_DEPLOY_USER may be variables). DEPLOY_SSH_KEY and SIM_DEPLOY_KNOWN_HOSTS belong to the production environment."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }
+      - id: refs
+        name: Release head, baseline and label
+        env:
+          REF: ${{ github.ref }}
+          VERSION: ${{ inputs.version }}
+          LABEL: ${{ inputs.label }}
+          BASELINE: ${{ inputs.baseline }}
+        run: |
+          [ "$REF" = refs/heads/main ] || { echo "::error::Releases ship main only (got $REF)"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]] || { echo "::error::version must look like 4.0 or 4.0.1 (got '$VERSION')"; exit 1; }
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then echo "::error::tag v$VERSION already exists"; exit 1; fi
+          [ -n "$LABEL" ] || LABEL="${VERSION//./}"
+          [[ "$LABEL" =~ ^[0-9A-Za-z-]+$ ]] || { echo "::error::label must be alphanumeric (got '$LABEL')"; exit 1; }
+          [ -n "$BASELINE" ] || BASELINE=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          [ -n "$BASELINE" ] || { echo "::error::No v* tag to gate against yet; pass the baseline input (the commit that is live now)."; exit 1; }
+          git rev-parse -q --verify "$BASELINE^{commit}" >/dev/null || { echo "::error::baseline '$BASELINE' is not a commit"; exit 1; }
+          node tools/changelog/compile.mjs --check
+          { echo "sha=$(git rev-parse HEAD)"; echo "baseline=$(git rev-parse "$BASELINE^{commit}")"; echo "label=$LABEL"; } >> "$GITHUB_OUTPUT"
+          echo "Release v$VERSION: head $(git rev-parse --short HEAD), baseline $BASELINE, label $LABEL" >> "$GITHUB_STEP_SUMMARY"
+
+  gate:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ needs.preflight.outputs.sha }}', fetch-depth: 0 }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
+      - name: Modal client
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          MODAL_CLIENT_VERSION: ${{ vars.MODAL_CLIENT_VERSION }}
+        run: |
+          python3 -m pip install --quiet "modal${MODAL_CLIENT_VERSION:+==$MODAL_CLIENT_VERSION}"
+          # The gate driver selects a named Modal profile; register the token under that name.
+          profile=$(grep -oE "MODAL_PROFILE: '[^']+'" tools/test-harness/release-gate.mjs | head -1 | cut -d"'" -f2)
+          modal token set --token-id "$MODAL_TOKEN_ID" --token-secret "$MODAL_TOKEN_SECRET" --profile "${profile:-default}" --activate --no-verify
+      - name: Full release gate
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          SHA: ${{ needs.preflight.outputs.sha }}
+          BASELINE: ${{ needs.preflight.outputs.baseline }}
+        run: |
+          # Foreground with a heartbeat: the gate can run longer than a quiet-log timeout.
+          ( while sleep 300; do echo "gate still running ($(date -u +%H:%MZ))"; done ) & beat=$!
+          set +e
+          tools/test-harness/release-gate.sh "$SHA" --baseline "$BASELINE" --out "$RUNNER_TEMP/gate" 2>&1 | tee "$RUNNER_TEMP/gate.log"
+          status=${PIPESTATUS[0]}
+          kill $beat
+          grep -E '^RELEASE_GATE ' "$RUNNER_TEMP/gate.log" | tail -1 >> "$GITHUB_STEP_SUMMARY" || true
+          exit $status
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: release-gate
+          path: |
+            ${{ runner.temp }}/gate.log
+            ${{ runner.temp }}/gate/**/*.json
+          if-no-files-found: ignore
+
+  ship:
+    needs: [preflight, gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: production
+    steps:
+      - name: Deploy secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SIM_DEPLOY_KNOWN_HOSTS: ${{ secrets.SIM_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          missing=()
+          for name in DEPLOY_SSH_KEY SIM_DEPLOY_KNOWN_HOSTS; do [ -n "${!name}" ] || missing+=("$name"); done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::The production environment is missing: ${missing[*]} (a restricted deploy key and the host's known_hosts line)."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: '${{ needs.preflight.outputs.sha }}', fetch-depth: 0 }
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Pull media
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['assets:pull'] ? 0 : 1)"; then pnpm assets:pull
+          else echo "::error::package.json has no assets:pull script; a release build needs the media"; exit 1; fi
+      - name: Browsers for the live walks
+        run: pnpm --filter mars-campus-viewer exec playwright install --with-deps chromium
+      - name: SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SIM_DEPLOY_KNOWN_HOSTS: ${{ secrets.SIM_DEPLOY_KNOWN_HOSTS }}
+          SIM_DEPLOY_HOST: ${{ vars.SIM_DEPLOY_HOST || secrets.SIM_DEPLOY_HOST }}
+          SIM_DEPLOY_USER: ${{ vars.SIM_DEPLOY_USER || secrets.SIM_DEPLOY_USER }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SIM_DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          printf 'Host %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n  ServerAliveInterval 30\n' \
+            "$SIM_DEPLOY_HOST" "$SIM_DEPLOY_USER" > ~/.ssh/config && chmod 600 ~/.ssh/config
+          ssh -o BatchMode=yes "$SIM_DEPLOY_USER@$SIM_DEPLOY_HOST" true
+      - name: Probe world
+        env:
+          SIM_PROBE_GOD_JSON: ${{ secrets.SIM_PROBE_GOD_JSON }}
+          NO_PROBE: ${{ inputs.no_probe }}
+        run: |
+          if [ "$NO_PROBE" = true ] || [ -z "$SIM_PROBE_GOD_JSON" ]; then
+            [ "$NO_PROBE" = true ] || echo "::warning::SIM_PROBE_GOD_JSON is not set; shipping without the live release probe"
+            echo "SHIP_PROBE_FLAG=--no-probe" >> "$GITHUB_ENV"
+          else
+            install -d -m 700 "$RUNNER_TEMP/release-probe"
+            printf '%s' "$SIM_PROBE_GOD_JSON" > "$RUNNER_TEMP/release-probe/.eden-god.json" && chmod 600 "$RUNNER_TEMP/release-probe/.eden-god.json"
+            echo "SHIP_PROBE_CLI=$RUNNER_TEMP/release-probe" >> "$GITHUB_ENV"
+          fi
+      - name: ship.sh
+        env:
+          SIM_DEPLOY_HOST: ${{ vars.SIM_DEPLOY_HOST || secrets.SIM_DEPLOY_HOST }}
+          SIM_DEPLOY_USER: ${{ vars.SIM_DEPLOY_USER || secrets.SIM_DEPLOY_USER }}
+          LABEL: ${{ needs.preflight.outputs.label }}
+        run: |
+          export SIM_WORLDS_HOST="$SIM_DEPLOY_USER@$SIM_DEPLOY_HOST" SHIP_ORIGIN="$SIM_ORIGIN"
+          # The workflow's concurrency group replaces the laptop lease file; outputs stay on the runner.
+          export SHIP_DEPLOY_LOCK="$RUNNER_TEMP/DEPLOY.lock" SHIP_OUT_ROOT="$RUNNER_TEMP/ship"
+          export SHIP_LEGACY_RELEASE_FILE="$RUNNER_TEMP/ship/LEGACY-RELEASE"
+          mkdir -p "$RUNNER_TEMP/ship"
+          ( while sleep 300; do echo "ship still running ($(date -u +%H:%MZ))"; done ) & beat=$!
+          set +e
+          tools/world-launcher/deploy/ship.sh --label "$LABEL" ${SHIP_PROBE_FLAG:-}
+          status=$?
+          kill $beat
+          exit $status
+      - name: healthz names this build
+        env:
+          SHA: ${{ needs.preflight.outputs.sha }}
+        run: |
+          body=$(curl -sSf --retry 5 --retry-delay 10 --retry-all-errors "$SIM_ORIGIN/worlds/__sim/healthz")
+          echo "$body" | head -c 2000; echo
+          echo "$body" | grep -q "we-${SHA:0:12}" || { echo "::error::healthz does not name we-${SHA:0:12}"; exit 1; }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: ship-${{ needs.preflight.outputs.label }}
+          path: ${{ runner.temp }}/ship
+          if-no-files-found: ignore
+      - name: Remove deploy credentials
+        if: always()
+        run: rm -f ~/.ssh/deploy_key "$RUNNER_TEMP/release-probe/.eden-god.json"
+
+  publish:
+    needs: [preflight, ship]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { ref: main, fetch-depth: 0 }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
+      - name: Changelog, tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ needs.preflight.outputs.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Fold the fragments as of the shipped commit; fragments merged during the release wait for the next one.
+          shipped=$(git ls-tree --name-only "$SHA" changes/ | grep -vE '^changes/(README|_template)\.md$' | grep -E '\.md$' || true)
+          tmp="$RUNNER_TEMP/changelog"; rm -rf "$tmp"; mkdir -p "$tmp/changes"
+          for f in $shipped; do git show "$SHA:$f" > "$tmp/$f"; done
+          if [ -f CHANGELOG.md ]; then cp CHANGELOG.md "$tmp/"; fi
+          node tools/changelog/compile.mjs --root "$tmp" --version "$VERSION" --notes "$RUNNER_TEMP/notes.md"
+          cp "$tmp/CHANGELOG.md" CHANGELOG.md
+          for f in $shipped; do git rm -q --ignore-unmatch "$f"; done
+          git add CHANGELOG.md
+          git tag -a "v$VERSION" "$SHA" -m "Sim $VERSION"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" --verify-tag --title "Sim $VERSION" --notes-file "$RUNNER_TEMP/notes.md"
+          git commit -q -m "release: changelog for $VERSION" -m "Folds the shipped changes/ fragments into CHANGELOG.md."
+          # main may have moved during the release; replay the changelog commit on top.
+          for attempt in 1 2 3; do
+            git pull -q --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          echo "::error::Released and tagged v$VERSION, but could not push the changelog commit to main (branch protection?). Open a PR from this run's diff."
+          exit 1
