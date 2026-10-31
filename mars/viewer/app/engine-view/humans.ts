@@ -847,7 +847,9 @@ if(v.handActuator&&!f.handActuator)v.lastHandActuator=v.handActuator;else if(f.h
     if ((v.activity === 'idle' || GAIT_ACTS.has(v.activity)) && v.walkAge !== undefined && v.walkAge < GESTURE_FADE && b.sitW === 0 && !engineHands && freeBody && !lib.cur) {
       const g = 1 - smooth(v.walkAge / GESTURE_FADE), on = v.restAgeAtWalk === undefined ? 1 : smooth(Math.min(1, v.restAgeAtWalk / IDLE_VARIETY_ONSET));
       const n0 = extra.idleNeutral ? neutralWeight(h.name, tSec) * on : 0, v0 = gv && libAction(v.rig, gv.clip) ? (1 - n0) * gv.w * on : 0;
-      const want = (n0 + v0) * g, have = neutralW + variantW;
+      // Entry 38: × the idle handoff of an actuator that just ended (a board stroke handing over to its step back): the body
+      // was not in the gesture then, and the arms-only copies drew the folded arms in one frame (0.73 m per 50 ms, take 6)
+      const want = (n0 + v0) * g * idleHandoff, have = neutralW + variantW;
       if (want > have + 1e-4) { const k = Math.min(20, (want - have) / Math.max(1e-3, 1 - want)) / (n0 + v0); armsN = n0 * k; armsV = v0 * k; }
     }
     const libOn = new Set<THREE.AnimationAction>();
