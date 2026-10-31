@@ -3,7 +3,8 @@
 #   tools/test-harness/remote-suite.sh <outDir> [--ref HEAD] [--baseline-ref main|none] [--skip V7,V8] [--node 22]
 # Ships `git archive <ref>` (committed tree only) plus the baseline ref, runs one-validation.sh remotely with V7 (real
 # Chrome, needs a GPU) and V8 (laptop production histories) skipped by default, and unpacks the logs into
-# <outDir>/out/suite (SUMMARY.tsv there). Needs `modal` installed and authenticated (`modal profile current`).
+# <outDir>/out/suite (SUMMARY.tsv there). Needs `modal` installed and authenticated:
+# MODAL_TOKEN_ID/MODAL_TOKEN_SECRET in the environment (CI), or a Modal profile (MODAL_PROFILE picks one).
 # Nothing runs on the laptop but git archive and the Modal client: no ports, no node test processes.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

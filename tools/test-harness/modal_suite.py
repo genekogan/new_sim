@@ -135,7 +135,7 @@ V5_SHARDS = 2
 assert sorted(s for g in GROUPS.values() for s in g) == sorted(set(ORDER) - {"V5-server-full", "V5-server-baseline"})
 
 
-# max_containers (lane GATECAP, 2026-10-23; Modal 1.5.2 keyword): the edenartlab workspace has a 100-container limit.
+# max_containers (lane GATECAP, 2026-10-23; Modal 1.5.2 keyword): the Modal workspace has a 100-container limit.
 # `modal run` makes a fresh ephemeral app per run, so this caps ONE run, not all of them: at most one run's fan-out
 # (group a on run_large; group s + 2 V5 shards on run) in flight, extra inputs (e.g. preemption restarts) queue instead
 # of adding containers. The cross-gate bound is the ledger team/lanes/GATES.inflight.

@@ -310,7 +310,8 @@ async function remoteRun(out, sourceSha, harnessRef, node, root = ROOT, only = [
   const logPath = join(out, 'gate-driver.log');
   const logFd = openSync(logPath, 'w');
   const child = spawn('bash', [join(root, 'tools/test-harness/remote-suite.sh'), out, '--ref', sourceSha, '--baseline-ref', 'none', '--harness-ref', harnessRef, '--node', node, ...(only.length ? ['--only', only.join(',')] : [])], {
-    cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MODAL_PROFILE: 'edenartlab' },
+    // Modal auth comes from the caller: MODAL_TOKEN_ID/MODAL_TOKEN_SECRET (CI) or a MODAL_PROFILE of their own; no default.
+    cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: process.env,
   });
   child.stdout.on('data', b => writeSync(logFd, b)); child.stderr.on('data', b => writeSync(logFd, b));
   let timedOut = false;
