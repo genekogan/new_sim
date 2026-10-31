@@ -144,6 +144,8 @@ type View = {
   since?: number;
   prevAct?: string;
   prevBase?: string;
+  restAge?: number;
+  restFrom?: number;
   partner?: string;
   partnerP?: THREE.Vector3;
   dist: number;
@@ -227,6 +229,7 @@ export type SampledHuman = {
   activityAge?: number;
   prevActivity?: string;
   prevBaseActivity?: string;
+  restAge?: number;
 };
 export type { Hands };
 /** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
@@ -291,6 +294,8 @@ const baseOf = (act: string, base?: string) => { if (act === 'cycle') return 'si
 /** Sitting on the ground (sit-ground, or an overlay layered on it): the seat is the grass. */
 const onGround = (act: string, base?: string) => act === 'sit-ground' || (base === 'sit-ground' && OVERLAYS.has(act));
 /** Idle variety: now and then (about 6 s in every 25, per person) the Idle_Neutral clip blends in. */
+const IDLE_VARIETY_ONSET = 1.2;
+export const REST_ACTS = new Set(['idle', 'reach']);
 function neutralWeight(id: string, t: number) { const ph = (hashId(id) % 997) / 997, u = ((t / 25 + ph) % 1) * 25; return u < 1 ? smooth(u) : u < 6 ? 1 : u < 7 ? 1 - smooth(u - 6) : 0; }
 const handList = (h: Hands): Vec3[] => [h.left, h.right].filter((q): q is Vec3 => !!q);
 const copyHands = (h?: Hands): Hands => ({ ...(h?.left ? { left: [...h.left] as Vec3 } : {}), ...(h?.right ? { right: [...h.right] as Vec3 } : {}) });
@@ -424,6 +429,7 @@ export class HumanViews {
       if (act !== v.activity) { v.prevAct = v.activity; v.prevBase = v.base; }
       v.age = act === v.activity ? v.age + 1 : 0;
       v.since = v.age * DT;
+      v.restAge = !REST_ACTS.has(act) ? 0 : v.restAge === undefined ? undefined : v.restAge + DT;
       v.activity = act;
       v.groundSeat = onGround(act, e.human.baseActivity);
       v.partner = (e.human as { partner?: string }).partner;
@@ -632,6 +638,9 @@ export class HumanViews {
       v.running = act === 'jog' || act === 'run' || (typeof f.speed === 'number' && f.speed > RUN_SPEED);
       v.speed = typeof f.speed === 'number' ? f.speed : 0;
       v.since = f.activityAge;
+      if (f.restAge !== undefined) v.restFrom = t - f.restAge;
+      else if (!REST_ACTS.has(act)) v.restFrom = t;
+      v.restAge = v.restFrom !== undefined && t >= v.restFrom ? t - v.restFrom : undefined;
       v.prevAct = f.prevActivity;
       v.prevBase = f.prevActivity === undefined ? undefined : baseOf(f.prevActivity, f.prevBaseActivity);
       v.partner = f.partner;
@@ -742,9 +751,13 @@ export class HumanViews {
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
     const idleFree = v.activity === 'idle' && b.sitW === 0 && !engineHands && freeBody && !lib.cur;
     const idleHandoff=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).idleBlend:1;
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff : 0;
+    // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
+    // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
+    // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
+    const restOnset = v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset : 0;
     const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
-    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff : 0;
+    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset : 0;
     const libOn = new Set<THREE.AnimationAction>();
     const libAt = (act: THREE.AnimationAction | null, weight: number, time: number) => {
       if (!act || weight <= 1e-4) return;
