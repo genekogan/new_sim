@@ -26,7 +26,8 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // pull's own turn ran during the reach (0.105 m per 50 ms): turn to the knob on arrival first, as M04 does for valves
     face=[params.slide.at[0],params.slide.at[2]];
     // a storage drawer's knob is reached deliberately (0.9 s): the 0.65 s reach peaked at 0.087 m per 50 ms (take 3)
-    if(containerInside(def))params.reach=.9;
+    // and the arm comes back down over 1 s (0.7 s lowered it at 0.082 m per 50 ms while the other hand carried, take 5)
+    if(containerInside(def)){params.reach=.9;params.release=1;}
    }else if(def.components.opening||def.tags.includes('hand-cabinet')){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];size?:number[];tint?:string}[]})?.shapes:undefined;
     const leaf=shapes?.find(s=>s.role==='door'&&s.pivot),knob=shapes?.find(s=>s.role==='door'&&['brass','chrome'].includes(s.tint??''));if(!leaf?.pivot)return null;

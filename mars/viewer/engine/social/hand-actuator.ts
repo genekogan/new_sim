@@ -19,11 +19,14 @@ const slide=z.object({at:vec,dir:z.tuple([z.number().finite(),z.number().finite(
 // drawer opened with the left); absent, the side's default hand as before.
 // `reach`: a slower, deliberate reach (s; default HAND_REACH_SECONDS), as entry 37's radio knob: the storage drawer (entry 42)
 // pulls out of a 0.65 s reach peaked at 0.087 m per 50 ms mid-reach (take 3); its knob is reached in 0.9 s.
-export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),slide:slide.optional(),hand:z.enum(['left','right']).optional(),reach:z.number().min(.3).max(2).optional()}).strict();
+export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),slide:slide.optional(),hand:z.enum(['left','right']).optional(),reach:z.number().min(.3).max(2).optional(),release:z.number().min(.3).max(2).optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
 export const handReachSeconds=(m:Pick<HandActuatorMotion,'reach'>)=>m.reach??HAND_REACH_SECONDS;
+/** `release`: the arm's way back down (s; default HAND_RELEASE_SECONDS). Entry 42's storage drawer, carrying in the other hand,
+ *  lowered its arm at 0.082 m per 50 ms in 0.7 s (take 5); it takes 1 s. */
+export const handReleaseSeconds=(m:Pick<HandActuatorMotion,'release'>)=>m.release??HAND_RELEASE_SECONDS;
 export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'slide'>){
  if(m.slide)return Math.max(1,Math.abs(m.slide.to-m.slide.from)*3.2);   // a drawer: about a second, an ordinary pull
  const o=m.opening;if(!o)return 0;
@@ -36,9 +39,9 @@ export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const commitAt=m.opening?.to===0||m.slide?.to===0?releaseAt:R;
  const k=smooth(((m.abortedAt??seconds)-R)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0,pos=m.slide?m.slide.from+(m.slide.to-m.slide.from)*k:0;
- const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/HAND_RELEASE_SECONDS))
-   :smooth(seconds/R)*(1-smooth((seconds-releaseAt)/HAND_RELEASE_SECONDS));
- const armDownAt=(m.abortedAt??releaseAt)+HAND_RELEASE_SECONDS,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
+ const Rel=handReleaseSeconds(m),weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/Rel))
+   :smooth(seconds/R)*(1-smooth((seconds-releaseAt)/Rel));
+ const armDownAt=(m.abortedAt??releaseAt)+Rel,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
  const idleWeight=m.abortedAt!==undefined||seconds<R?1-weight:idleBlend;
  return {angle,pos,weight,idleBlend,idleWeight,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt};
 }

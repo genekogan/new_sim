@@ -166,6 +166,9 @@ type TransferExec = {
 const LIFT_STEPS = Array.from({ length: 16 }, (_, i) => 0.04 + i * 0.02);
 /** A container front's thickness behind its face (m): the band a stored thing must clear the lip over. */
 const FRONT_BAND = 0.02, LIP_MARGIN = 0.01;
+/** An empty hand's arc keeps 4 cm: the drawn hand blends onto it from the clip over its first 0.35 s (presentation.ts
+ *  `goal`), a little under the engine's path (take 5: 1 cm under the lip at the drawer front). */
+const HAND_LIP_MARGIN = 0.04;
 /** The hand's path into (or out of) a container (presentation.ts insidePoint): up over the lip in front of it, across to
  *  straight above the place at the lip's height, then straight down to it (or the reverse). The lowest lift whose whole
  *  path keeps the thing (an empty hand: the hand) above the lip wherever its footprint is over the front band; `size` is
@@ -183,7 +186,7 @@ function insideArc(owner: Entity, slot: SurfaceSlot, from: Vec3, to: Vec3, into:
     // 1 cm of margin over the lip, checked finer than any tick samples it
     for (let i = 0; i <= 128 && ok; i++) {
       const q = fixtureLocal(owner, insidePoint(from, via, to, i / 128));
-      if (q[2] + half >= ins.face - FRONT_BAND && q[2] - half <= ins.face && q[1] - drop < ins.lip + LIP_MARGIN) ok = false;
+      if (q[2] + half >= ins.face - FRONT_BAND && q[2] - half <= ins.face && q[1] - drop < ins.lip + (size ? LIP_MARGIN : HAND_LIP_MARGIN)) ok = false;
     }
     if (ok) break;
   }
