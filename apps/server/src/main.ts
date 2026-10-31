@@ -165,7 +165,9 @@ if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entit
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
 // A punt install moves the static world (new carriers and rides), so the caches warmed before listening are rebuilt in
 // their own turn shortly after, not by the next Soul's `here`.
-const rewarm=()=>{if(closing||!edge)return;const w=edge.prepareForServing();console.log(`[activities] edge capability caches rebuilt in ${w.ms} ms for ${w.souls} Souls at tick ${host.engine.world.tick}`);};
+// `closing` is declared before this closure: a slow boot hook below must not let the timer reach it uninitialized (TDZ).
+let closing = false;
+const rewarm=()=>{if(closing||!edge)return;try{const w=edge.prepareForServing();console.log(`[activities] edge capability caches rebuilt in ${w.ms} ms for ${w.souls} Souls at tick ${host.engine.world.tick}`);}catch(error){console.error('[activities] edge capability cache rebuild failed; Souls build them on demand',error);}};
 if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`),engineBridge?()=>{setTimeout(rewarm,1000).unref();}:undefined);
 const listener = getRequestListener(app.fetch);
 // G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)
@@ -216,7 +218,6 @@ if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
 {const {retireResidentsBootHook}=await import('./retire-residents.ts');await retireResidentsBootHook(souls,db,host.worldId,config.dataDir,process.env);}
 // A full model is not ready for HTTP until its ordinary queued projection has folded into the engine.
 // Keep start, maintenance and input ordering above unchanged; this is a readiness boundary, not a CPU saving.
-let closing = false;
 if (engineBridge) {
   const waitAt = performance.now(), abort = new AbortController();
   const stopped = (signal: string) => abort.abort(new Error(`boot interrupted: ${signal}`));
@@ -235,7 +236,8 @@ if (engineBridge) {
     host.engine.prepareForServing?.();
     console.log(`[boot] serving cache preparation ${Math.round(performance.now() - prepareAt)} ms at tick ${host.engine.world.tick}`);
     // The first rich `here` after a restart otherwise builds these on its own request (~1.5 s blocked on Eden 2026).
-    if (edge) { const w = edge.prepareForServing(); console.log(`[boot] edge capability caches ${w.ms} ms for ${w.souls} Souls${w.failed ? ` (${w.failed} failed)` : ''} at tick ${host.engine.world.tick}`); }
+    // An optimisation only: a failure here is logged and the world still opens HTTP (Souls then build them on demand).
+    if (edge) { try { const w = edge.prepareForServing(); console.log(`[boot] edge capability caches ${w.ms} ms for ${w.souls} Souls${w.failed ? ` (${w.failed} failed)` : ''} at tick ${host.engine.world.tick}`); } catch (error) { console.error('[boot] edge capability cache warm failed; opening HTTP without it', error); } }
   } catch (error) {
     closing = true; console.error('[boot] initial physics unavailable; HTTP was not opened', error);
     try {
