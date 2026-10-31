@@ -68,6 +68,8 @@ export type HumanState = {
   handTransferV1?: import('../items/watering.ts').HandTransfer;
   /** Soul Actions 43: the last let-go before a reach (an idle gesture fades out on it); never controller context. */
   letGoV1?: import('../items/let-go.ts').LetGoV1;
+  /** Soul Actions 44: one recorded mug stage (drinking in sips, rinsing at a tap); never controller context. */
+  cupV1?: import('../items/cup.ts').CupMotion;
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };

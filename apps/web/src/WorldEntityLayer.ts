@@ -459,15 +459,19 @@ export class WorldEntityLayer {
       if (d.frozen) this.thaw(d);
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
-      const ride = this.overrides.get(id); if (ride) { d.obj.position.copy(ride); const yaw = this.overrideYaw.get(id); if (yaw !== undefined) d.obj.rotation.y = -yaw; }
+      // entry 44: a mug being drunk from or rinsed follows the drawn hand (its figure's cup pose), not the recorded item pose:
+      // the engine's mug is the same timeline resolved on a 1.75 m body, the drawn one on this rig's own lips
+      const cupHand = !d.removing && this.held.has(id) && !d.obj.userData.handleGrip && this.cupHeld(id, d);
+      const ride = cupHand ? undefined : this.overrides.get(id); if (ride) { d.obj.position.copy(ride); const yaw = this.overrideYaw.get(id); if (yaw !== undefined) d.obj.rotation.y = -yaw; }
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
       const shown = this.interiorVisible(id, d);
-      const inHand = !ride && !d.removing && this.held.has(id) && (d.obj.userData.handleGrip ? this.handleHeld(id, d) : this.handPoint(this.held.get(id)!, d.obj.position));
+      const inHand = cupHand || (!ride && !d.removing && this.held.has(id) && (d.obj.userData.handleGrip ? this.handleHeld(id, d) : this.handPoint(this.held.get(id)!, d.obj.position)));
+      if (!inHand || !d.obj.userData.cupShown) this.cupWater(id, null);
       if (!inHand && this.pours.has(id)) this.pours.get(id)!.visible = false;
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
-        if (inHand || ride || !d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
+        if (inHand || ride || !d.settled || shown !== (d.shown ?? true) || d.obj.userData.cupShown !== undefined) { if (d.obj.userData.cupShown === false) d.obj.userData.cupShown = undefined; this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
         continue;
       }
       d.obj.visible = shown;
@@ -493,6 +497,45 @@ export class WorldEntityLayer {
     palm(0, _pl); palm(1, _pr);
     if (Math.abs(_pl.y - _pr.y) < 0.06) out.copy(_pl).lerp(_pr, 0.5); else out.copy(_pl.y > _pr.y ? _pl : _pr);
     return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
+  }
+  /** Entry 44: a mug being drunk from or rinsed is drawn where its holder's figure says (humans.ts `cupPose`: the cup
+   *  timeline's pose moved with the drawn palm), tilted; the tap's stream ends in it, rinse water shows in it and runs out
+   *  of its rim into the basin. What is drawn is published on the mug (`cupDebug`) for proofs. */
+  private cupHeld(id: string, d: Drawn): boolean {
+    const f = this.figureOf(this.held.get(id)!), cp = f?.holder.userData.cupPose as { item: string; base: THREE.Vector3; q: THREE.Quaternion; water: number; outflow: number; tilt: number; atLips: boolean; lips: number[]; rimNear: number[]; palm: number[]; target: number[]; grip: number } | undefined;
+    if (!f || !cp || cp.item !== id) { if (d.obj.userData.cupShown) { d.obj.userData.cupShown = false; d.obj.quaternion.setFromAxisAngle(_yAxis, d.obj.rotation.y); } return false; }
+    d.obj.userData.cupShown = true;
+    d.obj.position.copy(cp.base); d.obj.quaternion.copy(cp.q);
+    const s = d.obj.scale.x, up = _vs.set(0, 1, 0).applyQuaternion(cp.q);
+    // the water's surface in the mug (horizontal, at its level up the axis), and the opening a tap's stream falls into
+    const level = CUP_RIM.floor + (CUP_RIM.full - CUP_RIM.floor) * cp.water, surface = _v3.copy(cp.base).addScaledVector(up, level * s);
+    for (const jets of this.tapJets.values()) {
+      const n = jets.getWorldPosition(_vn);
+      if (Math.hypot(surface.x - n.x, surface.z - n.z) < 0.08 && surface.y < n.y - 0.01) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = (n.y - surface.y) / Math.max(0.01, jets.parent?.getWorldScale(_vr).y ?? 1);
+    }
+    this.cupWater(id, cp.water > 0.02 && cp.tilt > -0.6 ? { at: surface, r: (CUP_RIM.r - 0.002) * s * Math.max(0.5, up.y) } : null);
+    // the rinse water leaving the lowest point of the rim, falling into the basin under it
+    let pour = this.pours.get(id), rim: number[] | null = null, drop = 0;
+    if (cp.outflow > 0.003) {
+      let low = Infinity; const p = new THREE.Vector3();
+      for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; p.set(Math.cos(a) * CUP_RIM.r * s, CUP_RIM.h * s, Math.sin(a) * CUP_RIM.r * s).applyQuaternion(cp.q).add(cp.base); if (p.y < low) { low = p.y; rim = p.toArray(); } }
+      let floor = rim![1] - 0.3; for (const jets of this.tapJets.values()) { const n = jets.getWorldPosition(_vn); if (Math.hypot(rim![0] - n.x, rim![2] - n.z) < 0.4) floor = n.y - Number(jets.userData.dropDefault ?? 0.3) * (jets.parent?.getWorldScale(_vr).y ?? 1); }
+      drop = Math.max(0.03, rim![1] - floor);
+      const dir = _vo.set(up.x, 0, up.z); if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0); dir.normalize();
+      if (!pour) { pour = spoutJets(SPOUT_SPEED); this.thingsGroup.add(pour); this.pours.set(id, pour); }
+      const u = (pour.material as THREE.ShaderMaterial).uniforms;
+      pour.position.set(rim![0], rim![1], rim![2]); pour.rotation.set(0, Math.atan2(-dir.z, dir.x), 0); pour.visible = true;
+      u.uFlow.value = cp.outflow; u.uDir.value = -0.9; u.uDrop.value = drop;
+    } else if (pour) pour.visible = false;
+    d.obj.userData.cupDebug = { base: cp.base.toArray().map((v) => +v.toFixed(4)), up: up.toArray().map((v) => +v.toFixed(4)), tilt: +cp.tilt.toFixed(4), atLips: cp.atLips, lips: cp.lips.map((v) => +v.toFixed(4)), rimNear: cp.rimNear.map((v) => +v.toFixed(4)), palm: cp.palm.map((v) => +v.toFixed(4)), target: cp.target.map((v) => +v.toFixed(4)), grip: +cp.grip.toFixed(3), water: +cp.water.toFixed(3), surface: surface.toArray().map((v) => +v.toFixed(4)), outflow: +cp.outflow.toFixed(3), rim: rim?.map((v) => +v.toFixed(4)) ?? null, drop: +drop.toFixed(3) };
+    return true;
+  }
+  private cupWaters = new Map<string, THREE.Mesh>();
+  private cupWater(id: string, w: { at: THREE.Vector3; r: number } | null) {
+    let m = this.cupWaters.get(id);
+    if (!w) { if (m) m.visible = false; return; }
+    if (!m) { m = new THREE.Mesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#bfe3f2', transparent: true, opacity: 0.75, roughness: 0.15, metalness: 0 })); m.name = 'rinse water'; m.renderOrder = 2; this.thingsGroup.add(m); this.cupWaters.set(id, m); }
+    m.position.copy(w.at); m.scale.setScalar(w.r); m.visible = true;
   }
   /** Entry 34: a thing held by its handle (a watering can) hangs from the right palm by its grip, turned with the body and
    *  tipped by the recorded pour (the figure's `wateringTilt`); its rose showers while the figure says the water flows. */

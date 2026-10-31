@@ -9,6 +9,7 @@
 // kettleHeat(state, tick), a pure function of world time.
 import { opSchema, cupSteam, kettleHeat, spoutRun, KETTLE_CLOCK, isKettleDef, isTeaCupDef, CUP_LITRES, CUP_RIM, KETTLE_GRIP, KETTLE_LITRES, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, type Op, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { canPoint, wateringEvents, type WateringMotion } from '../../../../mars/viewer/engine/items/watering.ts';
+import { cupEvents, MUG, type CupMotion } from '../../../../mars/viewer/engine/items/cup.ts';
 import { handActuatorFrame, HAND_REACH_SECONDS, HAND_RELEASE_SECONDS, HAND_IDLE_HANDOFF_SECONDS, type HandActuatorMotion } from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
 import { isTapDef, streamRun } from './watering.ts';
@@ -19,7 +20,10 @@ type Vec2 = [number, number]; type Vec3 = [number, number, number];
 type Step = { verb: string; params: Record<string, unknown> };
 type Refusal = { code: string; reason: string };
 export type TeaPlan = { steps: Step[]; summary: string };
-export const TEA_ACTIONS = new Set(['fill', 'boil', 'pour', 'brew']);
+export const TEA_ACTIONS = new Set(['fill', 'boil', 'pour', 'brew', 'drink', 'sip', 'wash']);
+/** Entry 44: a full cup is drunk in this many sips; a table this near (m) is where she stands to drink. */
+export const SIPS_PER_CUP = 5, SIP_TEA = 1 / SIPS_PER_CUP;
+const TABLE_NEAR = 8, SPOT_CLEAR = 0.7;
 /** How far (m) a kettle may be from the cup it pours into, and a tap from the kettle. */
 const NEAR_CUP = 2.5, TAP_REACH = 20, GRACE_TICKS = 1200;
 /** Seconds the tap runs into the kettle; seconds of stream for one cup. */
@@ -57,11 +61,11 @@ export function createTea(h: TeaHost) {
   const clear = (p: Vec3) => (h.engine.clearanceAtV1 ? h.engine.clearanceAtV1(p[0], p[2], 0) : Infinity) >= HUMAN_RADIUS + 0.02;
   const heat = (id: string) => kettleHeat(stateOf(id), h.engine.world.tick, dt());
   // the few things tea uses, found once per world version (never a scan per offer)
-  let index: { v: number; kettles: string[]; cups: string[]; taps: string[] } | null = null;
+  let index: { v: number; kettles: string[]; cups: string[]; taps: string[]; tables: string[] } | null = null;
   const things = () => {
     const v = h.version(); if (index?.v === v) return index;
-    const out = { v, kettles: [] as string[], cups: [] as string[], taps: [] as string[] };
-    for (const e of M().entities.values()) { const d = M().resolvedDef(e.def); if (!d) continue; if (isKettleDef(d as never)) out.kettles.push(e.id); else if (isTeaCupDef(d as never)) out.cups.push(e.id); else if (isTapDef(d)) out.taps.push(e.id); }
+    const out = { v, kettles: [] as string[], cups: [] as string[], taps: [] as string[], tables: [] as string[] };
+    for (const e of M().entities.values()) { const d = M().resolvedDef(e.def); if (!d) continue; if (isKettleDef(d as never)) out.kettles.push(e.id); else if (isTeaCupDef(d as never)) out.cups.push(e.id); else if (isTapDef(d)) out.taps.push(e.id); else if (d.tags?.includes('table') && d.slots?.some((x) => x.kind === 'surface')) out.tables.push(e.id); }
     return (index = out);
   };
 
@@ -153,9 +157,82 @@ export function createTea(h: TeaHost) {
   };
   const cupNear = (kettle: string) => {
     const k = ents()[kettle]?.pose?.p as Vec3 | undefined; if (!k) return null; let best = NEAR_CUP, c: string | null = null;
-    for (const id of things().cups) { const e = ents()[id], p = e?.pose?.p as Vec3 | undefined; if (!p || e.support?.kind !== 'resting-on' || num(stateOf(id).tea) > 0.05) continue; const d = Math.hypot(p[0] - k[0], p[2] - k[2]); if (d < best) { best = d; c = id; } }
+    for (const id of things().cups) { const e = ents()[id], p = e?.pose?.p as Vec3 | undefined; if (!p || e.support?.kind !== 'resting-on' || num(stateOf(id).tea) > 0.05 || stateOf(id).bag === false) continue; const d = Math.hypot(p[0] - k[0], p[2] - k[2]); if (d < best) { best = d; c = id; } }
     return c;
   };
+
+  // ---- entry 44: drinking at a table, washing up at the sink ----
+  const heldBy = (cup: string, body: string) => { const s = ents()[cup]?.support; return s?.kind === 'in-hand' && s.by === body ? (s.hand as 'left' | 'right') : null; };
+  const drinkers = new Map<string, Vec3>(), drinkSeen = new Set<string>();
+  /** Where to stand at the nearest table (≤ TABLE_NEAR): of six edge points (two along each long side, one at each end),
+   *  the nearest one that is clear and has nobody standing or about to stand within SPOT_CLEAR; facing into the table. */
+  function tableSpot(body: string, me: Vec2): { st: Vec3; face: number; table: string } | null {
+    let best: { st: Vec3; face: number; table: string; d: number } | null = null;
+    const others = Object.values(ents()).filter((x: any) => x?.human && x.id !== body).map((x: any) => x.pose.p as Vec3);
+    for (const [b, p] of drinkers) if (b !== body) others.push(p);
+    for (const t of things().tables) {
+      const wp = pose(t), d = defOf(t); if (!wp || !d || Math.hypot(wp.x - me[0], wp.z - me[1]) > TABLE_NEAR) continue;
+      const hx = d.size.box[0] / 2 * wp.s, hz = d.size.box[2] / 2 * wp.s, g = EDGE_GAP + 0.02;
+      for (const [lx, lz] of [[-0.3, hz + g], [0.3, hz + g], [-0.3, -(hz + g)], [0.3, -(hz + g)], [hx + g, 0], [-(hx + g), 0]] as Vec2[]) {
+        if (Math.abs(lx) > hx && Math.abs(lz) > 0) continue;
+        const st = toWorld(wp, [lx / wp.s, 0, lz / wp.s]); if (!clear(st) || others.some((o) => Math.hypot(o[0] - st[0], o[2] - st[2]) < SPOT_CLEAR)) continue;
+        const inward: Vec2 = Math.abs(lz) > 0 ? [0, -Math.sign(lz)] : [-Math.sign(lx), 0], face = heading(wp, inward), dd = Math.hypot(st[0] - me[0], st[2] - me[1]);
+        if (!best || dd < best.d) best = { st, face, table: t, d: dd };
+      }
+    }
+    return best;
+  }
+  function drinkPlan(body: string, cup: string, me: Vec2, one: boolean): TeaPlan | Refusal {
+    const m = M(), name = m.pathOf(cup), hand = heldBy(cup, body), tea = num(stateOf(cup).tea);
+    if (!hand) return { code: 'tea.not-holding', reason: `Pick up ${name} first; then drink the tea.` };
+    if (tea <= 0.05) return { code: 'tea.cup-empty', reason: `${name} is empty.` };
+    const sips = one ? 1 : Math.max(1, Math.round(tea / SIP_TEA)), sip = one ? Math.min(tea, SIP_TEA) : tea / sips;
+    const spot = tableSpot(body, me), steps: Step[] = [];
+    const yaw = ents()[body].pose.yaw as number;
+    let face = yaw;
+    if (spot) { drinkers.set(body, spot.st); face = spot.face; if (Math.hypot(spot.st[0] - me[0], spot.st[2] - me[1]) > 0.15) steps.push(walk(spot.st, spot.face)); }
+    steps.push(LET_GO, { verb: 'mars:cup_v1', params: { item: cup, stage: 'drink', face: r3(face), sips, from: r3(tea), sip: Math.round(sip * 10000) / 10000 } });
+    const left = Math.max(0, Math.round((tea - sips * sip) * 1000) / 1000);
+    return { steps, summary: `${one ? 'Took a sip of' : 'Drank'} the tea in ${name}${spot ? ` at ${m.pathOf(spot.table)}` : ''} (${sips} sip${sips > 1 ? 's' : ''}); ${left > 0.05 ? `about ${Math.round(left * 10) / 10} of a cup is left` : 'the cup is empty'}.` };
+  }
+  /** The wash at the nearest tap: the mug's base under the spout (its rim a little under the nozzle, the stream landing in
+   *  it), the body beside the sink as for a kettle, the palm on the mug's side to the body's right. */
+  function washSteps(cup: string, tap: string, hand: 'left' | 'right'): { walk: Step; wash: Step } | Refusal {
+    const tdef = defOf(tap)!, twp = pose(tap)!, sh = shapesOf(tdef), valve = sh.find((x) => x.tint === 'valve')?.at, nozzle = sh.find((x) => x.tint === 'nozzle')?.at;
+    if (!valve || !nozzle) return { code: 'tea.no-tap', reason: `${M().pathOf(tap)} has no tap to rinse a cup under.` };
+    const rimGap = 0.03, top = nozzle[1] - rimGap, land = nozzle[2] + streamRun(rimGap + MUG.h - MUG.floor), half = tdef.size.box[0] / 2, side = hand === 'right' ? 1 : -1;
+    // engine frame facing the sink's +x: its +z is the body's right; the palm 0.19 m to that side, the mug's axis 0.058 inside it
+    const bodyZ = land + side * (MUG.wrapOut - 0.19);
+    let stand = toWorld(twp, [-(half + HUMAN_RADIUS + 0.01), 0, bodyZ]);
+    for (const e of [0.04, 0.08]) if (!clear(stand)) stand = toWorld(twp, [-(half + HUMAN_RADIUS + e), 0, bodyZ]);
+    if (!clear(stand)) return { code: 'tea.tap-blocked', reason: `There is no room to stand beside ${M().pathOf(tap)} to rinse the cup.` };
+    const face = heading(twp, [1, 0]), hold = toWorld(twp, [nozzle[0], top - MUG.h, land]);
+    return { walk: { verb: 'mars:walk_to', params: { x: r3(stand[0]), z: r3(stand[2]), level: 0, face: r3(face) } },
+      wash: { verb: 'mars:cup_v1', params: { item: cup, stage: 'wash', face: r3(face), target: tap, hold: hold.map(r3), valve: toWorld(twp, [valve[0], valve[1] + 0.02, valve[2]]).map(r3) } } };
+  }
+  function washPlan(body: string, cup: string, me: Vec2): TeaPlan | Refusal {
+    const m = M(), name = m.pathOf(cup), st = stateOf(cup), held = heldBy(cup, body);
+    if (num(st.tea) > 0.05) return { code: 'tea.cup-not-empty', reason: `There is still tea in ${name}; drink it first.` };
+    if (num(st.brewedTick, -1) < 0) return { code: 'tea.cup-clean', reason: `${name} is already clean.` };
+    const other = Object.values(ents()).find((x: any) => x?.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === body && x.id !== cup);
+    if (other) return { code: 'tea.hands-full', reason: `You are holding ${m.pathOf(other.id)}; put it down first.` };
+    const cp = ents()[cup].pose.p as Vec3; let tap: string | null = null, best = TAP_REACH;
+    for (const t of things().taps) { const q = pose(t); if (!q) continue; const d = Math.hypot(q.x - cp[0], q.z - cp[2]); if (d < best) { best = d; tap = t; } }
+    if (!tap) return { code: 'tea.no-tap', reason: `There is no tap within ${TAP_REACH} m of ${name} to rinse it at.` };
+    const steps: Step[] = [];
+    // from where it stands (a table, a counter) and back there; a mug in hand goes to the nearest table afterwards
+    const at = held ? null : station(cup, me, -0.05);
+    if (!held && !at) return { code: 'tea.cup-not-down', reason: `${name} is not on a table or counter.` };
+    if (at && !clear(at.st)) return { code: 'tea.counter-blocked', reason: `There is no room to stand in front of ${name}.` };
+    const hand = held ?? 'right', w = washSteps(cup, tap, hand); if ('code' in w) return w;
+    if (at) steps.push(walk(at.st, at.face), LET_GO, { verb: 'mars:take_item', params: { item: cup, hand: 'right' } });
+    else steps.push(LET_GO);
+    steps.push(w.walk, w.wash);
+    let back: string;
+    if (at) { steps.push(walk(at.st, at.face), { verb: 'mars:put_item', params: { item: cup, surfaceSlot: `${at.owner}#${at.slot}` } }); back = m.pathOf(at.owner); }
+    else { const spot = tableSpot(body, me); if (spot) { steps.push(walk(spot.st, spot.face), { verb: 'mars:put_item', params: { item: cup, surfaceSlot: `${spot.table}#top` } }); back = m.pathOf(spot.table); } else back = 'your hand'; }
+    return { steps, summary: `Rinsed ${name} at ${m.pathOf(tap)} and set it down clean on ${back}.` };
+  }
 
   /** The act for a tea word on `id` (a kettle or a cup), a refusal, or null (not a tea thing: other paths answer). */
   function plan(soul: { entityId: string }, id: string, action: string): TeaPlan | Refusal | null {
@@ -163,8 +240,15 @@ export function createTea(h: TeaHost) {
     const m = M(), def = defOf(id); if (!def) return null;
     const body = ents()[soul.entityId]; if (!body?.human) return null;
     const me: Vec2 = [body.pose.p[0], body.pose.p[2]];
+    if ((action === 'drink' || action === 'sip' || action === 'wash') && isTeaCupDef(def as never)) {
+      const r = action === 'wash' ? washPlan(soul.entityId, id, me) : drinkPlan(soul.entityId, id, me, action === 'sip');
+      if (!('code' in r)) planned.delete(soul.entityId);
+      return r;
+    }
     const busy = Object.values(ents()).find((x: any) => x?.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId && !things().kettles.includes(x.id));
     if (busy) return { code: 'tea.hands-full', reason: `You are holding ${m.pathOf(busy.id)}; put it down first.` };
+    // entry 44: a washed mug has no tea bag in it (said before where the kettle is)
+    if (isTeaCupDef(def as never) && stateOf(id).bag === false) return { code: 'tea.no-bag', reason: `${m.pathOf(id)} has been washed and has no tea bag in it.` };
     const kettle = isKettleDef(def as never) ? id : isTeaCupDef(def as never) ? kettleNear(id) : null;
     if (!kettle) return isTeaCupDef(def as never) ? { code: 'tea.no-kettle', reason: `There is no kettle within ${NEAR_CUP} m of ${m.pathOf(id)}.` } : null;
     const k = heat(kettle), level = num(stateOf(kettle).level), litres = litresOf(defOf(kettle)!, (m.entities.get(kettle)?.params ?? {}) as Record<string, unknown>) || KETTLE_LITRES, cupL = CUP_LITRES / litres;
@@ -184,6 +268,7 @@ export function createTea(h: TeaHost) {
     const cup = isTeaCupDef(def as never) ? id : cupNear(kettle);
     if (!cup) return { code: 'tea.no-cup', reason: `There is no empty cup on the counter by ${kname}.` };
     if (num(stateOf(cup).tea) > 0.05) return { code: 'tea.cup-full', reason: `${m.pathOf(cup)} already has tea in it.` };
+    if (stateOf(cup).bag === false) return { code: 'tea.no-bag', reason: `${m.pathOf(cup)} has been washed and has no tea bag in it.` };
     if (action === 'pour') {
       if (k.phase === 'empty' || level < cupL * 0.9) return { code: 'tea.kettle-empty', reason: `${kname} has not enough water for a cup; fill it first.` };
       if (k.phase === 'cold') return { code: 'tea.kettle-cold', reason: `${kname} is cold; put it on first.` };
@@ -207,7 +292,9 @@ export function createTea(h: TeaHost) {
   function facts(id: string): Record<string, unknown> | null {
     const def = defOf(id); if (!def) return null;
     if (isKettleDef(def as never)) return { kettle: heat(id).phase };
-    if (isTeaCupDef(def as never)) return num(stateOf(id).tea) > 0.05 ? { tea: true } : null;
+    if (isTeaCupDef(def as never)) { const st = stateOf(id), tea = num(st.tea);
+      // entry 44: how much tea (one decimal), drunk (empty, until washed), or washed (clean); a fresh mug says nothing
+      return tea > 0.05 ? { tea: Math.max(0.1, Math.round(tea * 10) / 10) } : num(st.brewedTick, -1) >= 0 ? { empty: true } : st.bag === false ? { clean: true } : null; }
     return null;
   }
 
@@ -230,6 +317,16 @@ export function createTea(h: TeaHost) {
     }
     commit(ops, `${actor} tea ${key} ${m.target}`);
   }
+  /** Entry 44: a sip leaves the tea the drink's own timeline says (cupEvents: a pure function of the record); a rinse turns
+   *  the tap on and off at the valve contacts and leaves the mug clean when its water has run out. */
+  function cupEvent(m: CupMotion, actor: string, item: string, key: string, data: Record<string, unknown>) {
+    const ops: Op[] = [];
+    if (key.startsWith('sip-')) set(ops, item, { tea: num(data.tea) });
+    else if (key === 'valve-on' && m.target) set(ops, m.target, { on: true });
+    else if (key === 'valve-off' && m.target) set(ops, m.target, { on: false });
+    else if (key === 'washed') set(ops, item, { tea: 0, brewedTick: -1, bag: false });
+    commit(ops, `${actor} tea ${key} ${item}`);
+  }
   function fillEvent(m: WateringMotion, actor: string, key: string, data: Record<string, unknown>) {
     const ops: Op[] = [];
     if (key === 'valve-on') set(ops, m.target, { on: true });
@@ -248,12 +345,19 @@ export function createTea(h: TeaHost) {
     }
     for (const [body, until] of watching) {
       visits++;
-      const b = ents()[body], hm = b?.human, wm = hm?.wateringV1 as WateringMotion | undefined, am = hm?.handActuator as HandActuatorMotion | undefined;
+      const b = ents()[body], hm = b?.human, wm = hm?.wateringV1 as WateringMotion | undefined, am = hm?.handActuator as HandActuatorMotion | undefined, cm = hm?.cupV1 as CupMotion | undefined;
       const mine = (item: string | undefined) => !!item && things().kettles.includes(item);
       const holding = !!hm && things().kettles.some((c) => ents()[c]?.support?.kind === 'in-hand' && ents()[c].support.by === body);
-      const active = (wm && mine(wm.item)) || (am && mine(am.target)) || holding;
+      const cupItem = cm && things().cups.includes(cm.item) ? cm.item : undefined;
+      const active = (wm && mine(wm.item)) || (am && mine(am.target)) || holding || !!cupItem;
+      // a drinker's place at the table is kept from the plan until its drink has ended
+      if (cupItem) drinkSeen.add(body); else if (drinkSeen.delete(body)) drinkers.delete(body);
       if (active) watching.set(body, now + GRACE_TICKS);
-      if (wm && mine(wm.item)) {
+      if (cm && cupItem) {
+        const id = cm.actionId ?? `${body}:${cm.startTick}`, done = fired.get(id) ?? new Set<string>(); fired.set(id, done);
+        const s = (now - cm.startTick) * d;
+        for (const e of cupEvents(cm)) if (s >= e.at && !done.has(e.key)) { done.add(e.key); try { cupEvent(cm, body, cupItem, e.key, e.data); } catch (err) { h.log(`tea ${e.key}: ${(err as Error).message}`); } }
+      } else if (wm && mine(wm.item)) {
         const id = wm.actionId ?? `${body}:${wm.startTick}`, done = fired.get(id) ?? new Set<string>(); fired.set(id, done);
         const s = (now - wm.startTick) * d;
         for (const e of wateringEvents(wm)) if (s >= e.at && !done.has(e.key)) { done.add(e.key); try { (wm.stage === 'fill' ? fillEvent : pourEvent)(wm, body, e.key, e.data); } catch (err) { h.log(`tea ${e.key}: ${(err as Error).message}`); } }
@@ -266,7 +370,7 @@ export function createTea(h: TeaHost) {
           if (k.phase === 'cold') { const ops: Op[] = []; set(ops, am.target, { heatTick: at }); commit(ops, `${body} tea switch-on ${am.target}`); }
           else h.log(`tea switch-on ${am.target}: ${k.phase}, not switched`);
         }
-      } else if (!active && now > until) watching.delete(body);
+      } else if (!active && now > until) { watching.delete(body); drinkers.delete(body); }
       if (fired.size > 64) for (const x of [...fired.keys()].slice(0, 32)) fired.delete(x);
     }
     return moved;

@@ -19,7 +19,10 @@ export const KETTLE_SWITCH: [number, number, number] = [-0.118, 0.236, 0];
 /** Litres a full kettle holds; one cup takes CUP_LITRES of it. */
 export const KETTLE_LITRES = 1.2, CUP_LITRES = 0.25;
 /** The mug's rim (radius, height above its base) and the height the tea reaches in a full cup. */
-export const CUP_RIM = { r: 0.04, h: 0.1, full: 0.088 } as const;
+export const CUP_RIM = { r: 0.04, h: 0.1, full: 0.088, floor: 0.014 } as const;
+/** Entry 44: the drawn tea levels [shown while tea > x, drawn at the height of tea t]: thirds as it is poured, fifths as
+ *  it is drunk (a full cup, 0.8, 2/3, 0.6, 0.4, 1/3, 0.2). */
+export const TEA_STEPS: [number, number][] = [[0.9, 1], [0.75, 0.8], [0.62, 2 / 3], [0.5, 0.6], [0.36, 0.4], [0.25, 1 / 3], [0.05, 0.2]];
 
 /** Heating clock (s): it heats for HEAT, boils for BOIL, then switches itself off and stays hot for HOT. */
 export const KETTLE_CLOCK = { heat: 24, boil: 5, hot: 300 } as const;
@@ -94,27 +97,33 @@ const kettle: DefInput = {
   ] as DefInput['actions'],
 } as unknown as DefInput;
 
-const cupPalette = { glaze: '#e8e2d6', inside: '#d9d1c2', tea: '#7a4b26', string: '#f2efe6', tag: '#c9a24a' };
+const cupPalette = { glaze: '#e8e2d6', inside: '#d9d1c2', tea: '#7a4b26', string: '#f2efe6', tag: '#c9a24a', stain: '#9c7a58', bag: '#a8865e' };
 const cup: DefInput = {
   schema: 'def/1', name: 'core-cup', version: 2,
-  description: 'A mug with a handle and a tea bag in it. Boiling water poured in makes a cup of tea that stays in it, carried or set down, until it is drunk.',
+  description: 'A mug with a handle and a tea bag in it. Boiling water poured in makes a cup of tea that stays in it, carried or set down, until it is drunk, sip by sip. Rinsed at a tap it is clean again.',
   tags: ['kitchen', 'item', 'cup', 'mug', 'tea', 'container', 'tea-cup', 'recorded-item'], form: 'point',
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [
     { kind: 'lathe', at: [0, 0, 0], profile: [[0, 0], [0.038, 0], [0.042, 0.006], [0.044, 0.1], [0.04, 0.1], [0.038, 0.014], [0, 0.014]], segments: 18, tint: 'glaze' },
     { kind: 'torus', at: [0.05, 0.055, 0], r: 0.024, r2: 0.0065, segments: 10, tint: 'glaze' },
-    // tea rises in it as it is poured (three steps of a third); a full cup sits just under the rim
-    { kind: 'cyl', at: [0, 0.042, 0], r: 0.0385, h: 0.003, segments: 18, tint: 'tea', when: '@tea>0.05' },
-    { kind: 'cyl', at: [0, 0.066, 0], r: 0.039, h: 0.003, segments: 18, tint: 'tea', when: '@tea>0.4' },
-    { kind: 'cyl', at: [0, CUP_RIM.full, 0], r: 0.0395, h: 0.003, segments: 18, tint: 'tea', when: '@tea>0.75' },
-    // the tea bag's string over the rim and its paper tag outside
-    { kind: 'sweep', at: [0, 0, 0], path: [[0.008, 0.03, -0.012], [0.02, 0.085, -0.03], [0.012, 0.104, -0.044], [0.006, 0.09, -0.05]], r: 0.0012, segments: 4, tint: 'string' },
-    { kind: 'box', at: [0.006, 0.074, -0.051], size: [0.02, 0.026, 0.003], round: 0, tint: 'tag' }] } } as unknown as DefInput['make'],
+    // the tea's surface at its level: poured in thirds, drunk in fifths (entry 44); each step is drawn at the height of the
+    // tea it stands for (a level shows while the tea is above the step under it), a full cup just under the rim
+    ...TEA_STEPS.map(([when, tea]) => ({ kind: 'cyl', at: [0, CUP_RIM.floor + (CUP_RIM.full - CUP_RIM.floor) * tea, 0], r: 0.038 + 0.0015 * tea, h: 0.003, segments: 18, tint: 'tea', when: `@tea>${when}` })),
+    // entry 44: drunk, the mug keeps a tea stain at the bottom and the spent bag until it is washed
+    { kind: 'cyl', at: [0, CUP_RIM.floor + 0.001, 0], r: 0.036, h: 0.002, segments: 18, tint: 'stain', when: '@tea<=0.05&@brewedTick>=0' },
+    { kind: 'box', at: [0.006, CUP_RIM.floor + 0.008, -0.01], size: [0.034, 0.012, 0.026], round: 0.004, tint: 'bag', when: '!@bag=false&@brewedTick>=0&@tea<=0.4' },
+    // the tea bag's string over the rim and its paper tag outside (gone once the mug is washed)
+    { kind: 'sweep', at: [0, 0, 0], path: [[0.008, 0.03, -0.012], [0.02, 0.085, -0.03], [0.012, 0.104, -0.044], [0.006, 0.09, -0.05]], r: 0.0012, segments: 4, tint: 'string', when: '!@bag=false' },
+    { kind: 'box', at: [0.006, 0.074, -0.051], size: [0.02, 0.026, 0.003], round: 0, tint: 'tag', when: '!@bag=false' }] } } as unknown as DefInput['make'],
   params: Object.fromEntries(Object.entries(cupPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])) as DefInput['params'], palette: cupPalette,
-  // tea: how full it is (0..1 of a cup); brewedTick: the engine tick it was poured (its steam fades from there)
-  state: { tea: { type: 'number', min: 0, max: 1, default: 0 }, brewedTick: { type: 'number', min: -1, max: 1e12, default: -1 } } as DefInput['state'],
+  // tea: how full it is (0..1 of a cup); brewedTick: the engine tick it was poured (its steam fades from there; −1 = never,
+  // or washed since); bag: a tea bag in it (entry 44: washing takes the spent bag out)
+  state: { tea: { type: 'number', min: 0, max: 1, default: 0 }, brewedTick: { type: 'number', min: -1, max: 1e12, default: -1 }, bag: { type: 'bool', default: true } } as DefInput['state'],
   components: { carryable: { mass: 0.35, grips: 1 }, container: { capacity: 1 } } as DefInput['components'],
   size: { box: [0.13, 0.1, 0.09] },
-  actions: [{ name: 'brew', label: 'Make a cup of tea', then: [{ op: 'set', field: 'tea', value: 1 }] }] as DefInput['actions'],
+  actions: [{ name: 'brew', label: 'Make a cup of tea', then: [{ op: 'set', field: 'tea', value: 1 }] },
+    { name: 'drink', label: 'Drink the tea', then: [{ op: 'set', field: 'tea', value: 0 }] },
+    { name: 'sip', label: 'Take a sip of the tea', then: [{ op: 'set', field: 'tea', value: 0 }] },
+    { name: 'wash', label: 'Wash the cup', then: [{ op: 'set', field: 'tea', value: 0 }] }] as DefInput['actions'],
 } as unknown as DefInput;
 
 // A camp sink: a basin on a stand with a tall standpipe. Its spout is high enough to hold a kettle under it standing (a

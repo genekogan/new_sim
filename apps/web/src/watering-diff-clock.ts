@@ -13,7 +13,8 @@ export function wateringDiffAhead(model: WorldModel, message: unknown, depictedT
     // entry 43: a kettle's switch contact (heatTick) and a cup's tea wait the same way (the steam and the tea never show
     // ahead of the hand that pressed or poured)
     if (can) return before.in.parent !== e.in.parent || before.state?.level !== e.state?.level || before.state?.heatTick !== e.state?.heatTick;
-    if ((def.state as Record<string, unknown> | undefined)?.tea) return before.state?.tea !== e.state?.tea || before.state?.brewedTick !== e.state?.brewedTick;
+    // entry 44: a sip (tea) and a rinse (tea, brewedTick, bag) wait the same way: the tea falls with the mug at the lips
+    if ((def.state as Record<string, unknown> | undefined)?.tea) return before.state?.tea !== e.state?.tea || before.state?.brewedTick !== e.state?.brewedTick || before.state?.bag !== e.state?.bag;
     return growing && JSON.stringify(before.state ?? {}) !== JSON.stringify(e.state ?? {});
   });
 }
