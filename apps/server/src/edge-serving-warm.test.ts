@@ -86,9 +86,9 @@ test('warmForServing: reads wait until it ends; the ceiling lets them go; stop s
 });
 
 test('servingWait: rich reads wait BEFORE admission (not in flight, not billed, no 429); other routes and view=body do not wait',async()=>{
- assert.deepEqual(['GET /v1/edge/here','GET /v1/edge/observe','GET /v1/edge/capabilities','GET /v1/edge/around','POST /v1/edge/resolve'].map(s=>{const [m,p]=s.split(' ');return servingRead(m,p);}),[true,true,true,true,true]);
+ assert.deepEqual(['GET /v1/edge/here','GET /v1/edge/observe','GET /v1/edge/capabilities','GET /v1/edge/around','POST /v1/edge/resolve','POST /v1/edge/act','POST /v1/edge/converse'].map(s=>{const [m,p]=s.split(' ');return servingRead(m,p);}),[true,true,true,true,true,true,true]);
  assert.equal(servingRead('GET','/v1/edge/here','body'),false,'the body view lists no menu');
- for(const [m,p] of [['GET','/healthz'],['POST','/v1/edge/act'],['GET','/v1/edge/view'],['GET','/v1/edge/map'],['POST','/v1/edge/say']])assert.equal(servingRead(m,p),false,`${m} ${p}`);
+ for(const [m,p] of [['GET','/healthz'],['GET','/v1/edge/view'],['GET','/v1/edge/map'],['POST','/v1/edge/say']])assert.equal(servingRead(m,p),false,`${m} ${p}`);
  let now=1000;const adm=new Admission({now:()=>now});
  let release!:()=>void;let gate:Promise<void>|null=new Promise<void>(r=>{release=()=>{gate=null;r();};});
  const app=new Hono();app.use('/v1/edge/*',servingWait(()=>gate));
