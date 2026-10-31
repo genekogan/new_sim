@@ -20,7 +20,7 @@ export class TokenBuckets {
   }
 }
 
-const short = (s) => createHash('sha256').update(s).digest('hex').slice(0, 8);
+export const short = (s) => createHash('sha256').update(s).digest('hex').slice(0, 8);
 
 /**
  * check(req, rest, behindProxy) → null (go on) or { status: 429, body, headers } for the caller to send.
@@ -54,4 +54,108 @@ export function launcherFlood({ limits = {}, now = Date.now, log = (l) => consol
     if (xff) { const ip = String(xff).split(',')[0].trim(), key = short(ip), wait = ips.take(ip); if (wait) return refuse('address', key, `more than ${L.ipPerS * 60} requests a minute from your address`, wait, what); }
     return null;
   };
+}
+
+// ---------- Ceilings for untrusted clients (lane L1, LOAD-CONTRACT §2b; Gene 2026-10-31: agents that run Souls are
+// untrusted users, the world must be immune to being hammered). Exact limits on the Soul API, answered at once by the
+// launcher (no world call, no held refusal), registry-tunable per world (`limits` in worlds.json, op.mjs set-limits).
+// Per address only behind the reverse proxy (x-forwarded-for, which Caddy sets itself); this machine is never limited by
+// address. Caddy, not the launcher, accepts the connections, so "connections per address" is counted as the address's
+// requests in flight to world APIs and its WebSockets.
+export const SOUL_CEILINGS = Object.freeze({
+  ipPer10s: 60,             // Soul API requests per address per world per 10 s
+  ipConcurrent: 10,         // API requests in flight + WebSockets per address
+  ipListen: 4,              // listen/wait long-polls per address
+  soulListen: 2,            // listen/wait per Soul token
+  accountListen: 8,         // listen/wait per account (learned from the world's x-sim-account header, else per Soul)
+  accountHeavyPerMin: 120,  // C1/C2 per account (as above) per minute
+  worldBudgetRps: 10,       // C1/C2 forwarded to the world per second, every Soul together (bursts of 2 s)
+  maxBodyKb: 64,            // a Soul API request body (body uploads excepted)
+  c3CacheMs: 1000,          // C3 public reads: one world call per this long per URL (the micro-cache)
+});
+
+/** LOAD-CONTRACT §2 request classes for a path inside a world: 'C0' | 'listen' (C0 long-polls) | 'C1' | 'C2' | 'C3' | null. */
+export function requestClass(rest, method = 'GET') {
+  const read = method === 'GET' || method === 'HEAD';
+  if (rest === '/healthz' || rest === '/v1/config') return 'C0';
+  if (rest === '/v1/world/snapshot') return read ? 'C3' : null;
+  if (!rest.startsWith('/v1/edge/')) return null;
+  const r = rest.slice('/v1/edge/'.length);
+  if (/^(inbox\/listen|wait)\/?$/.test(r)) return 'listen';
+  if (/^(receipts(\/|$)|inbox(\/|$)|schema\/?$|boot\/static\/?$)/.test(r)) return 'C0';
+  if (read && /^(map|rides|items|platforms)\/?$/.test(r)) return 'C3';
+  return read ? 'C2' : 'C1';
+}
+
+export function soulCeilings({ limitsFor = () => null, now = Date.now, log = (l) => console.warn(`[launcher] ${l}`) } = {}) {
+  const buckets = new Map(), counts = new Map(), accounts = new Map(), refused = new Map();
+  const bucket = (name, perS, burst) => { const k = `${name}:${perS}:${burst}`; let b = buckets.get(k); if (!b) buckets.set(k, b = new TokenBuckets(perS, burst, now)); return b; };
+  const n = (k) => counts.get(k) ?? 0;
+  const add = (k, d) => { const v = n(k) + d; if (v > 0) counts.set(k, v); else counts.delete(k); };
+  const seen = new Map();
+  const note = (slug, code, scope) => {
+    const r = refused.get(slug) ?? {}; r[code] = (r[code] ?? 0) + 1; refused.set(slug, r);
+    const t = now(), id = `${slug} ${scope}`, e = seen.get(id);
+    if (!e || t - e.since >= 60_000) { log(`ceiling ${code} on ${id}${e?.n ? ` (+${e.n} in the last minute)` : ''}`); seen.set(id, { since: t, n: 0 }); if (seen.size > 10_000) seen.clear(); } else e.n++;
+  };
+  const limits = (slug) => ({ ...SOUL_CEILINGS, ...(limitsFor(slug) ?? {}) });
+  const no = (slug, status, code, scope, waitMs, message) => {
+    const s = Math.max(1, Math.ceil(waitMs / 1000)); note(slug, code, scope);
+    return { refuse: { status, headers: { 'retry-after': String(s), 'cache-control': 'no-store' }, body: { ok: false, code, message: `${message}; try again in ${s} s`, retry_after: s, limit: { scope } } } };
+  };
+  const soulOf = (req) => { const t = /^Bearer\s+(sim_\S+)/i.exec(req.headers.authorization ?? '')?.[1]; return t ? short(t) + short(t + '.') : null; };
+  return {
+    limits, refused: (slug) => ({ ...(refused.get(slug) ?? {}) }), soulOf,
+    /** The world says which account a Soul token belongs to (an opaque id): its Souls share the account's ceilings. */
+    learn(soul, account) { if (soul && account) { accounts.set(soul, short(String(account))); if (accounts.size > 50_000) accounts.clear(); } },
+    /** A WebSocket from `ip` (behind the proxy): admitted, or refused; release() when it closes. */
+    socket(slug, ip) {
+      if (!ip) return { release() {} };
+      const l = limits(slug);
+      if (n(`c|${ip}`) >= l.ipConcurrent) { note(slug, 'client.rate', 'address'); return null; }
+      add(`c|${ip}`, 1); let done = false;
+      return { release() { if (!done) { done = true; add(`c|${ip}`, -1); } } };
+    },
+    /** One request to a world: null (not an API request: go on), { refuse } or { cls, soul, release() }. */
+    check(req, slug, rest, behindProxy) {
+      if (!rest.startsWith('/v1/') && rest !== '/healthz') return null;
+      const cls = requestClass(rest, req.method), edge = rest.startsWith('/v1/edge/'), l = limits(slug);
+      const xff = behindProxy ? req.headers['x-forwarded-for'] : undefined, ip = xff ? String(xff).split(',')[0].trim() : null;
+      const soul = soulOf(req), acct = soul ? accounts.get(soul) ?? soul : null, heavy = edge && (cls === 'C1' || cls === 'C2');
+      const len = Number(req.headers['content-length'] ?? 0);
+      if (edge && !rest.startsWith('/v1/edge/body/uploads') && len > l.maxBodyKb * 1024) { note(slug, 'request.too-large', 'body'); return { refuse: { status: 413, headers: { 'cache-control': 'no-store' }, body: { ok: false, code: 'request.too-large', message: `a request body may be at most ${l.maxBodyKb} KB` } } }; }
+      if (heavy && !req.headers.authorization) { note(slug, 'auth.required', 'token'); return { refuse: { status: 401, headers: { 'cache-control': 'no-store' }, body: { ok: false, code: 'auth.required', message: 'this needs a Soul token' } } }; }
+      if (ip) {
+        if (edge) { const wait = bucket('ip', l.ipPer10s / 10, l.ipPer10s).take(`${slug}|${ip}`); if (wait) return no(slug, 429, 'client.rate', 'address', wait, `more than ${l.ipPer10s} requests in 10 s from your address to this world`); }
+        if (n(`c|${ip}`) >= l.ipConcurrent) return no(slug, 429, 'client.rate', 'address', 1000, `more than ${l.ipConcurrent} requests at once from your address`);
+        if (cls === 'listen' && n(`l|${ip}`) >= l.ipListen) return no(slug, 429, 'client.rate', 'address', 5000, `more than ${l.ipListen} listening connections from your address`);
+      }
+      if (cls === 'listen' && soul) {
+        if (n(`ls|${soul}`) >= l.soulListen) return no(slug, 429, 'soul.busy', 'soul', 5000, `this Soul already holds ${l.soulListen} listening connections`);
+        if (n(`la|${acct}`) >= l.accountListen) return no(slug, 429, 'account.rate', 'account', 5000, `this account already holds ${l.accountListen} listening connections`);
+      }
+      if (heavy && acct) { const wait = bucket('acct', l.accountHeavyPerMin / 60, Math.max(1, Math.round(l.accountHeavyPerMin / 4))).take(acct); if (wait) return no(slug, 429, 'account.rate', 'account', wait, `more than ${l.accountHeavyPerMin} requests a minute from this account's Souls`); }
+      if (heavy) { const wait = bucket('world', l.worldBudgetRps, l.worldBudgetRps * 2).take(slug); if (wait) return no(slug, 503, 'world.busy', 'world', wait, 'this world is answering as many requests as it can'); }
+      const keys = [...(ip ? [`c|${ip}`] : []), ...(cls === 'listen' ? [...(ip ? [`l|${ip}`] : []), ...(soul ? [`ls|${soul}`, `la|${acct}`] : [])] : [])];
+      for (const k of keys) add(k, 1);
+      let done = false;
+      return { cls, soul, release() { if (done) return; done = true; for (const k of keys) add(k, -1); } };
+    },
+  };
+}
+
+/** C3 public reads (LOAD-CONTRACT §2): one world call per URL per `ttlMs`, concurrent misses share it (single flight). */
+export class MicroCache {
+  constructor({ now = Date.now, maxEntries = 500, maxBytes = 8 * 2 ** 20 } = {}) { this.now = now; this.maxEntries = maxEntries; this.maxBytes = maxBytes; this.m = new Map(); this.flying = new Map(); this.hits = 0; this.misses = 0; }
+  /** fetch() → Promise<{ status, headers, body: Buffer }>; resolves with that response and whether it was shared. */
+  async get(key, ttlMs, fetch) {
+    const t = this.now(), e = this.m.get(key);
+    if (e && t - e.at < ttlMs) { this.hits++; return { ...e.r, cache: 'hit' }; }
+    const f = this.flying.get(key);
+    if (f) { this.hits++; return { ...(await f), cache: 'shared' }; }
+    this.misses++;
+    const p = fetch().then((r) => { if (r.status === 200 && r.body.length <= this.maxBytes) { this.m.set(key, { at: this.now(), r }); if (this.m.size > this.maxEntries) this.m.delete(this.m.keys().next().value); } return r; }).finally(() => this.flying.delete(key));
+    this.flying.set(key, p);
+    return { ...(await p), cache: 'miss' };
+  }
 }

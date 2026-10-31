@@ -27,6 +27,20 @@ Every file that owns a cost has a **dial** and exposes `setLoadLevel(level: Leve
 
 Admission (L2, `apps/server/src/load/admission.ts`): one outstanding heavy (C1/C2) request per Soul; per-Soul CPU-ms token bucket (refill `min(200, 500/awake)` ms/s, capacity 2,000 ms, charged measured handler time); the god holds a reserved 25 % of the request budget; heavy handlers run from a dispatcher after `tickOnce` within a frame budget (25 ms of each 50 ms at green, less above), round-robin across Souls, writes before reads; a job whose deadline passed is answered `world.busy` without running; a job whose socket closed is dropped. Shedding order: duplicate concurrent → C3 to launcher cache → C2 over budget → C2 past deadline (oldest first) → C1 past deadline only.
 
+## 2b. Ceilings for untrusted clients (Gene, 2026-10-31 04:40Z: agents that run Souls are untrusted users; the world must be immune to being taken down by them, accidentally or adversarially)
+
+Enforced server-side whether or not the client honours §3. Two layers, so a world that is already behind is protected by the launcher in front of it:
+
+| Where | Ceiling (v1 defaults; registry-tunable per world) | On breach |
+|---|---|---|
+| Launcher, per source IP | 60 requests/10 s to any one world's Soul API; 10 concurrent connections; 4 concurrent `listen` sockets | `429 client.rate` + Retry-After; connections above the cap closed at accept |
+| Launcher, per account (Soul token → account) | 2 concurrent `listen` per Soul, 8 per account; 120 heavy (C1/C2) requests/min per account across all its Souls | `429 soul.busy` / `account.rate` + Retry-After |
+| Launcher, per world | total heavy requests/s = `worldBudgetRps` from the registry (default 10; bench sets it per size class); request body ≤ 64 KB; C3 public reads served from the 1–2 s micro-cache, never forwarded more than once per second each | `503 world.busy` + Retry-After, answered by the launcher without touching the world |
+| World (L2 admission) | one outstanding heavy request per Soul; per-Soul CPU-ms budget; god reserve 25 %; **world total CPU-ms budget per frame** (the dispatcher never spends more than its frame budget on requests, whatever the sum of per-Soul budgets) | `429 soul.slow-down` / `503 world.busy`; a Soul over budget 3× in a minute gets a 60 s cool-down (Retry-After: 60) |
+| Both | every heavy read requires a Soul or god token (no unauthenticated C2/C3 that costs more than a cache hit — `calendar`, `scenes` are L8's) | `401` |
+
+Design rule for every lane: **the marginal cost of one more agent must be near zero when it is idle and bounded when it is busy**. A connected agent that only listens costs a held socket; its first request costs its own neighbourhood, never the world (§2 of the design, lanes L3/L4/L8). Growth in agents is therefore a budget question (how many budgets the frame can serve), not a stability question.
+
 ## 3. The busy signal
 
 - Every edge response carries `X-Sim-Load: green|amber|red|black`. At amber and above, every refusal carries `Retry-After` (seconds, integer ≥ 1).

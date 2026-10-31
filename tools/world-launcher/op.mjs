@@ -45,6 +45,7 @@ const usage = () => {
     + '       op.mjs remove-fork --port <launcher port> [--base /worlds] --slug <slug>\n'
     + '       op.mjs set-claimable --port <launcher port> [--base /worlds] --slug <slug> --claimable true|false\n'
     + '       op.mjs set-unlisted --port <launcher port> [--base /worlds] --slug <slug> --unlisted true|false\n'
+    + '       op.mjs set-limits --port <launcher port> [--base /worlds] --slug <slug> --limits \'{"worldBudgetRps":20,"ipListen":null}\'\n'
     + '       op.mjs set-heap --port <launcher port> [--base /worlds] --slug <slug> --mb <256-8192|default>\n'
     + '       op.mjs archive-world --port <launcher port> [--base /worlds] --slug <slug> [--reason <text>]\n'
     + '       op.mjs restore-world --port <launcher port> [--base /worlds] --id <archive id>\n'
@@ -76,6 +77,9 @@ if (cmd === 'create-world') {
 } else if (cmd === 'set-unlisted') {
   if (!flag('port') || !flag('slug') || !['true', 'false'].includes(flag('unlisted'))) usage();
   body = { slug: flag('slug'), unlisted: flag('unlisted') === 'true' };
+} else if (cmd === 'set-limits') {
+  if (!flag('port') || !flag('slug') || !flag('limits')) usage();
+  body = { slug: flag('slug'), limits: JSON.parse(flag('limits')) };
 } else if (cmd === 'set-heap') {
   if (!flag('port') || !flag('slug') || !flag('mb')) usage();
   body = { slug: flag('slug'), worldHeapMb: flag('mb') === 'default' ? null : Number(flag('mb')) };

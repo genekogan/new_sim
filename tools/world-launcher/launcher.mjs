@@ -93,7 +93,7 @@ import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
 import { EXISTING_WORLDS, decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 import { makeHandoff } from './handoff.mjs';
-import { launcherFlood } from './flood.mjs';
+import { MicroCache, launcherFlood, short, soulCeilings } from './flood.mjs';
 import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
 import { isUnlisted, publicWorlds } from './listing.mjs';
 import { opSoul, opSetTest } from './op-souls.mjs';
@@ -165,6 +165,9 @@ export async function openLauncher(cfg = {}) {
   const marsWebDir = cfg.marsWebDir ?? (existsSync(join(root, '.lane/mars-web')) ? join(root, '.lane/mars-web') : undefined);
   const log = cfg.log ?? ((s) => console.log(`[launcher] ${s}`));
   const flood = process.env.SIM_FLOOD === '0' ? () => null : launcherFlood({ log, limits: cfg.floodLimits });   // P2 coarse ceiling, see flood.mjs
+  // lane L1, LOAD-CONTRACT §2b: exact ceilings on the Soul API per address, Soul, account and world (registry `limits`)
+  const ceilings = soulCeilings({ limitsFor: (slug) => ({ ...(cfg.soulLimits ?? {}), ...(registry.get(slug)?.limits ?? {}) }), log });
+  const c3 = new MicroCache();
   const errors = clientErrors({ dir: join(dataDir, 'client-errors'), build: BUILD, log, limits: cfg.clientErrorLimits });   // lane ERR, client-errors.mjs
   const origin = `http://127.0.0.1:${port}`;
   const publicOrigin = (cfg.publicOrigin ?? origin).replace(/\/$/, '');
@@ -273,7 +276,7 @@ export async function openLauncher(cfg = {}) {
   // Gene 2026-10-16: one god per world; co-builders are off unless asked for (--cobuilders or SIM_COBUILDERS=1).
   const cobuilders = cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1';
   // lane DASH: the site owner's health page (health-dash.mjs)
-  const dash = healthDash({ dataDir, build: BUILD, base: B, registry, pool, live, stats, refreshStats, errors, hostHealth: () => hostHealth(dataDir), auth, wp,
+  const dash = healthDash({ dataDir, build: BUILD, base: B, registry, pool, live, stats, refreshStats, errors, ceilings, hostHealth: () => hostHealth(dataDir), auth, wp,
     verify: (a) => (auth ? verifiedCreator(a, auth.child, publicOrigin, root) : Promise.resolve(null)), worldOwner: safeOwner });
   const handoff = makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log, cobuilders });
   async function ownerArchive(w, body, authorization) {
@@ -530,7 +533,7 @@ export async function openLauncher(cfg = {}) {
   // the client hung up while we waited (a world booting, a retry, a hand-back): nothing is sent on its behalf, or a
   // long-poll listen would reach the world as a ghost and could supersede the agent's real listener
   const clientGone = (req, res) => res.destroyed || req.socket.destroyed;
-  function proxyHttp(req, res, targetPort, { tee, path, retry } = {}) {
+  function proxyHttp(req, res, targetPort, { tee, path, retry, soul, maxBody = 0 } = {}) {
     if (clientGone(req, res)) return;
     // Behind Caddy (a public origin other than our own) keep the visitor's x-forwarded-for, so per-person limits in
     // the worlds see people, not the proxy; locally it is set to the connecting address as before.
@@ -538,7 +541,8 @@ export async function openLauncher(cfg = {}) {
     const up = request({ hostname: '127.0.0.1', port: targetPort, path: path ?? req.url, method: req.method, headers: { ...req.headers, 'x-forwarded-for': xff } }, (r) => {
       // hop-by-hop headers stay on their hop: an upstream `connection: keep-alive` would turn this server's own choice
       // back on (forward() closes after its response; Node lets a user connection header override that)
-      const { connection: _c, 'keep-alive': _k, ...headers } = r.headers;
+      const { connection: _c, 'keep-alive': _k, 'x-sim-account': account, ...headers } = r.headers;
+      if (soul && account) ceilings.learn(soul, account);   // lane L1: the account a Soul token belongs to (never shown to the client)
       res.writeHead(r.statusCode ?? 502, headers);
       if (tee && (r.statusCode ?? 0) < 300) { const chunks = []; r.on('data', (c) => { if (chunks.length < 64) chunks.push(c); }); r.on('end', () => { try { tee(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { /* not json */ } }); }
       r.pipe(res);
@@ -547,6 +551,8 @@ export async function openLauncher(cfg = {}) {
     // once (the retry waits for the world to be back), so a page or poll in flight sees a short wait, not an error.
     up.on('error', () => { if (!res.headersSent && retry) retry(); else if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); else res.destroy(); });
     req.on('aborted', () => up.destroy()); res.on('close', () => up.destroy());
+    // lane L1: a Soul API body without a content-length is cut off at its ceiling (one with one was refused before)
+    if (maxBody > 0 && !req.readableEnded) { let n = 0; req.on('data', (c) => { n += c.length; if (n > maxBody) { up.destroy(); req.unpipe(up); if (!res.headersSent) json(res, 413, { ok: false, code: 'request.too-large', message: `a request body may be at most ${Math.round(maxBody / 1024)} KB` }, { connection: 'close' }); } }); }
     if (req.readableEnded) up.end(); else req.pipe(up);   // a retried GET: its (empty) body was already read
   }
   async function toWorld(req, res, slug, url, retried = false) {
@@ -556,6 +562,10 @@ export async function openLauncher(cfg = {}) {
       if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
       json(res, 404, { ok: false, code: 'world.not-served', slug }); return;
     }
+    // lane L1: the Soul API's ceilings (flood.mjs soulCeilings), answered at once without the world
+    const gated = retried ? null : ceilings.check(req, slug, url.pathname.slice(wp(slug).length) || '/', behindProxy);
+    if (gated?.refuse) { json(res, gated.refuse.status, gated.refuse.body, gated.refuse.headers); return; }
+    if (gated) res.once('close', gated.release);
     // P2: one flooding visitor or agent is refused here (every world shares this loop), before its world is contacted: a
     // refusal neither boots nor wakes a sleeping world, keeps it awake, counts as its use, nor counts as a look or an agent
     const flooded = retried ? null : flood(req, url.pathname.slice(wp(slug).length) || '/', behindProxy, slug);
@@ -579,7 +589,26 @@ export async function openLauncher(cfg = {}) {
     if (req.method === 'POST' && CLAIM_PATHS.has(rest) && claimLocked(w)) { json(res, 403, { ok: false, code: 'not-claimable', message: 'this world is not open for claiming' }); return; }
     const tee = req.method === 'POST' && rest === '/v1/god/preview' ? (body) => { if (typeof body?.id !== 'string') return; const s = seenOf(slug); s.previews.unshift({ id: body.id, accepted: !!body.accepted, summary: body.summary ?? null, failures: body.failures ?? null, at: Date.now() }); s.previews.length = Math.min(s.previews.length, 20); } : undefined;
     const again = !retried && (req.method === 'GET' || req.method === 'HEAD') ? () => void toWorld(req, res, slug, url, true).catch(() => { if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); }) : undefined;
-    proxyHttp(req, res, p, { tee, retry: again });
+    const lim = ceilings.limits(slug);
+    if (gated?.cls === 'C3' && req.method === 'GET') { void cachedRead(req, res, p, slug, url, lim.c3CacheMs); return; }
+    proxyHttp(req, res, p, { tee, retry: again, soul: gated?.soul, maxBody: rest.startsWith('/v1/edge/') && !rest.startsWith('/v1/edge/body/uploads') ? lim.maxBodyKb * 1024 : 0 });
+  }
+  /** A C3 public read from the micro-cache (LOAD-CONTRACT §2): one world call per URL per ttl, shared by every caller. */
+  async function cachedRead(req, res, p, slug, url, ttlMs) {
+    const key = `${slug} ${url.pathname}${url.search} ${req.headers['accept-encoding'] ?? ''} ${req.headers.authorization ? short(req.headers.authorization) : ''}`;
+    const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
+    let r;
+    try {
+      r = await c3.get(key, ttlMs, () => new Promise((yes, no) => {
+        const up = request({ hostname: '127.0.0.1', port: p, path: req.url, method: 'GET', headers: { ...req.headers, 'x-forwarded-for': xff } }, (u) => {
+          const chunks = []; u.on('data', (c) => chunks.push(c)); u.on('error', no);
+          u.on('end', () => { const { connection: _c, 'keep-alive': _k, 'transfer-encoding': _t, 'x-sim-account': _a, ...headers } = u.headers; const body = Buffer.concat(chunks); yes({ status: u.statusCode ?? 502, headers: { ...headers, 'content-length': String(body.length) }, body }); });
+        });
+        up.setTimeout(30_000, () => up.destroy(new Error('timeout'))); up.on('error', no); up.end();
+      }));
+    } catch { if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); return; }
+    if (clientGone(req, res)) return;
+    res.writeHead(r.status, { ...r.headers, 'x-sim-cache': r.cache }).end(req.method === 'HEAD' ? undefined : r.body);
   }
   /** Retired (a newer launcher serves now): anything still arriving here, on a connection opened before the switch,
    *  goes to the keeper's port, i.e. to the newer launcher; the connection closes after this response. */
@@ -652,12 +681,14 @@ export async function openLauncher(cfg = {}) {
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
         const out = await opCreateWorld(body); json(res, out[0], out[1]); return;
       }
-      const forkOp = path.match(/^\/__sim\/op\/(register-fork|remove-fork|set-claimable|set-unlisted|set-heap|archive-world|restore-world|list-archive|audit)$/)?.[1];
+      const forkOp = path.match(/^\/__sim\/op\/(register-fork|remove-fork|set-claimable|set-unlisted|set-heap|set-limits|archive-world|restore-world|list-archive|audit)$/)?.[1];
       if (forkOp && req.method === 'POST') {
         if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
         const chunks = []; for await (const c of req) chunks.push(c);
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
         const out = await ({ 'register-fork': opRegisterFork, 'remove-fork': opRemoveFork, 'set-claimable': opSetClaimable, 'set-unlisted': opSetUnlisted,
+          // lane L1: one world's Soul API ceilings (flood.mjs SOUL_CEILINGS names; positive numbers; null drops one), at once
+          'set-limits': (b) => { const w = registry.get(typeof b?.slug === 'string' ? b.slug : ''); if (!w) return [404, { ok: false, code: 'not-found', message: 'no world by that slug' }]; const ch = b?.limits; const names = Object.keys(ceilings.limits(w.slug)); if (!ch || typeof ch !== 'object' || Object.entries(ch).some(([k, v]) => !names.includes(k) || (v !== null && !(Number.isFinite(v) && v > 0)))) return [400, { ok: false, code: 'bad-limits', message: `limits: {${names.join(', ')}}: positive numbers, or null for the default` }]; const next = { ...(w.limits ?? {}) }; for (const [k, v] of Object.entries(ch)) if (v === null) delete next[k]; else next[k] = v; registry.update(w.slug, { limits: Object.keys(next).length ? next : undefined }); log(`limits ${w.slug} ${JSON.stringify(next)} (operator)`); return [200, { ok: true, slug: w.slug, limits: ceilings.limits(w.slug) }]; },
           // lane L1: one world's heap cap (MB, 256-8192; null = the launcher's default); applies from its next boot
           'set-heap': (b) => { const w = registry.get(typeof b?.slug === 'string' ? b.slug : ''); if (!w) return [404, { ok: false, code: 'not-found', message: 'no world by that slug' }]; const mb = b?.worldHeapMb; if (mb !== null && !(Number.isInteger(mb) && mb >= 256 && mb <= 8192)) return [400, { ok: false, code: 'bad-heap', message: 'worldHeapMb: an integer 256-8192, or null for the default' }]; registry.update(w.slug, { worldHeapMb: mb ?? undefined }); log(`heap ${w.slug} ${mb ?? 'default'} MB (operator; from its next boot)`); return [200, { ok: true, slug: w.slug, heapMb: worldHeapMb(registry.get(w.slug), prod.worldHeapMb) }]; },
           'archive-world': (b) => { const w = registry.get(typeof b?.slug === 'string' ? b.slug : ''); return w ? archive(w, 'operator', b?.reason) : [404, { ok: false, code: 'not-found', message: 'no world by that slug' }]; },
@@ -793,6 +824,10 @@ export async function openLauncher(cfg = {}) {
     const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
     const w = slug && !closing.has(slug) && registry.get(slug);
     if (!w) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return; }
+    // lane L1: WebSockets count toward the address's concurrent ceiling
+    const slot = ceilings.socket(slug, behindProxy && req.headers['x-forwarded-for'] ? String(req.headers['x-forwarded-for']).split(',')[0].trim() : null);
+    if (!slot) { socket.end('HTTP/1.1 429 Too Many Requests\r\nRetry-After: 5\r\nConnection: close\r\n\r\n'); return; }
+    socket.once('close', slot.release);
     const eyes = eyesAgent(req.headers['user-agent']);
     const attach = async (again) => {
       let p; try { p = await pool.ensure(worldEnv(w), { passive: eyes }); }
