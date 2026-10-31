@@ -20,7 +20,7 @@
 // was if it is heard again, a source that follows the listener (the sea) is heard wherever the camera is, and a voice's
 // event clock never fires a backlog of notes when it comes back.
 import type { WorldModel } from '@sim/world-compiler';
-import { pianoNotes } from '../../../../mars/viewer/app/engine-view/piano-score.ts';
+import { drumHits, pianoNotes } from '../../../../mars/viewer/app/engine-view/piano-score.ts';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
 import { sharedCoverProbe, type CoverProbe } from '../world-env.ts';
@@ -88,6 +88,31 @@ function playPianos(host: Host, x: number, y: number, z: number) {
     }
   }
   for (const [k, t] of pianoDone) if (t < now - 2) pianoDone.delete(k);
+}
+// Entry 26: a Soul at the drums is heard from the drum part on the piano's own clock (piano-score.ts), so a pianist and a
+// drummer play in time; the sticks strike the same hits. Scheduled a short way ahead, each hit once, within earshot only.
+const DRUM_RADIUS = 26, DRUM_VOLUME = 0.6, drumDone = new Map<string, number>();
+let drumsNear = false;
+function drumSound(c: AudioContext, out: AudioNode, at: number, kind: string, peak: number) {
+  if (kind === 'kick') { tone(c, out, at, 120, 42, 0.32, peak * 0.9, 'sine'); burst(c, out, at, 0.03, peak * 0.12, 1800, 'lowpass'); }
+  else if (kind === 'snare') { burst(c, out, at, 0.16, peak * 0.5, 1400); tone(c, out, at, 220, 180, 0.08, peak * 0.25, 'triangle'); }
+  else if (kind === 'hat') burst(c, out, at, 0.045, peak * 0.22, 7000);
+  else if (kind === 'tom') { tone(c, out, at, 160, 110, 0.35, peak * 0.6, 'sine'); burst(c, out, at, 0.05, peak * 0.1, 900, 'lowpass'); }
+  else burst(c, out, at, 1.1, peak * 0.22, 5000);   // crash
+}
+function playDrums(host: Host, x: number, y: number, z: number) {
+  drumsNear = false;
+  const now = host.worldSeconds; if (typeof now !== 'number' || !ctx || !master) return;
+  for (const r of host.residents?.() ?? []) {
+    if (r.activity !== 'play-music' || r.instrument !== 'drums' || !r.body) continue;
+    const g = falloff(Math.hypot(r.p[0] - x, r.p[1] - y, r.p[2] - z), DRUM_RADIUS, DRUM_VOLUME); if (g <= 0.001) continue;
+    drumsNear = true;
+    for (const h of drumHits(r.body, now - 0.05, now + PIANO_AHEAD)) {
+      const key = `${r.body}:${h.t}:${h.kind}`; if (drumDone.has(key)) continue; drumDone.set(key, h.t);
+      drumSound(ctx, master, ctx.currentTime + Math.max(0, h.t - now), h.kind, g * h.vel);
+    }
+  }
+  for (const [k, t] of drumDone) if (t < now - 2) drumDone.delete(k);
 }
 function bell(c: AudioContext, out: AudioNode, at: number, f = 1180, peak = 0.35) {
   for (const [m, a, d] of [[1, 1, 1.4], [2.0, 0.5, 0.9], [2.76, 0.35, 0.6], [5.4, 0.15, 0.3]] as const) tone(c, out, at, f * m, f * m * 0.995, d, peak * a);
@@ -264,7 +289,7 @@ function step(host: Host) {
     ambient = ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure });
   }
   people = movement.emitters(host.residents?.() ?? [], { x, y, z, ground }, now / 1000);
-  if (!settings.muted) playPianos(host, x, y, z); else pianoNear = false;
+  if (!settings.muted) { playPianos(host, x, y, z); playDrums(host, x, y, z); } else pianoNear = drumsNear = false;
   const heard: Heard[] = [], playlist = musicPlaying();
   for (const e of [...objects, ...ambient, ...people]) {
     if (playlist && e.spec.kind === 'music') continue;   // a world's own music things stay quiet under the playlist
@@ -353,7 +378,7 @@ export function startSoundLayer() {
   settings = loadSettings(store());
   const w = window as unknown as { __simEntity?: Host; __edenSound?: unknown };
   w.__edenSound = {
-    state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered, piano: { near: pianoNear, scheduled: pianoDone.size },
+    state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered, piano: { near: pianoNear, scheduled: pianoDone.size }, drums: { near: drumsNear, scheduled: drumDone.size },
       world: { trees: trees.count, exposure: +exposure.toFixed(2), night: +night.toFixed(2), typicalGround: +typicalGround.toFixed(1) },
       emitters: [...objects, ...ambient, ...people].map((e) => ({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, when: e.spec.when ?? null, on: condition(e.spec.when, e.state, night) })),
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
@@ -377,7 +402,7 @@ export function startSoundLayer() {
   };
   (window as unknown as { __edenMusic?: unknown }).__edenMusic = { state: musicState, log: musicLog, level: musicLevel, next: nextPiece, trackSeconds: musicTrackSeconds };
   // another tab took the sound, or this one came back: act now, not on the next (throttled, when hidden) tick
-  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' }); });
+  audioFocus()?.subscribe(() => { applyMaster(); syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || drumsNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' }); });
   const gesture = () => { unlock(); musicGesture(); };
   for (const ev of ['pointerdown', 'keydown', 'touchstart', 'touchend', 'click'] as const) window.addEventListener(ev, gesture, { capture: true, passive: true });
   // lane W1: the first scan of the world's sound sources (~0.2 s at 2x CPU on Eden 2026) waits until the arrival is over.
@@ -385,7 +410,7 @@ export function startSoundLayer() {
   setInterval(() => {
     if (!arrivalOver() || !document.querySelector('.world-scene canvas')) return;
     mountUi();
-    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
+    syncMusic({ on: musicOn(), volume: settings.volume * (pianoNear || drumsNear ? 0.2 : 1), unlocked: !!ctx && ctx.state === 'running' });
     const host = w.__simEntity; if (host?.camera && host.layer) { const t0 = performance.now(); try { step(host); } catch { /* a world mid-reload */ } cost.ticks++; cost.tickMs += performance.now() - t0; }
   }, TICK_MS);
 }

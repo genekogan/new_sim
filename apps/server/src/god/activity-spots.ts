@@ -201,6 +201,8 @@ export class GodActivitySpots {
     for (const t of all) if (t.c.instrument?.kind === 'piano' || is(t, 'piano')) {
       if (t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'play-piano', undefined, { instrument: 'piano' }); else standSpot(t, 'play-piano', { instrument: 'piano' });
     }
+    // entry 26: a drum kit with its own stool is played sitting on it (the stage's drummer sits too)
+    for (const t of all) if (t.c.instrument?.kind === 'drums' && t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'play-music', undefined, { instrument: 'drums' });
     for (const t of all) {
       const inst = INSTRUMENT_TAGS.find(([tag]) => t.tags.has(tag));
       if (inst) standSpot(t, 'play-music', { instrument: inst[1] });

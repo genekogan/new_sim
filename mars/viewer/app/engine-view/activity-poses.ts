@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { pianoHands } from './piano-score.ts';
+import { drumHands, pianoHands } from './piano-score.ts';
 import {gameContact,type RecordedGame} from './recorded-games.ts';
 import {rowingStroke} from './rowing-motion.ts';
 import {seesawAngle, swingAngle} from './play-motion.ts';
@@ -132,7 +132,8 @@ export function activityFrame(activity: string, base: string, seconds: number, i
     case 'play-piano': { const [l, r] = pianoHands(opts.actorId ?? id, seconds);
       f.hands = [[0.42, -0.02 + l.along, -0.36 + 0.028 * (1 - l.press)], [0.42, -0.02 - r.along, -0.36 + 0.028 * (1 - r.press)]]; f.lean = 0.1; f.look = 0.3; return f; }
     case 'play-music': { const s = Math.sin(t * 6) * 0.06;
-      if(opts.instrument==='drums'){f.hands=[[.38,.05,-.26+Math.max(0,Math.sin(t*7))*.22],[.38,.05,-.26+Math.max(0,Math.sin(t*7+Math.PI))*.22]];f.look=.18;}
+      // Entry 26: the sticks meet the drums at the drum part's own hits (the sound the visitor hears), lifting between them
+      if(opts.instrument==='drums'){const [l,r]=drumHands(opts.actorId ?? id,seconds);f.hands=[[.38,.05,-.26+l.lift*.16],[.38+r.reach*.06,.05+r.reach*.1,-.26+r.lift*.16+r.reach*.04]];f.look=.18;}
       else if(opts.instrument==='keyboard'||opts.instrument==='piano')return activityFrame('play-piano',base,seconds,id,opts);
       else if(['violin','viola'].includes(opts.instrument??'')){f.hands=[[.24,.1,.12],[.25,.2+s*2,-.05]];f.look=.14;}
       else if(opts.instrument==='cello'){f.hands=[[.3,-.02,-.14],[.38,.12+s*2,-.4]];f.look=.2;}
