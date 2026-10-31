@@ -1,0 +1,69 @@
+# The `proof-ok` check: does the PR (its body is the journal entry) carry the proof its tier needs?
+#   tier      `tools/proof/tier.mjs` over the PR's changed files; a tier:Tn label can raise it
+#   needs     docs/process/PROOF-POLICY.yml `pr_checks` for that tier (T0: only the problem statement)
+#   reads     the Problem, Acceptance, Proof and Self-audit sections, the linked issue's criteria (none may be
+#             dropped), and the linked proof.json (fetched, validated, compared with the checklist)
+#   reports   one bot comment, updated in place on every edit and push, plus the job summary
+# The tools run from the PR's base commit, so a PR cannot relax its own check; changes to the policy or the tools take
+# effect once merged. A maintainer can waive the check with the `proof:waived` label (it counts only when the
+# maintainer added it). Dependabot PRs pass: CI is their proof. Branch protection requires `proof-ok`.
+name: proof
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: proof-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  proof-ok:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      SIM_MAINTAINER: ${{ vars.MAINTAINER || github.repository_owner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
+      - name: Check the PR's acceptance and proof
+        id: check
+        run: |
+          if [ ! -f tools/proof/acceptance.mjs ]; then
+            echo "::warning::tools/proof/acceptance.mjs is not on the base branch yet; proof-check starts once it is merged."
+            echo "ok=true" >> "$GITHUB_OUTPUT"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          node tools/proof/acceptance.mjs pr --repo "$REPO" --pr "$PR" --head "$HEAD_SHA" \
+            --comment "$RUNNER_TEMP/comment.md" --summary "$GITHUB_STEP_SUMMARY" --output "$GITHUB_OUTPUT"
+      - name: Post or update the proof comment
+        if: steps.check.outputs.skip != 'true'
+        # Fork PRs get a read-only token; the job summary still has the report.
+        continue-on-error: true
+        run: |
+          marker='<!-- sim-proof-check -->'
+          id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md" --silent
+          else
+            gh api "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/comment.md" --silent
+          fi
+      - name: proof-ok
+        env:
+          OK: ${{ steps.check.outputs.ok }}
+          TIER: ${{ steps.check.outputs.tier }}
+        run: |
+          if [ "$OK" = true ]; then echo "proof-ok (${TIER:-n/a})"; exit 0; fi
+          echo "::error::Proof for ${TIER} is missing or invalid; the PR comment lists what to fix (.claude/skills/journal/SKILL.md)."
+          exit 1

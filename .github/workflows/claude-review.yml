@@ -1,4 +1,5 @@
-# Claude reviews every non-draft PR against AGENTS.md and docs/process/PROOF-POLICY.yml and posts one review
+# Claude reviews every non-draft PR against AGENTS.md and docs/process/PROOF-POLICY.yml, audits each acceptance
+# criterion against its evidence (the self-audit a milestone journal entry carries), and posts one review
 # comment (updated in place on later pushes). Runs on the maintainer's Claude subscription: repository secret
 # CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) plus the Claude GitHub app installed on the repo.
 name: claude-review
@@ -69,6 +70,21 @@ jobs:
             3. Proof: the PR's stated Tier must be at least the computed tier above. The Proof section must meet that
                tier's `required` list in PROOF-POLICY.yml (T2+: an uncut real-speed clip link of the changed journey;
                T3: playtest results with the policy's repeats per arm and a reviewer pass). Say exactly what is missing.
+               The `proof-ok` check verifies the form (`node tools/proof/acceptance.mjs pr --repo <repo> --pr <n>`);
+               you audit the substance, as a self-audit would:
+               a. Acceptance vs evidence: for each criterion, does the cited evidence actually show it? A test that
+                  asserts something else, a clip whose description does not show the claimed moment, or "works on my
+                  machine" is not evidence. Compare with the linked issue (`gh issue view`): no criterion dropped or
+                  quietly weakened; unmet and deferred ones are stated plainly.
+               b. Checks run: the commands fit the change (focused tests on the touched files, typecheck of touched
+                  packages); a check that could not run is listed as unverified, not as passing.
+               c. Failed attempts are kept with their evidence, not erased; a fix that took several attempts says why
+                  the last one is different.
+               d. Long tail / externalities: the change's cost to everything else is measured where it can matter
+                  (payload or context bytes with the feature absent, distant and in use; idle work; extra events or
+                  wakeups; unrelated journeys). "None" needs a reason for a T2+ change.
+               e. Known limits are honest and specific; the proof's commit matches the head, or the change since
+                  cannot affect what was shown.
             4. Docs: changed behaviour updates the doc that describes it; no doc left stale by the change.
             5. Changelog: a `changes/*.md` fragment with a user-facing line (changes/README.md), or the `no-changelog`
                label for changes with nothing user-facing.
@@ -79,7 +95,8 @@ jobs:
             **Tier**: stated vs computed
             **Blocking** (numbered, each with file:line and the fix)
             **Non-blocking** (short)
-            **Proof / Docs / Changelog**: one line each
+            **Acceptance audit**: one line per criterion: id, supported / weak / unsupported, why
+            **Proof / Self-audit / Docs / Changelog**: one line each
             Be specific and brief. Do not restate the diff. Do not push commits.
           claude_args: |
-            --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(node tools/proof/tier.mjs:*)"
+            --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*),Bash(node tools/proof/tier.mjs:*),Bash(node tools/proof/acceptance.mjs:*),Bash(gh issue view:*)"
