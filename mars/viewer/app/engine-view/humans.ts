@@ -58,7 +58,7 @@ import type { DepictionBeat } from './station-depiction.ts';
 import { sleepGoal, sleepHands, sleepHeadPitch, sleepRestWeight, sleepHeadRestLift } from './sleep.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
 import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
-import { handGameActive, handGameSuppress, poseHandGames, type HandGameDiag } from './hand-games.ts';
+import { handGameActive, handGameGestureClock, handGameSuppress, poseHandGames, type HandGameDiag } from './hand-games.ts';
 import type { HandHoldState } from '../../engine/social/hand-hold.ts';
 import type { RpsState } from '../../engine/social/rps.ts';
 import {recordedGame,type RecordedGame} from './recorded-games.ts';
@@ -359,7 +359,8 @@ function armsAction(rig: Rig, name: string): THREE.AnimationAction | null {
   return a;
 }
 // 'operate' (a hand actuator) is standing too: an idle gesture fades out over its reach and back in after the release.
-export const REST_ACTS = new Set(['idle', 'reach', 'operate']);
+// entry 35: a rock-paper-scissors count is standing still too (the onset clock runs on; the hand game fades gestures itself)
+export const REST_ACTS = new Set(['idle', 'reach', 'operate', 'rps']);
 /** Activities in which the body covers ground on its feet (walk.ts: `ex.gait ?? 'walk'`, wading). Idle variety fades out
  *  with the Walk weight's ease at a walk start; the onset clock restarts only from a full stride (take-replay restAge). */
 export const GAIT_ACTS = new Set(['walk', 'wade', 'jog', 'run']);
@@ -841,15 +842,15 @@ export class HumanViews {
     // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
     // entry 35: a hand game holds idle gestures off, fading them out from its start and back in after it (no pop at a
     // join, a count's start or a release); rps keeps the variety layer for that fade
-    const hgOff = handGameSuppress(v);
+    const hgOff = handGameSuppress(v), gT = handGameGestureClock(v, tSec);
     const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0) || (v.activity === 'rps' && hgOff < 1)) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
     const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : 1;
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
     const restOnset = v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) * idleHandoff * restOnset * (1 - hgOff) : 0;
-    const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, gT) * idleHandoff * restOnset * (1 - hgOff) : 0;
+    const variant = idleFree ? idleVariant(h.name, gT) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
     const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset * (1 - hgOff) : 0;
     v.variety = neutralW + variantW;
     // A walk starting out of an idle gesture: the legs take the walk's own ease (WALK_EASE, 0.55 s), but folded arms opening
@@ -873,8 +874,8 @@ export class HumanViews {
     };
     if (lib.cur) libAt(lib.cur.act, curW, lib.cur.time);
     if (lib.prev) libAt(lib.prev.act, prevW, lib.prev.time);
-    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, variantTime(variant!.clip, h.name, tSec));
-    if (neutralW > 0) libAt(gestureAction(v.rig, 'Idle_Neutral'), neutralW, tSec);
+    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, variantTime(variant!.clip, h.name, gT));
+    if (neutralW > 0) libAt(gestureAction(v.rig, 'Idle_Neutral'), neutralW, gT);
     if (neutralW + variantW > 1e-4) libAt(idleBodyAction(v.rig), neutralW + variantW, b.idleT);
     if (armsN > 0) libAt(armsAction(v.rig, 'Idle_Neutral'), armsN, tSec);
     if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, variantTime(gv.clip, h.name, tSec));

@@ -20,6 +20,7 @@ import { seatFitProblem } from '../bodies/humanoid.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 import { RPS, RPS_SHAPES, type RpsShape } from './rps.ts';
+import { trackHandGame } from './hand-hold.ts';
 
 /** Overlay activities (upper body; drawn on top of baseActivity). */
 export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'operate',
@@ -119,7 +120,9 @@ const nudged = (rt: Runtime, actor: string) => rt.holder('actor:' + actor).some(
 const restore = (rt: Runtime, ex: Exec) => {
   const h = rt.world.entities[ex.p.actor]?.human; if (!h) return;
   if (h.activity === ex.p.activity || (ex.phase && h.activity === 'walk')) h.activity = ex.base === 'sit' && !held(rt, ex.p.actor) ? 'idle' : ex.base;
-  delete h.baseActivity; delete h.seatHeight; delete h.partner; delete h.together; delete h.instrument; delete h.game; delete h.rps; if (ex.phase) delete h.speed;
+  delete h.baseActivity; delete h.seatHeight; delete h.partner; delete h.together; delete h.instrument; delete h.game; if (ex.phase) delete h.speed;
+  // entry 35: a count's state stays a moment after it ends (`end`), cleared by social/hand-hold.ts stepHandHolds
+  if (h.rps && h.rps.end === undefined) { h.rps = { ...h.rps, end: rt.tick }; trackHandGame(rt, ex.p.actor); }
   // together/1: a carried item stays in the hand between activities
   if (h.holding) h.prop = h.holding; else delete h.prop;
 };

@@ -11,23 +11,29 @@ import { JOIN_SECONDS, OFFER_SECONDS, RELEASE_SECONDS, type HandHoldState } from
 
 /** Seconds over which idle gestures fade out as a hand game begins, and back in once it is over (humans.ts GESTURE_FADE). */
 const FADE = 1.4;
+/** A gesture held still as a hand game begins fades out a little slower than it fades in (it may be a hand at the hair). */
+const FADE_OUT = 2.0;
+/** After a hand game ends, idle gestures stay off this long before they fade back in (a pause, not a fidget at once). */
+const HOLD_OFF = 1.0;
 /** Palm centre to palm surface (half a hand's thickness, humans.ts PALM_LIFT). */
 export const PALM_HALF = 0.02;
 /** Joined hands: palm height above the feet, and how far ahead of the pair's shoulders they hang. */
 const HOLD_Y = 0.9, HOLD_AHEAD = 0.07;
 /** RPS fist: ahead of the shoulder, below it (ready, at the top of a pump), and the pump's height. */
-const FIST_AHEAD = 0.34, FIST_DOWN = 0.34, PUMP = 0.13, FIST_IN = 0.05;
+const FIST_AHEAD = 0.27, FIST_DOWN = 0.34, PUMP = 0.13, FIST_IN = 0.05;
 /** Finger joint curls per unit (rig.ts CURL / THUMB), the per-finger shapes and their thumb. */
 const CURL = [0.1, 1.0, 1.15, 0.7], THUMB = [0.15, 0.35, 0.45];
-type Shape = { fingers: [number, number, number, number]; thumb: number; spread: number };
-const FIST: Shape = { fingers: [1, 1, 1, 1], thumb: 1.6, spread: 0 };
+/** fingers: curl per finger (negative straightens); thumb: its curl; wrap: 0..1 how far the thumb lies across the curled
+ *  index and middle fingers (a fist's thumb, never left hanging below it); spread: scissors. */
+type Shape = { fingers: [number, number, number, number]; thumb: number; spread: number; wrap?: number };
+const FIST: Shape = { fingers: [1.45, 1.45, 1.45, 1.45], thumb: 0.6, spread: 0, wrap: 1 };
 const SHAPES: Record<RpsShape, Shape> = {
   rock: FIST,
   // flat and together: every finger straightened along its own metacarpal (a negative value straightens, see shapeFingers)
   paper: { fingers: [-1, -1, -1, -1], thumb: 0.15, spread: 0 },
-  scissors: { fingers: [-1, -1, 1, 1], thumb: 1.6, spread: 0.2 },
+  scissors: { fingers: [-1, -1, 1.45, 1.45], thumb: 0.6, spread: 0.2, wrap: 1 },
 };
-const GRIP: Shape = { fingers: [0.62, 0.6, 0.58, 0.56], thumb: 0.55, spread: 0 };
+const GRIP: Shape = { fingers: [0.8, 0.78, 0.76, 0.74], thumb: 0.7, spread: 0 };
 const OPEN: Shape = { fingers: [0.12, 0.12, 0.14, 0.16], thumb: 0.2, spread: 0 };
 
 export type HandGameView = {
@@ -36,13 +42,19 @@ export type HandGameView = {
   hgTick?: number; hgDt?: number;
   /** The hand partner's drawn root (handHold.with), when it is in this frame. */
   holdP?: THREE.Vector3;
+  /** The activity before this one and seconds since this one began (take replay's activity history). */
+  prevAct?: string; since?: number;
 };
 export type HandGameDiag = { kind: 'hold' | 'offer' | 'rps'; w: number; side: 'left' | 'right'; shape?: string; beat?: number;
   /** Total drawn curl (rad) of each finger (index, middle, ring, pinky) and the thumb of the layered hand. */
   curl: number[]; palm: number[];
   /** The palm's outward normal as drawn, and how far the index fingertip joint lies to that side of its knuckle (m): a
    *  closed hand's fingers curl toward its palm, so this is positive for a fist when the palm frame is the right way up. */
-  normal: number[]; curlSide: number };
+  normal: number[]; curlSide: number;
+  /** The bend (rad) at each finger's knuckle (index, middle, ring, pinky): a fist bends there, a claw does not. */
+  knuckles: number[];
+  /** From the thumb's last joint to the middle joints of the index and middle fingers (m): a fist's thumb lies there. */
+  thumbGap: number };
 
 const S = (x: number) => smooth(clamp01(x));
 const V = () => new THREE.Vector3();
@@ -59,23 +71,55 @@ const holdWeight = (hh: HandHoldState, tick: number, dt: number) => {
 };
 /** How far idle gestures are held off now (0..1): faded out from the game's start, back in after it. */
 export function handGameSuppress(v: HandGameView): number {
-  const t = v.hgTick, dt = v.hgDt ?? 0.05; if (t === undefined) return 0;
+  const after = afterGame(v), t = v.hgTick, dt = v.hgDt ?? 0.05; if (t === undefined) return after;
   const hh = v.handHold;
   if (hh) {
     const start = hh.offered ?? hh.since; if (start === undefined) return 0;
-    const end = hh.release !== undefined ? hh.release + RELEASE_SECONDS / dt : Infinity;
-    return t < end ? S((t - start) * dt / FADE) : 1 - S((t - end) * dt / FADE);
+    const end = hh.release !== undefined ? hh.release + (RELEASE_SECONDS + HOLD_OFF) / dt : Infinity;
+    return t < end ? S((t - start) * dt / FADE_OUT) : 1 - S((t - end) * dt / FADE);
   }
-  if (v.rps) return S((t - v.rps.start) * dt / FADE);
-  return 0;
+  if (v.rps) { if (v.rps.end === undefined) return S((t - v.rps.start) * dt / FADE_OUT); const u = (t - v.rps.end) * dt; return u < HOLD_OFF ? 1 : 1 - S((u - HOLD_OFF) / FADE); }
+  return after;
+}
+/** After a count has ended (the activity is back to standing): idle gestures held off, then faded back in. */
+function afterGame(v: HandGameView): number {
+  if (v.rps || v.prevAct !== 'rps' || v.since === undefined) return 0;
+  return v.since < HOLD_OFF ? 1 : 1 - S((v.since - HOLD_OFF) / FADE);
+}
+/**
+ * The clock idle gestures play on (humans.ts): while a hand game runs, a gesture that was playing when it began holds
+ * still where it was and only fades out (take 3: an Idle_Neutral hand coming down from the hair at its own 0.12 m per
+ * 50 ms just as Ada offered her hand). Once the game is over the gestures run on the ordinary clock again.
+ */
+export function handGameGestureClock(v: HandGameView, t: number): number {
+  const k = v.hgTick, dt = v.hgDt ?? 0.05; if (k === undefined) return t;
+  const hh = v.handHold, r = v.rps;
+  const start = hh ? (hh.offered ?? hh.since) : r ? r.start : undefined, over = hh ? hh.release !== undefined && k >= hh.release + RELEASE_SECONDS / dt : r ? r.end !== undefined : true;
+  if (start === undefined || over || k < start) return t;
+  return t - (k - start) * dt;
 }
 /** Is a hand-game layer drawn this frame (so humans.ts layers the body even when nothing else would)? */
 export const handGameActive = (v: HandGameView) => !!(v.hgTick !== undefined && (v.rps || v.handHold));
 
-/** The rig's palm frame in the wrist's local frame: finger direction, palm normal (out of the palm), and their cross. */
+const P = (o: THREE.Object3D) => o.getWorldPosition(V());
+/**
+ * The hand's frame from its own bones, in world space: f = wrist → palm centre, across = little-finger knuckle → index
+ * knuckle (square to f), n = out of the palm by the hand's side (a right hand palm down, fingers ahead, has its index on
+ * the left: n = f × across; a left hand, across × f). Built from the knuckles, never from how the clip bends a finger:
+ * the live client's woman rig rests its fingers so that the clip-derived curl axis (rig.ts bendAxis) twists them into
+ * a claw (take 2).
+ */
+function handGeom(arm: Arm) {
+  const f = palm(arm, V()).sub(P(arm.hand)).normalize(), across = P(arm.fingers[1]).sub(P(arm.fingers[13]));
+  across.addScaledVector(f, -across.dot(f)).normalize();
+  const n = arm.side > 0 ? V().crossVectors(across, f) : V().crossVectors(f, across);
+  return { f, across, n: n.normalize() };
+}
+/** The palm frame in the wrist's local frame: finger direction, palm normal (out of the palm), and their cross. */
 function palmFrame(arm: Arm) {
-  const fl = V().copy(arm.palmLocal).normalize(), nl = V().crossVectors(arm.curlAxis!, fl).normalize(), bl = V().crossVectors(fl, nl);
-  return { fl, nl, bl };
+  const g = handGeom(arm), hqi = arm.hand.getWorldQuaternion(new THREE.Quaternion()).invert();
+  const fl = V().copy(arm.palmLocal).normalize(), nl = g.n.applyQuaternion(hqi); nl.addScaledVector(fl, -nl.dot(fl)).normalize();
+  return { fl, nl, bl: V().crossVectors(fl, nl) };
 }
 /** The wrist's world rotation that points the fingers along F and the palm along N (F ⟂ N assumed after Gram-Schmidt). */
 function handQuat(arm: Arm, F: THREE.Vector3, N: THREE.Vector3) {
@@ -89,10 +133,13 @@ function placeHand(arm: Arm, holder: THREE.Object3D, goal: THREE.Vector3, q: THR
 }
 /** Shape the fingers on the rig's bones: each finger curls about the hand's own curl axis; scissors spread two apart. */
 function shapeFingers(arm: Arm, s: Shape) {
-  if (!arm.curlAxis || arm.fingers.length < 16) return;
-  const hq = arm.hand.getWorldQuaternion(new THREE.Quaternion()), axis = V().copy(arm.curlAxis).applyQuaternion(hq);
+  if (arm.fingers.length < 16) return;
+  const hq = arm.hand.getWorldQuaternion(new THREE.Quaternion()), n = handGeom(arm).n;
+  // each finger curls about its own axis, square to the finger and to the palm normal (tips toward the palm)
+  const axes = [0, 1, 2, 3].map((f) => { const d = P(arm.fingers[f * 4 + 2]).sub(P(arm.fingers[f * 4 + 1])).normalize(); return V().crossVectors(d, n).normalize(); });
+  const thumbAxis = arm.thumb.length === 3 ? V().crossVectors(P(arm.thumb[1]).sub(P(arm.thumb[0])).normalize(), n).normalize() : null;
   for (let f = 0; f < 4; f++) {
-    const c = s.fingers[f], chain = arm.fingers.slice(f * 4, f * 4 + 4);
+    const c = s.fingers[f], chain = arm.fingers.slice(f * 4, f * 4 + 4), axis = axes[f];
     if (c >= 0) { for (let j = 0; j < 4; j++) turn(chain[j], axis, CURL[j] * c); continue; }
     // straighten by -c: each joint swings its segment onto the line of the one before (the finger's own axis, not the
     // middle finger's curl axis, so a pinky that bends a little sideways in the clip still comes out straight)
@@ -108,13 +155,21 @@ function shapeFingers(arm: Arm, s: Shape) {
     const along = V().subVectors(arm.fingers[6].getWorldPosition(V()), kM).normalize(), sign = Math.sign(V().crossVectors(n, along).dot(lateral)) || 1;
     turn(arm.fingers[1], n, sign * s.spread); turn(arm.fingers[5], n, -sign * s.spread * 0.6);
   }
-  if (arm.thumbAxis && arm.thumb.length === 3) { const ta = V().copy(arm.thumbAxis).applyQuaternion(hq); arm.thumb.forEach((t, j) => turn(t, ta, THUMB[j] * s.thumb)); }
+  if (thumbAxis) arm.thumb.forEach((t, j) => turn(t, thumbAxis, THUMB[j] * s.thumb));
+  // a fist's thumb lies across the middle joints of the curled index and middle fingers, just in front of them
+  if (s.wrap && arm.thumb.length === 3) {
+    const g = handGeom(arm), T = P(arm.fingers[2]).add(P(arm.fingers[6])).multiplyScalar(0.5).addScaledVector(g.f, 0.012);
+    swing(arm.thumb[0], P(arm.thumb[2]), T, s.wrap);
+  }
+  void hq;
 }
-const mixShape = (a: Shape, b: Shape, k: number): Shape => ({ fingers: a.fingers.map((x, i) => x + (b.fingers[i] - x) * k) as Shape['fingers'], thumb: a.thumb + (b.thumb - a.thumb) * k, spread: a.spread + (b.spread - a.spread) * k });
+const mixShape = (a: Shape, b: Shape, k: number): Shape => ({ fingers: a.fingers.map((x, i) => x + (b.fingers[i] - x) * k) as Shape['fingers'], thumb: a.thumb + (b.thumb - a.thumb) * k, spread: a.spread + (b.spread - a.spread) * k, wrap: (a.wrap ?? 0) + ((b.wrap ?? 0) - (a.wrap ?? 0)) * k });
 /** Total bend (rad) of each finger chain and the thumb, as drawn (diagnostics and the acceptance read-out). */
 function facing(arm: Arm) {
   const n = V().copy(palmFrame(arm).nl).applyQuaternion(arm.hand.getWorldQuaternion(new THREE.Quaternion())), side = arm.fingers.length >= 16 ? V().subVectors(arm.fingers[3].getWorldPosition(V()), arm.fingers[1].getWorldPosition(V())).dot(n) : 0;
-  return { normal: n.toArray().map((x) => +x.toFixed(3)), curlSide: +side.toFixed(4) };
+  const knuckles = arm.fingers.length < 16 ? [] : [0, 1, 2, 3].map((f) => { const p = arm.fingers.slice(f * 4, f * 4 + 3).map(P); return +V().subVectors(p[1], p[0]).normalize().angleTo(V().subVectors(p[2], p[1]).normalize()).toFixed(3); });
+  const thumbGap = arm.fingers.length >= 16 && arm.thumb.length === 3 ? +P(arm.thumb[2]).distanceTo(P(arm.fingers[2]).add(P(arm.fingers[6])).multiplyScalar(0.5)).toFixed(4) : -1;
+  return { normal: n.toArray().map((x) => +x.toFixed(3)), curlSide: +side.toFixed(4), knuckles, thumbGap };
 }
 export function fingerCurls(arm: Arm): number[] {
   const bend = (bones: THREE.Object3D[]) => { const p = bones.map((b) => b.getWorldPosition(V())); let s = 0; for (let i = 0; i + 2 < p.length; i++) s += V().subVectors(p[i + 1], p[i]).normalize().angleTo(V().subVectors(p[i + 2], p[i + 1]).normalize()); return +s.toFixed(3); };
@@ -136,7 +191,7 @@ export function poseHandGames(v: HandGameView, arms: Arm[], side: (i: number) =>
   const P = holder.position;
   // ---- holding hands (and an offered hand)
   if (v.handHold && v.holdP) {
-    const hh = v.handHold, i = arms.findIndex((_, k) => side(k) === hh.hand), arm = arms[i]; if (!arm?.curlAxis) return null;
+    const hh = v.handHold, i = arms.findIndex((_, k) => side(k) === hh.hand), arm = arms[i]; if (!arm || arm.fingers.length < 16) return null;
     const { w, mix, grip } = holdWeight(hh, tick, dt); if (w <= 1e-4) return null;
     const Q = v.holdP, u = V().set(Q.x - P.x, 0, Q.z - P.z); if (u.lengthSq() < 1e-6) return null; u.normalize();
     // the pair's forward: mine, square to the line between us (both bodies face the same way when holding hands)
@@ -144,8 +199,9 @@ export function poseHandGames(v: HandGameView, arms: Arm[], side: (i: number) =>
     const front = hh.hand === 'right';   // the body on the left holds in front, palm back; the other behind, palm forward
     const Nh = V().copy(fp).multiplyScalar(front ? -1 : 1), M = V().set((P.x + Q.x) / 2, floor + HOLD_Y, (P.z + Q.z) / 2).addScaledVector(fp, HOLD_AHEAD);
     const holdGoal = V().copy(M).addScaledVector(Nh, -PALM_HALF), holdF = V().copy(UP).multiplyScalar(-0.8).addScaledVector(u, 0.55);
-    // an offered hand: out toward them, low, palm up and a little toward them, fingers forward and toward them
-    const offerGoal = V().copy(P).addScaledVector(u, 0.36).addScaledVector(fwd, 0.2).setY(floor + 0.96), offerN = V().copy(UP).multiplyScalar(0.85).addScaledVector(u, 0.5), offerF = V().copy(fwd).multiplyScalar(0.75).addScaledVector(u, 0.6);
+    // an offered hand: out in front, a little toward them (never into their side: take 5 reached her hip), palm up and
+    // a little toward them, fingers forward and toward them
+    const offerGoal = V().copy(P).addScaledVector(u, 0.2).addScaledVector(fwd, 0.32).setY(floor + 0.96), offerN = V().copy(UP).multiplyScalar(0.85).addScaledVector(u, 0.5), offerF = V().copy(fwd).multiplyScalar(0.75).addScaledVector(u, 0.6);
     const goal = V().copy(offerGoal).lerp(holdGoal, mix), q = handQuat(arm, offerF, offerN).slerp(handQuat(arm, holdF, Nh), mix);
     const pole = V().copy(fp).multiplyScalar(-0.7).addScaledVector(UP, -0.5).addScaledVector(u, -0.15);
     const from = bonesOf(arm);
@@ -156,9 +212,9 @@ export function poseHandGames(v: HandGameView, arms: Arm[], side: (i: number) =>
   }
   // ---- rock-paper-scissors (the right hand)
   if (v.rps) {
-    const r = v.rps, t = (tick - r.start) * dt; if (t < 0) return null;
+    const r = v.rps, t = (tick - r.start) * dt; if (t < 0 || t >= RPS.SECONDS) return null;
     const w = t < RPS.RAISE ? S(t / RPS.RAISE) : t < RPS.HOLD_END ? 1 : 1 - S((t - RPS.HOLD_END) / (RPS.DOWN_END - RPS.HOLD_END)); if (w <= 1e-4) return null;
-    const i = arms.findIndex((_, k) => side(k) === 'right'), arm = arms[i]; if (!arm?.curlAxis) return null;
+    const i = arms.findIndex((_, k) => side(k) === 'right'), arm = arms[i]; if (!arm || arm.fingers.length < 16) return null;
     const shoulder = arm.upper.getWorldPosition(V());
     // pumps: the fist is up between beats and down on each (FIRST, +BEAT, +2·BEAT) and on the shoot; then stays down
     const phi = (t - RPS.FIRST) / RPS.BEAT, up = t < RPS.FIRST - RPS.BEAT / 2 ? 1 : t >= RPS.SHOOT ? 0 : (1 - Math.cos(2 * Math.PI * phi)) / 2;

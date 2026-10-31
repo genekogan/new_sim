@@ -19,18 +19,21 @@ import { angleDelta, datan2, dcos, dsin, hypot, wrapAngle, type Vec2 } from '../
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
+import { RPS_STATE_TAIL } from './rps.ts';
 
 /** Body points side by side (m): shoulder to shoulder with a hand's width between (the walk planner keeps 2r = 0.56 m). */
 export const HAND_GAP = 0.62;
 /** The inner hands travel to each other (the viewer's reach), then hold. */
-export const JOIN_SECONDS = 0.9;
+export const JOIN_SECONDS = 1.8;
 /** The hands part and both arms come back down. */
 export const RELEASE_SECONDS = 0.9;
 /** An offered hand goes out this far (the viewer), and waits. */
-export const OFFER_SECONDS = 0.8;
+export const OFFER_SECONDS = 1.9;
 /** The state stays this long after the arms are down, so the viewer can fade idle gestures back in (no pop). */
-export const HAND_STATE_TAIL = 1.5;
+export const HAND_STATE_TAIL = 2.6;
 const STEP_SPEED = 0.55, TURN_RATE = 2.2, PAIR_TURN_RATE = 1.3, WALK_CAP = 1.4 * 1.04, WALK_MIN = 0.08;
+/** A follower who lets go while walking slows to a stop at a walker's ordinary braking (locomotion/walk.ts BRAKE). */
+const BRAKE = 2.4;
 /** A held pair farther apart than this has let go (m). */
 const BREAK_GAP = 0.95;
 
@@ -49,6 +52,8 @@ const schema = z.object({
 }).strict();
 export type HandHoldParams = z.infer<typeof schema>;
 type Exec = { p: HandHoldParams; t: number; phase: 'waiting' | 'stepping' | 'joining' | 'releasing' | 'turning' | 'done'; until?: number;
+  /** release: the walking velocity a follower lets go with (m/s), braked to a stop while the hands part. */
+  coast?: [number, number];
   /** turn: the pair's start heading, the angle to turn and the middle it turns about. */
   turn?: { from: number; by: number; mid: Vec2; seconds: number; lead: number; follow: number } };
 
@@ -64,6 +69,8 @@ const smooth = (k: number) => (k <= 0 ? 0 : k >= 1 ? 1 : k * k * (3 - 2 * k));
 /** Bodies with a hand-hold state, kept as plain data for the per-tick guard (no scan of the whole entity table). */
 const holders = (rt: Runtime): string[] => (rt.services.handHolders ??= []) as string[];
 function track(rt: Runtime, id: string) { const l = holders(rt); if (!l.includes(id)) { l.push(id); l.sort(); } }
+/** A body whose hand-game state (a count's tail, social/pose.ts) the per-tick guard clears when it is due. */
+export const trackHandGame = track;
 /** Joined (hands met), not letting go. */
 export const joined = (h: Entity['human'] | undefined, tick?: number) => !!h?.handHold && h.handHold.since !== undefined && h.handHold.release === undefined && (tick === undefined || tick >= h.handHold.since);
 /** The body this one walks hand in hand with (its partner), when they are joined; the walk planner ignores it as an obstacle. */
@@ -124,9 +131,19 @@ export const handHold: ActionDef<HandHoldParams, true, Exec> = {
     if (!h) return { status: 'failed', diagnostic: issue('body-gone', 'The body is gone.', [ex.p.actor]) };
     ex.t += dt;
     if (ex.p.mode === 'release') {
+      let movedNow = false;
+      if (ex.t <= dt + 1e-9) { const f = (rt.services.handFollow as Record<string, { v: [number, number]; tick: number }> | undefined)?.[a.id]; if (f && rt.tick - f.tick <= 2 && hypot(f.v[0], f.v[1]) >= WALK_MIN) { ex.coast = [...f.v]; movedNow = f.tick === rt.tick; } }
       letGo(rt, a);
-      const r = h.handHold?.release; if (r === undefined || tick >= r + ticks(RELEASE_SECONDS, dt)) return { status: 'completed' };
-      return { status: 'running', phase: 'letting-go' };
+      // (the leader's walk already carried this body this tick: braking starts on the next)
+      if (ex.coast && !movedNow) {
+        // a follower let go mid-stride: slow to a stop as any walker does, straight on, never into anything
+        const v = hypot(ex.coast[0], ex.coast[1]), nv = Math.max(0, v - BRAKE * dt), k = v > 0 ? nv / v : 0, step: Vec2 = [ex.coast[0] * k * dt, ex.coast[1] * k * dt];
+        const to: Vec2 = [a.pose.p[0] + step[0], a.pose.p[2] + step[1]];
+        if (nv > 0 && clear(rt, a, to)) { a.pose.p = [to[0], a.pose.p[1], to[1]]; ex.coast = [ex.coast[0] * k, ex.coast[1] * k]; publish(a, nv * dt, dt); }
+        else { delete ex.coast; publish(a, 0, dt); }
+      }
+      const r = h.handHold?.release; if ((r === undefined || tick >= r + ticks(RELEASE_SECONDS, dt)) && !ex.coast) return { status: 'completed' };
+      return { status: 'running', phase: ex.coast ? 'slowing' : 'letting-go' };
     }
     if (ex.p.mode === 'turn') return turnPair(rt, ex, a, dt);
     // join
@@ -141,9 +158,10 @@ export const handHold: ActionDef<HandHoldParams, true, Exec> = {
     const ready = theirs?.with === a.id && theirs.release === undefined && rt.holder('actor:' + b.id).some((id) => { const r = rt.records.get(id); return r?.verb === 'hand_hold_v1' && (r.params as HandHoldParams).group === ex.p.group; });
     if (!ready) {
       if (ex.t > (ex.p.waitSeconds ?? 30)) { delete plans[ex.p.group!]; return fail('no-answer', 'Nobody took your hand in time.'); }
-      // face the one we wait for, slowly (an offered hand goes out toward them)
-      const want = datan2(b.pose.p[2] - a.pose.p[2], b.pose.p[0] - a.pose.p[0]);
-      if (ex.p.offer && hypot(b.pose.p[0] - a.pose.p[0], b.pose.p[2] - a.pose.p[2]) > 1.6) a.pose.yaw = turnToward(a.pose.yaw, want, TURN_RATE * dt * 0.5);
+      // an offerer beside them turns, slowly, to face the way they face (side by side); farther off, toward them
+      const near = hypot(b.pose.p[0] - a.pose.p[0], b.pose.p[2] - a.pose.p[2]) <= 1.2;
+      const want = near ? b.pose.yaw : datan2(b.pose.p[2] - a.pose.p[2], b.pose.p[0] - a.pose.p[0]);
+      if (ex.p.offer && !rt.holder('actor:' + b.id).some((id) => rt.records.get(id)?.verb === 'walk_to')) a.pose.yaw = turnToward(a.pose.yaw, want, TURN_RATE * dt * 0.5);
       return { status: 'running', phase: ex.p.offer ? 'offering' : 'waiting' };
     }
     let plan = plans[ex.p.group!];
@@ -203,13 +221,18 @@ function turnPair(rt: Runtime, ex: Exec, a: Entity, dt: number) {
 /** walk.ts, after the walker's own step: keep its hand partner beside it (same tick, so no lag), at most a walk's speed. */
 export function followHand(rt: Runtime, a: Entity, dt: number) {
   const b = rt.world.entities[handPartnerOf(rt, a) ?? ''], bh = b?.human; if (!b || !bh) return;
-  // the partner doing something of its own (its owner told it to) is never moved: the guard lets go instead
-  if (rt.holder('actor:' + b.id).length) return;
+  // the partner doing something of its own (its owner told it to) is never moved: the guard lets go instead. Its own
+  // let-go, admitted but not yet stepped, still walks this tick (then brakes from this stride, never stopping dead)
+  if (rt.holder('actor:' + b.id).some((id) => { const r = rt.records.get(id); return !(r?.verb === 'hand_hold_v1' && (r.params as HandHoldParams).mode === 'release'); })) return;
   const A = at(a), B = at(b), r = rightOf(a.pose.yaw), side = (B[0] - A[0]) * r[0] + (B[1] - A[1]) * r[1] >= 0 ? 1 : -1;
   const goal: Vec2 = [A[0] + r[0] * side * HAND_GAP, A[1] + r[1] * side * HAND_GAP];
   if (!clear(rt, b, goal)) { letGo(rt, a, 'narrow'); publish(b, 0, dt); return; }
   const dx = goal[0] - B[0], dz = goal[1] - B[1], d = hypot(dx, dz), step = Math.min(d, WALK_CAP * dt);
   if (d > 1e-6) b.pose.p = [B[0] + dx / d * step, b.pose.p[1], B[1] + dz / d * step];
+  // the follower's velocity, for a let-go mid-stride (the release brakes from it); plain data, never published
+  const fol = (rt.services.handFollow ??= {}) as Record<string, { v: [number, number]; tick: number }>;
+  if (step > 1e-6) fol[b.id] = { v: [dx / d * step / dt, dz / d * step / dt], tick: rt.tick }; else delete fol[b.id];
+  if (!Object.keys(fol).length) delete rt.services.handFollow;
   b.pose.yaw = turnToward(b.pose.yaw, a.pose.yaw, 4 * dt);
   publish(b, step, dt);
 }
@@ -220,7 +243,9 @@ export function stepHandHolds(rt: Runtime) {
   const dt = 0.05, tick = rt.tick + 1;
   for (const id of [...list]) {
     const e = rt.world.entities[id], h = e?.human, hh = h?.handHold;
-    if (!hh) { list.splice(list.indexOf(id), 1); continue; }
+    // a finished count's tail (social/pose.ts): cleared once the viewer's idle hold-off is over
+    if (h?.rps?.end !== undefined && tick >= h.rps.end + ticks(RPS_STATE_TAIL, dt)) delete h.rps;
+    if (!hh) { if (h?.rps?.end === undefined) list.splice(list.indexOf(id), 1); continue; }
     if (hh.release !== undefined) { if (tick >= hh.release + ticks(RELEASE_SECONDS + HAND_STATE_TAIL, dt)) { delete h!.handHold; list.splice(list.indexOf(id), 1); } continue; }
     const o = rt.world.entities[hh.with], oh = o?.human;
     if (!oh) { letGo(rt, e, 'partner-gone'); continue; }
@@ -231,5 +256,5 @@ export function stepHandHolds(rt: Runtime) {
     const busy = (x: Entity) => !!(x.human!.sleepPose || x.human!.riding || x.human!.carrier || x.human!.grip || x.human!.activity === 'sit' || x.human!.baseActivity === 'sit');
     if (apart > BREAK_GAP || Math.abs(o.pose.p[1] - e.pose.p[1]) > 0.3 || (oh.level ?? 0) !== (h!.level ?? 0) || busy(e) || busy(o)) letGo(rt, e, 'apart');
   }
-  if (!list.length) delete rt.services.handHolders;
+  if (!list.length) { delete rt.services.handHolders; delete rt.services.handFollow; }
 }

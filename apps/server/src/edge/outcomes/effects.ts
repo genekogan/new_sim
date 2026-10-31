@@ -26,7 +26,8 @@ export function confirmedTogetherEffects(ledger:EdgeLedger,r:EdgeReceipt,op:Item
  const boarded=linked&&linked.kind==='ride'&&linked.guestReceipts[r.soulId]===r.id&&linked.responses[r.soulId]==='accepted'?`Accepted ${linked.host.name}'s invitation and boarded ${linked.ride?.object??'the ride'}; the ride has not left the ground yet and is not finished.`:null;
  // entry 35: a finished game of rock-paper-scissors reports the world's verdict (both throws and who won)
  const rps=linked&&met.length?ledger.together.rpsVerdict(linked,r.soulId):null;if(rps)detail.rps={you:rps.mine,them:rps.theirs,result:rps.result};
- return{changed,met,detail,untrusted:met.length>0||!!boarded,...(rps?{summary:rps.text}:met.length?{summary:`Completed ${String((detail.together as {what?:string}).what??r.capability)} with ${met.map(s=>s.name).join(', ')}.`}:boarded?{summary:boarded}:{})};
+ const hands=linked?.what==='hold-hands'&&met.length&&ledger.together.handsWith(ledger.host.minds.get(r.soulId)?.entityId??'')?`You are holding hands with ${met.map(s=>s.name).join(', ')}.`:null;
+ return{changed,met,detail,untrusted:met.length>0||!!boarded,...(rps?{summary:rps.text}:hands?{summary:hands}:met.length?{summary:`Completed ${String((detail.together as {what?:string}).what??r.capability)} with ${met.map(s=>s.name).join(', ')}.`}:boarded?{summary:boarded}:{})};
 }
 const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
 /** Entitled action response/state only; never raw hidden object fields. */

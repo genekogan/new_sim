@@ -11,7 +11,7 @@ import {poseV1} from '../social/pose.ts';
 import type {ActionDef} from '../actions/types.ts';
 import {walkTo} from '../locomotion/walk.ts';
 import {handHold,stepHandHolds,HAND_GAP,RELEASE_SECONDS,HAND_STATE_TAIL} from '../social/hand-hold.ts';
-import {RPS} from '../social/rps.ts';
+import {RPS,RPS_STATE_TAIL} from '../social/rps.ts';
 import {hashOf} from '../core/hash.ts';
 
 function fixture(){const scene=provingGround();const world=addAll(emptyWorld('proving-ground',scene),human('a',-6,-6),human('b',-6,-5.25));world.entities.a.pose.yaw=0;world.entities.b.pose.yaw=0.2;const registry=new Map<string,ActionDef>([[poseV1.verb,poseV1],[walkTo.verb,walkTo],[handHold.verb,handHold as ActionDef]]);const spatial=new Spatial(scene);spatial.sync(world);return {scene,registry,rt:new Runtime(world,registry,{spatial},DEFAULT_INVARIANTS)};}
@@ -57,6 +57,15 @@ test('hand-hold: an offer nobody takes lapses and lowers the hand; a broken pair
  {const {rt}=fixture();join(rt);E(rt,'b').pose.p=[-6,0,-3];tickOnce(rt);assert.ok(E(rt,'a').human!.handHold?.release!==undefined&&E(rt,'b').human!.handHold?.release!==undefined,'too far apart: both let go');}
  {const {rt,scene,registry}=fixture();join(rt);const w=rt.submit('walk_to',{actor:'a',x:-3,z:-6,speed:1});for(let i=0;i<10;i++)tickOnce(rt);const restored=Runtime.restore(rt.snapshot(),registry,{spatial:new Spatial(scene)},DEFAULT_INVARIANTS);for(let i=0;i<80;i++){tickOnce(rt);tickOnce(restored);assert.equal(restored.stateHash(),rt.stateHash());}assert.equal(hashOf(rt.world.entities.b.pose),hashOf(restored.world.entities.b.pose));assert.ok(!rt.isActive(w.id)||true);}
 });
+test('hand-hold: a follower who lets go mid-stride brakes to a stop, never stopping dead; the leader walks on',()=>{
+ const {rt}=fixture();join(rt);const A=E(rt,'a'),B=E(rt,'b');
+ const w=rt.submit('walk_to',{actor:'a',x:2,z:-5.7,speed:1});for(let i=0;i<60;i++)tickOnce(rt);assert.ok((B.human!.speed??0)>.9,'walking together');
+ const r=rt.submit('hand_hold_v1',{actor:'b',mode:'release'});const speeds:number[]=[];let last=[...B.pose.p];
+ for(let i=0;i<40;i++){tickOnce(rt);speeds.push(Math.hypot(B.pose.p[0]-last[0],B.pose.p[2]-last[2])/.05);last=[...B.pose.p];}
+ for(let i=1;i<speeds.length;i++)assert.ok(speeds[i-1]-speeds[i]<=2.4*.05+1e-6,'braking at most 2.4 m/s² ('+speeds.slice(0,12).map(x=>x.toFixed(2))+')');
+ assert.ok(speeds[0]>.8&&speeds.at(-1)!<1e-6,'from a stride to a stop');assert.equal(r.status,'completed');
+ assert.ok(rt.isActive(w.id)||w.status==='completed','the leader walks on');assert.deepEqual(rt.violations,[]);
+});
 test('rps: one shared count from one start tick; each shape hidden until the shoot beat; both end together',()=>{
  const {rt}=fixture();E(rt,'b').pose.p=[-5,0,-6];E(rt,'b').pose.yaw=Math.PI;
  const p={activity:'rps',seconds:RPS.SECONDS,gap:1,group:'r1',pairedPolicy:'ready-v1',waitSeconds:20,alone:'fail',clear:true};
@@ -64,11 +73,12 @@ test('rps: one shared count from one start tick; each shape hidden until the sho
  const seen:{tick:number;a?:unknown;b?:unknown}[]=[];
  for(let i=0;i<400&&(rt.isActive(ra.id)||rt.isActive(rb.id));i++){tickOnce(rt);seen.push({tick:rt.tick,a:structuredClone(E(rt,'a').human!.rps),b:structuredClone(E(rt,'b').human!.rps)});}
  assert.equal(ra.status,'completed',JSON.stringify(ra.diagnostic));assert.equal(rb.status,'completed',JSON.stringify(rb.diagnostic));
- const on=seen.filter(s=>s.a&&s.b) as {tick:number;a:{start:number;shoot:number;shape?:string};b:{start:number;shoot:number;shape?:string}}[];
+ const on=seen.filter(s=>s.a&&s.b&&!(s.a as {end?:number}).end) as {tick:number;a:{start:number;shoot:number;shape?:string};b:{start:number;shoot:number;shape?:string}}[];
  assert.ok(on.length>100);assert.ok(on.every(s=>s.a.start===s.b.start&&s.a.shoot===s.b.shoot),'one shared count');
  assert.ok(on.every(s=>(s.tick<s.a.shoot)===(s.a.shape===undefined)&&(s.tick<s.b.shoot)===(s.b.shape===undefined)),'no shape before the shoot');
  assert.equal(on.at(-1)!.a.shape,'rock');assert.equal(on.at(-1)!.b.shape,'scissors');
  const d=Math.hypot(E(rt,'a').pose.p[0]-E(rt,'b').pose.p[0],E(rt,'a').pose.p[2]-E(rt,'b').pose.p[2]);assert.ok(Math.abs(d-1)<0.04,'arm\'s length '+d);
- assert.equal(E(rt,'a').human!.rps,undefined);assert.deepEqual(rt.violations,[]);
+ assert.ok(E(rt,'a').human!.rps?.end!==undefined,'the count\'s state stays a moment after it ends');for(let i=0;i<Math.round(RPS_STATE_TAIL/.05)+2;i++)tickOnce(rt);
+ assert.equal(E(rt,'a').human!.rps,undefined,'then it is cleared');assert.deepEqual(rt.violations,[]);
  assert.equal(rt.submit('pose_v1',{actor:'a',...p}).status,'failed','rps without a throw is refused');
 });
