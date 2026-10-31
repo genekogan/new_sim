@@ -142,6 +142,13 @@ export function menuWorldOf(host: HostLike): MenuWorld {
 export function setMenuWorld(host: object, mw: MenuWorld | null) {if (mw) SET.set(host, mw); else SET.delete(host);}
 
 // ---- replica side (item 2b): plain state + spatial replica + verdicts
+/** Main ships these with the verdicts (B-delta does not replicate them: they change inside a step without an event).
+ *  One row per actor with a program, emitted when `programAction(p).action.status` or the action id changes (main
+ *  compares per actor with a program after each tick: O(programs)). Answers `programAction`, here.ts `endsIn`
+ *  (params.seconds + the first 'running' tick) and the replica runtime's record for that action. Receipt
+ *  plan/detail/outcome are NOT shipped: the worker reads them from sqlite (read-only WAL connection), as the ledger does. */
+export type ActionRow = {actor: string; programId: string; step: number; action: {id: string; verb: string; status: string; phase?: string};
+  params: {seconds?: number; actor?: string; fixture?: string; on?: string; slot?: string}; requestedTick?: number; runningTick?: number; tick: number};
 export type VerdictRow = {soulId: string; actor: string; key: string; verdict: Diag | null; tick: number};
 /** The verdicts main computed for the programs a replica's reads ask about. A miss answers "feasible" (the planner's
  *  refusal then comes at act time, as `deferRouteChecks` offers do today) and is queued for main (`misses`). */

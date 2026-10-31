@@ -45,7 +45,7 @@ import type { ApplyContext, WalkoutPrep } from './god.ts';
 import type { BuildNotice } from './builds.ts';
 import { arrivalNote } from '../arrival-placement.ts';
 import { seatTopsOf } from './use-check.ts';
-import { wants, type MenuFocus } from '../edge/ledger/focus.ts';
+import { wants, wantsPrefix, type MenuFocus } from '../edge/ledger/focus.ts';
 /** arrival-search/1: the upserts whose geometry (def, place, size, shape, params) differs from the before-model. */
 const titleOf = (e: Entity): string | undefined => (e as Entity & {about?: {title?: string}}).about?.title;
 const geometryOf = (e: Entity) => JSON.stringify([e.def, e.in, e.p, e.r, e.s, e.shape, e.anchor, e.params, e.seed]);
@@ -1643,98 +1643,103 @@ export class EngineBridge {
     const focus = (this.edge as { menuFocusV1?(): MenuFocus | null } | undefined)?.menuFocusV1?.() ?? null;
     try { this.nav.capabilities(soul, caps, plans, focus); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
     releaseBigScratch();   // L1: room-reach searches inside a multi-storey house share one ~110 MB workspace; not kept after
-    try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
+    // B-facade item 4 (L3 b4): a focused build (bindOne / words act) runs only the sections whose offers the focus can name:
+    // the object scans read every entity of the world (three passes) and perceive/layers scan signs and stalls
+    const named = (...verbs: string[]) => !focus || focus.targets.size > 0 || verbs.some((v) => wantsPrefix(focus, v + ':', v));
+    if (named('read')) try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
     const ents = this.mw.world.entities as Record<string, any>, me = ents[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
-    const held = Object.values(ents).find((x: any) => x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId) as any;
-    const name = (id: string) => (this.model.entities.has(id) ? this.model.pathOf(id) : String(ents[id]?.label ?? id));
-    // MARSLIVED: a thing resting on a table is reached from the table's floor (its top's height matched Mimos's 0.53 m
-    // raised floor, so a cup on the ground-floor tea table read "floor 1" and Souls were sent up there for it)
-    const levelOf = (x: any) => { let s = x; for (let i = 0; i < 4 && s.support?.kind === 'resting-on' && ents[s.support.on]; i++) s = ents[s.support.on]; return this.levelOfY(s.pose.p[1]); };
-    const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR) as any[];
-    near.sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1));
-    // SOULSIM-H F2: "sit on the bench" from 77 m sat on the ground (the bench was past NEAR, so only sit:here was offered).
-    // The nearest few seats beyond NEAR are offered too (sit only), so a named seat resolves to its own walk-and-sit.
-    const seatAsset = (x: any) => !!(this.physics?.assets[x.def] as { slots?: { kind: string }[] } | undefined)?.slots?.some((sl) => sl.kind === 'seat');
-    near.push(...(Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && x.support?.kind !== 'in-hand' && seatAsset(x) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) > NEAR && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= FAR_SEAT) as any[])
-      .sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1)).slice(0, FAR_SEATS));
-    const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
-      const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
-      const at = this.mw.standableNearV1!([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
-      return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
-    };
-    const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
-    // floors (2026-10-26): a seat the body cannot use names the nearest one it can (or the ground)
-    const unusable: number[] = [], usable: { id: string; label: string; d: number }[] = [];
-    for (const x of near) {
-      const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
-      const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
-      if (asset.slots?.some((s) => s.kind === 'seat')) {
-        const u = this.mw.bodyUsesV1!(x.id), mine = u?.body === soul.entityId;
-        const seats = asset.slots.filter((s) => s.kind === 'seat').length, taken = this.seatTakers(x.id), others = taken.filter((b) => b !== soul.entityId);
-        // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
-        // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
-        const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
-        const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
-        const id = `sit:${x.id}`, labelOf = (seatWords: string) => `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${seatWords}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-        // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
-        const full = others.length >= seats || (!!u && !mine && seats <= 1);
-        // seat fit (engine bodies/humanoid.ts): a body whose look sets its height cannot get onto a seat too high for it.
-        // SEATDEF: the heights are the def's seat heights as the use-check reads them (seatTopsOf: engine seat slots carry
-        // none, so this read nothing before). Only too-high blocks: a seat lower than a body likes (a floor cushion) is sat on.
-        const tops = [...seatTopsOf(this.model, x.id).values()].filter((y) => Number.isFinite(y));
-        const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
-        // floors (2026-10-26): the sitter's feet rest on the floor under the seat (the terrain, or a floor plate on it); a
-        // thing standing higher than that floor (on a deck the world does not walk on) would seat the body inside it
-        const feet = levelOf(x) === 0 ? this.mw.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
-        // a floating thing (a moored canoe, party S8) rides above the pond floor by design and is boarded from its side
-        const afloat = !!ent && isFloatingDef(this.model.resolvedDef(ent.def) as { components: Record<string, unknown> });
-        const inside = !afloat && lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
-        const top = tops.length ? Math.min(...tops) : undefined, ownDef = ent ? this.model.resolvedDef(ent.def) : undefined;
-        const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `sit on top, ${top.toFixed(2)} m high; ` : top !== undefined ? `seat ${top.toFixed(2)} m high; ` : '';
-        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : inside;
-        const label = labelOf(onTop);
-        if (block?.code === 'seat.inside' || block?.code === 'seat.too-high') unusable.push(caps.length); else if (!block) usable.push({ id, label, d });
-        caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
-        plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
-      }
-      if (d > NEAR) continue; // F2: a far seat is offered for sitting only
-      // beds/1: a bed with native berths is lain on through the engine's take_slot (walk to its side, lie down on the
-      // mattress, rest, get up); a bed no adult fits on is not offered at all (bedUseRefusal names it if asked by id)
-      const berths = x.support?.kind !== 'in-hand' && this.isBed(x.id) ? this.berthsOf(x.id) : 0;
-      if (berths) {
-        const occ = this.mw.seatOccupantsV1?.(x.id, 'berth') ?? [];
-        const mine = occ.some((o) => o.body === soul.entityId), others = occ.filter((o) => o.body !== soul.entityId).map((o) => o.body);
-        const block = mine ? { code: 'bed.yours', reason: `You are lying on ${name(x.id)} already; stand:here to get up.` }
-          : others.length >= berths ? { code: 'bed.taken', reason: `${others.map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} lying there.` } : null;
-        for (const [verb, activity, sec] of [['lie', 'lie', 120], ['sleep', 'nap', 600]] as const) {
-          const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-          caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: sec } } });
-          plans.set(id, { label, steps: [...stand, { verb: 'mars:take_slot', params: { owner: x.id, activity } }, { verb: 'rest', params: { seconds: sec } }, { verb: 'stand', params: {} }], seconds: true });
+    if (named('sit', 'lie', 'sleep', 'pick-up', 'put-on')) {
+      const held = Object.values(ents).find((x: any) => x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId) as any;
+      const name = (id: string) => (this.model.entities.has(id) ? this.model.pathOf(id) : String(ents[id]?.label ?? id));
+      // MARSLIVED: a thing resting on a table is reached from the table's floor (its top's height matched Mimos's 0.53 m
+      // raised floor, so a cup on the ground-floor tea table read "floor 1" and Souls were sent up there for it)
+      const levelOf = (x: any) => { let s = x; for (let i = 0; i < 4 && s.support?.kind === 'resting-on' && ents[s.support.on]; i++) s = ents[s.support.on]; return this.levelOfY(s.pose.p[1]); };
+      const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR) as any[];
+      near.sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1));
+      // SOULSIM-H F2: "sit on the bench" from 77 m sat on the ground (the bench was past NEAR, so only sit:here was offered).
+      // The nearest few seats beyond NEAR are offered too (sit only), so a named seat resolves to its own walk-and-sit.
+      const seatAsset = (x: any) => !!(this.physics?.assets[x.def] as { slots?: { kind: string }[] } | undefined)?.slots?.some((sl) => sl.kind === 'seat');
+      near.push(...(Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && x.support?.kind !== 'in-hand' && seatAsset(x) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) > NEAR && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= FAR_SEAT) as any[])
+        .sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1)).slice(0, FAR_SEATS));
+      const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
+        const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
+        const at = this.mw.standableNearV1!([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
+        return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
+      };
+      const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
+      // floors (2026-10-26): a seat the body cannot use names the nearest one it can (or the ground)
+      const unusable: number[] = [], usable: { id: string; label: string; d: number }[] = [];
+      for (const x of near) {
+        const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
+        const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
+        if (asset.slots?.some((s) => s.kind === 'seat')) {
+          const u = this.mw.bodyUsesV1!(x.id), mine = u?.body === soul.entityId;
+          const seats = asset.slots.filter((s) => s.kind === 'seat').length, taken = this.seatTakers(x.id), others = taken.filter((b) => b !== soul.entityId);
+          // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
+          // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
+          const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
+          const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
+          const id = `sit:${x.id}`, labelOf = (seatWords: string) => `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${seatWords}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+          // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
+          const full = others.length >= seats || (!!u && !mine && seats <= 1);
+          // seat fit (engine bodies/humanoid.ts): a body whose look sets its height cannot get onto a seat too high for it.
+          // SEATDEF: the heights are the def's seat heights as the use-check reads them (seatTopsOf: engine seat slots carry
+          // none, so this read nothing before). Only too-high blocks: a seat lower than a body likes (a floor cushion) is sat on.
+          const tops = [...seatTopsOf(this.model, x.id).values()].filter((y) => Number.isFinite(y));
+          const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
+          // floors (2026-10-26): the sitter's feet rest on the floor under the seat (the terrain, or a floor plate on it); a
+          // thing standing higher than that floor (on a deck the world does not walk on) would seat the body inside it
+          const feet = levelOf(x) === 0 ? this.mw.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
+          // a floating thing (a moored canoe, party S8) rides above the pond floor by design and is boarded from its side
+          const afloat = !!ent && isFloatingDef(this.model.resolvedDef(ent.def) as { components: Record<string, unknown> });
+          const inside = !afloat && lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
+          const top = tops.length ? Math.min(...tops) : undefined, ownDef = ent ? this.model.resolvedDef(ent.def) : undefined;
+          const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `sit on top, ${top.toFixed(2)} m high; ` : top !== undefined ? `seat ${top.toFixed(2)} m high; ` : '';
+          const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : inside;
+          const label = labelOf(onTop);
+          if (block?.code === 'seat.inside' || block?.code === 'seat.too-high') unusable.push(caps.length); else if (!block) usable.push({ id, label, d });
+          caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
+          plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
+        }
+        if (d > NEAR) continue; // F2: a far seat is offered for sitting only
+        // beds/1: a bed with native berths is lain on through the engine's take_slot (walk to its side, lie down on the
+        // mattress, rest, get up); a bed no adult fits on is not offered at all (bedUseRefusal names it if asked by id)
+        const berths = x.support?.kind !== 'in-hand' && this.isBed(x.id) ? this.berthsOf(x.id) : 0;
+        if (berths) {
+          const occ = this.mw.seatOccupantsV1?.(x.id, 'berth') ?? [];
+          const mine = occ.some((o) => o.body === soul.entityId), others = occ.filter((o) => o.body !== soul.entityId).map((o) => o.body);
+          const block = mine ? { code: 'bed.yours', reason: `You are lying on ${name(x.id)} already; stand:here to get up.` }
+            : others.length >= berths ? { code: 'bed.taken', reason: `${others.map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} lying there.` } : null;
+          for (const [verb, activity, sec] of [['lie', 'lie', 120], ['sleep', 'nap', 600]] as const) {
+            const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+            caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: sec } } });
+            plans.set(id, { label, steps: [...stand, { verb: 'mars:take_slot', params: { owner: x.id, activity } }, { verb: 'rest', params: { seconds: sec } }, { verb: 'stand', params: {} }], seconds: true });
+          }
+        }
+        if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
+          const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+          caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
+          plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
+        }
+        if (held && asset.surfaceSlots?.length) {
+          const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
+          // MARSLIVED: the free place nearest the Soul (the first free one was often on a table's far side, against a
+          // counter: "put the cup on the prep table" failed as unreachable while the near end was free)
+          // MARSLAND: engine poses carry the negated three.js yaw (fixtureSpec registers yaw: −wp.yaw); turn the slot's local
+          // offset with the entity's own (three.js) yaw, or a turned table's places are mirrored and the far one is chosen
+          const yw = -(x.pose.yaw ?? 0), at = (sl: { local?: number[] }) => { const l = sl.local ?? [0, 0, 0]; return [x.pose.p[0] + l[0] * Math.cos(yw) + l[2] * Math.sin(yw), x.pose.p[2] - l[0] * Math.sin(yw) + l[2] * Math.cos(yw)]; };
+          const free = (asset.surfaceSlots as { id: string; local?: number[] }[]).filter((s) => !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
+          const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
+          caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
+          if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
         }
       }
-      if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
-        const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-        caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
-        plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
-      }
-      if (held && asset.surfaceSlots?.length) {
-        const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
-        // MARSLIVED: the free place nearest the Soul (the first free one was often on a table's far side, against a
-        // counter: "put the cup on the prep table" failed as unreachable while the near end was free)
-        // MARSLAND: engine poses carry the negated three.js yaw (fixtureSpec registers yaw: −wp.yaw); turn the slot's local
-        // offset with the entity's own (three.js) yaw, or a turned table's places are mirrored and the far one is chosen
-        const yw = -(x.pose.yaw ?? 0), at = (sl: { local?: number[] }) => { const l = sl.local ?? [0, 0, 0]; return [x.pose.p[0] + l[0] * Math.cos(yw) + l[2] * Math.sin(yw), x.pose.p[2] - l[0] * Math.sin(yw) + l[2] * Math.cos(yw)]; };
-        const free = (asset.surfaceSlots as { id: string; local?: number[] }[]).filter((s) => !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
-        const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
-        caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
-        if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
-      }
+      const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
+      for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
     }
-    const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
-    for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
-    if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
+    if (this.layers.active() && named('buy', 'pay', 'sell')) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
     if (wants(focus, 'sit:here')) this.sitHere(caps, plans, here, soul.entityId);
     this.fireLit(caps);
     try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
