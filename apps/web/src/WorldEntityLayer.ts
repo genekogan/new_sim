@@ -15,6 +15,7 @@ import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion, syncLightGlow } from './gen-mesh/motion.ts';
+import { hasFlames } from './fx/flames.ts';
 import {lightDiffAhead} from './light-diff-clock.ts';
 import {defLights} from './WorldNightLights.ts';
 import {waterJets} from './fx/water-jets.ts';
@@ -768,6 +769,10 @@ export class WorldEntityLayer {
     const isWorld = !!builder?.world;
     const wp = m.worldPose(e);
     const target = isWorld ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(wp.x, wp.y, wp.z);
+    // Soul Actions entry 33: a fire or neon sign lit by hand in place is redrawn at once (no 2.5 s edit ease, during which
+    // nothing animates), so its catch or strike plays from the contact
+    const inPlace = !!existing && !existing.removing && existing.to.p.distanceTo(target) < 1e-6 && existing.to.s === wp.s && def.tags.includes('hand-operated') && (def.tags.includes('neon') || hasFlames(def));
+    if (inPlace) ease = false;
     const refinement = ease && !isWorld ? this.sites.refinement(e, m) : null;
     if (existing && existing.defHash === defHash && !existing.removing && !force) {
       if (isWorld) return;

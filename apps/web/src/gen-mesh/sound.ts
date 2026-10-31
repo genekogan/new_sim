@@ -116,6 +116,16 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
     case 'crickets': every((at) => { const f = variant ? 3600 : 4600; for (let i = 0; i < (variant ? 6 : 3); i++) tone(c, out, at + i * (variant ? 0.03 : 0.05), f, f, 0.025, 0.1); return variant ? 0.35 + r() * 0.2 : 0.6 + r() * 0.4; }); break;
     case 'bell': { const f = [1180, 880, 1480][variant] ?? 1180; every((at) => { bell(c, out, at, f); return variant === 1 ? 1.4 : 0.9; }); break; }
     case 'hum': {
+      if (variant === 2) {
+        // Soul Actions entry 33: a neon sign's transformer buzz. Twice the mains frequency (120 Hz) rich in harmonics through a
+        // resonant band, a pure 120 Hz under it, a faint high fizz and the odd tick at the electrodes.
+        const o = c.createOscillator(), bp = filt(c, 'bandpass', 240, 1.1), g = c.createGain(); o.type = 'sawtooth'; o.frequency.value = 120; g.gain.value = 0.3;
+        o.connect(bp).connect(g).connect(out); o.start(); nodes.push(o, lfo(c, 0.43, 0.05, g.gain));
+        const p = c.createOscillator(), pg = c.createGain(); p.frequency.value = 120; pg.gain.value = 0.32; p.connect(pg).connect(out); p.start(); nodes.push(p);
+        bed('bandpass', 3600, 1.4, 0.035);
+        every((at) => { burst(c, out, at, 0.008 + r() * 0.015, 0.04 + r() * 0.06, 4800); return 0.4 + r() * 2.2; });
+        break;
+      }
       const base = variant ? 60 : 50;
       for (const [m, a] of [[1, 0.5], [2, 0.3], [3, 0.12]] as const) { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = base * m; g.gain.value = a; o.connect(g).connect(out); o.start(); nodes.push(o); }
       bed('bandpass', 2500, 2, 0.04); break; }

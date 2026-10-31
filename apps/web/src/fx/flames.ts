@@ -101,14 +101,14 @@ registerFx('fire', {
 /** Mount a fire on every flame cluster under `obj`; returns false when there is none. `catchUp`: a fire a Soul just lit
  *  by hand (a hand-operated def is rebuilt at the contact) catches and grows to full over IGNITE seconds. */
 const IGNITE = 1.6;
-export function mountFlames(obj: THREE.Object3D, id: string, catchUp = false): boolean {
+export function mountFlames(obj: THREE.Object3D, id: string, catchUp = false, wisp = false): boolean {
   const fires: Mounted[] = [];
   obj.traverse((pivot) => {
     const clusters = pivot.userData?.flames as FlameCluster[] | undefined; if (!clusters?.length) return;
     const standIns = pivot.children.filter((c) => (c as THREE.Mesh).isMesh);
     for (const m of standIns) m.onBeforeRender = noteCamera;
     clusters.forEach((c, i) => {
-      const kind = kindOf(c), fire = createFire(seedOf(`${id}#${i}`), c.r * 1.05, kind, c.h * 1.05);
+      const kind = kindOf(c), fire = createFire(seedOf(`${id}#${i}`), c.r * 1.05, kind, c.h * 1.05, wisp && kind === 'torch');
       fire.group.position.set(c.p[0], c.p[1], c.p[2]);
       fire.group.children[0].onBeforeRender = noteCamera;
       pivot.add(fire.group);

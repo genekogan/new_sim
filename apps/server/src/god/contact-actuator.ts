@@ -7,6 +7,8 @@ import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } f
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionsOf, actuatedState, thenPatch, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
+/** Entry 33: the most of a neon sign's words a nearby Soul is shown (the sign's own limit, 32, plus a line break shown as " / "). */
+const NEON_WORDS = 34;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true };
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
@@ -46,6 +48,14 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
    return facts;
+  },
+  /** Entry 33: a neon sign's words for a Soul near it (the same nearby rule as `facts`): its owner's text, at most 32
+   *  characters on two lines, control characters removed, with the owner ref that set it. Untrusted text. */
+  words(target:string){
+   const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def);if(!e||!def||!def.tags.includes('neon'))return null;
+   const raw=typeof e.state?.text==='string'?e.state.text:(def.state as Record<string,{default?:unknown}>|undefined)?.text?.default;
+   const text=typeof raw==='string'?raw.replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f]/g,'').split('\n').map(l=>l.trim()).filter(Boolean).slice(0,2).join(' / ').slice(0,NEON_WORDS):'';
+   return text?{text,owner:e.owner??'god'}:null;
   },
   prepare(soul:EdgeSoul,target:string,action:string):ContactActuatorIntent|null{
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),a=def&&actionsOf(def).find(a=>a.name===action);

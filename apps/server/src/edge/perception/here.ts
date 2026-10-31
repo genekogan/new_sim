@@ -254,11 +254,14 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     // M01: the few facts first; enclosure and sightline (entity-world walls) only for a thing that has some.
     const facts=t.kind==='object'&&t.distance<=4?ledger.contactActuator?.facts(t.id):null;
     const state=facts&&Object.keys(facts).length&&P.sameEnclosure(t.at)&&P.sees(t.at,t.id)?facts:null;
+    // entry 33: a neon sign's words, only for a Soul this near it; attributed and untrusted (never in offers)
+    const said=state?ledger.contactActuator?.words?.(t.id):null;
+    const words=said?{text:said.text,by:said.owner==='god'?"the world's maker":said.owner.startsWith('soul:')?(host.minds.get(said.owner.slice(5))?.name??said.owner.slice(5)):said.owner.replace(/^group:/,'group '),untrusted:true as const}:null;
     return ({
     id: t.id, kind: kindOf(t),
     ...(t.kind === 'seat' || t.kind === 'object' || t.kind === 'spot' || t.kind === 'item' ? {name: t.name} : {}),
     ...(t.what ? {what: t.what} : {}),
-    ...(state&&Object.keys(state).length ? {state} : {}),
+    ...(state&&Object.keys(state).length ? {state} : {}), ...(words ? {words} : {}),
     ...(t.kind === 'seat' ? {free: !!t.free} : {}), ...(t.kind === 'object' ? {readable: true} : {}),
     dist: t.distance, bearing: P.bearing(t.at)});});
   const conversations = talks.filter(t => t.members.some(id => id === soul.soulId || (seenIds.has(id) && earshot(seen.find(s => s.soulId === id)!.distance))))

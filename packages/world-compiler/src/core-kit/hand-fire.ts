@@ -68,4 +68,85 @@ const campfire: DefInput = {
   actions: fireActions('Light the campfire', 'Put out the campfire') as DefInput['actions'],
 } as DefInput;
 
-export const HAND_FIRE: DefInput[] = [candleStand, stringLights, campfire];
+// Torches (Soul Actions entry 33): the same hand-lit fire. The hand goes to the charred top of the fuel head (tinted `valve`),
+// raised a little above the shoulder; the flame (role flame, drawn only while lit) burns on the head and its warm,
+// flickering light pools on the ground (night map, flicker pattern for any def named torch). One mechanism, two mounts.
+const torchHead = (y: number, z = 0): Shape[] => [
+  { kind: 'lathe', at: [0, y - 0.16, z], profile: [[0.018, 0], [0.04, 0.05], [0.056, 0.115], [0.058, 0.13], [0.052, 0.135]], segments: 12, tint: 'iron' },
+  { kind: 'cyl', at: [0, y - 0.05, z], r: 0.041, h: 0.1, segments: 12, tint: 'wrap' },
+  { kind: 'torus', at: [0, y - 0.075, z], r: 0.043, r2: 0.005, segments: 10, tint: 'iron', pitch: Math.PI / 2 },
+  { kind: 'cyl', at: [0, y + 0.006, z], r: 0.03, h: 0.012, segments: 10, tint: 'valve' },
+  { kind: 'cone', at: [0, y + 0.17, z], r: 0.066, h: 0.32, segments: 7, tint: 'flame', glow: 1, role: 'flame', pivot: [0, y, z], when: '@on' }];
+const torchLook = { iron: { type: 'color', default: '#2b2724', doc: 'iron colour' }, pole: { type: 'color', default: '#6b5034', doc: 'pole colour' }, wrap: { type: 'color', default: '#3a2a1e', doc: 'fuel wrap colour' }, valve: { type: 'color', default: '#1f1712', doc: 'charred top of the head (the hand goes here)' }, flame: { type: 'color', default: '#ff9a3c', doc: 'flame colour' } };
+const torchPalette = { iron: '#2b2724', pole: '#6b5034', wrap: '#3a2a1e', valve: '#1f1712', flame: '#ff9a3c' };
+const torchSound = { kind: 'fire', radius: 7, volume: 0.22, when: 'on', mode: 'loop', variant: 0 };
+const standingTorch: DefInput = {
+  schema: 'def/1', name: 'core-standing-torch', version: 1,
+  description: 'An iron garden torch on a wooden pole (1.45 m), its head wrapped and soaked to burn. A Soul lights it and puts it out by hand, reaching up to the head; it burns with a flickering flame and throws warm light around it.',
+  tags: ['lighting', 'torch', 'fire', 'hand-operated', 'local-fixture'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
+    { kind: 'cyl', at: [0, 0.02, 0], r: 0.12, h: 0.04, segments: 10, tint: 'iron' },
+    { kind: 'cyl', at: [0, 0.075, 0], r: 0.03, h: 0.07, segments: 8, tint: 'iron' },
+    { kind: 'cyl', at: [0, 0.68, 0], r: 0.02, h: 1.2, segments: 8, tint: 'pole' },
+    { kind: 'torus', at: [0, 0.5, 0], r: 0.022, r2: 0.005, segments: 8, tint: 'iron', pitch: Math.PI / 2 },
+    ...torchHead(1.44)] } } as unknown as DefInput['make'],
+  params: torchLook as DefInput['params'], palette: torchPalette,
+  state: { on: { type: 'bool', default: false } } as DefInput['state'],
+  components: { light: { color: '#ff8b3d', range: 4.5, on: true, at: [0, 1.6, 0] }, sound: torchSound } as DefInput['components'],
+  size: { box: [0.26, 1.78, 0.26] },
+  actions: fireActions('Light the standing torch', 'Put out the standing torch') as DefInput['actions'],
+} as DefInput;
+// For a wall: back plate at the def's back (z -0.13; place it with its back to the wall), an arm and a collar holding
+// the torch upright 0.15 m out from the wall, its head at 1.52 m.
+const wallTorch: DefInput = {
+  schema: 'def/1', name: 'core-wall-torch', version: 1,
+  description: 'An iron wall bracket holding a torch upright 15 cm from the wall, its head at 1.5 m. Place it with its back against a wall. A Soul lights it and puts it out by hand, reaching up to the head; it burns with a flickering flame and throws warm light on the wall and the ground.',
+  tags: ['lighting', 'torch', 'fire', 'wall', 'hand-operated', 'local-fixture'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [
+    { kind: 'box', at: [0, 1.24, -0.12], size: [0.09, 0.26, 0.016], tint: 'iron' },
+    { kind: 'box', at: [0, 1.22, -0.06], size: [0.022, 0.022, 0.11], tint: 'iron' },
+    { kind: 'box', at: [0, 1.3, -0.075], size: [0.016, 0.016, 0.12], tint: 'iron', pitch: -0.75 },
+    { kind: 'cyl', at: [0, 1.225, 0.02], r: 0.03, h: 0.05, segments: 10, tint: 'iron' },
+    { kind: 'cyl', at: [0, 1.2, 0.02], r: 0.02, h: 0.36, segments: 8, tint: 'pole' },
+    ...torchHead(1.52, 0.02)] } } as unknown as DefInput['make'],
+  params: torchLook as DefInput['params'], palette: torchPalette,
+  state: { on: { type: 'bool', default: false } } as DefInput['state'],
+  components: { light: { color: '#ff8b3d', range: 4.5, on: true, at: [0, 1.68, 0.2] }, sound: torchSound } as DefInput['components'],
+  size: { box: [0.2, 1.86, 0.28] },
+  actions: fireActions('Light the wall torch', 'Put out the wall torch') as DefInput['actions'],
+} as DefInput;
+
+// A neon sign (entry 33): glass tube lettering (state `text`, chosen by its owner, at most 32 characters on 1–2 lines)
+// and a tube border on a dark backboard between two posts, switched on and off by hand at the switch box on the left
+// post (1.2 m; the lamps' contact). The viewer draws the tubes (tag `neon`, gen-mesh/kits/neon.mesh.ts): pale glass
+// while off, a stutter as each tube strikes, then a steady glow with a hot core, bloom and spill; the coloured pools
+// on the ground are its two lights; a quiet transformer hum while lit.
+const neonSign: DefInput = {
+  schema: 'def/1', name: 'core-neon-sign', version: 1,
+  description: 'A neon sign: glass tube lettering (state text, its owner\'s words, up to 32 characters on one or two lines) and a tube border on a dark board between two posts (top 2.15 m). A Soul switches it on and off by hand at the switch box on the left post; lit, it glows and hums quietly.',
+  tags: ['lighting', 'sign', 'neon', 'hand-operated', 'local-fixture'], form: 'point',
+  make: { kind: 'gen', gen: 'kit/2', args: { round: 0.008, shapes: [
+    ...[-0.8, 0.8].flatMap((x) => [
+      { kind: 'box', at: [x, 1.1, 0], size: [0.05, 2.2, 0.05], tint: 'frame' },
+      { kind: 'box', at: [x, 0.015, 0], size: [0.12, 0.03, 0.34], tint: 'frame' }]),
+    { kind: 'box', at: [0, 1.78, -0.005], size: [1.7, 0.74, 0.04], tint: 'board' },
+    { kind: 'box', at: [0, 2.165, -0.005], size: [1.74, 0.03, 0.06], tint: 'frame' },
+    { kind: 'box', at: [0, 1.395, -0.005], size: [1.74, 0.03, 0.06], tint: 'frame' },
+    { kind: 'box', at: [0.35, 1.62, -0.07], size: [0.26, 0.13, 0.08], tint: 'frame' },
+    { kind: 'box', at: [-0.8, 1.2, 0.055], size: [0.08, 0.12, 0.06], tint: 'valve' },
+    { kind: 'box', at: [-0.8, 1.215, 0.092], size: [0.014, 0.034, 0.016], tint: 'lever' },
+    { kind: 'cyl', at: [-0.8, 1.32, 0.04], r: 0.009, h: 0.12, segments: 6, tint: 'frame' }],
+    faces: [{ neon: true, at: [0, 1.78, 0.022], w: 1.56, h: 0.62 }] } } as unknown as DefInput['make'],
+  params: { frame: { type: 'color', default: '#1c1d21', doc: 'posts and frame colour' }, board: { type: 'color', default: '#121318', doc: 'backboard colour' },
+    valve: { type: 'color', default: '#4a4f57', doc: 'switch box colour (the hand goes here)' }, lever: { type: 'color', default: '#c9ccd2', doc: 'switch lever colour' },
+    tube: { type: 'color', default: '#ff3d8e', doc: 'lettering tube colour' }, border: { type: 'color', default: '#2fd6ff', doc: 'border tube colour' } } as DefInput['params'],
+  palette: { frame: '#1c1d21', board: '#121318', valve: '#4a4f57', lever: '#c9ccd2', tube: '#ff3d8e', border: '#2fd6ff' },
+  state: { on: { type: 'bool', default: false }, text: { type: 'string', max: 32, default: 'OPEN' } } as DefInput['state'],
+  // the coloured spill on the ground in front of the board (the viewer draws the glow on the board itself)
+  components: { lights: [{ color: '#ff3d8e', range: 5, on: true, at: [-0.45, 1.78, 0.7] }, { color: '#ff3d8e', range: 5, on: true, at: [0.45, 1.78, 0.7] }],
+    sound: { kind: 'hum', radius: 7, volume: 0.16, when: 'on', mode: 'loop', variant: 2 } } as DefInput['components'],
+  size: { box: [1.76, 2.18, 0.34] },
+  actions: switches('Switch on the neon sign', 'Switch off the neon sign') as DefInput['actions'],
+} as DefInput;
+
+export const HAND_FIRE: DefInput[] = [candleStand, stringLights, campfire, standingTorch, wallTorch, neonSign];

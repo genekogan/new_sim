@@ -11,6 +11,8 @@ import { shapeFaceMeshes } from './faces.ts'; // XP8 hook
 import { kitClassSurface, kitSurfaceAttribute, kitSurfaceSuffix } from './kit-surfaces.ts'; // Y1 / XP7 hook
 
 const cache = new Map<string, THREE.Object3D>();
+/** Entry 33: hand-operated things this viewer has drawn out (on false), so a fire catches only when it was seen lit by hand. */
+const wasOut = new Map<string, boolean>();
 
 /** Geometry for one primitive, centred where its kind is naturally centred; caller transforms. */
 function primitive(sh: KitShape, round: number, v: number): THREE.BufferGeometry {
@@ -239,7 +241,11 @@ registerMesh({
     if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {}, flameHint: flameHint(ctx.def), plant: isPlantDef(ctx.def), smokeFx: !ctx.def.components.route && !ctx.def.tags.includes('moving') }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
-    if (ctx.params.condition !== 'construction') mountFlames(obj, ctx.entity.id, ctx.def.tags.includes('hand-operated')); // W2: flame parts burn (fx/flames.ts); not on a building site; a fire lit by hand catches
+    // W2: flame parts burn (fx/flames.ts); not on a building site. A fire lit by hand catches (entry 22); entry 33: only
+    // when this viewer saw it out before (a fire already burning when a viewer arrives burns at full); a torch smokes.
+    const hand = ctx.def.tags.includes('hand-operated'), lit = ctx.entity.state?.on === true, catchUp = hand && lit && wasOut.get(ctx.entity.id) === true;
+    if (hand) wasOut.set(ctx.entity.id, !lit);
+    if (ctx.params.condition !== 'construction') mountFlames(obj, ctx.entity.id, catchUp, ctx.def.tags.includes('torch'));
     return obj;
   },
   instanceKey(ctx) { const a = parseKitArgs(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },

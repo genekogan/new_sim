@@ -43,6 +43,8 @@ const KINDS:Record<string,Kind>={
  // festival kit (anchors at the lantern / bulb itself)
  'paper-lantern':{height:()=>0,size:.6,color:'#ffd9a0',intensity:.55,flicker:false},
  'festoon':{height:()=>0,size:.32,color:'#ffe2a8',intensity:.7,flicker:false},
+ // Soul Actions entry 33: a torch's glow, at its flame (anchored at the light itself)
+ 'torch':{height:()=>0,size:1.1,color:'#ff9a4a',intensity:.6,flicker:true},
 };
 export class Halos{
  readonly mesh:THREE.InstancedMesh;
