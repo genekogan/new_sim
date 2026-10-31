@@ -159,6 +159,11 @@ type TransferExec = {
 const supportKey = (e: Entity) => JSON.stringify(e.support ?? null);
 
 /** Already within HERE_REACH of the target (e.g. the next item along the table): no walk, just turn to it. */
+/** Opted-in presented items (drawn reach and bend, presentation.ts): stand at the side of a table nearest the item.
+ *  0.3 m in from the edge + the 0.35 m approach gap is a 0.65 m reach, a standing ~50° bend for a 1.71 m body; at
+ *  0.44 m in (0.79 m) a shorter rig could only reach it kneeling. Other items keep the shared station order. */
+const PRESENTED_COMFORT_DEPTH = 0.3;
+const presentedDepth = (it: Entity) => (it.tags?.includes('entity-world-item-pose') ? PRESENTED_COMFORT_DEPTH : undefined);
 function fromHere(a: Entity, target: Vec3): Station | null {
   if (reachOf(a, target) > HERE_REACH || !STILL_ACTIVITIES.has(a.human!.activity) || a.human!.activity === 'sit') return null;
   return { p: [a.pose.p[0], a.pose.p[2]], yaw: heading([target[0] - a.pose.p[0], target[2] - a.pose.p[2]]) };
@@ -185,7 +190,7 @@ function planTake(rt: Runtime, p: TransferParams) {
     if (!owner || !s.slot) return fail('item.unsupported-source', `${it.id} rests on ${s.on}, which is not a surface an item can be taken from`, [it.id, s.on]);
   } else if (s?.kind !== 'ground') return fail('item.unsupported-source', `${it.id} is ${whereIs(rt.world, it)}; only items on a surface or the ground can be taken`, [it.id]);
   const target = graspPoint(it);
-  const st = fromHere(a, target) ?? reachStation(rt, a, target, owner, `${it.id} (${whereIs(rt.world, it)})`);
+  const st = fromHere(a, target) ?? reachStation(rt, a, target, owner, `${it.id} (${whereIs(rt.world, it)})`, presentedDepth(it));
   if ('code' in st) return { ok: false as const, diagnostic: { ...st, subjects: [...new Set([...(st.subjects ?? []), it.id])] } };
   const here = Math.abs(st.p[0] - a.pose.p[0]) < 0.05 && Math.abs(st.p[1] - a.pose.p[2]) < 0.05;
   if (!here) {
@@ -232,7 +237,7 @@ function planPut(rt: Runtime, p: TransferParams) {
   const g = CATALOG[it.def].handling!.grips[1][0].local;
   const q = rot2([g[0], g[2]], owner.pose.yaw);
   const target: Vec3 = [slot.p[0] + q[0], slot.p[1] + g[1], slot.p[2] + q[1]];
-  const st = fromHere(a, slot.p) ?? reachStation(rt, a, slot.p, owner, `surface slot ${slot.id}`);
+  const st = fromHere(a, slot.p) ?? reachStation(rt, a, slot.p, owner, `surface slot ${slot.id}`, presentedDepth(it));
   if ('code' in st) return { ok: false as const, diagnostic: st };
   const here = Math.abs(st.p[0] - a.pose.p[0]) < 0.05 && Math.abs(st.p[1] - a.pose.p[2]) < 0.05;
   if (!here) {

@@ -147,8 +147,11 @@ export type Station = { p: Vec2; yaw: number };
  * that edge straight opposite the target (clamped to the edge), first with ≥ APPROACH_CLEARANCE;
  * sides ordered by distance from the actor. On the ground: 8 points GROUND_STANDOFF around it, the
  * one facing the actor first. `item.unreachable` names what blocks every candidate.
+ * `comfortDepth` (m, opted-in presented items only): a side whose edge is farther than this from the target ranks after
+ * every shallower side, so the body stands where the reach is short (a bowl 0.44 m in from the end the actor walked up
+ * to is 0.23 m in from the side); sides within it keep the actor-distance order.
  */
-export function reachStation(rt: Runtime, actor: Entity, target: Vec3, owner: Entity | undefined, what: string): Station | Diagnostic {
+export function reachStation(rt: Runtime, actor: Entity, target: Vec3, owner: Entity | undefined, what: string, comfortDepth?: number): Station | Diagnostic {
   const sp = rt.services.spatial as Spatial | undefined;
   sp?.sync(rt.world);
   const g = sp?.level(actor.human!.level);
@@ -175,7 +178,8 @@ export function reachStation(rt: Runtime, actor: Entity, target: Vec3, owner: En
       const probe = add2(c, rot2([edge[0] + s.n[0] * APPROACH_GAPS[0], edge[1] + s.n[1] * APPROACH_GAPS[0]], owner.pose.yaw));
       rows.push({ ...s, edge, depth, order: hyp(probe[0] - me[0], probe[1] - me[1]) });
     }
-    rows.sort((a, b) => a.order - b.order || sides.indexOf(a) - sides.indexOf(b));
+    const deep = (r: { depth: number }) => (comfortDepth === undefined ? 0 : Math.max(r.depth, comfortDepth));
+    rows.sort((a, b) => deep(a) - deep(b) || a.order - b.order || sides.indexOf(a) - sides.indexOf(b));
     for (const s of rows)
       for (const gap of APPROACH_GAPS) {
         const p = add2(c, rot2([s.edge[0] + s.n[0] * gap, s.edge[1] + s.n[1] * gap], owner.pose.yaw));
