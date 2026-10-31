@@ -14,7 +14,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {HumanViews,type SampledHuman} from '../../../mars/viewer/app/engine-view/humans.ts';
 import {templateFromGltf,type Template} from '../../../mars/viewer/app/engine-view/people.ts';
 import {hashId} from '../../../mars/viewer/app/engine-view/people-light.ts';
-import {itemPresentation,ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS,type ItemTransferV1} from '../../../mars/viewer/engine/items/presentation.ts';
+import {itemPresentation,ITEM_PUT_RECOVERY_SECONDS,ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS,type ItemTransferV1} from '../../../mars/viewer/engine/items/presentation.ts';
 import {BODY_MODEL} from '../../../mars/viewer/engine/body/model.ts';
 
 const DT=.05;
@@ -63,7 +63,7 @@ function frames(id:string,grasp:[number,number,number],place:[number,number,numb
  for(let t=1;t<=R;t++)push(k++,'reach',lerp3(CARRY,place,smooth(t/R)),put,true);            // put reach (holding)
  for(let t=1;t<=R;t++)push(k++,'reach',lerp3(place,REST,smooth(t/R)),put,false);            // withdraw (released at the end)
  put.releaseTick=k-1;
- for(let t=1;t<=Rec;t++)push(k++,'idle',REST,put,false);                                    // recovery
+ for(let t=1;t<=Math.round(ITEM_PUT_RECOVERY_SECONDS/DT);t++)push(k++,'idle',REST,put,false); // recovery (a put's is longer)
  for(let j=0;j<30;j++)push(k++,'idle',undefined,undefined,false);
  return out;
 }
@@ -90,4 +90,32 @@ test('a pick-up out of folded arms: the gesture fades out over the reach and the
  if(process.env.ITEM_DEBUG)console.log('fold worst',r.worst.toFixed(3),'@',r.at,'variety at reach',r.rows[start].variety.toFixed(2),'at grasp',r.rows[start+Math.round(ITEM_REACH_SECONDS/DT)].variety.toFixed(2));
  assert.ok(r.rows[start].variety>.9,'folded arms are playing when the reach starts');
  assert.ok(r.worst<=.08,`palm step ${r.worst.toFixed(3)} m per 50 ms at tick ${r.at}`);
+});
+
+/** Entry 42 (take 4): a put whose recovery runs into an idle gesture. The released arm eased from the engine's rest point
+ *  to the clip while the gesture faded in on the same clock: the palm stayed at the hip, then rushed to the head
+ *  (0.176 m per 50 ms; the gesture share is multiplied by the arm's own return, a product of two ramps). */
+function idWithClip(clip:string,t0:number,t1:number){
+ for(let i=0;i<40000;i++){const id='h_put'+i,h=hashId(id);
+  const n=(t:number)=>((t/25+(h%997)/997)%1)*25<7;
+  const g=(t:number)=>{const cyc=t/37+((h>>>7)%991)/991,u=(cyc%1)*37;return u<10.2?{clip:['Idle_LookAround_Loop','Idle_FoldArms_Loop'][(Math.floor(cyc)+h)%2],full:u>=1.2&&u<9}:null;};
+  let ok=true;for(let t=t0;t<=t1;t+=.25){const c=g(t);if(n(t)||!(c&&c.clip===clip&&c.full)){ok=false;break;}}
+  if(ok)return id;}
+ throw new Error('no id');
+}
+test('a put-down whose recovery runs into an idle gesture: the arm returns first, then the gesture comes in, no palm faster than 0.08',async()=>{
+ for(const clip of ['Idle_FoldArms_Loop','Idle_LookAround_Loop']){
+  // the put's recovery is ticks 754-798 (37.7-39.9 s); the gesture is full from before the put's withdraw to after
+  const id=idWithClip(clip,36.5,41.5),r=await measure(id,[.58,.75,0],[.6,1.0,.05]);
+  const rec=r.rows.filter(x=>x.k>=754&&x.k<=754+Math.round(ITEM_PUT_RECOVERY_SECONDS/DT));
+  if(process.env.ITEM_DEBUG){console.log(clip,'worst',r.worst.toFixed(3),'@',r.at,'variety end of recovery',rec.at(-1)?.variety.toFixed(2));if(process.env.ITEM_DEBUG==='2')for(let i=1;i<r.rows.length;i++){const x=r.rows[i];if(x.k<740||x.k>808)continue;console.log(x.k,x.act,x.variety.toFixed(2),[0,1].map(j=>Math.hypot(...x.palms[j].map((q,n)=>q-r.rows[i-1].palms[j][n])).toFixed(3)).join(' '),x.palms.map(p=>p.map(q=>q.toFixed(2)).join(',')).join(' | '));}}
+  assert.ok((rec.at(-1)?.variety??0)>.9,`${clip} is playing once the recovery is over`);
+  // the gesture clip's own loop moves the hand too (the look-around drops it from the eyes at 0.15 m per 50 ms, standing
+  // idle with nothing in hand): a pair is held to 0.08 unless the same tick of plain idle moves as fast (+1 cm)
+  const v=await views(),idle=r.rows.map(x=>{v.setFrame([{id,p:[0,0,0],yaw:0,walk:0,walkDist:0,restAge:30+x.k*DT,speed:0,activity:'idle'}],x.k*DT);v.render(1);return (v.bones(id)[id] as unknown as {arms:{palm:number[]}[]}).arms.map(a=>a.palm);});
+  let worst=0,at=0,clipOwn=0;
+  for(let i=1;i<r.rows.length;i++)for(let j=0;j<2;j++){const s=Math.hypot(...r.rows[i].palms[j].map((x,n)=>x-r.rows[i-1].palms[j][n])),own=Math.hypot(...idle[i][j].map((x,n)=>x-idle[i-1][j][n]));clipOwn=Math.max(clipOwn,own);if(s>.08&&s<=own+.01)continue;if(s>worst){worst=s;at=r.rows[i].k;}}
+  if(process.env.ITEM_DEBUG)console.log(clip,'transition worst',worst.toFixed(3),'@',at,'clip own motion max',clipOwn.toFixed(3));
+  assert.ok(worst<=.08,`${clip}: palm step ${worst.toFixed(3)} m per 50 ms at tick ${at}`);
+ }
 });

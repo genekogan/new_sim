@@ -8,7 +8,7 @@
 // its own activity this tick, because they are submitted later) and publish `human.baseActivity` =
 // the activity they are layered on ('sit' = seated).
 import { z } from 'zod';
-import {insideLength,insidePoint,insideReachSeconds,ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS,type InsideVia} from './presentation.ts';
+import {insideLength,insidePoint,insideReachSeconds,ITEM_PUT_RECOVERY_SECONDS,ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS,type InsideVia} from './presentation.ts';
 import { angleDelta, clamp, heading, q6, rot2, wrapAngle, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
@@ -341,7 +341,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       const it = rt.world.entities[ex.item];
       if(ex.phase==='recover'){
         a.human!.activity='idle';ex.t++;
-        if(ex.t<ticks(ITEM_RECOVERY_SECONDS))return{status:'running',phase:'recover'};
+        // a released put recovers longer: the arm goes back first, then any idle gesture comes in (presentation.ts)
+        if(ex.t<ticks(ex.mode==='put'&&!inHand(rt.world,ex.actor,ex.hand)?ITEM_PUT_RECOVERY_SECONDS:ITEM_RECOVERY_SECONDS))return{status:'running',phase:'recover'};
         // the released hand stayed at its rest point while the drawn arm eased back to the idle clip
         if(!inHand(rt.world,ex.actor,ex.hand))setHand(a,ex.hand,undefined);
         return{status:'completed',outputs:{item:ex.item,hand:ex.hand,support:it.support}};

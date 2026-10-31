@@ -5,6 +5,11 @@
 // The engine's opted-in reach / withdraw and the drawn posture hump both use this clock.
 export const ITEM_REACH_SECONDS=1;
 export const ITEM_RECOVERY_SECONDS=1.2;
+/** Entry 42 (take 4): after a put the released arm went back to the clip while an idle gesture faded in on the same
+ *  1.2 s ramp: the gesture's share rode on the arm's return (a product of two ramps), and a hand-to-the-eyes look-around
+ *  rose 0.9 m in 0.4 s (0.176 m per 50 ms). Now the arm is back on the clip in ITEM_PUT_ARM_BACK, and the gesture comes in
+ *  afterwards over the rest of a longer put recovery (on the rig: folded arms 0.074, look-around 0.140 before). */
+export const ITEM_PUT_RECOVERY_SECONDS=2.2,ITEM_PUT_ARM_BACK=.7,ITEM_PUT_GESTURE_DELAY=.3;
 /** A pick-up reach fades the idle variety (fold arms, look around) out over this long from the reach start, as M04's
  *  GESTURE_FADE (1.4 s, humans.ts) does for hand actuators. Longer here because the torso bends at the same time and
  *  carries the folded arms down with it: over 1.4 s the free hand dropped 0.095 m per 50 ms on the rig, over 2 s 0.079. */
@@ -81,6 +86,7 @@ export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:s
  // After release the engine keeps the hand at its rest point through recovery: the drawn arm eases from it to the clip.
  // A pick-up's recovery ends holding the item: no gesture comes back (it would be cut when the record clears), only
  // the reach-start fade runs out.
+ if(transfer.releaseTick!==undefined&&transfer.mode==='put'&&!holding){const u=(tick-transfer.releaseTick)*dt;return{weight:1-smooth(u/ITEM_PUT_ARM_BACK),idleBlend:smooth((u-ITEM_PUT_GESTURE_DELAY)/(ITEM_PUT_RECOVERY_SECONDS-ITEM_PUT_GESTURE_DELAY)),...posture};}
  if(transfer.releaseTick!==undefined){const r=smooth((tick-transfer.releaseTick)*dt/ITEM_RECOVERY_SECONDS);return{weight:holding?1:pickUp&&transfer.cancelTick!==undefined?0:1-r,idleBlend:holding?fade:Math.max(r,fade),...posture};}
  return{weight:holding?1:cancelled?back:reaching?lead:pickUp?smooth(s/R):1,idleBlend:fade,...goal,...posture};
 }

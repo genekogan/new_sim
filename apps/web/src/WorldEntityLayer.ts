@@ -126,7 +126,8 @@ export class WorldEntityLayer {
     // entry 42: this runs after update(), which saw last frame's moving containers: a drawer whose hand just let go shows
     // what is in it where it is now (shut: hidden; open: at its place), never one frame back at the open place
     for(const [id,box] of this.keptIn){
-      if(this.movingBoxes.has(box))continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
+      // a recorded item (take track) is drawn where its native twin is: a hand is taking it out or has just put it in
+      if(this.movingBoxes.has(box)||this.overrides.has(id))continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
       const open=this.model?.entities.get(box)?.state?.open===true;
       if(!open){if(k.inst?k.shown!==false:k.obj.visible)this.showKept(id,k,false);}
       else if(k.obj.position.distanceToSquared(k.to.p)>1e-8&&k.settled){k.obj.position.copy(k.to.p);this.showKept(id,k,true);}
