@@ -43,7 +43,10 @@ export type LiveJson = {
 };
 
 /** The routes a read worker answers itself, by mode (S.readMode): what the launcher may route to its port. */
-export const READ_ROUTES: Record<number, string[]> = {1: ['here', 'capabilities'], 2: ['here', 'observe', 'capabilities', 'resolve', 'view']};
+// Mode 2 lists only what the worker computes over HTTP (read-worker.ts handle(): GET here). It forwards anything else to main
+// over its intents port, so routing observe/capabilities/view there only added a hop, let the launcher's 2 s no-headers
+// fallback ask main a second time (B-soak n24 on the live copy: 458 fallbacks in 4 min), and sent reads past the red/black shed.
+export const READ_ROUTES: Record<number, string[]> = {1: ['here', 'capabilities'], 2: ['here']};
 
 export const newSharedLoad = () => new Float64Array(new SharedArrayBuffer(S.size * Float64Array.BYTES_PER_ELEMENT));
 /** The process's one shared array (the watchdog gets this buffer). Tests make their own with newSharedLoad(). */

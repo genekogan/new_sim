@@ -241,7 +241,7 @@ async function join_(run, i) {
   const soul = { i, dir };
   const a = await runCli(soul, ['register', BASE], 60_000);
   // v2: a create the proxy answered 502/503 (a slow world under N concurrent creates) is tried again, up to 3 times
-  let b; for (let k = 0; k < (LOAD === 'stageb' ? 3 : 1); k++) { b = await runCli(soul, ['create', `Bench${i}`], 120_000); if (b.outcome === 'ok' || existsSync(join(dir, '.eden-agent.json')) && JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) break; run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(5000); }
+  let b; for (let k = 0; k < (LOAD === 'stageb' ? 3 : 1); k++) { b = await runCli(soul, ['create', `Bench${i}`], 120_000); if (existsSync(join(dir, '.eden-agent.json')) && JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) break; run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(5000); }
   if (!JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
   soul.token = JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token;
   return soul;

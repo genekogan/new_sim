@@ -79,7 +79,12 @@
 // Local only: binds 127.0.0.1, edge minds (owners' agents think; the world pays for none), no credentials, no tunnels.
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { createServer, request } from 'node:http';
+import { Agent, createServer, request } from 'node:http';
+// Requests to a world (and its read workers) each get a new loopback connection: with a kept-alive one, a world whose loop
+// stalls closes the idle socket just as the next request is written on it (ECONNRESET on a reused socket, seen at N = 24
+// on the live copy: POST /v1/souls and every POST answered 502 world.unavailable, never retried). Hop-by-hop headers stay on their hop.
+const WORLD_AGENT = new Agent({ keepAlive: false });
+const hopless = (h) => { const { connection: _c, 'keep-alive': _k, ...rest } = h; return rest; };
 import { clientErrors } from './client-errors.mjs';
 import { healthDash } from './health-dash.mjs';
 import { connect } from 'node:net';
@@ -546,7 +551,7 @@ export async function openLauncher(cfg = {}) {
     // Behind Caddy (a public origin other than our own) keep the visitor's x-forwarded-for, so per-person limits in
     // the worlds see people, not the proxy; locally it is set to the connecting address as before.
     const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
-    const up = request({ hostname: '127.0.0.1', port: targetPort, path: path ?? req.url, method: req.method, headers: { ...req.headers, 'x-forwarded-for': xff } }, (r) => {
+    const up = request({ agent: WORLD_AGENT, hostname: '127.0.0.1', port: targetPort, path: path ?? req.url, method: req.method, headers: { ...hopless(req.headers), 'x-forwarded-for': xff } }, (r) => {
       // hop-by-hop headers stay on their hop: an upstream `connection: keep-alive` would turn this server's own choice
       // back on (forward() closes after its response; Node lets a user connection header override that)
       const { connection: _c, 'keep-alive': _k, 'x-sim-account': account, ...headers } = r.headers;
@@ -558,7 +563,7 @@ export async function openLauncher(cfg = {}) {
     });
     // A world that was just handed over (or restarted) refused the connection before answering: a GET/HEAD is asked again
     // once (the retry waits for the world to be back), so a page or poll in flight sees a short wait, not an error.
-    up.on('error', () => { if (!res.headersSent && retry) retry(); else if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); else res.destroy(); });
+    up.on('error', (e) => { if (process.env.SIM_PROXY_DEBUG === '1' && !clientGone(req, res)) log(`proxy ${req.method} ${(path ?? req.url).split('?')[0]}: ${e.code ?? e.message} reused=${up.reusedSocket} headersSent=${res.headersSent}`); if (!res.headersSent && retry) retry(); else if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); else res.destroy(); });
     req.on('aborted', () => up.destroy()); res.on('close', () => up.destroy());
     // lane L1: a Soul API body without a content-length is cut off at its ceiling (one with one was refused before)
     if (maxBody > 0 && !req.readableEnded) { let n = 0; req.on('data', (c) => { n += c.length; if (n > maxBody) { up.destroy(); req.unpipe(up); if (!res.headersSent) json(res, 413, { ok: false, code: 'request.too-large', message: `a request body may be at most ${Math.round(maxBody / 1024)} KB` }, { connection: 'close' }); } }); }
@@ -653,7 +658,7 @@ export async function openLauncher(cfg = {}) {
       st.fallback++; st.lastFallback = { why, at: Date.now() };
       if (!clientGone(req, res)) proxyHttp(req, res, mainPort, opts);
     };
-    const up = request({ hostname: '127.0.0.1', port: readPort, path: req.url, method: req.method, headers: { ...req.headers, 'x-forwarded-for': xff } }, (r) => {
+    const up = request({ agent: WORLD_AGENT, hostname: '127.0.0.1', port: readPort, path: req.url, method: req.method, headers: { ...hopless(req.headers), 'x-forwarded-for': xff } }, (r) => {
       if (settled) { r.resume(); return; }
       if ((r.statusCode ?? 502) >= 500 && r.statusCode !== 503) { r.resume(); fallback(`status ${r.statusCode}`); return; }
       settled = true; clearTimeout(timer);
@@ -698,7 +703,7 @@ export async function openLauncher(cfg = {}) {
     let r;
     try {
       r = await c3.get(key, ttlMs, () => new Promise((yes, no) => {
-        const up = request({ hostname: '127.0.0.1', port: p, path: req.url, method: 'GET', headers: { ...req.headers, 'x-forwarded-for': xff } }, (u) => {
+        const up = request({ agent: WORLD_AGENT, hostname: '127.0.0.1', port: p, path: req.url, method: 'GET', headers: { ...hopless(req.headers), 'x-forwarded-for': xff } }, (u) => {
           const chunks = []; u.on('data', (c) => chunks.push(c)); u.on('error', no);
           u.on('end', () => { sawLoad(slug, u.headers['x-sim-load']); const { connection: _c, 'keep-alive': _k, 'transfer-encoding': _t, 'x-sim-account': _a, ...headers } = u.headers; const body = Buffer.concat(chunks); yes({ status: u.statusCode ?? 502, headers: { ...headers, 'content-length': String(body.length) }, body }); });
         });
