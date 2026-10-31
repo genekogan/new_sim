@@ -46,6 +46,8 @@ export class ObjectTable {
   private pending = new Map<string, string | null>();
   private pendingGen = 0;
   private dataVersion = -1;
+  /** moves on every change (load, put, drop) */
+  changes = 0;
   private stmts: Stmts;
   private db: Sql;
   private worldId: string;
@@ -84,7 +86,7 @@ export class ObjectTable {
   private load() {
     OBJECT_TABLE_STATS.loads++;
     this.rows.clear(); this.sorted = []; this.kinds.clear(); this.cells.clear(); this.cellOf.clear(); this.pending.clear();
-    this.list = null; this.idList = null;
+    this.list = null; this.idList = null; this.changes++;
     for (const r of this.stmts.all.all(this.worldId) as {body: string}[]) {
       const o = deepFreeze(JSON.parse(r.body) as ObjectRecord); OBJECT_TABLE_STATS.parsed++;
       this.rows.set(o.id, o); this.sorted.push(o.id); this.index(o);
@@ -105,11 +107,11 @@ export class ObjectTable {
     deepFreeze(o);
     const old = this.rows.get(o.id);
     if (old) this.unindex(old); else { insertSorted(this.sorted, o.id); this.idList = null; }
-    this.rows.set(o.id, o); this.index(o); this.list = null;
+    this.rows.set(o.id, o); this.index(o); this.list = null; this.changes++;
   }
   private drop(id: string) {
     const old = this.rows.get(id); if (!old) return;
-    this.unindex(old); this.rows.delete(id); removeSorted(this.sorted, id); this.list = null; this.idList = null;
+    this.unindex(old); this.rows.delete(id); removeSorted(this.sorted, id); this.list = null; this.idList = null; this.changes++;
   }
 
   /** The framework wrote this body (already in the database). */

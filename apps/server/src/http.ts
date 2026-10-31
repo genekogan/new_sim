@@ -200,12 +200,15 @@ export function buildApp(d: Deps) {
   });
   app.get('/v1/scenes/:hash', c => {
     const hash=c.req.param('hash');
-    const capture=/^[a-f0-9]{64}$/.test(hash)?d.db.renderSceneCapture(d.host.worldId,hash):undefined;
     const world=c.req.query('world');  // lane W1: the web names its world, so a capture it may keep is keyed by world too
-    if(!capture||(world!==undefined&&world!==d.host.worldId))return c.json({ok:false,code:'not-found',message:'No recorded render scene for this world.'},404,{'Cache-Control':'no-store'});
+    // L8: verified once by hash and kept serialized (db.renderSceneCaptureJson): a request never re-reads or re-parses the row
+    const json=/^[a-f0-9]{64}$/.test(hash)&&(world===undefined||world===d.host.worldId)?d.db.renderSceneCaptureJson(d.host.worldId,hash):undefined;
+    if(json===undefined)return c.json({ok:false,code:'not-found',message:'No recorded render scene for this world.'},404,{'Cache-Control':'no-store'});
     // A capture is content-addressed (hash verified on read, never rewritten), so a visitor's browser keeps it: a returning
-    // arrival skips this round trip between its first take and its first frame (~0.12 s on live).
-    return c.json({worldId:d.host.worldId,...capture},200,{'Cache-Control':world===undefined?'no-store':'private, max-age=604800, immutable'});
+    // arrival skips this round trip between its first take and its first frame (~0.12 s on live). The hash is its ETag.
+    const etag=`"${hash}"`,headers={'Cache-Control':world===undefined?'no-store':'private, max-age=604800, immutable',ETag:etag};
+    if((c.req.header('if-none-match')??'').split(',').some(t=>t.trim().replace(/^W\//,'')===etag))return c.body(null,304,headers);
+    return c.body(json,200,{...headers,'Content-Type':'application/json'});
   });
   // The archive/live canonical Takes remain full; only the public response copy
   // uses a self-contained dictionary when this exact capability is requested.
