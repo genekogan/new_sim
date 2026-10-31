@@ -770,6 +770,28 @@ function parseDecision(text2, { now = Date.now } = {}) {
   }
   return { ...value, wakeAt, call: { type: call.type, command: call.command, args } };
 }
+var DEADLINE_LEAD = Object.freeze({ minMs: 12e4, maxMs: 6e5, fraction: 0.1 });
+var deadlineLeadMs = (remainingMs) => Math.min(DEADLINE_LEAD.maxMs, Math.max(DEADLINE_LEAD.minMs, Math.round(remainingMs * DEADLINE_LEAD.fraction)));
+var OWNER_TIME = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})/g;
+function ownerCommitmentTimes(texts) {
+  const times = /* @__PURE__ */ new Set();
+  for (const text2 of texts) if (typeof text2 === "string") for (const m of text2.matchAll(OWNER_TIME)) {
+    const t = Date.parse(m[0]);
+    if (Number.isFinite(t)) times.add(t);
+  }
+  return [...times].sort((a, b) => a - b);
+}
+function deadlineWake(wakeAt, commitments, now) {
+  if (wakeAt == null) return { wakeAt: null, lead: null };
+  const requested = Date.parse(wakeAt);
+  let best = null;
+  for (const deadline of commitments) {
+    if (deadline <= now) continue;
+    const at = deadline - deadlineLeadMs(deadline - now);
+    if (at > now && at < requested && (!best || at < best.at)) best = { at, deadline };
+  }
+  return best ? { wakeAt: new Date(best.at).toISOString(), lead: { wakeAt: new Date(best.at).toISOString(), deadlineAt: new Date(best.deadline).toISOString(), requestedWakeAt: wakeAt } } : { wakeAt, lead: null };
+}
 function retainDecision(journal, fence, decision, { events = [], threadId, initialInstruction, deadlineAt = Infinity } = {}) {
   const c = journal.control.checkpoint();
   if (c.value?.pendingDecision) throw Error("Previous decision must be reconciled first");
@@ -854,11 +876,21 @@ async function applyPendingDecision(journal, fence, world, { signal } = {}) {
   const latest = journal.control.checkpoint();
   if (latest.value?.pendingDecision?.id !== id) throw Error("Pending decision changed while applying");
   const receipt = response?.receipt == null ? null : receiptProjection(response.receipt, reference);
-  const priorWake = latest.value.wakeAt;
-  const wakeAt = decision.wakeAt ?? (call.type === "listen" ? priorWake ?? null : call.type === "wait" && call.args.cancelWake === true ? null : priorWake && Date.parse(priorWake) > pending.retainedAt ? priorWake : null);
-  const { lastResult, urgentRecoveryV1, decisionProgressV1, ...previous } = latest.value;
+  const priorWake = latest.value.wakeAt, priorLead = latest.value.deadlineWakeV1 ?? null, cancel = call.type === "wait" && call.args.cancelWake === true;
+  let wakeAt = decision.wakeAt ?? (call.type === "listen" ? priorWake ?? null : cancel ? null : priorWake && Date.parse(priorWake) > pending.retainedAt ? priorWake : null);
+  if (wakeAt === null && decision.wakeAt == null && !cancel && call.type !== "listen" && priorLead && priorWake === priorLead.wakeAt && Date.parse(priorLead.requestedWakeAt) > pending.retainedAt) wakeAt = priorLead.requestedWakeAt;
+  const commitments = ownerCommitmentTimes([latest.value.initialInstruction, ...journal.ownerTaskTexts?.() ?? []]);
+  let lead = priorLead && wakeAt === priorLead.wakeAt ? priorLead : null;
+  if (lead && !commitments.includes(Date.parse(lead.deadlineAt))) {
+    wakeAt = Date.parse(lead.requestedWakeAt) > pending.retainedAt ? lead.requestedWakeAt : null;
+    lead = null;
+  }
+  const scheduled = deadlineWake(wakeAt, commitments, pending.retainedAt);
+  const deadlineWakeV1 = scheduled.lead ?? lead;
+  wakeAt = scheduled.wakeAt;
+  const { lastResult, urgentRecoveryV1, decisionProgressV1, deadlineWakeV1: _lead, ...previous } = latest.value;
   const listenTo = ["listen", "wait"].includes(call.type) && Object.hasOwn(call.args, "listenTo") ? listeningScope(call.args.listenTo) : latest.value.listenTo ?? [];
-  const finalized = { ...previous, pendingDecision: null, lastDecisionId: id, lastCall: call, wakeAt, listenTo, lastReceipt: receipt ?? receiptProjection(latest.value.lastReceipt) ?? null };
+  const finalized = { ...previous, pendingDecision: null, lastDecisionId: id, lastCall: call, wakeAt, listenTo, ...deadlineWakeV1 ? { deadlineWakeV1 } : {}, lastReceipt: receipt ?? receiptProjection(latest.value.lastReceipt) ?? null };
   const envelopeBytes = Buffer.byteLength(JSON.stringify({ ...finalized, lastResult: null })) - 4;
   const bytesLimit = Math.max(0, Math.min(32768, 65536 - envelopeBytes - RECOVERY_METADATA_BYTES - 128));
   journal.control.save(fence, latest.revision, { ...finalized, lastResult: responseProjection(response, reference, { bytesLimit }) });
@@ -1104,6 +1136,9 @@ function attachOwnerTasks(db, { now, transaction, control, limits = {} }) {
     capture,
     assertCapacity,
     stats,
+    openTexts() {
+      return db.prepare("SELECT text FROM owner_tasks_v1 WHERE closed_at IS NULL AND text IS NOT NULL ORDER BY event_seq").all().map((r) => r.text);
+    },
     closeFromOperation(fence, id) {
       return transaction(() => {
         control.assertOwner(fence);
@@ -1323,6 +1358,9 @@ function openJournal(directory, { worldId, soulId, now = Date.now, retention = {
     },
     ownerTaskStats() {
       return ownerTasks.stats();
+    },
+    ownerTaskTexts() {
+      return ownerTasks.openTexts();
     },
     closeOwnerTaskFromOperation(fence, id) {
       return ownerTasks.closeFromOperation(fence, id);
