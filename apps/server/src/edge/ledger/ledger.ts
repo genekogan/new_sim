@@ -824,7 +824,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // (a focused build: object offers only when the focus names one, or aboard, where stand:here names the ride's leave)
     // (L3 c: a focus that names objects builds only theirs: the object ids of its ids, and its targets)
     const objs = !focus || ride || focus.verbs.has('object') ? undefined : focusObjects(focus);
-    if (!focus || ride || focus.verbs.has('object') || objs!.size) for (const p of this.providers) try {caps.push(...p(soul, objs, this.objectPlaces));} catch {/* a provider fault hides only its own entries */}
+    if (!focus || ride || focus.verbs.has('object') || objs!.size) {const outer = this.carrierPass; this.carrierPass = outer ?? {}; try {for (const p of this.providers) try {caps.push(...p(soul, objs, this.objectPlaces));} catch {/* a provider fault hides only its own entries */}} finally {this.carrierPass = outer;}}
     if (ride && !stepping) {const seated = this.rideStandRefusal(soul.entityId, caps), i = seated ? caps.findIndex(c => c.id === 'stand:here') : -1; if (i >= 0) caps[i] = {...caps[i]!, available: false, blocked: seated!};}
     shapeRigidCapabilities(me, caps, plans as never, {seconds: {type: 'integer', min: 1, max: 600, default: 60}});
     // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
@@ -1551,8 +1551,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   // ---------------------------------------------------------------- rides (carrier/1)
   private carriersNative(): {id: string; def: string; label: string; pose: {p: number[]; yaw: number}; state: {phase: string; home: number[]; yaw: number; seats: Record<string, string | null>; route: {id: string; keys: {t: number; p: number[]}[]}; elapsed: number; departAtTick: number | null; flights: number; holding: boolean; waitTicks: number; phaseTick: number; bank?: {door: [number,number,number]; exits: Record<string,[number,number,number]>}; hold?: {by: string; seats: number; filled: number; untilTick: number}}}[] {
+    if (this.carrierPass) return this.carrierPass.list ??= (this.host.engine as unknown as {carriers?: () => never[]}).carriers?.() ?? [];
     return (this.host.engine as unknown as {carriers?: () => never[]}).carriers?.() ?? [];
   }
+  /** L3: within one run of the object providers (every ride's view asks), the engine's carriers are listed once (each
+   *  listing copied every entity: ~30 ms of a capabilities read on the live Eden 2026 with 8 rides). */
+  private carrierPass: {list?: never[]} | null = null;
   /** The ride this body is boarding, seated in or leaving. */
   /** RIDE-EXIT (Gene's review 2026-10-23): a ride that is back on the ground holds the body only while it steps out (the engine sets
    *  it down within LEAVE_LIMIT); a request meanwhile is refused with how long that takes, never accepted to fail later as actor.busy. */
