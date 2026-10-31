@@ -69,14 +69,17 @@ export class LifecycleRunner {
    * planned and again under the host writer lock; with every pending birth queued at once, one drainInputs ran
    * every guard back to back (4 joins ~ 8 s of one tick on eden2) and /healthz missed its 5 s answer. */
   private births=new Set<string>();
-  /** A detached probe already ran in this macrotask (cleared at the next check phase, after I/O such as /healthz
-   * has been served). pump plans no further birth while it is set; the host's guard itself always runs. */
+  /** A detached probe already ran in this macrotask. pump plans no further birth while it is set; the host's guard itself
+   * always runs. Cleared by whichever of setImmediate / setTimeout(0) fires first: either is a later macrotask, after
+   * this one's microtasks (the commit's onCommitted pump) have drained. setImmediate alone was coarser than "this
+   * macrotask": a probe made in the check phase stayed set through the next timers phase, so a create accepted in a
+   * setTimeout continuation planned no birth until some later pump (srv-r5 gate, lifecycle-ws tests). */
   private probed=false;
   /** A birth was held back by `probed` or by the onApplied hook (`planBirths:false`) while none is in flight: one
-   * later pump is owed, run from a check-phase setImmediate (lane srv-r5fix-births). Without it the queue only moved
+   * later pump is owed, run when `probed` clears (else from a setImmediate) (lane srv-r5fix-births). Without it the queue only moved
    * on the next tick or request, so a world driven by drainInputs alone (the commit's own pump lands in the probed
    * macrotask) left every later birth pending. The owed pump never owes another, so a deferred guard cannot spin. */
-  private owed=false;private owing=false;
+  private owed=false;private owing=false;private probeGen=0;
   private recoveryAfter:{requestedAt:number;requestId:string}|undefined;
   private authority:(op:LifecycleOperation)=>boolean;
   constructor(host:WorldHost,journal:LifecycleJournal,authority:(op:LifecycleOperation)=>boolean){
@@ -88,7 +91,11 @@ export class LifecycleRunner {
   }
   private current(op:LifecycleOperation){const current=this.journal.get(op.scope,op.requestId);if(!current||current.state!==op.state)throw new LifecycleDeferred('Lifecycle state changed');return current;}
   private spendProbe(){
-    if(this.probed)return;this.probed=true;setImmediate(()=>{this.probed=false;this.settleOwed();}).unref?.();
+    if(this.probed)return;this.probed=true;
+    // Cleared by whichever of setImmediate / setTimeout(0) fires first (lane srv-r5fix-ws); the generation keeps the
+    // later of the pair from clearing a newer probe's flag.
+    const gen=++this.probeGen,clear=()=>{if(gen!==this.probeGen||!this.probed)return;this.probed=false;this.settleOwed();};
+    setImmediate(clear).unref?.();setTimeout(clear,0).unref?.();
   }
   private owe(){
     if(this.owed||this.owing)return;this.owed=true;

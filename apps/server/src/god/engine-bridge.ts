@@ -1773,7 +1773,10 @@ export class EngineBridge {
       const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
       for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
     }
-    if (this.layers.active() && named('buy', 'pay', 'sell')) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
+    // (srv-r5 stroll fix: the construction / private / for-sale refusals read only the offers already built, so they run on
+    // every focused build as on the whole menu; only the economy's buy/pay listing waits for a focus that names it. A words
+    // walk to a closed site was offered available on its focused build.)
+    if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here, named('buy', 'pay', 'sell')); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
     if (wants(focus, 'sit:here')) this.sitHere(caps, plans, here, soul.entityId);
     this.fireLit(caps);
     try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
