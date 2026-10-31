@@ -67,3 +67,44 @@ with `--slice`.
 ```bash
 node tools/bench/capacity/bench.mjs --root <checkout> --fixture <compact copy> --world-key eden-2026 --via-launcher --port 5153 --heap-mb 2048 --arms hostile,incident --out <dir>
 ```
+
+## Recorded baseline (2026-10-31, before the server-reliability fixes)
+
+Fixture: the compact Eden 2026 copy, sha256 `d0921000a7ef…`, heap cap 768 MB unless noted; two repeats per arm, shown
+as ranges. Reports: `team/scratch/srv/clients/{eden2-da5269cd0,local-fixture-da5269cd0,vl-pair/*}/REPORT.md`.
+
+**eden2 slice (gates; main da5269cd0, Soul CLI 2.4.0, CPUs 6–7, 4 GB):** every arm FAILS and every arm wedges.
+
+| arm | tick service (bar) | healthz p99 ms (bar) | act / read p99 s (bar) | heap % cap (bar) | longest healthz gap s | other |
+|---|---|---|---|---|---|---|
+| n1 | 0.84–0.96 (≥ 0.95) | 1172–5000 (≤ 200) | 1.5 / 19.2 (≤ 1) | 72 | 3.5–72.7 | |
+| n6 | 0.05–0.06 (≥ 0.8) | 5000 (≤ 1000) | 42.3 / 43.8 (≤ 3) | 80 (≤ 60) | 45–46 | |
+| n12 | 0.04–0.08 (≥ 0.5) | 5000 (≤ 1000) | 89.9 / 57.5 (≤ 5) | 85 (≤ 70) | 95–102 | timeouts 18–19 |
+| n24 | 0.07–0.11 | 5000 | 78.9 / 59.8 | 95 | 90–113 | timeouts 25–46 (bar 0) |
+| incident | 0.07–0.12 | 5000 | 42.9 / 59.5 | 81 | 44–55 | 4 listeners per Soul (bar 1) |
+| hostile | 0.02 | 5000 | — | 77 | 49 | 0 designed refusals; 185–193 of ~640 requests failed, p99 30 s |
+
+Marginal cost (M8): 0.021 CPU-s/s idle and 0.024 active per added Soul over an intercept of ~1.0 CPU-s/s with no Souls
+(the world alone takes a core); RSS +9.4 MB per Soul over 862 MB.
+
+**Laptop, direct (indicative; M3 Max, whole host):** same shape, later: n1/n6 do not wedge (gaps ≤ 27 s), n12 and up
+wedge (25–34 s), hostile 114–122 s; healthz p99 5000 ms in every arm; tick service 0.72–0.78 at n1, 0.07–0.16 at n12.
+
+**Laptop, through the launcher (indicative; heap 2048 MB; main da5269cd0 + CLI 2.4.0 against R1 f6a903983 + CLI 2.5.0,
+paired, two repeats each):**
+
+| arm | quantity | main | R1 |
+|---|---|---|---|
+| incident | tick service | 0.36 / 0.51 | 0.99 / 0.99 |
+| incident | healthz p99 ms | 5000 / 5000 | 897 / 482 |
+| incident | act / read p99 s | 14.6 / 19.2 · 10.7 / 12.4 | 1.7 / 1.4 · 0.7 / 2.6 |
+| incident | longest gap s | 17.4 / 25.2 | 3.3 / 2.8 |
+| incident | listeners per Soul | 2 / 3 (superseded 96 / 92) | 1 / 1 (second listen exits "already" 48 / 48) |
+| hostile | requests (ok) | 1471 (1356) / 824 (523) | 55983 (1763) / 152740 (2446) |
+| hostile | launcher refusals | none (no ceilings) | world.busy 302 / 428, account.rate 1150 / 1804, client.rate 52645 / 148034 |
+| hostile | 5xx · failed · p99 | 50 · 65 · 30 s / 182 · 119 · 30 s | 63 · 63 · 3.2 s / 1 · 27 · 2.0 s |
+| hostile | tick service · longest gap s | 0.015 · 91 / — · 260 | 0.021 · 57 / 0.021 · 62 |
+
+Reading: R1's polite client and Soul API ceilings fix the incident arm outright (one listener, tick ≈ 1, no wedge) and
+turn the hostile flood into fast, designed refusals, but four instant-retry loops per Soul still wedge the world
+(57–62 s gaps): the tick-thread cost is the server lanes' work, and only an eden2 slice run of a fixed head gates.
