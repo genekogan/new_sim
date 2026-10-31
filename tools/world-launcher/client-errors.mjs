@@ -73,10 +73,12 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
   mkdirSync(dir, { recursive: true });
   const aggFile = join(dir, 'agg.json'), logFile = join(dir, 'events.jsonl');
   // The table is re-read when another launcher generation (a release's handover) wrote it since and nothing is unsaved here.
-  let agg = { builds: {}, kinds: {}, arrivals: [], arrivalHours: {} }, seenMtime = -1;
-  const mtime = () => { try { return statSync(aggFile).mtimeMs; } catch { return 0; } };
+  // "Wrote it" is the file's identity, not its mtime alone: every write renames a fresh file into place (a new inode), and
+  // Linux file clocks are coarse enough that two writes a few ms apart share an mtime (#406).
+  let agg = { builds: {}, kinds: {}, arrivals: [], arrivalHours: {} }, seenFile = '';
+  const fileId = () => { try { const st = statSync(aggFile); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch { return 'none'; } };
   const load = () => {
-    const m = mtime(); if (m === seenMtime || dirty) return; seenMtime = m;
+    const m = fileId(); if (m === seenFile || dirty) return; seenFile = m;
     try { const a = JSON.parse(readFileSync(aggFile, 'utf8')); if (a && typeof a.kinds === 'object') agg = { builds: a.builds ?? {}, kinds: a.kinds, arrivals: Array.isArray(a.arrivals) ? a.arrivals : [], arrivalHours: a.arrivalHours ?? {} }; } catch { /* first run */ }
     if (!agg.builds[build]) { agg.builds[build] = now(); later(); }
     for (const b of Object.keys(agg.builds).sort((x, y) => agg.builds[x] - agg.builds[y]).slice(0, -20)) delete agg.builds[b];
@@ -98,7 +100,7 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
   const flush = () => {
     if (timer) { clearTimeout(timer); timer = null; }
     if (!dirty) return; dirty = false;
-    try { writeFileSync(`${aggFile}.tmp`, JSON.stringify(agg)); renameSync(`${aggFile}.tmp`, aggFile); seenMtime = mtime(); } catch (e) { log(`client-errors: cannot write the table: ${e.message}`); }
+    try { writeFileSync(`${aggFile}.tmp`, JSON.stringify(agg)); renameSync(`${aggFile}.tmp`, aggFile); seenFile = fileId(); } catch (e) { log(`client-errors: cannot write the table: ${e.message}`); }
   };
   const later = () => { dirty = true; if (!timer) { timer = setTimeout(flush, L.flushMs); timer.unref?.(); } };
   const append = (row) => {
