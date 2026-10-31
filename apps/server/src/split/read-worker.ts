@@ -107,6 +107,7 @@ function askMisses() {
   parentPort!.postMessage({t: 'ask', index: wd.index, misses: [...m.values()]}); c2.asks += m.size; m.clear();
 }
 const tickNow = () => R2 ? (RW?.R.pos.tick ?? -1) : M.tick;
+const ADMISSION = process.env.SIM_ADMISSION !== '0';   // main.ts: SIM_ADMISSION=0 turns in-world admission off
 const LAG_GENS = 40;   // 2 s of ticks behind main: main answers instead
 /** The Soul reads this worker computes (mode 2), by route: the body main's route answers (edge/routes.ts, edge/eyes/
  *  routes.ts), from the same read code over the read-only host. `world`: main's wrap adds the load block (view's route
@@ -273,8 +274,9 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
         const lv = level(), acct: Record<string, string> = who.account ? {'x-sim-account': who.account} : {};
         const inbox = await inboxOf(who.soulId, RH!.minds.get(who.soulId)?.owner ?? '');
         cost.served++;
-        // as main's wrap: the load block at amber and above unless the frame has its own `world` (observe does)
-        const world = r.world && lv !== 'green' && !('world' in r.body) ? {world: worldBlock(lv)} : {};
+        // as main's wrap: the load block at amber and above unless the frame has its own `world` (observe does); main
+        // adds it at the level its admission admitted the read at, so a world without admission (SIM_ADMISSION=0) never
+        const world = r.world && ADMISSION && lv !== 'green' && !('world' in r.body) ? {world: worldBlock(lv)} : {};
         return send(res, 200, {contract: CONTRACT, ...r.body, ...world, ...(inbox ? {inbox} : {})}, {...acct, 'x-sim-read-cpu-ms': r.cpuMs.toFixed(3), 'x-sim-read-kind': kind});
       }
     }
