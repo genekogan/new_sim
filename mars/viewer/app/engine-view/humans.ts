@@ -57,7 +57,8 @@ import type {ShoreContactV1} from '../../../../packages/engine-contract/src/shor
 import type { DepictionBeat } from './station-depiction.ts';
 import { sleepGoal, sleepHands, sleepHeadPitch, sleepRestWeight, sleepHeadRestLift } from './sleep.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
-import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
+import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, SING_LET_GO, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
+import { accompanistOf } from './piano-score.ts';
 import {recordedGame,type RecordedGame} from './recorded-games.ts';
 import {runningGaitAt} from './running-gait.ts';
 import {PLAY_MOTION, playSeatAt, rideSeat} from './play-motion.ts';
@@ -748,8 +749,12 @@ export class HumanViews {
    * Apply interpolated pose/animation. alpha ∈ [0,1] = fraction of the next tick elapsed.
    * `reach`: nearest point of a gripped part (components.ts) for grips without a known slot.
    */
+  /** Entry 36: who plays the piano or the drums now (a singer sings along with the nearest), rebuilt each render. */
+  private players: { id: string; p: readonly number[]; kind: 'piano' | 'drums' }[] = [];
   render(alpha: number, reach?: Reach) {
     PLAY_MOTION.value.set(0, 0, 0, 0); // empty playground seats hang at rest; riders set theirs below
+    this.players.length = 0;
+    for (const [id, v] of this.views) if (v.activity === 'play-piano' || (v.activity === 'play-music' && v.instrument === 'drums')) this.players.push({ id, p: v.cur.p, kind: v.activity === 'play-piano' ? 'piano' : 'drums' });
     for (const v of this.views.values()) this.pose(v, alpha, reach);
     // the dock shows one bicycle fewer for each one out under a rider (decorative-motion 'dock-bike')
     let out = 0; for (const v of this.views.values()) if (v.bike?.visible) out++; PLAY_MOTION.value.w = out;
@@ -787,8 +792,12 @@ export class HumanViews {
     // a library clip that does the whole body replaces the procedural frame; overlays (hands) stay on top of it
     const clipBody = !!lib.cur && CLIP_BODY.has(v.activity) && lib.cur.pick.body !== 'seat' && !(lib.cur.pick.body === 'ground-seat' && v.activity !== 'sit-ground');
     const pairPhase = v.partner && v.partner < h.name ? v.partner : h.name; // partners move in step
+    // entry 36: a singer sings along with the nearest player (her head and breath follow the sung notes); just after her
+    // singing ends, the singing frame eases out (the hand lets go of the mic) instead of snapping to the base posture
+    const letGo = v.activity !== 'sing' && v.prevAct === 'sing' && (v.since ?? 9) < SING_LET_GO && !GAIT_ACTS.has(v.activity);
     const act: ActivityFrame | null = freeBody && !engineHands && w < 0.5 && !waveClip && !interactClip && !clipBody && !lib.sleep
-      ? activityFrame(v.activity, v.base, tSec, pairPhase, { groundSeat: v.groundSeat, since: v.since, gap: v.partnerP ? Math.hypot(v.partnerP.x - h.position.x, v.partnerP.z - h.position.z) : undefined,instrument:v.instrument,game:v.game,gameTick:v.gameTick,gameDt:v.gameDt,actorId:h.name }) : null;
+      ? letGo ? activityFrame('sing', 'idle', tSec, pairPhase, { since: 9, released: v.since, accompanist: null })
+      : activityFrame(v.activity, v.base, tSec, pairPhase, { groundSeat: v.groundSeat, since: v.since, gap: v.partnerP ? Math.hypot(v.partnerP.x - h.position.x, v.partnerP.z - h.position.z) : undefined,instrument:v.instrument,game:v.game,gameTick:v.gameTick,gameDt:v.gameDt,actorId:h.name, ...(v.activity === 'sing' ? { accompanist: accompanistOf(v.cur.p, this.players) } : {}) }) : null;
     h.rotation.z = 0; h.rotation.x = 0;
     let lieFloor = h.position.y;
     if (act?.lying) {
@@ -1079,15 +1088,18 @@ export class HumanViews {
       source = 'expression';
       const floor = (act.lying ? (act.lying.face === 'back' ? lieFloor : h.position.y - 0.1) : h.position.y - act.hop) + 0.06;
       v.arms.forEach((arm, i) => {
-        const left = armSide(v, i) === 'left', q = act.hands![left ? 0 : 1];
-        if (!q) { if (sitW > 0 && !seatClip) handOnThigh(v, i, sitW); return; }
+        const left = armSide(v, i) === 'left', q = act.hands![left ? 0 : 1], r = act.rootHands?.[left ? 0 : 1], wgt = act.handW?.[left ? 0 : 1] ?? 1;
+        if (!q && !r) { if (sitW > 0 && !seatClip) handOnThigh(v, i, sitW); return; }
         arm.upper.getWorldPosition(_s);
-        const t = V().copy(_s).addScaledVector(_fwd, q[0]).addScaledVector(_right, (left ? -1 : 1) * q[1]).addScaledVector(UP, q[2]);
+        // entry 36: a goal on a fixed thing (the mic's grip) is placed from the body root at its own height above the floor
+        const t = r ? V().copy(h.position).addScaledVector(_fwd, r[0]).addScaledVector(_right, (left ? -1 : 1) * r[1]).addScaledVector(UP, r[2])
+          : V().copy(_s).addScaledVector(_fwd, q![0]).addScaledVector(_right, (left ? -1 : 1) * q![1]).addScaledVector(UP, q![2]);
         if (t.y < floor) t.y = floor;
+        if (wgt <= 0) return;
         targets[i] = t;
-        armTo(arm, t, 1, 0.98, h, V().copy(_right).multiplyScalar(left ? -0.6 : 0.6).addScaledVector(UP, -0.5).addScaledVector(_fwd, -0.2));
+        armTo(arm, t, wgt, 0.98, h, V().copy(_right).multiplyScalar(left ? -0.6 : 0.6).addScaledVector(UP, -0.5).addScaledVector(_fwd, -0.2));
       });
-      closeHands(v, targets.map((t) => (t ? 0.6 : 0)));
+      closeHands(v, v.arms.map((_, i) => !targets[i] ? 0 : act.curl ? act.curl[armSide(v, i) === 'left' ? 0 : 1] : 0.6));
     } else if (runFallback && !gait && !fp && !posed && proneW===0 && sitW===0) {
       source='expression';v.arms.forEach((arm,i)=>{const f=runFallback.hands[arm.side>0?0:1];targets[i]=arm.upper.getWorldPosition(V()).addScaledVector(_fwd,f.forward).addScaledVector(_right,-arm.side*.06).addScaledVector(UP,f.up);});reachTo(v,targets,false);closeHands(v,targets.map(()=>.45));
     } else if (sitW > 0 && !seatClip) v.arms.forEach((_, i) => handOnThigh(v, i, sitW));

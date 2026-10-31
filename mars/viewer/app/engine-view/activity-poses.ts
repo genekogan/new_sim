@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { drumHands, pianoHands } from './piano-score.ts';
+import { PIANO_STEP, drumHands, pianoHands, voiceAt, type Accompanist } from './piano-score.ts';
 import {gameContact,type RecordedGame} from './recorded-games.ts';
 import {rowingStroke} from './rowing-motion.ts';
 import {seesawAngle, swingAngle} from './play-motion.ts';
@@ -38,7 +38,10 @@ export function propFor(activity: string, prop?: string, instrument?:string): Pr
 }
 /** Extra inputs of a frame: seconds since the activity began (one-shot gestures; undefined = cycle on take time) and
  *  the distance to the partner of a paired gesture (body points; undefined = the contract gap). */
-export type FrameOpts = { groundSeat?: boolean; since?: number; gap?: number;instrument?:string;game?:RecordedGame;gameTick?:number;gameDt?:number;actorId?:string };
+export type FrameOpts = { groundSeat?: boolean; since?: number; gap?: number;instrument?:string;game?:RecordedGame;gameTick?:number;gameDt?:number;actorId?:string;
+  /** Entry 36: whom a singer sings along with (her voice and the head/breath motion follow its sung notes), and, after
+   *  her singing ended, the seconds since (the hand lets go of the mic and the pose eases out). */
+  accompanist?: Accompanist | null; released?: number };
 const GAP: Record<string, number> = { hug: 0.52, handshake: 0.85, 'high-five': 0.75, give: 0.9, take: 0.9 };
 /** Shoulder height and half width the hand goals below are written for (BODY_MODEL: shoulders at 1.34 m). */
 const SH = 1.34, HALF = 0.19;
@@ -58,11 +61,37 @@ export type ActivityFrame = {
   look: number;
   /** leisure: riding a playground seat (play-motion.ts): the swing's or the see-saw plank's angle now (rad). */
   ride?: { kind: 'swing' | 'seesaw'; angle: number };
+  /** Entry 36: hand goals relative to the body root instead of the shoulder: [forward, outward, height above the floor]
+   *  (a hand on a fixed thing at a set height: the mic stand's grip), and each arm's blend weight toward its goal (the
+   *  arm eases from the base posture to the goal and back) and how far its fingers close. */
+  rootHands?: [HandGoal | null, HandGoal | null]; handW?: [number, number]; curl?: [number, number];
 };
 const S = (x: number) => x * x * (3 - 2 * x);
 const tri = (x: number) => 1 - Math.abs(((x % 2) + 2) % 2 - 1); // 0..1..0 over 2
 /** Stable per-person phase in [0,1). */
 export function idPhase(id: string): number { let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619); return ((h >>> 0) % 10007) / 10007; }
+
+/** Entry 36: where the right hand holds the mic, from the body root: the mic stand's grip (core/mic-stand MIC_GRIP, out
+ *  on the boom 0.252 m ahead of the pole, 1.41 m up) seen from the singer's place 0.55 m in front of the pole; the palm
+ *  sits a little to the right of, behind and below the handle's axis (the fingers close round it). */
+export const MIC_HAND: HandGoal = [0.55 - 0.252 - 0.014, 0.024, 1.402];
+const SING_REACH = 0.9;
+export const SING_LET_GO = 0.8;
+/** Singing at a mic stand: the right hand eases onto the mic and holds it there; the left hangs easy and moves a little
+ *  with the beat; she sways with the beat (one sway over two beats, eased in), leans a little toward the mic, her head
+ *  lifts a touch on each sung note and her chest rises on the in-breath where a phrase ends (the rigs have no jaw). On
+ *  `released` (her singing ended) the same frame eases out: the hand lets go and returns to the base posture. */
+function singFrame(f: ActivityFrame, seconds: number, opts: FrameOpts): ActivityFrame {
+  const since = opts.since ?? 9, k = opts.released === undefined ? S(Math.min(1, since / SING_REACH)) : 1 - S(Math.min(1, opts.released / SING_LET_GO));
+  const swayK = opts.released === undefined ? S(Math.min(1, Math.max(0, since - 0.4) / 1.6)) : k, beat = (2 * Math.PI * seconds) / (4 * PIANO_STEP);
+  const { open, breath } = voiceAt(opts.accompanist ?? null, seconds), sing = open * swayK;
+  f.hands = [[0.06 + 0.012 * Math.cos(beat), 0.07, -0.56 + 0.01 * Math.sin(beat)], [0.06, 0.08, -0.56]];
+  f.rootHands = [null, MIC_HAND]; f.handW = [k, k]; f.curl = [0.45 * k, 0.74 * k];
+  f.side = 0.045 * swayK * Math.cos(beat);
+  f.lean = (0.05 - 0.035 * breath) * k;
+  f.look = (0.1 - 0.05 * sing - 0.03 * breath) * k;
+  return f;
+}
 
 export function activityFrame(activity: string, base: string, seconds: number, id: string, opts: FrameOpts = {}): ActivityFrame | null {
   const ph = idPhase(id), t = seconds + ph * 7, seated = base === 'sit' || base === 'sit-ground';
@@ -155,8 +184,7 @@ export function activityFrame(activity: string, base: string, seconds: number, i
       f.hands = [null, [0.32 + 0.2 * k, 0.02, -0.25 + 0.05 * k]]; f.look = 0.1; return f; }
     case 'use-computer': { const ty = Math.sin(t * 11) * 0.012, mouse = S(Math.max(0, Math.sin(t * 0.37) - 0.55) * 2.2);
       f.hands = [[0.4, -0.12, -0.42 + ty], [0.4 - 0.02 * mouse, -0.1 + 0.2 * mouse, -0.42 - ty]]; f.lean = 0.07; f.look = 0.12; return f; }
-    case 'sing': { const g = Math.sin(t * 0.8), sway = Math.sin(t * 1.6);
-      f.hands = [[0.22 + 0.06 * g, 0.18 + 0.08 * g, -0.12 + 0.18 * Math.max(0, g)], [0.2, -0.16, 0.2]]; f.side = 0.04 * sway; f.look = -0.12; return f; }
+    case 'sing': return singFrame(f, seconds, opts);
     case 'listen': { const nod = Math.max(0, Math.sin(t * 0.5) - 0.9) * 4;
       f.hands = [[0.24, -0.1, down + 0.02], [0.26, -0.08, down + 0.02]]; f.look = 0.05 + 0.15 * nod; return f; }
     // together/1 paired gestures: the meeting points are on the line between the two bodies (mid = half the gap)

@@ -1565,9 +1565,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
         : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined);
       if (!marks) return undefined;
       const best = marks.map(m => {const placeId = m.place ?? around(m.at[0], m.at[1])[0], pl = placeId ? this.places.byId.get(placeId) : undefined;
-        return {label: m.label, distance: here ? Math.hypot(m.at[0] - here[0], m.at[1] - here[1]) : 0, ...(pl && known.includes(pl) ? {place: pl.name, placeId: pl.id} : {})};})
+        return {label: m.label, at: m.at, distance: here ? Math.hypot(m.at[0] - here[0], m.at[1] - here[1]) : 0, ...(pl && known.includes(pl) ? {place: pl.name, placeId: pl.id} : {})};})
         .sort((a, b) => a.distance - b.distance || a.label.localeCompare(b.label))[0];
-      return best ?? null;
+      if (!best) return null;
+      // entry 36: who is singing at the nearest mic (a sing spot is one singer's), for a polite refusal that names them
+      const {at, ...out} = best, w = this.host.engine.world as NativeWorld;
+      if (verb === 'sing') for (const e of Object.values(w.entities)) if (e.kind === 'human' && e.id !== me?.id && e.human?.activity === 'sing' && Math.hypot(e.pose.p[0] - at[0], e.pose.p[2] - at[1]) < 0.7) {const n = this.host.mindByEntity?.get(e.id)?.name; if (n) return {...out, by: n};}
+      return out;
     };
     // ROUTE-RECHECK: places with a reading spot in them (the spot's place and every place round it), from the world's spots
     const spotPlaces = new Map<string, Set<string>>(), hasSpot = (verb: string, placeId: string) => {

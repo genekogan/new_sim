@@ -206,7 +206,8 @@ export class GodActivitySpots {
     for (const t of all) {
       const inst = INSTRUMENT_TAGS.find(([tag]) => t.tags.has(tag));
       if (inst) standSpot(t, 'play-music', { instrument: inst[1] });
-      if (is(t, 'microphone', 'mic-stand')) standSpot(t, 'sing');
+      // entry 36: a mic stand (core/mic-stand) has its singer's place and sings along with the music playing within 12 m
+      if (is(t, 'microphone', 'mic-stand')) standSpot(t, 'sing', t.c.instrument?.kind === 'mic' ? { accompany: 12 } : {}, t.c.instrument?.kind === 'mic' ? 'singer' : undefined);
     }
     for (const t of all) {
       if (!t.c.venue) continue;
