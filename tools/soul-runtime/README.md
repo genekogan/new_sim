@@ -18,6 +18,13 @@ dispatcher offers pending facts to a host, including on restart, and pages past
 already-offered but unhandled events. Host acceptance is not agent handling.
 A host adapter must deduplicate offered identities and preserve one decision
 owner. A callback that blocks on inference must not run in the receiver loop.
+Receiver backoff counts consecutive failed connects, not quiet time: an event
+stream the server admitted (validated hello) that stayed open at least 5 s and
+then ended (an idle world rotates its stream about every 65 s) reconnects
+within 1 s jitter (`reconnecting`). Failed, refused or immediately dropped
+connects back off 1 s doubling to 30 s (`retrying`); a stated Retry-After on a
+429/503 is a floor (+0-20 % jitter, at most 120 s). One read stays outstanding
+per source, so reconnecting never adds a long-poll.
 
 Current tests inject process death after commit, stale concurrent cursor writes,
 conflicting duplicate events, host notification failure, terminal revocation,

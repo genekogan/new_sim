@@ -92,3 +92,70 @@ test('pre-request state, aborted pages and refused ingestion never produce succe
  assert.equal(states.some(s=>s.state==='receiver-ready'),false);assert.equal(j.cursor('owner'),null);
  const rejected=[];await assert.rejects(runReceiver({journal:j,source:'world',read:async()=>({cursor:null,gap:true,events:[]}),onState:s=>rejected.push(s)}),/Gap needs/);assert.equal(rejected.some(s=>s.state==='receiver-ready'),false);
 });
+
+// Soak r1 §B: an idle world closes its event stream about every 65 s. A stream
+// the server admitted must not count as a failed connect, or a quiet Soul's
+// receiver sits out a 30 s backoff in every ~95 s.
+function clock(){let t=0;return {now:()=>t,advance:ms=>{t+=ms;}};}
+const interrupted=()=>Object.assign(Error('Event stream interrupted'),{transient:true});
+test('a quiet stream that keeps closing normally reconnects promptly instead of backing off',async t=>{
+ const j=fixture(t),stop=new AbortController(),c=clock(),states=[],delays=[];let opens=0;
+ await runReceiver({journal:j,source:'world',signal:stop.signal,retryable:e=>e.transient===true,now:c.now,random:()=>0.5,
+  read:async({onReady})=>{opens++;onReady({mode:'stream-adopted',successful:true});c.advance(65000);throw interrupted();},
+  onState:s=>states.push(s),sleep:async ms=>{delays.push(ms);c.advance(ms);if(delays.length===8)stop.abort();}});
+ assert.equal(opens,8);assert.deepEqual(delays,Array(8).fill(500),'every normal close reconnects within the 1 s jitter, never 1→2→4→…→30 s');
+ assert.equal(states.filter(s=>s.state==='reconnecting').length,8);assert.equal(states.some(s=>s.state==='retrying'),false);
+ assert.equal(states.find(s=>s.state==='reconnecting').connectedMs,65000);assert.equal(j.cursor('world'),null,'reconnecting never advances a cursor');
+});
+test('consecutive failed connects still back off exponentially to the cap',async t=>{
+ const j=fixture(t),stop=new AbortController(),delays=[];
+ await runReceiver({journal:j,source:'world',signal:stop.signal,retryable:e=>e.transient===true,random:()=>0,
+  read:async()=>{throw Object.assign(Error('Event stream unavailable'),{transient:true});},
+  sleep:async ms=>{delays.push(ms);if(delays.length===7)stop.abort();}});
+ assert.deepEqual(delays,[1000,2000,4000,8000,16000,30000,30000]);
+});
+test('an admitted stream that dies at once is a failure, not a healthy rotation',async t=>{
+ const j=fixture(t),stop=new AbortController(),c=clock(),delays=[];
+ await runReceiver({journal:j,source:'world',signal:stop.signal,retryable:e=>e.transient===true,now:c.now,random:()=>0,
+  read:async({onReady})=>{onReady({mode:'stream-adopted',successful:true});c.advance(200);throw Object.assign(Error('Event stream ended'),{transient:true});},
+  sleep:async ms=>{delays.push(ms);c.advance(ms);if(delays.length===5)stop.abort();}});
+ assert.deepEqual(delays,[1000,2000,4000,8000,16000],'accept-then-close loops cannot storm the server');
+});
+test('a healthy close after failures resets the backoff; the next failure starts again at 1 s',async t=>{
+ const j=fixture(t),stop=new AbortController(),c=clock(),delays=[];let n=0;
+ const fail=()=>Object.assign(Error('Event stream unavailable'),{transient:true});
+ await runReceiver({journal:j,source:'world',signal:stop.signal,retryable:e=>e.transient===true,now:c.now,random:()=>0,
+  read:async({onReady})=>{n++;if(n<=3)throw fail();if(n===4){onReady({mode:'stream-adopted',successful:true});c.advance(65000);throw interrupted();}throw fail();},
+  sleep:async ms=>{delays.push(ms);c.advance(ms);if(delays.length===5)stop.abort();}});
+ assert.deepEqual(delays,[1000,2000,4000,0,1000]);
+});
+test('Retry-After is honoured as a floor with up to 20 % jitter, and never as a prompt reconnect',async t=>{
+ const j=fixture(t),stop=new AbortController(),c=clock(),states=[],delays=[];let n=0;
+ await runReceiver({journal:j,source:'world',signal:stop.signal,retryable:e=>e.transient===true,now:c.now,random:()=>0.5,
+  read:async({onReady})=>{n++;if(n===1){onReady({mode:'stream-adopted',successful:true});c.advance(65000);throw interrupted();}
+   if(n===2)throw Object.assign(Error('Event stream refused'),{code:'stream.refused',status:503,transient:true,retryAfterMs:5000});
+   throw Object.assign(Error('World request refused'),{code:'soul.slow-down',status:429,transient:true,retryAfterMs:600000});},
+  onState:s=>states.push(s),sleep:async ms=>{delays.push(ms);c.advance(ms);if(delays.length===3)stop.abort();}});
+ assert.deepEqual(delays,[500,5500,132000],'stated wait (+10 % at random=0.5) beats the 2 s backoff; an absurd Retry-After is capped at 120 s before jitter');
+ const refused=states.filter(s=>s.state==='retrying');assert.equal(refused[0].retryAfterMs,5000);assert.equal(refused[0].code,'stream.refused');
+});
+test('a committed page still resets the backoff on long-poll sources',async t=>{
+ const j=fixture(t),stop=new AbortController(),delays=[];let n=0;
+ await runReceiver({journal:j,source:'owner',signal:stop.signal,retryable:e=>e.transient===true,random:()=>0,
+  read:async({after})=>{n++;if(n===1||n===2||n===4)throw Object.assign(Error('offline'),{transient:true});if(n===5){stop.abort();}return {cursor:after??'o_0',events:[]};},
+  sleep:async ms=>{delays.push(ms);}});
+ assert.deepEqual(delays,[1000,2000,1000]);
+});
+test('real SSE reader: an event-free stream that the server closes every 40 ms keeps reconnecting without backoff',async t=>{
+ const {createWorldClient}=await import('./world-client.mjs');
+ const j=fixture(t),stop=new AbortController(),states=[];let opens=0;
+ const world=createWorldClient({world:'http://127.0.0.1:1234/world',token:'synthetic-fixture-only',expectedSoulId:'s_quiet',fetchImpl:async url=>{
+  opens++;let timer;const cursor=new URL(url).searchParams.get('cursor');const enc=new TextEncoder();
+  return new Response(new ReadableStream({start(c){c.enqueue(enc.encode('event: hello\ndata: '+JSON.stringify({contract:'eden-edge/1',format:'envelope',soulId:'s_quiet',cursor,head:cursor})+'\n\n'));timer=setTimeout(()=>{try{c.close();}catch{}},40);},cancel(){clearTimeout(timer);}}),{headers:{'content-type':'text/event-stream'}});
+ }});
+ const running=runReceiver({journal:j,source:'world',read:args=>world.eventPage(args),signal:stop.signal,retryable:e=>e.transient===true,minHealthyMs:20,healthyReconnectMs:5,onState:s=>states.push(s)});
+ await new Promise(r=>setTimeout(r,600));stop.abort();await running;
+ const delays=states.filter(s=>s.state==='reconnecting'||s.state==='retrying');
+ assert.ok(opens>=8,`expected prompt reconnects, saw ${opens} opens`);assert.equal(delays.some(s=>s.state==='retrying'),false);assert.ok(delays.every(s=>s.delayMs<5));
+ assert.equal(states.filter(s=>s.state==='receiver-ready').length,1);assert.equal(j.cursor('world'),null);
+});

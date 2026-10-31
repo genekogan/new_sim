@@ -22,6 +22,14 @@ const observed=response=>{
  return {state:'recorded',evidence:reconciliation.evidence,status:200,response:{...response,reconciliation}};
 };
 export const isTransientRead=e=>e?.transient===true;
+// LOAD-CONTRACT v1 §3: a refusal's stated wait, from Retry-After (seconds or an
+// HTTP date) or the body's world.retry_after_s. Receivers treat it as a floor.
+export function retryAfterMs(headers,data){
+ const h=headers?.get?.('retry-after');
+ if(h){const n=Number(h);if(Number.isFinite(n)&&n>=0)return n*1000;const at=Date.parse(h);if(Number.isFinite(at))return Math.max(0,at-Date.now());}
+ for(const v of [data?.world?.retry_after_s,data?.error?.retry_after_s,data?.retry_after_s])if(Number.isFinite(v)&&v>=0)return v*1000;
+ return null;
+}
 export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000,expectedSoulId=null}){
  const base=new URL(world);
  if(base.username||base.password||base.search||base.hash||!(base.protocol==='https:'||(base.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(base.hostname))))throw Error('World must be HTTPS or loopback HTTP without credentials/query');
@@ -37,14 +45,14 @@ export function createWorldClient({world,token,fetchImpl=fetch,timeoutMs=65000,e
   let data;
   try{const text=await response.text();if(Buffer.byteLength(text)>4*1024*1024)throw Error();data=JSON.parse(text);}
   catch{throw error('transport.body','World response body was incomplete or invalid',{transient:readOnly&&(response.status>=500||response.status<300),uncertain:!readOnly,status:response.status});}
-  if(!response.ok)throw error(data.error?.code??data.code??`http.${response.status}`,data.error?.message??data.message??'World request refused',{status:response.status,transient:readOnly&&(response.status===429||response.status>=500),uncertain:!readOnly&&response.status>=500});
+  if(!response.ok)throw error(data.error?.code??data.code??`http.${response.status}`,data.error?.message??data.message??'World request refused',{status:response.status,transient:readOnly&&(response.status===429||response.status>=500),uncertain:!readOnly&&response.status>=500,retryAfterMs:retryAfterMs(response.headers,data)});
   return data;
  }
  const eventPage=createEventReader({open:async(after,signal)=>{
   let response;
   try{response=await fetchImpl(origin+'/v1/edge/events?'+new URLSearchParams({cursor:after??'c_0',format:'envelope'}),{headers:{authorization:`Bearer ${token}`,accept:'text/event-stream'},redirect:'error',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]):AbortSignal.timeout(timeoutMs)});}
   catch{throw error('transport.unreachable','Event stream unavailable',{transient:!signal?.aborted});}
-  if(!response.ok)throw error('stream.refused','Event stream refused',{status:response.status,transient:response.status===429||response.status>=500});
+  if(!response.ok){throw error('stream.refused','Event stream refused',{status:response.status,transient:response.status===429||response.status>=500,retryAfterMs:retryAfterMs(response.headers)});}
   if(!response.headers.get('content-type')?.toLowerCase().includes('text/event-stream'))throw error('stream.invalid','Event stream content type unavailable');
   return response;
  },validateHello:(hello,{after})=>{
