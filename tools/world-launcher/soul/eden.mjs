@@ -11,7 +11,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.5.0";
+const VERSION = "2.5.1";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -404,7 +404,8 @@ async function caps(...args) {
     else if (args[i] === "--limit") limit = Number(args[++i]);
     else search = (search ? search + " " : "") + args[i];
   }
-  const d = ok(await call("/v1/edge/capabilities"), "capabilities");
+  // The plain listing is the world's page (what is near); search and verb filters read the whole menu.
+  const d = ok(await call("/v1/edge/capabilities" + (search || verb || all ? "?all=1" : "")), "capabilities");
   let list = d.capabilities ?? [];
   if (!all) list = list.filter((c) => c.available);
   if (verb) list = list.filter((c) => c.verb === verb);
@@ -413,6 +414,7 @@ async function caps(...args) {
   }
   return {
     total: (d.capabilities ?? []).length, matching: list.length, shown: Math.min(list.length, limit),
+    ...(d.omitted ? { notListed: d.omitted.count, note: d.omitted.note } : {}),
     offers: list.slice(0, limit).map((c) => ({ id: c.id, label: c.label, ...(c.params && Object.keys(c.params).length ? { params: Object.keys(c.params) } : {}), ...(c.verb === "paint" && c.params?.painting ? { painting: c.params.painting } : {}), ...(c.available ? {} : { available: false }) })),
   };
 }
