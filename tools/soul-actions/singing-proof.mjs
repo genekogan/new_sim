@@ -18,7 +18,7 @@ let beaBody=null;const bea=()=>{const s=samples.filter(Boolean).at(-1);if(!beaBo
 const waitFor=async(pred,ms)=>{const t0=Date.now();while(Date.now()-t0<ms){if(pred())return true;await page.waitForTimeout(100);}return false;};
 try{
  await post('/v1/god/env',{timeOfDay:process.env.SOUL_SING_TIME??'16:30',timeScale:0,weather:{kind:'clear'}});
- await page.goto(base+(process.env.SOUL_SING_EYE??'/?eye=0.45,1.72,1.55&at=-0.05,1.12,4.9'));await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=4&&window.__edenSound,null,{timeout:180000});
+ await page.goto(base+(process.env.SOUL_SING_EYE??'/?eye=0.7,1.7,1.75&at=0.05,1.15,4.8'));await page.waitForFunction(()=>window.__simEntity?.contactFrame()?.bones&&Object.keys(window.__simEntity.contactFrame().bones).length>=4&&window.__edenSound,null,{timeout:180000});
  await page.waitForFunction(()=>!document.querySelector('.viewer-arrival-title'),null,{timeout:300000});await page.waitForTimeout(2500);await installFrameStamp(page);
  writeFileSync(out+'/initial.yml',await page.locator('body').ariaSnapshot());viewport=await page.evaluate(()=>({w:innerWidth,h:innerHeight,dpr:devicePixelRatio}));
  await page.getByRole('button',{name:'Music is on: turn off',exact:true}).click();await page.waitForFunction(()=>window.__edenSound.state().ctx==='running');
@@ -34,12 +34,13 @@ try{
  await page.waitForTimeout(16000);
  await run('cal','sing at the microphone');await mark('cal-refused');
  await page.waitForTimeout(6000);
- await mark('stop-sent');await run('bea','stop singing');await sing1;
+ await mark('stop-sent');await run('bea','stop singing');
  await waitFor(()=>bea()&&bea().activity!=='sing',10000);await mark('bea-stopped');
  await page.waitForTimeout(5000);
  const sing2=run('bea','sing at the microphone');await waitFor(()=>bea()?.activity==='sing',30000);await mark('bea-singing-2');
- await Promise.all(band);await mark('band-done');
- await sing2;await waitFor(()=>bea()&&bea().activity!=='sing',10000);await mark('bea-stopped-2');
+ // the CLI's wait returns once an act has started: the band's end is read from the depiction
+ await waitFor(()=>{const s=samples.filter(Boolean).at(-1);return s&&!s.bodies.some(b=>b.activity==='play-piano'||b.activity==='play-music');},(BAND+40)*1000);await mark('band-done');
+ await waitFor(()=>bea()&&bea().activity!=='sing',10000);await mark('bea-stopped-2');await Promise.all([...band,sing1,sing2]);
  await page.waitForTimeout(4000);
  assert.deepEqual(errors,[]);pass=true;
 }finally{clearInterval(timer);let bytes=null,voiceLog=null;try{voiceLog=await page.evaluate(()=>window.__edenSound.voiceLog());bytes=await page.evaluate(async()=>{const a=window.__singAudio;if(!a)return null;await new Promise(r=>{a.rec.onstop=r;a.rec.stop();});const b=new Blob(a.chunks,{type:'audio/webm'});const buf=await b.arrayBuffer();a.stream.getTracks().forEach(t=>t.stop());return Array.from(new Uint8Array(buf));});}catch{}if(bytes)writeFileSync(out+'/actual-audio.webm',Buffer.from(bytes));writeFileSync(out+'/proof.json',JSON.stringify({pass,beaBody,commands,marks,samples,voiceLog,errors,viewport,method:'Real full client, four ordinary paired Soul CLI seats, plain words; actual WebAudio master tap recorded; music playlist off; camera fixed.'}));try{const v=page.video();await ctx.close();await v.saveAs(out+'/continuous.webm');}finally{await browser.close();}console.log(JSON.stringify({pass,out,commands:commands.map(c=>[c.seat,c.words,c.result?.accepted,c.result?.receipt?.phase,c.result?.code]),samples:samples.length,marks,errors}));}
