@@ -52,10 +52,12 @@ const WORDS=/far note|far soup|far club|far question|Zed|Yan|Picnic|Swap books|S
 const FULLWALL=JSON.stringify([0,1,2,3].map(s=>({s,t:`secret show ${s}`,d:'secret detail',by:'s_z',n:'Zed',day:0}))),FULLBOARD=JSON.stringify(['w','o'].flatMap(c=>[0,1].map(r=>({c,r,t:`${c==='w'?'Wanted':'Offered'}: secret thing ${r}`,by:'s_z',n:'Zed',re:[{t:'secret reply',by:'s_y',n:'Yan'}],...(r===0?{tk:{by:'s_y',n:'Yan'}}:{})}))));
 const stateOf=s=>s.textBy==='FULLWALL'?{...s,textBy:FULLWALL}:s.textBy==='FULLBOARD'?{...s,textBy:FULLBOARD}:s;
 // a can hangs on its hook (entry 34): new side only, one hook per can
-const CARRIER=[300,480];
+const CARRIER=[-28,-28];
 const HANG=[HOOK_PEG[0]-CAN_GRIP[0],HOOK_PEG[1]-CAN_GRIP[1],HOOK_PEG[2]-CAN_GRIP[2]];
 function stats(xs){const s=[...xs].sort((a,b)=>a-b);return {n:s.length,meanMs:+(s.reduce((a,b)=>a+b,0)/s.length).toFixed(4),p95Ms:+s[Math.floor(s.length*.95)].toFixed(4),maxMs:+s[s.length-1].toFixed(4)};}
+const LOG=process.env.M04_CROWD_LOG?(...a)=>console.error(new Date().toISOString(),...a):()=>{};
 async function scene(version,{distant=true}={}){
+ LOG('scene',version,distant);
  const col=version==='v1'?0:1;
  const f=fixture(':memory:',factory,{durableClockV1:true});f.brain.quiesce();
  const edge=new EdgeLedger(f.host,f.db,undefined,{ambient:false});const app=new Hono();let soul;
@@ -70,8 +72,10 @@ async function scene(version,{distant=true}={}){
  const ordinary=()=>edge.capabilities(soul).filter(c=>['stand:here','wave:here','rest:here','sit-ground:here'].includes(c.id)).map(c=>c.id).sort();
  // a second Soul far away (before the baseline, so the baseline already holds him): later he carries a lit lantern
  await invite(f,'bo');const brow=await accept(f.host,f.souls.create('dev:bo',{name:'Bo',description:'Crowd test carrier'}));const bo={soulId:brow.id,entityId:brow.entity_id,name:brow.name,owner:brow.owner};await tick(5);
- await accept(f.host,f.host.enqueue('edge-relocate','test:crowd',{soulId:bo.soulId,entityId:bo.entityId,to:CARRIER,why:'crowd carrier far away'}));await tick(40);
- await tick(20);const tickEmpty=await timed();
+ // the fixture's ground ends ~30 m out: he is relocated to its far corner, ~40 m away (beyond the 30 m sight radius)
+ await tick(60);await accept(f.host,f.host.enqueue('edge-relocate','test:crowd',{soulId:bo.soulId,entityId:bo.entityId,to:CARRIER,why:'crowd carrier far away'}));await tick(20);
+ LOG('bo at',JSON.stringify(f.host.engine.world.entities[bo.entityId].pose.p));
+ await tick(20);LOG('timing empty');const tickEmpty=await timed();LOG('placing distant');
  const absent=await here(),ord0=ordinary();
  let far=[];
  if(distant){
@@ -92,7 +96,8 @@ async function scene(version,{distant=true}={}){
    for(let n=0;n<1400&&!['completed','failed','replaced'].includes(edge.receipt(bo.soulId,r.receipt.id)?.phase);n++)await tick(1);
    carried={phase:edge.receipt(bo.soulId,r.receipt.id)?.phase,support:f.host.engine.world.entities[item].support.kind,held:f.host.engine.world.entities[bo.entityId].human?.heldItemsV1??null,
     distanceFromAna:+Math.hypot(bb.pose.p[0]-f.host.engine.world.entities[soul.entityId].pose.p[0],bb.pose.p[2]-f.host.engine.world.entities[soul.entityId].pose.p[2]).toFixed(1)};}}
- await tick(45);const distantHere=await here();
+ LOG('carried',JSON.stringify(carried));
+ await tick(45);const distantHere=await here();LOG('distant here');
  const b=f.host.engine.world.entities[soul.entityId],[x,z]=[b.pose.p[0],b.pose.p[2]];
  const near=Object.entries(FAMILIES).flatMap(([k,fam])=>{const p=[x+fam[2][0],z+fam[2][1]],st=col===1&&Object.keys(fam[3]).length?{state:stateOf(fam[3])}:{};
   return k==='can'&&col===1?[{op:'place',def:'core/can-hook@1',tmp:'$hn',name:'can-hook',p},{op:'place',def:fam[col],name:k,in:{parent:'$hn'},p:HANG,...st}]:[{op:'place',def:fam[col],name:k,p,...st}];});
@@ -100,7 +105,7 @@ async function scene(version,{distant=true}={}){
  await tick(45);
  const crowded=await here(),caps=edge.capabilities(soul);
  const t0=performance.now();for(let i=0;i<20;i++)await here();const hereMs=(performance.now()-t0)/20;
- const tickCrowd=await timed();
+ LOG('timing crowd');const tickCrowd=await timed();LOG('timed crowd');
  const farNames=new Set(far.map(o=>o.name).filter(n=>!n.startsWith('far-hook-'))),farIds=new Set(far.map(o=>god.model.get(o.name)?.id).filter(Boolean));
  const report={version,distantThings:far.length,absent:JSON.stringify(absent).length,distant:JSON.stringify(distantHere).length,crowded:JSON.stringify(crowded).length,
   objects:crowded.objects.map(o=>o.kind+(o.state?JSON.stringify(o.state):'')),doHere:crowded.doHereCoverage,doHereIds:crowded.doHere.map(c=>c.id.replace(/e_[0-9a-f]+/,'#')),
