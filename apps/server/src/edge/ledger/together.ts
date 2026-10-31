@@ -246,7 +246,7 @@ export class Together {
   private sourceCache: {key: string; list: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[]} | null = null;
   /** Deterministic item sources: shelves (books), writing desks (letters) and walkable places by kind (gardens → flowers…). */
   sources() {
-    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = (this.p.staticVersion?.() ?? '') + '|' + Object.keys(this.w.regions).length + ':' + this.p.places.byId.size + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
+    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = (this.p.staticVersion?.() ?? '') + '|' + Object.keys(this.w.regions).length + ':' + this.p.places.version + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
     if (this.sourceCache?.key === key) {menuStats.src.hit++; return this.sourceCache.list;}
     menuStats.src.miss++; const c0 = cpuNow();
     const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];

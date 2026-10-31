@@ -118,6 +118,13 @@ export function readLedger(host: ReadOnlyHost, placeData?: unknown, env: NodeJS.
   L.weatherNow = (() => 'weather' in E ? E.weather ?? undefined : undefined) as never;
   L.lightningNear = (x: number, z: number) => 'strikes' in E ? lightningFrom(E.strikes ?? [], x, z, host.rw.R.pos.tick) : null;
   L.spotsProvider = () => (E.spots ?? null) as never;
+  // the body plans main keeps per receipt (approach names: "walking to Kitchen chair, 18 m left"), from the receipt rows
+  {const db = host.db.db as DatabaseSync; let q: ReturnType<DatabaseSync['prepare']> | null = null;
+    (L as unknown as {bodyPlans: unknown}).bodyPlans = {get: (id: string) => {
+      q ??= db.prepare('SELECT capability, plan FROM edge_receipts_v1 WHERE world_id=? AND receipt_id=?');
+      const r = q.get(host.worldId, id) as {capability: string; plan: string | null} | undefined; if (!r?.plan) return undefined;
+      try {const p = JSON.parse(r.plan) as {label: string; steps: unknown[]}; return {capability: r.capability, label: p.label, steps: p.steps};} catch {return undefined;}
+    }, set() {/* main's */}, delete() {return false;}, get size() {return 0;}, keys: () => [][Symbol.iterator]()};}
   // a ride's boarding check is the engine's (a punt's bank and water today): main's answer, as its ledger cached it
   (L as unknown as {boardingIssue: (id: string, tick: number, route: string) => unknown}).boardingIssue = (id, _tick, route) => {
     const w = (host.rw.ledgerEnv as {boarding?: Record<string, {route: string; issue: unknown}>}).boarding?.[id];

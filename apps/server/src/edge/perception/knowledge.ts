@@ -48,11 +48,11 @@ export class PlaceKnowledge {
   /** Places marked secret themselves (not counting their insides). */
   marked(): Set<string> {
     // keyed on the place count: a god edit that adds or removes places re-derives (a re-added place keeps its id)
-    if (this.secretsCache && this.secretsCache.size === this.L.places.byId.size) return this.secretsCache.set;
+    if (this.secretsCache && this.secretsCache.size === this.L.places.version) return this.secretsCache.set;
     const o = this.overrides(), out = new Set<string>();
     for (const p of this.L.places.byId.values()) if (o.get(p.id) ?? (p as Place & {secret?: boolean}).secret === true) out.add(p.id);
     for (const [id, on] of o) if (on && this.L.places.byId.has(id)) out.add(id);
-    this.secretsCache = {size: this.L.places.byId.size, set: out}; return out;
+    this.secretsCache = {size: this.L.places.version, set: out}; return out;   // keyed on the index version: a replaced place (same count) re-derives
   }
   /** The outermost secret place holding (or being) this place, by the parent chain; null when nothing about it is secret. */
   secretRoot(placeId: string): string | null {

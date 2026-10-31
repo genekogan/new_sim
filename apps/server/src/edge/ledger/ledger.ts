@@ -457,7 +457,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** D1: the plans this ledger started, by receipt (for the body's current step), newest 512. */
   private bodyPlans = new Map<string, {capability: string; label: string; steps: Program['steps']}>();
-  private planFor(receipt: string, capability: string, label: string, steps: Program['steps']) {this.bodyPlans.set(receipt, {capability, label, steps}); if (this.bodyPlans.size > 512) this.bodyPlans.delete(this.bodyPlans.keys().next().value!);}
+  private planFor(receipt: string, capability: string, label: string, steps: Program['steps']) {
+    this.bodyPlans.set(receipt, {capability, label, steps}); if (this.bodyPlans.size > 512) this.bodyPlans.delete(this.bodyPlans.keys().next().value!);
+    // B-facade: kept with the receipt too, so a read worker names the approach as main does (the restart re-arm reads a
+    // plan only for a waiting receipt: a started one's is description only)
+    try {(this.planStmt ??= this.db.db.prepare('UPDATE edge_receipts_v1 SET plan=? WHERE world_id=? AND receipt_id=?')).run(JSON.stringify({label, steps}), this.host.worldId, receipt);} catch {/* the description is best effort */}
+  }
+  private planStmt: ReturnType<Db['db']['prepare']> | null = null;
   /** D1: the body of a Soul as the engine has it now, with its running act's current step. */
   bodyOf(soulId: string): BodyStateV1 | null {
     const m = this.host.minds.get(soulId); if (!m) return null;
