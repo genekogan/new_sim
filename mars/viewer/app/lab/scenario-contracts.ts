@@ -1,4 +1,4 @@
-// Generated from docs/engineering/SCENARIO_COVERAGE.json.
+// Generated from deploy/scenario-coverage.json.
 // Run node deploy/scenario-contracts.mjs; engine tests check exact parity.
 export const LAB_SCENARIO_GROUPS = [
   {
