@@ -11,7 +11,7 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "2.5.1";
+const VERSION = "2.5.2";
 const STATE = ".eden-agent.json";
 const CLI = "node eden.mjs";
 
@@ -93,7 +93,7 @@ const TERMINAL = new Set(["completed", "failed", "replaced"]);
 // Idempotency-Key (the world returns the first answer to a repeat), are ever retried; `unreachable` gets full-jitter
 // exponential backoff (1 s base, 60 s cap, 6 tries) and then a clear exit 75. Nothing loops forever except listen,
 // which is one held long-poll per Soul (.listen.lock) and backs off the same way.
-export const BUSY_CODES = new Set(["world.busy", "soul.busy", "soul.slow-down", "world.starting", "world.crowded", "rate-limited"]);
+export const BUSY_CODES = new Set(["world.busy", "soul.busy", "soul.slow-down", "world.starting", "world.crowded", "rate-limited", "client.rate", "account.rate"]);
 export const RETRY = { tries: 6, baseMs: 1_000, capMs: 60_000, busyWaits: 3 };
 const TIME_SCALE = Number(process.env.EDEN_TIME_SCALE) > 0 ? Number(process.env.EDEN_TIME_SCALE) : 1; // tests only
 const pause = (ms) => sleep(ms * TIME_SCALE);
@@ -124,6 +124,7 @@ const WAITING = {
   "world.busy": "the world is busy", "world.crowded": "the world is crowded", "world.starting": "the world is starting",
   "soul.busy": "your previous request is still being answered", "soul.slow-down": "you are asking faster than the world answers",
   "rate-limited": "you are asking faster than the world answers",
+  "client.rate": "too many requests are coming from this address", "account.rate": "this account's Souls are asking faster than the world allows",
 };
 const said = new Set();
 /** One calm line per distinct thing (stderr), never a stream. */
@@ -132,9 +133,73 @@ function calm(line) { if (!said.has(line)) { said.add(line); process.stderr.writ
 function worldNote(data) { const n = data?.world?.note; if (typeof n === "string" && n.trim()) calm(`WORLD: ${n.trim()}`); }
 const secs = (ms) => `${Math.max(1, Math.round(ms / 1000))} s`;
 
+// 2.5.2 (server reliability, churn item 1): a refusal reaches the human in words. Each 429/503 the world or launcher
+// answers is kept for 60 s in a small file in the Soul folder, one per channel (requests; the background listen), and
+// cleared when the world next answers that channel. Every command's JSON then starts with `slowed`: one first-person
+// sentence the agent repeats to its person. The waits and retries above are unchanged; this only says them.
+export const SLOWED_WINDOW_MS = 60_000;
+export const SLOWED_FILES = { requests: ".eden-slowed.json", listen: ".eden-slowed-listen.json" };
+const SLOW_CODES = new Set(["soul.slow-down", "client.rate", "account.rate", "rate-limited"]);
+const REASON = {
+  "client.rate": "too many requests at once from this address", "account.rate": "too many requests from this account's Souls",
+  "soul.busy": "my previous request was still being answered", "soul.slow-down": "I asked for a lot in a short time",
+  "rate-limited": "I asked faster than the world answers", "world.busy": "the world was too busy to answer in time",
+  "world.crowded": "the world is crowded", "world.starting": "the world is still starting up",
+};
+const slowedRun = [];   // this process's refusals: {ch, at, code, reason, ms, next}
+export const channelOf = (path) => (String(path).startsWith("/v1/edge/inbox/listen") ? "listen" : "requests");
+/** The words for one refusal: the world's own `message` (first clause, "your" → "my") or a built-in sentence per code. */
+export function refusalOf(status, data, ms) {
+  const code = codeOf(data) ?? `http-${status}`, raw = data?.error?.message ?? data?.message;
+  const said = typeof raw === "string" ? raw.split(/;\s/)[0].replace(/\s*try again in \d+\s*s\.?$/i, "").replace(/\byour\b/gi, "my").replace(/[.\s]+$/, "").trim() : "";
+  return { code, reason: (said || REASON[code] || "the world could not answer right now").slice(0, 120), ms: Number.isFinite(ms) ? Math.round(ms) : null };
+}
+export function readSlowed(ch, at = Date.now()) {
+  try { const j = JSON.parse(readFileSync(SLOWED_FILES[ch], "utf8")); return Array.isArray(j) ? j.filter((x) => at - x.at < SLOWED_WINDOW_MS) : []; } catch { return []; }
+}
+/** next: "retry" (this CLI waits ms and asks again), "listen" (the listen loop does), "none" (given up; try again after ms). */
+function noteRefusal(path, r, next, ms) {
+  const ch = channelOf(path), e = { at: Date.now(), ...refusalOf(r.status, r.data, ms), next };
+  slowedRun.push({ ch, ...e });
+  try { writeFileSync(SLOWED_FILES[ch], JSON.stringify([...readSlowed(ch), e].slice(-20)) + "\n"); } catch { /* a read-only folder: words on this run only */ }
+}
+function clearSlowed(path) {
+  const f = SLOWED_FILES[channelOf(path)];
+  if (existsSync(f)) try { unlinkSync(f); } catch { /* already gone */ }
+}
+const times = (n) => (n === 1 ? "once" : n === 2 ? "twice" : `${n} times`);
+/** Still refused: the sentence for a channel's refusals in the last 60 s, with the count and the next try. */
+export function slowedSentence(list, ch = "requests", at = Date.now()) {
+  const recent = (list ?? []).filter((x) => at - x.at < SLOWED_WINDOW_MS);
+  if (!recent.length) return null;
+  const last = recent.at(-1), n = recent.length, span = secs(at - recent[0].at), why = `${last.reason} (${last.code})`;
+  const left = last.ms != null ? last.at + last.ms - at : null, when = left == null ? "shortly" : left < 1000 ? "now" : `in ${secs(left)}`;
+  const lead = ch === "listen" ? (n === 1 ? `My listen for your messages was just refused: ${why}` : `My listen for your messages was refused ${n} times in the last ${span}: ${why}`)
+    : SLOW_CODES.has(last.code) ? (n === 1 ? `The world asked me to slow down${last.ms ? ` for ${secs(last.ms)}` : ""}: ${why}` : `The world asked me to slow down ${n} times in the last ${span}: ${why}`)
+    : n === 1 ? `My last request was refused: ${why}` : `My last ${n} requests were refused in the last ${span}: ${why}`;
+  const tail = last.next === "listen" ? `still listening, next try ${when}` : last.next === "retry" ? `retrying ${when}` : `not retried; I can try once more ${when}`;
+  return `${lead}; ${tail}.`;
+}
+/** Refused, then answered within this command: said once, in the past tense. */
+export function recoveredSentence(run, at = Date.now(), ch = "requests") {
+  if (!run?.length) return null;
+  const last = run.at(-1), why = `${last.code}: ${last.reason}`, took = secs(at - run[0].at);
+  if (ch === "listen") return `My listen for your messages was refused ${times(run.length)} (${why}); it got through after ${took}.`;
+  return SLOW_CODES.has(last.code) ? `The world asked me to slow down ${times(run.length)} (${why}); it answered after ${took}.`
+    : `The world refused my request ${times(run.length)} (${why}); it went through after ${took}.`;
+}
+/** The `slowed` line for this command's output: each channel still refused, else what this run recovered from. */
+export function slowedLine(at = Date.now()) {
+  const parts = ["requests", "listen"].map((ch) => {
+    const kept = readSlowed(ch, at);
+    return kept.length ? slowedSentence(kept, ch, at) : recoveredSentence(slowedRun.filter((x) => x.ch === ch), at, ch);
+  }).filter(Boolean);
+  return parts.length ? parts.join(" ") : null;
+}
+
 // as: "soul" (default, the Soul's delegated token), "owner" (account routes under /v1/agent, same token),
 // "dev" (legacy self-made identity), "none". retry: false hands every answer back at once (listen runs its own loop).
-async function call(path, { method, body, as = "soul", timeoutMs, recoverRead = false, retry = true } = {}) {
+async function call(path, { method, body, as = "soul", timeoutMs, recoverRead = false, retry = true, slowedNext } = {}) {
   const s = load();
   if (as === "soul") ({ path, body } = withNow(path, body));
   const url = need(s, "world", `Run: ${CLI} register <world-url>`) + path;
@@ -150,6 +215,10 @@ async function call(path, { method, body, as = "soul", timeoutMs, recoverRead = 
     const r = await callOnce(url, { method, headers, body, timeoutMs, recoverRead });
     if (r.load && r.load !== "green") calm(`the world is under load (${r.load}); answers may be slow`);
     worldNote(r.data);
+    const refused = r.status === 429 || r.status === 503, waitOut = isBusy(r.status, r.data) && cls !== "none" && busy < RETRY.busyWaits;
+    const waitMs = waitOut ? statedJitter(r.retryAfterMs ?? Math.max(1_000, fullJitter(busy + 2))) : null;
+    if (refused) noteRefusal(path, r, waitOut ? "retry" : slowedNext ?? "none", waitMs ?? r.retryAfterMs);
+    else if (r.status >= 200 && r.status < 500) clearSlowed(path);
     if (r.status === 0 && cls !== "none") {
       if (++failed < RETRY.tries) {
         const ms = fullJitter(failed - 1);
@@ -157,11 +226,10 @@ async function call(path, { method, body, as = "soul", timeoutMs, recoverRead = 
         await pause(ms); continue;
       }
       r.data.error.tries = failed; r.data.error.seconds = Math.round((Date.now() - t0) / 1000);
-    } else if (isBusy(r.status, r.data) && cls !== "none" && busy < RETRY.busyWaits) {
+    } else if (waitOut) {
       busy++;
-      const ms = statedJitter(r.retryAfterMs ?? Math.max(1_000, fullJitter(busy + 1)));
-      process.stderr.write(`${WAITING[codeOf(r.data)] ?? "the world is busy"}; waiting ${secs(ms)}\n`);
-      await pause(ms); continue;
+      process.stderr.write(`${WAITING[codeOf(r.data)] ?? "the world is busy"}; waiting ${secs(waitMs)}\n`);
+      await pause(waitMs); continue;
     }
     if (r.status === 0 && cls === "none") r.data.error.notRetried = true;
     if (headers.authorization && !path.startsWith("/v1/edge/inbox/")) noticeInbox(r.data);
@@ -756,7 +824,7 @@ async function listen(...args) {
   let attempt = 0, lastCode;
   for (;;) {
     const q = new URLSearchParams({ timeoutMs: once ? "0" : "50000", ...(after ? { after } : {}) });
-    const r = await call(`/v1/edge/inbox/listen?${q}`, { timeoutMs: 60_000, recoverRead: !once, retry: false });
+    const r = await call(`/v1/edge/inbox/listen?${q}`, { timeoutMs: 60_000, recoverRead: !once, retry: false, slowedNext: once ? undefined : "listen" });
     if (!once) { const holder = listenLockHolder(); if (holder && holder.pid !== process.pid) return alreadyListening(holder); }
     if (r.status === 0 || r.status === 429 || r.status >= 500) {
       const code = codeOf(r.data) ?? `http-${r.status}`;
@@ -915,8 +983,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try { argv = ["act", "say", "ack", "result", "wait"].includes(cmd) ? takeNowFlag(args) : args; } catch (e) { process.stderr.write(`error: ${e.message}\n`); process.exit(1); }
   fn(...argv).then(async (out) => {
     await flushNow();
+    const slowed = out && typeof out === "object" && !Array.isArray(out) ? slowedLine() : null;
+    if (slowed) out = { slowed, ...out };
     process.stdout.write(typeof out === "string" ? out : JSON.stringify(out, null, 1) + "\n");
   }, (e) => {
+    const slowed = slowedLine();
+    if (slowed) process.stderr.write(`SLOWED: ${slowed}\n`);
     process.stderr.write(`error: ${e.message}\n`);
     process.exit(e.exitCode ?? 1);
   });

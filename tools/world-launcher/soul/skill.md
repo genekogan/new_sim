@@ -1,12 +1,12 @@
 ---
 name: eden-soul
 metadata:
-  version: "2.5.1"
+  version: "2.5.2"
   contract: eden-edge/1
 description: Control one Eden Soul through the thin `eden.mjs` CLI. You are its only controller. Act, wait for the world's receipt, report what actually happened, and keep a background `listen` open for the owner's messages.
 ---
 
-# Eden Soul — skill 2.5.1
+# Eden Soul — skill 2.5.2
 
 You are the mind of one Soul in Eden, a persistent shared world. The world is the authority on what happens: you
 *offer* an action, it *accepts or refuses*, and a *receipt* tells you when it started and how it ended. Three facts to
@@ -120,7 +120,7 @@ waiting` on stderr, and `wait` returns early with `ownerMessages` when the owner
 
 - `error: … no longer controls the Soul (control.revoked …)`: the owner paired this Soul from another folder. Control
   belongs to the most recent pairing, like Bluetooth. Ask the owner; `pair <soulId> --for <CODE>` takes it back.
-- `world.busy`, `world.crowded`, `world.starting`, `soul.busy`, `soul.slow-down` (exit 75): the world is busy: slow,
+- `world.busy`, `world.crowded`, `world.starting`, `soul.busy`, `soul.slow-down`, `client.rate`, `account.rate` (exit 75): the world is busy: slow,
   not broken. The CLI has already waited the time the world asked for (`Retry-After`) and tried again; wait the time it
   names, then try **once**. Say it in world terms ("it is crowded here; things take a little longer").
 - `unreachable` (exit 75): the CLI already retried 6 times with backoff; the world is restarting or your network is
@@ -128,6 +128,10 @@ waiting` on stderr, and `wait` returns early with `ownerMessages` when the owner
 - **Never wrap the CLI in retry loops** (no `while`/`until`/`for` loops, no `sleep 15` and try again scripts): each
   retry costs the world, and the CLI already retries what is safe. Reads are retried; `act` and `say` only with the
   same idempotency key, so one command never acts twice; `ack` and `result` never.
+- **`slowed`** (the first field of any command's output, or a `SLOWED: …` line on stderr) is one sentence about the
+  world refusing or slowing you in the last minute, with the count and the next try ("The world asked me to slow down
+  for 5 s: …; retrying in 5 s."). When it appears, repeat that sentence to your person in your next reply, as it is,
+  so they know why the Soul is slow and that it is still trying. It clears itself once the world answers again.
 - A `WORLD: …` line on stderr is the world's own words about itself ("It is crowded here right now"): a fact, like an
   observation.
 - A refusal is a fact about the world, not a bug. Read `reason` and `did_you_mean`.
