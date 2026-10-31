@@ -10,6 +10,7 @@
 //                               role:fill rises with level (0..1)
 import * as THREE from 'three';
 import type { MeshCtx } from './registry.ts';
+import { DRAWER_TRAVEL } from '@sim/world-compiler';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const declared = (ctx: MeshCtx, k: string) => Object.hasOwn(ctx.def.params ?? {}, k);
@@ -92,6 +93,8 @@ function stateRoles(root: THREE.Object3D, look: Look) {
     const role = o.userData.role as string | undefined; if (!role) return;
     if (role === 'door' && s.open !== undefined) o.rotation.y = s.open === true ? -Math.PI * 0.48 : 0;
     if (role === 'lid' && s.open !== undefined) o.rotation.x = s.open === true ? -Math.PI * 0.6 : 0;
+    // Soul Actions entry 24: a drawer slides straight out of the front; its closed place is kept for the hand's timeline
+    if (role === 'drawer' && s.open !== undefined) { o.userData.restZ = o.position.z; if (s.open === true) o.position.z += DRAWER_TRAVEL; }
     if (role === 'flame' && s.lit !== undefined) o.visible = s.lit !== false;
     if (role === 'fill' && typeof s.level === 'number') { o.scale.y = Math.max(0.001, Math.min(1, s.level)); o.visible = s.level > 0.001; }
     // W5: a bed's damp patch (role fill on a thing with `moisture`, no `level`) spreads across the soil as it is watered

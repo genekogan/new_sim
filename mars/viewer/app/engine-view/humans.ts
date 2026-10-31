@@ -787,7 +787,9 @@ export class HumanViews {
     const { walk, idle, mixer, extra } = v.rig;
     const wt = b.walkT >= a.walkT ? a.walkT + (b.walkT - a.walkT) * alpha : b.walkT;
     const opening=v.handActuator?.opening;
-    const backwards=opening&&opening.side*(opening.to-opening.from)<0;
+    const slide=v.handActuator?.slide;
+    // pulling a door toward you or a drawer out, the body steps backwards
+    const backwards=(opening&&opening.side*(opening.to-opening.from)<0)||(!!slide&&slide.to>slide.from);
     walk.time=backwards?(walk.getClip().duration-wt%walk.getClip().duration)%walk.getClip().duration:wt;
     idle.time = b.idleT;
     // Body activity layer (activity-poses.ts): free hands only (engine hand points / grips win), never on a frame or prone.

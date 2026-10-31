@@ -117,6 +117,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       const d = Math.hypot(s.at[0] - me[0], s.at[1] - me[1]);
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
+      if(host.deferContacts&&def.tags.includes('wall-window')&&s.key&&!host.contactPlan?.(ctx.soul,s.key,a.name))return {code:'contact.out-of-reach',reason:'This window handle is outside standing hand reach from your floor.'};
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
       return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));
     };
