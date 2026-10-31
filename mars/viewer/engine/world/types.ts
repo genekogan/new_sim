@@ -62,6 +62,8 @@ export type HumanState = {
     depthMetres: number; submergedHeightMetres: number; normal: Vec3;
   };
   handActuator?: import('../social/hand-actuator.ts').HandActuatorMotion;
+  /** Soul Actions 34: one recorded watering-can stage (fill at a tap, pour on a planter); never controller context. */
+  wateringV1?: import('../items/watering.ts').WateringMotion;
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };
@@ -176,6 +178,8 @@ export type Entity = {
   /** Partial preparation survives interruption; incomplete contents cannot be served. */
   foodPreparation?: FoodPreparation;
   gardenCare?: import('../objects/garden.ts').GardenState;
+  /** Soul Actions 34: a handle-held can rides this much lower in the hand when it is full (m). */
+  carryDropV1?: number;
   planting?: import('../objects/planting.ts').PlantingState;
   /** Placed electrical equipment (construction/solar.ts place_equipment, spec §19): kind + configuration. */
   equipment?: { kind: string; config: Record<string, number | string | boolean> };

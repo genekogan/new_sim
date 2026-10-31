@@ -48,6 +48,9 @@ export type Handling = {
   hands?: 1 | 2;
   /** A small hand-held item (bowl, spoon, cup…): taken / put / eaten with by engine/items. */
   small?: true;
+  /** Soul Actions 34: an item held by a handle (a watering can) hangs from the hand: carried with the arm down at the
+   *  side at this hand point (body frame, m) instead of the small-item carry point, and reached for in `reachSeconds`. */
+  hangCarry?: { fwd: number; side: number; up: number; reachSeconds: number };
   /**
    * Small enough (≤ SMALL_LOAD_KG) to carry in one hand while climbing a frame or walking a beam
    * (construction/frame.ts). Absent = not small.

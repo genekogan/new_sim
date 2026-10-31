@@ -21,6 +21,7 @@ import { hasStraightLandings, railRaster } from './rail-raster.ts';
 import { tokenHit } from '../edge/ledger/vocabulary.ts';
 import { doorInGap, freeDoorOpening, isDoorDef, isShut } from './doors.ts';
 import { dryingOps } from './garden.ts';
+import { createWatering, type Watering } from './watering.ts';
 import { createContactActuatorService } from './contact-actuator.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
@@ -214,13 +215,15 @@ export class EngineBridge {
       body:id=>this.host.engine.world.entities[id] as never,access:(id,soul)=>this.layers.refusal(id,soul),
       record:(soul,id,action)=>{const r=this.edge!.comms?.objects.act?.(id,soul,{action,params:{}}) as {accepted?:boolean}|undefined;if(!r?.accepted)throw Error('switch.object-record-refused');},
       commit:(ops,note,done)=>this.god.engineAct(ops,note,done)});
-    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
+    // Entry 34: the watering-can act (watering.ts): planned for perceive's offers, its moments committed per tick
+    this.watering = createWatering({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, commit: (ops, note) => this.god.engineAct(ops as never, note), log: (m) => this.log(m) });
+    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers, watering: this.watering });
     this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } else if (c.diff.upserts.some(e => { const d=this.model.resolvedDef(e.def); return d?.components.opening && d.tags.includes('hand-operated'); })) { this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick, context) => { this.gardenTick(tick); try { if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; } else { this.flush(); this.projectedEdits = this.godEdits; if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(context?.startedAtMs); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } } catch (error) { this.failProjection(error); throw error; } },
+      afterTick: (tick, context) => { this.gardenTick(tick); this.watering?.tick(); try { if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; } else { this.flush(); this.projectedEdits = this.godEdits; if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(context?.startedAtMs); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } } catch (error) { this.failProjection(error); throw error; } },
       onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
       afterTickComplete: () => { this.completedTicks++; this.completedEdits = this.projectedEdits; this.checkProjectionSoon(); },
       onClockUnavailable: () => this.failProjection(new Error('bridge.readiness.clock-unavailable')),
@@ -329,6 +332,7 @@ export class EngineBridge {
       this.checkProjectionSoon();
     });
   }
+  private watering?: Watering;
   /** Entry 18: when the world day changes, gardens dry by the days passed (capped at 3; time set backwards restarts the count). */
   private gardenDay: number | null = null;
   private gardenTick(tick: number) {
