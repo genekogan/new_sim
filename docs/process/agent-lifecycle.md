@@ -1,0 +1,74 @@
+# Agent lifecycle
+
+Most changes to Sim are made by coding agents, supervised by the maintainer. People follow the same path. The repo's
+workflows, templates and skills implement it; this page says what each step means.
+
+```
+issue → branch → change + focused tests → proof at the PR's tier → PR → CI + review → merge → release
+```
+
+## 1. Issue
+
+Work starts from a GitHub issue: a bug, a feature or a playtest finding. Triage labels it with an area and a proof
+tier, tries a reproduction on a fake-mind world, and marks it ready for an agent or for the maintainer's decision.
+Plans, briefs and status notes live in the issue and its comments, never in the tree.
+
+## 2. Branch
+
+One branch, or one worktree, per issue. Keep the change small enough to review in one sitting; split a large piece of
+work into issues that each merge on their own. Several agents can work in parallel when their changes don't overlap;
+one coordinator decides the order of merges when they do.
+
+Keep the agent's context small: read with search and line ranges, run focused commands, and summarise large outputs in
+a file under `.local/` instead of pasting them. Start a fresh session rather than letting one grow without bound.
+
+## 3. Change and focused tests
+
+Write the change with its tests. Iterate with `node --test` on the touched files and `tsc -p` of the touched packages
+([testing](../testing.md)). Run the walk, bundle or conformance check when your change can affect it. Never run a live
+model locally; never point a test at production data.
+
+## 4. Proof
+
+[PROOF-POLICY.yml](PROOF-POLICY.yml) maps changed paths to a tier, and `node tools/proof/tier.mjs` prints yours.
+
+| Tier | Typical change | Proof |
+|---|---|---|
+| T0 | docs, tools, process, CI | lint |
+| T1 | server or package logic, nothing visible | focused tests and typecheck |
+| T2 | visible UI or behaviour | T1 plus one uncut, real-speed clip of the changed journey on a fake-mind world (phone too when layout changed) |
+| T3 | Soul behaviour, navigation, engines, shared or brittle code | T2 plus a scenario playtest with two repeats per arm, a reviewer agent pass and maintainer sign-off |
+| T4 | the release head | the remote gate, live walks, cdn-walk, changelog |
+
+**Proof levels are not equal.** A unit test proves the code does what the test says. A scripted e2e proves a script
+can drive the page. Only a walk on the real URL with real input proves a person can do it. Don't call a visible change
+done on the first two alone. Report what failed as plainly as what passed, and record a check you could not run as
+unverified rather than passing.
+
+## 5. Pull request
+
+Open a draft PR from the template: summary, tier, proof (links to clips and logs, not files in the tree), docs touched,
+changelog. Add a fragment in [`changes/`](../../changes/README.md) for anything users notice, or the `no-changelog`
+label. A change in behaviour updates its doc in the same PR.
+
+## 6. Review
+
+CI runs the checks for the PR's paths; a reviewer agent reviews every push, and the author answers each comment with a
+fix or a reason. The maintainer reviews T3 and above and anything labelled for them. See [review](review.md).
+
+## 7. Merge
+
+Squash-merge to `main` once required checks pass. `main` is always releasable.
+
+## 8. Release
+
+The release workflow ships `main`'s head: the remote gate against the cached baseline, approval for the production
+environment, the staged ship with healthz, walks and cdn-walk, then the changelog and a GitHub Release. See
+[release](../release.md).
+
+## Authority
+
+- Bug fixes need no approval. Neither do test expectation updates, baseline re-pins or skill version bumps that come
+  with a reviewed change; record the reason in the commit.
+- Destructive production actions (deleting worlds, data, releases or backups) need the maintainer's explicit yes.
+- Agents never change permission settings, secrets or other projects' services.
