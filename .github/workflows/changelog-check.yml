@@ -1,4 +1,5 @@
 # Every PR adds a changes/<pr-or-slug>.md fragment (changes/README.md), or carries the `no-changelog` label.
+# Dependabot PRs are exempt: dependency bumps are not user-facing.
 name: changelog
 on:
   pull_request:
@@ -20,7 +21,7 @@ jobs:
       - name: Require a fragment or the no-changelog label
         if: github.event_name == 'pull_request'
         env:
-          NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+          NO_CHANGELOG: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') || github.event.pull_request.user.login == 'dependabot[bot]' }}
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |

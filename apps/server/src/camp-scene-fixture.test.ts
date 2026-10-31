@@ -40,7 +40,7 @@ test('public five-file leaf dependency input executes in an isolated subprocess 
     'packages/protocol/package.json','packages/protocol/src/scene-capture.ts'];
   const input=JSON.parse(readFileSync(new URL('codec-input.v1.json',directory),'utf8'));
   assert.deepEqual(input.files.map((f:any)=>f.path),files);assert.equal(input.semanticsParent,CAMP_SCENE_PRODUCER_PIN);
-  const codecPublication='f7536a647b0ecd663554719da608babfaed14988';
+  const codecPublication='4ecb87dc96133f180e03dc5bc336e6d9deba64c5';
   for(const f of input.files) {
     // The published five-file closure is immutable. Later additive codecs
     // have their own inputs; do not substitute current source for this proof.
