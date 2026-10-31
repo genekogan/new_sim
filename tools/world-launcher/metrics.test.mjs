@@ -15,7 +15,7 @@ const val = (text, sel) => { const line = text.split('\n').find((l) => l.startsW
 test('each live.json field becomes its contract metric, labelled by world only', () => {
   const ce = { totals: () => ({ ws: 15, js: 4 }), rate10m: () => 14, newSinceRelease: () => 1 };
   const t = metricsText({ now: NOW, launcher: { build: 'we-abc', maxRunning: 24, memAvailableMb: 1000 }, clientErrors: ce,
-    worlds: [{ slug: 'eden-2026', status: 'running', restarts: 2, lastBootMs: 8_500, live: LIVE }, { slug: 'mars-2027', status: 'asleep', restarts: 0, live: null }] });
+    worlds: [{ slug: 'eden-2026', status: 'running', restarts: 2, lastBootMs: 8_500, refused: { 'client.rate': 7, 'world.busy': 2, 'Bad Class': 1 }, live: LIVE }, { slug: 'mars-2027', status: 'asleep', restarts: 0, live: null }] });
   assert.equal(val(t, 'sim_launcher_worlds_running'), 1);
   assert.equal(val(t, 'sim_launcher_worlds_total'), 2);
   assert.equal(val(t, 'sim_launcher_info{build="we-abc"}'), 1);
@@ -36,6 +36,9 @@ test('each live.json field becomes its contract metric, labelled by world only',
   assert.equal(val(t, 'sim_world_phase{world="eden-2026",phase="serving"}'), 1);
   assert.equal(val(t, 'sim_world_restarts_total{world="eden-2026",reason="exit"}'), 2);
   assert.equal(val(t, 'sim_world_last_boot_seconds{world="eden-2026"}'), 8.5);
+  assert.equal(val(t, 'sim_world_refused_total{world="eden-2026",class="client.rate"}'), 7);
+  assert.equal(val(t, 'sim_world_refused_total{world="eden-2026",class="world.busy"}'), 2);
+  assert.ok(!t.includes('Bad Class'));
   assert.equal(val(t, 'sim_world_status{world="mars-2027",status="asleep"}'), 1);
   assert.equal(val(t, 'sim_client_errors_total{kind="ws"}'), 15);
   assert.equal(val(t, 'sim_client_errors_rate10m'), 14);

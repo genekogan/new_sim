@@ -56,7 +56,9 @@ function registry() {
 
 /**
  * metricsText({worlds, launcher, clientErrors, now}) → Prometheus text.
- *  worlds: [{slug, status, restarts?, restartsByReason?: {exit|wedged|crashloop|planned: n}, lastBootMs?, live?}]
+ *  worlds: [{slug, status, restarts?, restartsByReason?: {exit|wedged|crashloop|planned: n}, lastBootMs?, refused?, live?}]
+ *          refused = the launcher's ceilings: requests it refused for this world since it started, by class
+ *          ({'client.rate': n, 'account.rate': n, 'world.busy': n}) → sim_world_refused_total{world,class}
  *          (status from the launcher's pool; live = readLive(world.dataDir) or null)
  *  launcher: {build?, maxRunning?, maxWorlds?, memAvailableMb?}
  *  clientErrors: the clientErrors() table (client-errors.mjs) or null
@@ -82,6 +84,9 @@ export function metricsText({ worlds = [], launcher = {}, clientErrors = null, n
     const byReason = w.restartsByReason && typeof w.restartsByReason === 'object' ? w.restartsByReason : null;
     if (byReason) for (const reason of ['exit', 'wedged', 'crashloop', 'planned']) c('sim_world_restarts_total', 'World restarts by the launcher, by reason.', { world, reason }, num(byReason[reason]) ?? 0);
     else c('sim_world_restarts_total', 'World restarts by the launcher, by reason.', { world, reason: 'exit' }, w.restarts);   // a launcher without reasons
+    for (const [cls, n] of Object.entries(w.refused && typeof w.refused === 'object' ? w.refused : {})) {
+      if (/^[a-z][a-z0-9_.]{0,31}$/.test(cls)) c('sim_world_refused_total', 'Requests the launcher refused for this world (its ceilings), by class.', { world, class: cls }, n);
+    }
     g('sim_world_last_boot_seconds', 'Seconds the world\'s last boot took (start to healthy).', L, num(w.lastBootMs) === null ? null : w.lastBootMs / 1000);
 
     const v = w.live; if (!v) continue;
