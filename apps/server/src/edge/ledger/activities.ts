@@ -67,6 +67,18 @@ export const SPOT_ACTIVITIES: Record<string, {prop?: string; seconds: number; la
 /** CN5 choreographed games at spots: 2–6 players; the world keeps the turns (social/pose.ts GAMES). */
 export const GAME_ACTIVITIES: Record<string, 'frisbee' | 'petanque' | 'volleyball'> = {'play-frisbee': 'frisbee', 'play-petanque': 'petanque', 'play-volleyball': 'volleyball'};
 export const GAME_MAX_PLAYERS = 6;
+/** srv-act-words: every verb an offer of `activityCapabilities` can have (spot and court activities, the fixed sit / lie /
+ *  read / stargaze offers, the on-the-spot moves; their ids are `<verb>:…`). A focused build whose focus names none of
+ *  them, not `here` and no target, skips the activity listing (edge-bind-one-oracle checks the set against the whole menu). */
+export const ACTIVITY_VERBS: ReadonlySet<string> = new Set([...Object.keys(SPOT_ACTIVITIES), ...Object.keys(GAME_ACTIVITIES),
+  'sit', 'sit-ground', 'stand', 'stargaze', 'read', 'lie', 'nap', 'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps']);
+/** srv-act-words: whether a focused build may want an offer of the activity listing (always, without a focus). */
+export function activityMayOffer(f: {ids: ReadonlySet<string>; verbs: ReadonlySet<string>; targets: ReadonlySet<string>; here?: boolean} | null | undefined): boolean {
+  if (!f || f.here || f.targets.size) return true;
+  for (const v of f.verbs) if (ACTIVITY_VERBS.has(v)) return true;
+  for (const id of f.ids) if (ACTIVITY_VERBS.has(id.slice(0, Math.max(0, id.indexOf(':'))))) return true;
+  return false;
+}
 /** Postures done lying on a spot's furniture or mat (the rest of a `lie` spot is lying down or a nap). */
 const LYING_SPOT = new Set(['lie', 'nap', 'situps', 'pushups', 'bench-press', 'yoga', 'hammock']);
 const INSTRUMENTS = new Set<string>(POSE_INSTRUMENTS);

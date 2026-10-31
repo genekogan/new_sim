@@ -58,6 +58,16 @@ export const SOLO: Record<string, {seconds: number; seated: boolean; label: stri
   cheer: {seconds: 3, seated: true, label: 'Cheer (params.to: someone)'},
   point: {seconds: 3, seated: true, label: 'Point at someone, a place or a thing (params.at)'},
 };
+/** srv-act-words: every verb an offer of `Together.capabilities` can have. A focused build whose focus names none of them,
+ *  no `…:here`/`…:held` id and no target skips the together listing (edge-bind-one-oracle checks the set). */
+export const TOGETHER_VERBS: ReadonlySet<string> = new Set([...Object.keys(PAIRED), ...Object.keys(SOLO), 'accept', 'decline', 'follow', 'ask-to-stop', 'give', 'put-down', 'eat', 'drink', 'pick-up']);
+/** srv-act-words: whether a focused build may want an offer of the together listing (always, without a focus). */
+export function togetherMayOffer(f: {ids: ReadonlySet<string>; verbs: ReadonlySet<string>; targets: ReadonlySet<string>; here?: boolean} | null | undefined): boolean {
+  if (!f || f.here || f.targets.size) return true;
+  for (const v of f.verbs) if (TOGETHER_VERBS.has(v)) return true;
+  for (const id of f.ids) if (TOGETHER_VERBS.has(id.slice(0, Math.max(0, id.indexOf(':'))))) return true;
+  return false;
+}
 export const ITEM_NAMES: Record<ItemKind, string> = {book: 'a book', flower: 'a flower', cup: 'a cup of tea', food: 'something to eat', letter: 'a letter', tool: 'a tool', frisbee: 'a frisbee'};
 const CONSUMABLE = new Set<ItemKind>(['cup', 'food']);
 /** Where things are found: place words (id + name) per item kind. */
