@@ -9,7 +9,7 @@ import {actionsOf,actuatedState} from './actuators.ts';
 import {isContactActuator,type ContactActuatorIntent,type ContactActuatorService} from './contact-actuator.ts';
 
 type Step={verb:string;params:Record<string,unknown>};
-type Engine={closedDoorsOnWalkV1?:(actor:string,steps:Step[])=>{goal:[number,number];doors:string[]}|null;walkFromReachesV1?:(actor:string,from:[number,number],steps:Step[])=>boolean};
+type Engine={closedDoorsOnWalkV1?:(actor:string,steps:Step[])=>{goal:[number,number];doors:string[];goalDoors?:()=>string[]}|null;walkFromReachesV1?:(actor:string,from:[number,number],steps:Step[])=>boolean};
 export type DoorPassage={door:string;name:string;steps:Step[];direct:Step[];open:ContactActuatorIntent;note:string};
 export type DoorPassageRefusal={refuse:true;code:string;reason:string};
 /** How far past the door line the close is planned from (its far side). */
@@ -45,6 +45,15 @@ export function createDoorPassage(d:{engine:()=>Engine;model:()=>WorldModel;cont
    const legs=(first:number[]):Step[]=>[{verb:'stand',params:{}},walk(first),{verb:'mars:hand_actuator_v1',params:{...open.params,passage:{mode:'open',...passage}}},walk(closeAt),{verb:'mars:hand_actuator_v1',params:{...close.params,passage:{mode:'close',...passage}}},...rest];
    return {door:id,name,open:intent,note:`Through ${name}: opened it by hand on the way, and closed it behind unless someone was following.`,steps:legs(stage),direct:legs(openAt)};
   }
-  return refusal;
+  if(refusal)return refusal;
+  // No door on this side opens the way. When every door walling the destination's own side is locked or private (the
+  // way would need it even after another door), refuse naming it, rather than walking round to the nearest point outside.
+  const m=d.model(),goalSide=(found.goalDoors?.()??[]).filter(id=>!found.doors.includes(id)).flatMap(id=>{const e=m.entities.get(id),def=e&&m.resolvedDef(e.def);if(!e||!def)return [];
+   // only a door that walls the destination in (its other side is not reachable from the destination): a free-standing
+   // door in the open borders every region it stands in and separates nothing
+   const p=m.worldPose(e),k=[Math.sin(p.yaw),Math.cos(p.yaw)],g=(found.goal[0]-p.x)*k[0]+(found.goal[1]-p.z)*k[1]>=0?1:-1,beyond:[number,number]=[p.x-k[0]*g*FAR,p.z-k[1]*g*FAR];
+   if(eng.walkFromReachesV1!(soul.entityId,beyond,steps))return [];
+   const denied=d.access(id,soul),name=e.name??id;return denied?{refuse:true as const,code:denied.code,reason:`The way to ${what} goes through ${name}: ${denied.reason.replace(/[.\s]+$/,'')}. It was not opened.`}:actuatedState(e,def).locked===true?{refuse:true as const,code:'door.locked',reason:`The way to ${what} goes through ${name}, which is locked. It was not opened.`}:null;}).map(x=>x);
+  return goalSide.length&&goalSide.every(x=>x)?goalSide[0]:null;
  };
 }

@@ -76,6 +76,13 @@ test('door passage: by hand on the way, close behind, contention, obstruction, r
  const priv=await accept(f.host,edge.act(ana,{capability:'walk:private-bench'}));assert.equal(priv.accepted,false,JSON.stringify(priv));assert.match(JSON.stringify(priv),/private-door/);
  await tick(20);assert.deepEqual(W.entities[ana.entityId].pose.p,p0,'refusals do not move the body');assert.equal(JSON.stringify(god.model.get('store-door').state),beforeStore);
  report.refusals={locked:locked.error??locked.reason??locked,private:priv.error??priv.reason??priv};report.checks.push('locked and private doors refused with readable reasons, nothing moved');
+ // 7b. from inside the courtyard (two doors on the way, the second locked): refused at once naming the locked one; no
+ // closest approach and no nav-connect lift out of the courtyard
+ const inAgain=await act(ana,'walk:inside-bench');await finish([[ana,inAgain]]);assert.equal(side(ana),'inside');const p1=[...W.entities[ana.entityId].pose.p];
+ const locked2=await accept(f.host,edge.act(ana,{capability:'walk:store-bench'}));assert.equal(locked2.accepted,false,JSON.stringify(locked2));assert.match(JSON.stringify(locked2),/store-door/);
+ await tick(20);assert.deepEqual(W.entities[ana.entityId].pose.p,p1,'refused from inside, not lifted out');report.refusals.lockedFromInside=locked2.error??locked2.reason??locked2;report.checks.push('from inside a closed yard, a locked door at the destination is refused by name; no closest approach');
+ // a walk out of the yard to the open field (free-standing doors elsewhere separate nothing) still passes
+ const outAgain=await act(ana,'walk:outside-lamp');const [eoa]=await finish([[ana,outAgain]]);assert.equal(eoa.phase,'completed',JSON.stringify(eoa));assert.equal(side(ana),'outside');
  assert.deepEqual(f.host.engine.runtime.violations,[]);
  report.contextBytes={absent:JSON.stringify(absent).length,distant100:JSON.stringify(far).length,nearby:JSON.stringify(nearby).length,nearbyDoorFacts:nearby.objects?.find(o=>o.id===doorId)?.state??null,afterPassage:JSON.stringify(after).length};
  assert.equal(report.contextBytes.distant100,report.contextBytes.absent,'100 distant doors add +0 bytes');

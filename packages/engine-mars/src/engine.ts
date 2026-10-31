@@ -2060,7 +2060,7 @@ export class MarsEngine implements Engine {
   /** Soul Actions entry 31 (pure): the closed doors walling this body off from its plan's first walk_to destination. Null
    * when a walk reaches it (or it names nothing). Doors are the walk graph's closed-gap solids (`<door>#door:<opening>`,
    * god engine-bridge) bordering the region the failed route exhausted; nearest to the way there first, at most `max`. */
-  closedDoorsOnWalkV1(actor:string,steps:{verb:string;params?:Record<string,unknown>}[],max=4):{goal:[number,number];doors:string[]}|null{
+  closedDoorsOnWalkV1(actor:string,steps:{verb:string;params?:Record<string,unknown>}[],max=4):{goal:[number,number];doors:string[];goalDoors:()=>string[]}|null{
     const step=steps.find(s=>s.verb==='walk_to'),e=this.ents[actor];if(!step||!e?.human||(e.human.level??0)!==0)return null;
     const t=this.pointOf(step.params?.to);if(!t)return null;
     const start=this.godWalkoutStartV1(actor);if(!start)return null;
@@ -2070,9 +2070,13 @@ export class MarsEngine implements Engine {
     if(r.ok||r.diagnostic.code!=='route.unreachable')return null;
     const pos=(id:string)=>{const o=spatial.scene.obstacles.find(x=>x.id.startsWith(id+'#door:'));return o?o.obb.c:null;};
     const along=(c:[number,number])=>hypot(c[0]-start.p[0],c[1]-start.p[1])+hypot(c[0]-goal[0],c[1]-goal[1]);
-    const ids=[...new Set((r.diagnostic.subjects??[]).filter(s=>s.includes('#door:')).map(s=>s.split('#')[0]))].map(id=>({id,c:pos(id)})).filter((x):x is {id:string;c:[number,number]}=>!!x.c)
+    const named=(d:{subjects?:string[]})=>[...new Set((d.subjects??[]).filter(s=>s.includes('#door:')).map(s=>s.split('#')[0]))].map(id=>({id,c:pos(id)})).filter((x):x is {id:string;c:[number,number]}=>!!x.c)
       .sort((a,b)=>along(a.c)-along(b.c)).slice(0,max).map(x=>x.id);
-    return ids.length?{goal,doors:ids}:null;
+    const ids=named(r.diagnostic);
+    // asked only when no door on this side opens the way: the doors walling the destination's own side (the same search
+    // from the destination, which floods that side once), so a locked door there refuses instead of a closest approach
+    const goalDoors=()=>{const back=spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:0,p:goal},{level:0,p:start.p},{nameObstacles:id=>id.includes('#door:')});return back.ok?[]:named(back.diagnostic);};
+    return {goal,doors:ids,goalDoors};
   }
   /** Soul Actions entry 31 (pure): does a walk from `from` (level 0) reach this plan's first walk_to destination, a
    * standing point at its standoff as the walk itself would choose (goalNear's turns), with the world as it is now? */
