@@ -12,7 +12,7 @@ import {threadCpuUsage} from 'node:process';
 import {WorldHost} from '../world.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {GodMode} from '../god/god.ts';
-import {DeltaTap} from './delta.ts';
+import {DeltaTap, PROF} from './delta.ts';
 import {freshTables, worldInit} from './world-init.ts';
 import {Replica, type WorldDelta, type WorldInit} from './read-model.ts';
 
@@ -32,7 +32,7 @@ const attach = EdgeLedger.prototype.attachComms;
 EdgeLedger.prototype.attachComms = function (this: EdgeLedger, c) {attach.call(this, c); L = this; setTimeout(start, 0);};
 const onCommit = GodMode.prototype.onCommit;
 GodMode.prototype.onCommit = function (this: GodMode, f) {god = this; return onCommit.call(this, f);};
-const tickCost: number[] = [];
+const tickCost: number[] = []; let profTicks = 0;
 
 // ---- consumers
 const R = new Replica(), lagR = new Replica();
@@ -181,7 +181,7 @@ createServer(async (req, res) => {
     let v: unknown;
     const p = u.pathname;
     if (p === '/status') v = {tick: host!.engine.world.tick, pos: tap.pos, replica: R.pos, lag: lagR.pos, stats: {...stats, postCpuMs: summ(stats.postCpuMs)}, coverage,
-      cost: {...tap.cost, cpuMs: summ(tap.samples.map(s => s[0])), bytes: summ(tap.samples.map(s => s[1]))}, tickCpuMs: summ(tickCost), walkers: walkers.length, souls: souls().length, born};
+      cost: {...tap.cost, cpuMs: summ(tap.samples.map(s => s[0])), bytes: summ(tap.samples.map(s => s[1]))}, tickCpuMs: summ(tickCost), prof: Object.fromEntries(Object.entries(PROF).map(([k, x]) => [k, r3(x / Math.max(1, tap!.cost.ticks - profTicks))])), walkers: walkers.length, souls: souls().length, born};
     else if (p === '/diffs') v = diffs;
     else if (p === '/probe') {   // CPU per call of each read the tap makes
       const time = (f: () => unknown, n = 200) => {const c = cpuMs(); for (let i = 0; i < n; i++) f(); return r3((cpuMs() - c) / n);};
@@ -201,7 +201,7 @@ createServer(async (req, res) => {
     else if (p === '/check') v = {ok: check('on demand'), stats};
     else if (p === '/resnapshot') {tap.restart('forced (oracle)'); v = {gen: tap.gen};}
     else if (p === '/lagdrop') {lagR.pos = {...lagR.pos, seq: -5}; v = {ok: true};}   // as if far behind: the ring cannot serve it
-    else if (p === '/reset') {tap.samples.length = 0; tickCost.length = 0; stats.postCpuMs.length = 0; v = {ok: true};}
+    else if (p === '/reset') {tap.samples.length = 0; tickCost.length = 0; for (const k of Object.keys(PROF)) delete PROF[k]; profTicks = tap.cost.ticks; stats.postCpuMs.length = 0; v = {ok: true};}
     else {res.statusCode = 404; v = {error: 'unknown'};}
     res.end(J(v));
   } catch (e) {res.statusCode = 500; res.end(J({error: (e as Error).stack}));}

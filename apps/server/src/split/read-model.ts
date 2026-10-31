@@ -14,13 +14,15 @@ const SIGHT_RADIUS = 30, OBJECT_RADIUS = 15, NEAR_RADIUS = 20, GO_NEAR_RADIUS = 
 
 /** A world entity as the engine holds it (plain data; `pose` is the only part that moves every tick). */
 export type Ent = {id: string; kind?: string; def?: string; label?: string; pose: {p: number[]; yaw: number}; human?: Record<string, unknown> & {activity?: string; level?: number}; [k: string]: unknown};
-/** A pose update of an entity whose other fields did not change: [id, x, y, z, yaw]. */
-export type BodyRow = [string, number, number, number, number];
+/** A pose update of an entity whose other fields did not change: [id, x, y, z, yaw] or [id, x, y, z, yaw, human.speed]
+ *  (exact numbers: B-spatial's people-avoid tests flip at the millimetre). */
+export type BodyRow = [string, number, number, number, number] | [string, number, number, number, number, number];
 export type MindRow = {soulId: string; entityId: string; name: string; owner: string; native: boolean};
 /** An edge receipt as its phase-change notifications carry it (ledger.onReceipt). Open = waiting | started. */
 export type ReceiptRow = {id: string; soulId: string; capability: string; phase: string; acceptedTick: number; startedTick: number | null; endedTick: number | null; code: string | null; programId: string | null};
-/** A Soul body's engine programme: [entityId, programId | null, step, action verb, action status, phase]. */
-export type ProgramRow = [string, string | null, number, string, string, string];
+/** A Soul body's engine programme: [entityId, programId | null, step, action id, action verb] (engine.programOf/programAction).
+ *  The action's status and phase are not carried: they move inside a step with no programme event. */
+export type ProgramRow = [string, string | null, number, string, string];
 /** A Soul body's native seat holds (engine.nativeSeatHoldsV1): [entityId, [{action, slot}]]. */
 export type HoldRow = [string, {action: string; slot: string}[]];
 /** A carrier (engine.carriers(): bikes, punts, balloons): derived from its entity (Replica.carrierRows). */
@@ -115,7 +117,7 @@ export class Replica {
   apply(d: WorldDelta): boolean {
     if (d.gen !== this.pos.gen || d.seq !== this.pos.seq + 1) return false;
     for (const e of d.ents ?? []) this.entities.set(e.id, e);
-    for (const b of d.bodies ?? []) {const e = this.entities.get(b[0]); if (e) e.pose = {...e.pose, p: [b[1], b[2], b[3]], yaw: b[4]};}
+    for (const b of d.bodies ?? []) {const e = this.entities.get(b[0]); if (!e) continue; e.pose = {...e.pose, p: [b[1], b[2], b[3]], yaw: b[4]}; if (b.length === 6 && e.human) e.human = {...e.human, speed: b[5]};}
     for (const id of d.gone ?? []) this.entities.delete(id);
     if (d.env) this.env = d.env;
     if (d.living !== undefined) this.living = d.living;

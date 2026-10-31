@@ -6,7 +6,7 @@
 // Nothing here scans the world per tick: bodies are the tracked set (Soul/native humans, carriers, and entities the tick
 // reported), comms objects come from L8's table.changes(since), receipts from the ledger's receipt listener.
 import {threadCpuUsage} from 'node:process';
-import type {ChangeEvent, PathCommit} from '@sim/engine-contract';
+import type {ChangeEvent, PathCommit, ProgramEvent} from '@sim/engine-contract';
 import type {WorldHost} from '../world.ts';
 import type {EdgeLedger} from '../edge/ledger/ledger.ts';
 import type {EdgeReceipt} from '../edge/contract.ts';
@@ -19,23 +19,27 @@ type V2 = [number, number];
 type Eng = {
   world: {tick: number; entities: Record<string, Ent>; regions: Record<string, {polygon: V2[]}>; env: Record<string, unknown>; navV1?: {solids?: unknown[]}};
   programOf(actor: string): string | null;
-  programAction?(id: string): {step: number; action: {verb: string; status: string; phase?: string}} | null;
+  programAction?(id: string): {step: number; action: {id: string; verb: string; status: string; phase?: string}} | null;
   nativeSeatHoldsV1?(actor: string): {action: string; slot: string}[];
   carriers?(): {id: string}[];
   staticEpochV1?(): number;
 };
-export type TickOut = {paths: readonly PathCommit[]; changes: readonly ChangeEvent[]};
+export type TickOut = {paths: readonly PathCommit[]; changes: readonly ChangeEvent[]; programs?: readonly ProgramEvent[]};
 export type StreamMessage = WorldDelta | Resnapshot;
 const cpuMs = () => {const u = threadCpuUsage(); return (u.user + u.system) / 1000;};
 /** deltas kept for a consumer that fell behind (60 s at 20 ticks/s); further behind = re-snapshot */
 export const DELTA_RING = 1200;
+/** DELTA_PROFILE=1: wall ms per section of the tap, summed (harness only) */
+export const PROFILE = process.env.DELTA_PROFILE === '1', PROF: Record<string, number> = {};
 const SPATIALS = new WeakMap<object, number>(), SPOTS = new WeakMap<object, number>(); let spotsN = 0, spatialsN = 0;
 
 export const receiptRow = (r: EdgeReceipt): ReceiptRow => ({id: r.id, soulId: r.soulId, capability: r.capability, phase: r.phase, acceptedTick: r.acceptedTick, startedTick: r.startedTick ?? null, endedTick: r.endedTick ?? null, code: r.code ?? null, programId: r.programId ?? null});
 export const mindRow = (m: {soulId: string; entityId: string; name: string; owner: string; native: boolean}): MindRow => ({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner, native: !!m.native});
 const mindKey = (m: MindRow) => `${m.entityId}|${m.name}|${m.owner}|${m.native ? 1 : 0}`;
-/** an entity without its pose, as a comparable string (key order is the engine's own) */
-export const restKey = (e: Ent) => {const {pose: _p, ...rest} = e; return JSON.stringify(rest);};
+/** an entity without its pose and its human.speed, as a comparable string (key order is the engine's own) */
+export const restKey = (e: Ent) => {const {pose: _p, ...rest} = e; if (rest.human && 'speed' in rest.human) {const {speed: _s, ...h} = rest.human; rest.human = h;} return JSON.stringify(rest);};
+/** a walking body's speed ramps every tick without an event: it rides in the pose row */
+const speedOf = (e: Ent): number | undefined => {const v = e.human?.speed; return typeof v === 'number' ? v : undefined;};
 const copy = <T>(v: T): T => v === undefined ? v : JSON.parse(JSON.stringify(v)) as T;
 
 export class DeltaTap {
@@ -43,7 +47,7 @@ export class DeltaTap {
   gen = 0; seq = 0;
   private eng!: Eng; private table: ObjectTable | null = null;
   // the baseline the next delta is a difference from (the producer's memory; a WorldInit is a fresh read)
-  private tracked = new Set<string>(); private poses = new Map<string, [number, number, number, number]>(); private rests = new Map<string, string>();
+  private tracked = new Set<string>(); private poses = new Map<string, [number, number, number, number, number | undefined]>(); private rests = new Map<string, string>();
   private mindKeys = new Map<string, string>(); private fadedSeen = new Set<string>();
   private programKeys = new Map<string, string>(); private holdKeys = new Map<string, string>();
   private objectGen = 0; private togetherVersion = -1; private itemsKey = '';
@@ -56,7 +60,7 @@ export class DeltaTap {
   private subs = new Set<(m: StreamMessage) => void>();
   private faultLogged = false;
   /** tick-thread cost: CPU ms of building each delta (and its JSON bytes when `measureBytes`) */
-  readonly cost = {ticks: 0, cpuMs: 0, maxCpuMs: 0, bytes: 0, maxBytes: 0, resnapshots: 0, staticSends: 0, sceneSends: 0, objectDeltas: 0, receipts: 0, ents: 0, bodyRows: 0, unsettled: 0};
+  readonly cost = {ticks: 0, cpuMs: 0, maxCpuMs: 0, bytes: 0, maxBytes: 0, resnapshots: 0, staticSends: 0, sceneSends: 0, epochReads: 0, itemReads: 0, objectDeltas: 0, receipts: 0, ents: 0, bodyRows: 0, unsettled: 0};
   readonly samples: [number, number][] = [];
   measureBytes = false;
 
@@ -93,12 +97,13 @@ export class DeltaTap {
     this.epoch = this.epochNow(); this.cheapKey = this.staticCheapKey(); this.warm = this.epoch.endsWith('w'); this.staticCache = null; this.menuKey = JSON.stringify(this.menuInputsNow());
     if (reason !== 'boot') {this.cost.resnapshots++; const m: Resnapshot = {t: 'resnapshot', gen: this.gen, reason}; for (const f of this.subs) try {f(m);} catch { /* a consumer fault never breaks the tick */ }}
   }
-  private track(e: Ent) {this.tracked.add(e.id); this.poses.set(e.id, [e.pose.p[0], e.pose.p[1], e.pose.p[2], e.pose.yaw]); this.rests.set(e.id, restKey(e));}
+  private track(e: Ent) {this.tracked.add(e.id); this.poses.set(e.id, [e.pose.p[0], e.pose.p[1], e.pose.p[2], e.pose.yaw, speedOf(e)]); this.rests.set(e.id, restKey(e));}
 
   // ---- fresh reads (also used by WorldInit)
   programNow(entityId: string): ProgramRow {
     const eng = this.engine(), p = eng.programOf(entityId), a = p ? eng.programAction?.(p) : null;
-    return [entityId, p, a?.step ?? 0, a?.action.verb ?? '', a?.action.status ?? '', a?.action.phase ?? ''];
+    // not the action's status/phase: they move inside a step without a programme event (B-facade reads them on main)
+    return [entityId, p, a?.step ?? 0, a?.action.id ?? '', a?.action.verb ?? ''];
   }
   holdsNow(entityId: string): {action: string; slot: string}[] {return (this.engine().nativeSeatHoldsV1?.(entityId) ?? []).map(x => ({action: x.action, slot: x.slot}));}
   private programRow(entityId: string, baseline = false): ProgramRow | null {
@@ -166,6 +171,7 @@ export class DeltaTap {
     const table = this.objectTable();
     if (table !== this.table) {this.restart('object table replaced'); return;}
     const w = eng.world, ents = w.entities, d: WorldDelta = {v: 1, gen: this.gen, seq: this.seq + 1, tick: w.tick, logSeq: this.host.seq};
+    const P = PROFILE ? PROF : null; let pt = P ? performance.now() : 0; const mark = (k: string) => {if (P) {const t = performance.now(); P[k] = (P[k] ?? 0) + t - pt; pt = t;}};
     // objects first: a reload of the table voids its deltas, and the stream restarts before anything is emitted
     let objects: ObjectDeltaRow[] | null = null, objectGen = this.objectGen;
     if (table) {
@@ -177,13 +183,21 @@ export class DeltaTap {
     const changed = new Set<string>();
     for (const p of out.paths) changed.add(p.entity);
     for (const c of out.changes) if (c[1] !== '$env') changed.add(c[1]);
+    mark('objects');
     // receipts (phase changes since the last delta, in order), programmes and seat holds of Soul bodies
     if (this.receiptBuf.length) {d.receipts = this.receiptBuf; this.receiptBuf = [];}
-    const programs: ProgramRow[] = [], holds: HoldRow[] = [];
-    for (const m of this.host.minds.values()) {const p = this.programRow(m.entityId); if (p) {programs.push(p); changed.add(m.entityId);} const h = this.holdRow(m.entityId); if (h) {holds.push(h); changed.add(m.entityId);}}
-    if (programs.length) d.programs = programs; if (holds.length) d.holds = holds;
-    // a body whose programme, hold or receipt moved is re-read whole (its task/seat fields change without a pose change)
+    // a body whose receipt or programme moved is re-read whole (its task/seat fields change without a pose change)
     for (const r of d.receipts ?? []) {const m = this.host.minds.get(r.soulId); if (m) changed.add(m.entityId);}
+    for (const p of out.programs ?? []) changed.add(p.actor);
+    // a Soul's programme row and seat holds are re-read only when the tick named its body (a programme event, a change,
+    // a path, a receipt), or it has none on record yet
+    const programs: ProgramRow[] = [], holds: HoldRow[] = [];
+    for (const m of this.host.minds.values()) {
+      const id = m.entityId; if (!changed.has(id) && this.programKeys.has(id) && this.holdKeys.has(id)) continue;
+      const p = this.programRow(id); if (p) programs.push(p); const h = this.holdRow(id); if (h) holds.push(h);
+    }
+    if (programs.length) d.programs = programs; if (holds.length) d.holds = holds;
+    mark('receipts+programs');
     // bodies: the tracked set, plus whatever the tick reported (births, god edits, a carried item)
     const bodies: BodyRow[] = [], full: Ent[] = [], gone: string[] = [];
     for (const id of changed) if (!this.tracked.has(id)) {
@@ -193,19 +207,21 @@ export class DeltaTap {
     for (const id of this.tracked) {
       const e = ents[id];
       if (!e) {gone.push(id); this.tracked.delete(id); this.poses.delete(id); this.rests.delete(id); continue;}
-      const was = this.poses.get(id)!, p = e.pose.p, moved = was[0] !== p[0] || was[1] !== p[1] || was[2] !== p[2] || was[3] !== e.pose.yaw;
+      const was = this.poses.get(id)!, p = e.pose.p, sp = speedOf(e), moved = was[0] !== p[0] || was[1] !== p[1] || was[2] !== p[2] || was[3] !== e.pose.yaw || was[4] !== sp;
       if (!moved && !changed.has(id)) continue;
-      if (moved) {was[0] = p[0]; was[1] = p[1]; was[2] = p[2]; was[3] = e.pose.yaw;}
+      if (moved) {was[0] = p[0]; was[1] = p[1]; was[2] = p[2]; was[3] = e.pose.yaw; was[4] = sp;}
       // the rest of the entity is compared only when the tick named it (paths, changes, programme/hold/receipt): a body
       // that only moved sends its pose (stringifying every walking body each tick was most of the tap's cost)
       const rest = changed.has(id) ? restKey(e) : undefined;
       if (rest !== undefined && rest !== this.rests.get(id)) {this.rests.set(id, rest); if (!full.some(f => f.id === id)) full.push(copy(e));}
-      else if (moved) bodies.push([id, p[0], p[1], p[2], e.pose.yaw]);
+      else if (moved) bodies.push(sp === undefined ? [id, p[0], p[1], p[2], e.pose.yaw] : [id, p[0], p[1], p[2], e.pose.yaw, sp]);
     }
     if (bodies.length) d.bodies = bodies; if (full.length) d.ents = full; if (gone.length) d.gone = gone;
+    mark('bodies');
     // env (the clock's datetime moves every tick) and the day clock, whole when changed
     const env = JSON.stringify(w.env); if (env !== this.envKey) {this.envKey = env; d.env = JSON.parse(env);}
     const lv = this.livingNow(), lk = JSON.stringify(lv); if (lk !== this.livingKey) {this.livingKey = lk; d.living = lv;}
+    mark('env');
     // minds, faded
     const minds: MindRow[] = [];
     for (const m of this.host.minds.values()) {const r = mindRow(m), k = mindKey(r); if (this.mindKeys.get(m.soulId) !== k) {this.mindKeys.set(m.soulId, k); minds.push(r);}}
@@ -213,26 +229,29 @@ export class DeltaTap {
     if (this.mindKeys.size > this.host.minds.size) {const g = [...this.mindKeys.keys()].filter(id => !this.host.minds.has(id)); for (const id of g) this.mindKeys.delete(id); d.mindsGone = g;}
     const faded = this.L.faded;
     if (faded.size !== this.fadedSeen.size || [...faded].some(id => !this.fadedSeen.has(id))) {this.fadedSeen = new Set(faded); d.faded = [...faded].sort();}
+    mark('minds');
     // carriers are entities (their `carrier` state rides in `ents`): the replica derives them; no per-tick read of their state
     if (objects) {d.objects = {gen: objectGen, deltas: objects}; this.objectGen = objectGen;}
     // placed items (the together version moves with every together write), static epoch, menu inputs
     const tv = this.L.together.version;
     if (tv !== this.togetherVersion) {
-      this.togetherVersion = tv; d.togetherVersion = tv;
+      this.togetherVersion = tv; d.togetherVersion = tv; this.cost.itemReads++;
       const items = this.itemsNow(), k = JSON.stringify(items); if (k !== this.itemsKey) {this.itemsKey = k; d.items = items;}
     }
     const ready = this.navReadyNow(), flipped = ready !== this.navReady; if (flipped) {this.navReady = ready; d.navReady = ready;}
     const cheap = this.staticCheapKey();
     if (cheap !== this.cheapKey || flipped || (!this.warm && w.tick % 200 === 0)) {
-      this.cheapKey = cheap; const epoch = this.epochNow(); this.warm = this.epoch.endsWith('w') || epoch.endsWith('w');
+      this.cheapKey = cheap; const epoch = this.epochNow(); this.cost.epochReads++; this.warm = this.epoch.endsWith('w') || epoch.endsWith('w');
       if (epoch !== this.epoch) {this.epoch = epoch; d.static = this.staticLayer(); this.cost.staticSends++;}
     }
     // B-spatial: paged windows, connectivity readiness, the static scene when its rebuild key moved
     const pages = this.pagesNow(), pk = JSON.stringify(pages); if (pk !== this.pagesKey) {this.pagesKey = pk; d.pages = JSON.parse(pk);}
     const sk = this.sceneKeyNow(); if (sk !== this.sceneKey) {this.sceneKey = sk; d.sceneKey = sk; d.scene = this.sceneNow(); this.cost.sceneSends++;}
+    mark('items+static');
     const menu = this.menuInputsNow(), mk = JSON.stringify(menu); if (mk !== this.menuKey) {this.menuKey = mk; d.menuInputs = menu;}
     this.seq = d.seq;
     this.ring.push(d); if (this.ring.length > 2 * DELTA_RING) this.ring = this.ring.slice(-DELTA_RING);
+    mark('spatial+menu');
     const ms = cpuMs() - c0, C = this.cost;
     C.ticks++; C.cpuMs += ms; C.maxCpuMs = Math.max(C.maxCpuMs, ms); C.bodyRows += bodies.length; C.ents += full.length; C.receipts += d.receipts?.length ?? 0; C.objectDeltas += objects?.length ?? 0;
     let bytes = 0;

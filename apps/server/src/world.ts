@@ -143,7 +143,7 @@ export class WorldHost {
   paused = false;
   listeners: HostListener[] = [];
   /** Stage B (split/delta.ts, SIM_READ_WORKER=1 only): the WorldDelta tap, given each completed tick's own paths/changes. */
-  splitTap?: (tick: number, out: { paths: PathCommit[]; changes: ChangeEvent[] }) => void;
+  splitTap?: (tick: number, out: { paths: PathCommit[]; changes: ChangeEvent[]; programs: ProgramEvent[] }) => void;
   ring: Batch[] = [];
   lastSnapshotTick = 0;
   /** Adaptive snapshot cadence (lane L5): a periodic snapshot is also due once the ticks since the last one cost
