@@ -1,108 +1,97 @@
-# Sim successor checkout
+# AGENTS.md
 
-Canonical code home: `<repo>`. Strategy: `<eden4>/`.
-Gene authorized the merge in `23-MERGE-KICKOFF-PROMPT.md`; execute plan 22 v3
-with the kickoff's corrections. Read `docs/sim/RUNBOOK.md` before running
-services. Original `<old-sim-repo>`, `~/Mars`, `~/Dev/littlemartians` are references;
-Mars and Little Martians are read-only during this tranche.
+Rules for anyone changing this repository, human or agent (Claude Code, Codex, Cursor, …). `CLAUDE.md` imports this
+file. Keep it short: every rule here binds; detail lives in the linked docs.
 
-Never touch eden3 (`/opt/eden3`), the Mars service/user, unrelated server
-users, DNS or Cloudflare. Only Sim's Caddy site, units, data and Litestream
-entries are in scope. No raw media/source archives/vendor SDK. Never stage,
-commit or push secrets, and never bypass the global pre-commit hook.
+## What this is
 
-Local development/test minds are fake. Model budget <=$1 per world per
-rolling real 24 hours; keep the existing stricter default $0.50. New worlds
-require the verified human owner. Toy retains `toy-1` and its database.
-No timetable/routine object. World customs and perception inform decisions;
-triggers cause thinking, and only an explicit NOW instruction runs directly.
+Sim, the server and web app behind sim.eden.art: persistent worlds, Souls driven by their owners' own agents at the
+edge, god mode for world creators, and a vendored deterministic engine under `mars/` (its invariants:
+[mars/AGENTS.md](mars/AGENTS.md)). **Code wins over docs**; fix a doc you find wrong. Start at
+[docs/README.md](docs/README.md).
 
-## Playtests, the swarm director and Modal spend (since 2026-10-26)
+## Setup and everyday commands
 
-- **Playtest framework** (`tools/playtest/`, `DESIGN.md`): scripted batteries, persona runs and casts play Souls as Claude CLI seats in a
-  dev world; Reviewer + Developer passes; frozen sets and `replay-set` scorecards (`team/playtest/ROOT-CAUSES-20261025.md` §E). Measure
-  on a quiet machine only: never run workers, tsc, tests or ship checks on the laptop during a battery (two were contaminated on 10-26);
-  two repeats per arm; seats must use one relative command per call (allowlist, `arena/adapters/claude-headless.mjs`).
-- **Swarm director** (`tools/playtest/director/swarm/`, `playtest.mjs direct <cast>`): several Souls directed live through the owner
-  card channel with a typed console; casts in `tools/playtest/scenarios/casts/`. From a chat session: the `sim-director` skill.
-- **Modal policy is binding** (`<team>/lanes/MODAL-POLICY.md`): one gate per release head, cached baseline (no main re-runs),
-  4 containers per run, scoped candidate gates, never for perf experiments or tools/docs-only changes; ≤ 3 gates/day across lanes.
-- Round 2 of the playtests (wayfinding, look/see, podium casts) lives in `tools/playtest/scenarios/{wayfind,look}-*.json`,
-  `casts/podium-*.json`, `scenarios/round2.json`, plan `tools/playtest/ROUND2.md`.
+- Node ≥ 22.18 runs TypeScript by type stripping: no `enum`, no parameter properties, no other non-erasable syntax.
+  pnpm 10: `pnpm install --frozen-lockfile`, then `pnpm assets:pull` (media is not in git).
+- Local server: `BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=.local/dev node --env-file=.env apps/server/src/main.ts`.
+  See [docs/development.md](docs/development.md).
+- Before a PR: `pnpm typecheck` (or `tsc -p` for the packages you touched), `node --test` on the affected test files,
+  and the walk and bundle checks below when your change can affect them. What to run when:
+  [docs/testing.md](docs/testing.md).
 
-## Releases (current since 2026-10-20; the old `pnpm check` / staging / `/srv/sim/ops` recipe is retired)
+## Minds, money and data
 
-Only the release owner (R, id on the top line of `<team>/lanes/ROSTER.md`, holding `team/lanes/DEPLOY.lock`) ships,
-writes to eden2 and pushes. A lane hands R `branch@sha` + a gate receipt; R ships it on current main.
-- **Gate (Modal; never full suites on the laptop):** `tools/test-harness/release-gate.sh <head> --baseline <main sha>
-  --out <dir>` (`--dry-run` first: it shows whether main's run comes from the gate cache; see REMOTE-SUITE.md). Lanes may
-  gate a candidate with `--scope auto` (only the steps its diff touches; docs/tools-only: not gated); the release head
-  always takes the default full scope, and only a full-scope receipt makes a ship receipt. Clean = 0 new failures, 0 blockers, 0 unexpected skips; the standing quarantine
-  (`tools/test-harness/quarantine.json`) has **9 entries** (10 retired); a clean gate reports `quarantined 8`, because the
-  east-house phase A whole-skeleton entry now runs and passes (kept only for older baselines; see the file's 2026-10-21
-  note). GitHub Actions runs fail at start (account billing, Gene's); the Modal gate is the release check.
-  At most 3 gates in flight across tranches (Modal workspace limit is 100 containers; one run = 4); ledger
-  `team/lanes/GATES.inflight` (append a line before you start, remove it when receipt.json exists).
-- **Conformance re-pins:** known library failures are pinned by exact def hash, so a changed def revision fails
-  `conformance` until a reviewed supplement `packages/conformance/conformance/<lane>-<date>.json` re-pins its documented
-  tuples hash for hash (e.g. `bsgen-20261021.json`, `seatdef-20261022.json`), listed with a note in that folder's
-  README. A re-pin is made by the lane that changed the behaviour, in the same change, with its reason in that record note;
-  no approval is needed (Gene, 2026-10-23: no approval gates for test expectations, baselines or skill bumps). Never edit older supplements.
-- **Walkability is gated (V3-walk):** the gate audits fixed copies of eden-2026, bench-eden, bench-hamlet, a fresh Eden 2026
-  genesis and the generated fuzz world (`tools/test-harness/walk/fuzz-world.mjs`, `walk-audit.ts --fuzz`: every building type
-  x 5 yaws x 3 grounds, packed rows, furnished, stacked, nested; also scores seats and beds a Soul cannot use) with
-  `apps/server/src/god/walk-audit.ts` (bad destinations, one-ways, goalless things, floats per place), and fails when any
-  place is worse than `tools/test-harness/walk/baseline/` (incl. `fuzz.json`). Check locally in ~1 min:
-  `node tools/test-harness/walk/walk.mjs` (`--world fuzz,bench-hamlet` for a subset). A deliberate change (better or worse)
-  updates the baseline as a reviewed file change, in its own commit before the final gate: `walk.mjs --write`, or
-  `walk.mjs --from <gate out>/candidate/out/suite/walk --write`.
-- **Bundle size is gated (V3-bundle):** `tools/test-harness/bundle-budget/bundle-gate.test.mjs` measures the web build
-  (code files; keyed by chunk name without its hash, raw + gzip) against the reviewed
-  `tools/test-harness/bundle-budget/baseline.json` and fails on +10% or more for any chunk (over 4 KB slack) or the total,
-  or on a new chunk of 100 KB+ the baseline does not know. Local check: `node tools/test-harness/bundle-budget/budget.mjs
-  --build --check`. A deliberate change updates the baseline in its own reviewed commit: `budget.mjs --build --write`, or
-  `budget.mjs --from <gate out>/candidate/out/suite/bundle/current.json --write`; the gate never writes it.
-- **Godmode build safety (BUILDSAFE, `buildsafe/1`):** god `commitBatch` repairs at commit time what an edit newly cuts off
-  (a 1 m gate or a nudge, in the same batch, on the shared clearance rule); leftovers come back as one actionable line plus
-  a tested op, and a sealed refusal stands unless the repair reopens it. Never add a separate post-hoc walk fix for a
-  fence or wall that cuts off a way.
-- **Seats (SEATDEF):** core seat heights come from the def's model geometry (a change is a new def revision; old revisions
-  keep their bytes). The edge sit capability refuses only `seat.too-high`; a low seat is sat on.
-- **Build:** `tools/world-launcher/deploy/release.sh production --reload` (exactly HEAD of a clean tree). The asset CDN is
-  ON by default (`SIM_ASSETS_CDN_ENABLED=0` opts out for one release; other values refused); the build fails without the CDN
-  origin + `cdn-manifest-*.json` in dist, or without the Eden experience pin call. It keeps the stage links + 3 newest
-  `/srv/sim-worlds/releases`. New CDN objects go up first with `tools/cdn/publish.mjs` (R only; key by path, never read).
-- **Order per ship:** compact backups of production and legacy (`pre-r<NNN>-<stage>-<ts>`) → `release.sh legacy`
-  (upload only) → [live probe: `deploy/release-probe.mjs ... --expect-build we-<sha12>`, wait for `<dir>/ready`] →
-  `release.sh production --reload` → legacy: `sha256sum -c FILES.sha256` in `/srv/sim-old/releases/<build>-root`, then
-  its `activate.sh legacy <rel> --reload`, update `LEGACY-RELEASE` → [touch `<dir>/released`] → healthz (build, 6/6,
-  hostOk) → walks (all worlds, desktop + phone, poster + stall) → `node tools/cdn/cdn-walk.mjs <out>
-  https://sim.eden.art/worlds/w/eden-2026/ https://sim.eden.art/w/mars https://sim.eden.art/w/eden` (must PASS) → lane
-  live checks → fast-forward main + push → SHIP-LOG (`<team>/reviews/sim-release-20261015/SHIP-LOG.md`) with the
-  rollback commands (`activate.sh <stage> <previous release> --reload`).
-- **eden2 retention:** `tools/world-launcher/deploy/retention.sh --host root@eden2` lists what keep-N would delete
-  (10 routine backups per stage; 5 legacy releases + linked + in use). Dry run is the default; `--apply` needs Gene's yes.
-- **One command:** `tools/world-launcher/deploy/ship.sh --label <n>` runs that order from backups to cdn-walk (`--dry-run`
-  first; see `tools/world-launcher/deploy/RELEASES.md`); R still does lane checks, main + push, SHIP-LOG.
-- Do not replay passing checks without a source change or unresolved finding that warrants it.
+- Local and test minds are **fake** (`BRAIN_MODE=fake`; anything else means live). Never run a live model unless the
+  task is testing the models.
+- The model budget is at most $1 per world per rolling 24 h, default $0.50, reserved before each provider call. Never
+  raise it in code or tests.
+- New worlds need a verified human owner. One god per world.
+- Tests never use production data, production databases or ports of running services. Use an isolated `DATA_DIR`
+  under an ignored path (`.local/`).
+- Never commit secrets, `.env`, `deploy.env`, databases, run outputs or media. Never bypass the secret scanner or
+  commit hooks (`--no-verify`).
+
+## Engine invariants
+
+- The engine core is deterministic: fixed tick, no `Date.now` or `Math.random` (randomness comes from the world RNG),
+  zod as its only dependency, named diagnostics. Kernel changes apply or are refused with a reason.
+- Never bypass support, ownership or admission; never move through forbidden geometry, teleport or silently respawn.
+  Renderers, pose adapters and cameras observe state and never own a second movement path.
+- A local failure never stops the clock, the UI or unrelated actors; invariant corruption stays visible and contained.
+- Skipped, `FIXME` and `TODO` checks count as unproved. Golden baselines change only with proof of an intended change.
+- Contract: [docs/architecture/engine-contract.md](docs/architecture/engine-contract.md).
+
+## Gates every change keeps green
+
+- **Walk (V3-walk):** `node tools/test-harness/walk/walk.mjs`. A deliberate change updates the baseline with
+  `--write`, in its own reviewed commit. [docs/testing.md](docs/testing.md#walk-gate)
+- **Bundle (V3-bundle):** `node tools/test-harness/bundle-budget/budget.mjs --build --check`. The baseline changes only
+  in its own commit (`--write`); the gate never writes it. [docs/testing.md](docs/testing.md#bundle-gate)
+- **Conformance pins:** a changed library def revision needs a new supplement in
+  `packages/conformance/conformance/`, in the same change, with its reason. Never edit older supplements.
+- **Full gate:** the [remote gate](docs/testing/remote-gate.md) runs the complete suite for a release head: 0 new
+  failures, 0 blockers, 0 unexpected skips. Don't re-run passing checks without a source change.
+
+## God mode build safety and seats
+
+- **BUILDSAFE:** god `commitBatch` repairs what an edit newly cuts off, in the same batch
+  (`apps/server/src/god/buildsafe-rule.ts`). Never add a separate after-the-fact walk fix.
+- **SEATDEF:** seat heights come from the def's model geometry. A change is a new def revision; old revisions keep
+  their bytes. Sitting refuses only `seat.too-high`.
+
+## Playtests and the swarm director
+
+- Batteries, personas and casts live in `tools/playtest/`. Measure on a quiet machine only, two repeats per arm.
+  Seats use one relative command per call. [docs/testing/playtests.md](docs/testing/playtests.md)
+- Directed live casts: `node tools/playtest/playtest.mjs direct <cast>`, or the `sim-director` skill from a chat
+  session. [docs/testing/swarm-director.md](docs/testing/swarm-director.md)
+
+## Cloud spend
+
+- The remote gate runs once per release head against a cached baseline; candidates use scoped gates. Never gate perf
+  experiments or docs/tools-only changes. Respect the shared concurrency cap.
+  [docs/process/modal-policy.md](docs/process/modal-policy.md)
+
+## Agent lifecycle
+
+- Work starts from an issue; one branch or worktree per piece of work; small, reviewed pull requests. Proof goes in
+  the PR, not the tree: no status, brief, prompt or report files.
+- Each PR names its proof tier ([PROOF-POLICY.yml](docs/process/PROOF-POLICY.yml); `node tools/proof/tier.mjs`) and
+  adds a changelog fragment in [`changes/`](changes/README.md) unless it is labelled `no-changelog`.
+- "Done" means walked on the real URL with real input; a scripted e2e alone doesn't count. Visual evidence is uncut,
+  real-speed video. [docs/process/](docs/process/agent-lifecycle.md)
+- Bug fixes need no approval. Destructive production deletes need the maintainer's explicit yes.
+- Repo skills: `.claude/skills/` (plain Markdown, readable by any agent). Agent definitions: `.claude/agents/`.
+
+## Release and operations
+
+- Releases run through the release workflow: gate receipt, build of exactly HEAD of a clean tree, CDN-first assets,
+  staged ship, healthz, walks, cdn-walk, rollback on failure. [docs/release.md](docs/release.md)
+- Never touch services, users, DNS or proxies on the host that aren't Sim's. [docs/operations.md](docs/operations.md)
 
 ## Visitor analytics
 
-GoatCounter site `simeden`, dashboard **https://simeden.goatcounter.com** (Gene's account; the `site-analytics` skill
-covers it beside genekogan.com and mars.college). `apps/web/src/visitor-counts.ts` sends the counts itself (no GoatCounter
-script): page views as `/w/<slug>` (or `/` for the world list; never a query, hash, Soul id or token), referrer origin,
-screen width (the dashboard's phone/desktop split), and events `enter world <slug>` (arrival card gone), `soul paired`,
-`god connected`. Cookieless. Not counted: local/private/tailnet hosts, `navigator.webdriver` (all ship.sh walks, probe,
-poster, stall, cdn-walk), `?shot`, a browser with `localStorage.skipgc = 't'`. Build env `SIM_GOATCOUNTER` = a code or a
-full count URL (default `simeden`; `off` disables). The world pages' only CSP is `frame-ancestors 'none'`; a fetch
-directive added there must allow `https://simeden.goatcounter.com`.
-
-Imported `mars/AGENTS.md` carries original-checkout history; its prohibitions
-on authorized Eden fork work are superseded by Gene's kickoff, while engine
-determinism, geometric and evidence safeguards remain useful.
-
-Parallel helpers: bounded Opus tasks in successor worktrees only. Lead owns
-import, server, persistence/day/steering and deployment. Before adding helpers,
-check subscription quota. Do not import computer workshop/library reading
-candidates; wait for the read-only boundary's final publication receipt and
-import both activities plus six shared wiring files as one unit.
+- `apps/web/src/visitor-counts.ts` is cookieless and never sends a query string, hash, Soul id or token. Automation
+  is excluded (`navigator.webdriver`, `?shot`, `skipgc`). A CSP fetch directive must allow the counter origin.
+  [docs/operations/analytics.md](docs/operations/analytics.md)
