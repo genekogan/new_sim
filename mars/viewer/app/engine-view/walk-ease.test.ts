@@ -60,3 +60,15 @@ test('the idle onset clock restarts from the last full stride, never from a walk
   assert.equal(lastFullStride(shuffle, 0, 200, dt), 140, 'a long slow shuffle counts as moving until 60 ticks before its end');
   assert.equal(lastFullStride(shuffle, 0, 200, dt, 60, false), null);
 });
+
+test('past the last sample a slowing body keeps slowing; a steady one keeps its share', () => {
+  // engine arrival: 1.2 m/s, then 0.2 m/s for 4 ticks, then the window ends (its successor not here yet)
+  const slow: PoseSample[] = [[0, 0, 0, 0, 0], [20, 1200, 0, 0, 0], [24, 1240, 0, 0, 0]];
+  const s = gaitSegments([{ track: slow, offset: 0 }], dt);
+  // the client sat at the window's end for three frames (tick 24, then 25-27 ahead): the stop runs on to standing
+  const held = gaitSegments([{ track: [...slow, [40, 1240 + 160, 0, 0, 0]], offset: 0 }], dt);
+  assert.ok(walkWeightAt(s, 28, dt) < 0.2 && walkWeightAt(s, 32, dt) < 0.02, 'a slowing body finishes its stop: ' + walkWeightAt(s, 28, dt));
+  assert.ok(walkWeightAt(held, 28, dt) > 0.4, 'one that keeps its slow pace keeps a partial stride');
+  const steady = gaitSegments([{ track: track(0, 24, 1.2, 24), offset: 0 }], dt);
+  assert.equal(walkWeightAt(steady, 24, dt), 1);
+});

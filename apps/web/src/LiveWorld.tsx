@@ -818,7 +818,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           people.setPlatformFloors(floors,base?.levels.find(l=>l.id===0)?.y??0);
           if(locationRegions!==take.finalState.regions){locationRegions=take.finalState.regions;depictedLocations=depictedWorldLocations(take.finalState.regions,base?.levels??[],(x,z,y)=>platformFloorOffset(floors,x,z,y,base?.levels.find(l=>l.id===0)?.y??0));}
           const beat=worldDepictionBeat(context.current.depictionBeatAt,s.conn.welcome?.worldId,take,depictedTick,past.current?'history':'live',pick.exact);
-          const sampled = people.show(local * take.dt, depictedTick * dt,beat);
+          const sampled = people.show(local * take.dt, depictedTick * dt,beat,(depictedTick - take.startTick) * take.dt);
           games.update(sampled.entities,depictedTick);
           bodyModels.sync(records,sampled.entities);
           const sampledFloaters=new Map(Object.entries(sampled.entities).flatMap(([id,e])=>{const body=recordedBody(records[id]?.body,e.state);if(body?.family!=='floater')return [];const url=admittedBodyUrl(body.modelUrl,apiPath('').replace(/\/$/,''));return [[id,{...body,...(url?{modelUrl:url}:{})} as NonNullable<Entity['body']>]] as [string,NonNullable<Entity['body']>][];}));
