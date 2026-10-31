@@ -43,10 +43,11 @@ test('heartbeat: pongs that arrived during a stall are read before the verdict; 
   // a ping goes out, then the main thread stalls while the pong arrives; the sweep runs right after the stall
   f.sweep(); await new Promise((r) => setImmediate(r));
   assert.equal(c.alive, false);
-  const end = Date.now() + 300; while (Date.now() < end) { /* the stall */ }
+  const end = Date.now() + 1500; while (Date.now() < end) { /* the stall (long enough for the other process to answer) */ }
   f.sweep(); await new Promise((r) => setImmediate(r));
   assert.ok(f.hub.clients.has(c), 'the pong that came in during the stall counted');
   // a viewer whose pong really never came, seen by a sweep that ran 40 s late: kept one more round
+  for (let i = 0; i < 300 && !c.alive; i++) await new Promise((r) => setTimeout(r, 10));   // the last real ping's pong is in
   c.alive = false; (c.ws as unknown as { ping: () => void }).ping = () => {};
   f.setSweepAt(Date.now() - 40_000); f.sweep(); await new Promise((r) => setImmediate(r));
   assert.ok(f.hub.clients.has(c), 'a late sweep judges nobody');
