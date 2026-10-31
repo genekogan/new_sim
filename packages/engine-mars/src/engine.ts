@@ -304,7 +304,12 @@ export class MarsEngine implements Engine {
     // tick reuses the pass's listing while nothing that runs here can add, remove or replace an entity: no live action
     // (clearStairHeads, timeoutStalledReflexes and the quiet point act only through live actions), no programme to
     // advance, no quiet point, no one leaving. The clock, attention and take recorder change no entry.
-    const table: EntityTable = listTable(this.ents);
+    // L4 (c): the listing the last step ended with, while nothing outside step has run engine code since (tableWritesV1)
+    const cached = this.tableCacheV1;
+    const reuse = !!cached && cached.entities === this.ents && this.tableCacheAt === this.tableWritesV1;
+    if (reuse) this.tableReusesV1++;
+    const table: EntityTable = reuse ? checkedTable(cached!) : listTable(this.ents);
+    this.tableCacheV1 = null;
     this.m.stepCarriers(this.rt, table);   // carrier/1: rides move their seated riders first (no carriers: no effect)
     this.rt.step(table);
     const pass: EntityTable | null = (this.rt as any).passTable ?? null;
@@ -325,7 +330,7 @@ export class MarsEngine implements Engine {
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
     // S1 r2: the bodies in Object.keys order, found again without reading every entity's kind while the table holds the
     // same objects under the same keys (stableIndices: an entity's kind never changes); the loop adds and removes none
-    const ents = this.ents, { keys, list } = still ? pass! : listTable(ents) as { keys: string[]; list: any[] };
+    const ents = this.ents, listing: EntityTable = still ? pass! : listTable(ents), { keys, list } = listing as { keys: string[]; list: any[] };
     for (const i of stableIndices(ents, 'engine bodies', list, keys, (e: any) => e.kind === 'human').idx) {
       const id = keys[i], e = list[i];
       // creatures (bodies/creatures.ts) show a rest of 5 s or more as 'settle' (the duck sits, the snail withdraws, the dog lies
@@ -350,6 +355,8 @@ export class MarsEngine implements Engine {
       const parents = new Set<string>(); for (const r of this.rt.records.values()) if (r.parent && this.rt.isActive(r.id)) parents.add(r.parent);
       for (const [id, r] of this.rt.records) if (r.endedTick !== undefined && r.endedTick < tick - KEEP_RECORDS && !parents.has(id)) this.rt.records.delete(id);
     }
+    // L4 (c): the body loop changed no entry; the next step reuses this listing unless engine code runs in between
+    this.tableCacheV1 = listing; this.tableCacheAt = this.tableWritesV1;
     return out;
   }
 
@@ -1855,6 +1862,14 @@ export class MarsEngine implements Engine {
    *  listed all ~4,900 entities of Eden 2026 to find the few bodies; ~4% of a busy world). Positions are read live. */
   private passHumans:any[]|null=null;
   private inPass=0;
+  /** L4 (c): the entity-table listing the last step ended with, and the tableWritesV1 count it was taken at. */
+  private tableCacheV1: EntityTable | null = null;
+  private tableCacheAt = -1;
+  /** L4 (c): moves on entry to and exit from every MarsEngine method but `step` and the TABLE_PURE reads (below the
+   *  class), so a listing taken at the end of one step is reused by the next only when no other engine code ran. */
+  tableWritesV1 = 0;
+  /** L4 (c): steps that reused the listing (load stats). */
+  tableReusesV1 = 0;
   /** world-edit/1 read: the nearest clear standing point to `at` on a level (rings of 0.25 m out to `maxRing`), away from
    *  other bodies; null when none. Used to plan a Soul's approach to a god-placed thing on another floor. */
   standableNearV1(at:[number,number],level=0,except?:string,minClear=HUMAN_RADIUS+.12,maxRing=24):[number,number]|null{
@@ -1922,6 +1937,14 @@ export class MarsEngine implements Engine {
   /** lane NAV (nav-connect/1, connectivity.ts): the world's level-0 connectivity, relabelled for what changed since the last
    *  read (only the edited ground tiles on a ground world). The main area is the one holding the arrival point. Pure read. */
   private conn?:NavConnectivity;
+  private epochSpatial?:Spatial;private epochSeen=-1;private staticEpoch=0;
+  /** Load lane L4: the static-geometry epoch — a counter that moves exactly when what the walk planner sees of the static
+   *  world changed since the last call (a god commit, a layer or def change, a world edit, a construction phase, a re-based
+   *  or replaced spatial service). It is read after a spatial sync, so it is the planner's own change test (Spatial.epoch,
+   *  `navChanged`), monotonic over this engine's life. Consumers key derived caches on it instead of scanning the world
+   *  (punt search, menu sources). Inside readPassV1 it costs nothing more than an integer compare. */
+  staticEpochV1():number{const sp=this.rt.services.spatial as Spatial;sp.sync(this.rt.world);
+    if(sp!==this.epochSpatial||sp.epoch!==this.epochSeen){this.epochSpatial=sp;this.epochSeen=sp.epoch;this.staticEpoch++;}return this.staticEpoch;}
   connectivityV1():NavConnectivity{this.navWarmV1(Infinity);return this.conn!;}
   /** lane NAV: is each standing point connected to the main walkable area (levels and stairs as the planner sees them)?
    *  Points off the main component, and upper floors, are settled by the planner (reachV1 to the nearest main point). */
@@ -2349,6 +2372,42 @@ export class MarsEngine implements Engine {
     return true;
   }
   takeChunks(afterTick: number) { return this.chunks.filter(c => c.toTick > afterTick); }
+}
+
+// L4 (c, server-reliability 2026-10-31): listing the entity table (Object.keys over ~4,900 keys of a dictionary-mode
+// object, then each value) was ~12 % of an idle served world's CPU, once a tick. Nothing outside the engine writes the
+// table (the server only reads engine.world), and inside it every write runs in a MarsEngine method or in step. So every
+// method but step and the reads below moves `tableWritesV1` on entry and on exit (exit: a method that steps and then
+// writes still voids the listing its inner step left), and step reuses the listing the previous step ended with while
+// the count is unchanged and the table is the same object. Exact: the same keys, order and values as a fresh listing
+// (oracle SIM_TABLE_CHECK=1 lists afresh and throws on any difference). A method added later is wrapped by default.
+/** Reads called between ticks on a served world that never add, remove or replace an entry of the table. */
+const TABLE_PURE: ReadonlySet<string> = new Set<string>([
+  // read every tick by the server and the step itself (SIM_L4_SCAN_SITES=1 engine calls on the live copy); each only reads
+  // the table (spatial syncs and connectivity labels are derived state outside it)
+  'takeChunks', 'composedRules', 'renderContextKeyV1', 'carrierOf', 'carriers', 'stallProbeV1', 'placeLevelV1', 'programOf',
+  'poseSampleOf', 'staticEpochV1', 'lyingRoomAtV1', 'navWarmV1', 'connectivityV1', 'navCheckV1',
+]);
+const TABLE_COUNT = process.env.SIM_L4_SCAN_SITES === '1' ? new Map<string, number>() : null;
+(MarsEngine as unknown as { tableWriteSitesV1?: Map<string, number> | null }).tableWriteSitesV1 = TABLE_COUNT;   // diagnostic (SIM_L4_SCAN_SITES=1): calls per method
+for (const name of Object.getOwnPropertyNames(MarsEngine.prototype)) {
+  if (name === 'constructor' || name === 'step' || TABLE_PURE.has(name)) continue;
+  const d = Object.getOwnPropertyDescriptor(MarsEngine.prototype, name)!;
+  if (typeof d.value !== 'function') continue;
+  const f = d.value as (...a: unknown[]) => unknown;
+  const wrapped = TABLE_COUNT
+    ? function (this: MarsEngine, ...a: unknown[]) { TABLE_COUNT.set(name, (TABLE_COUNT.get(name) ?? 0) + 1); this.tableWritesV1++; try { return f.apply(this, a); } finally { this.tableWritesV1++; } }
+    : function (this: MarsEngine, ...a: unknown[]) { this.tableWritesV1++; try { return f.apply(this, a); } finally { this.tableWritesV1++; } };
+  Object.defineProperty(wrapped, 'name', { value: name });
+  Object.defineProperty(MarsEngine.prototype, name, { ...d, value: wrapped });
+}
+const TABLE_CHECK = process.env.SIM_TABLE_CHECK === '1';
+/** The cached listing; under SIM_TABLE_CHECK=1 first proved equal to a fresh one. */
+function checkedTable(t: EntityTable): EntityTable {
+  if (!TABLE_CHECK) return t;
+  const f = listTable(t.entities);
+  if (f.keys.length !== t.keys.length || f.keys.some((k, i) => k !== t.keys[i] || f.list[i] !== t.list[i])) throw new Error('table-cache: the entity table changed outside a MarsEngine method');
+  return t;
 }
 
 function centroid(poly: [number, number][]): [number, number] { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [r3(x / poly.length), r3(z / poly.length)]; }

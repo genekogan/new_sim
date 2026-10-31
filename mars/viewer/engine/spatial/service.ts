@@ -19,6 +19,7 @@ import type { GroundField } from './ground.ts';
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
 /** Non-human entity that blocks walking where it stands: a static phase, or no phase and a catalog `obstacle` fixture (chair, bench, campfire). */
+import { navTrustChecking, navTrustToken } from './nav-trust.ts';
 const isStatic = (e: Entity) => e.kind !== 'human' && (e.phase ? STATIC_PHASES.has(e.phase) : CATALOG[e.def]?.obstacle === true);
 /**
  * What sync's change test reads of one static entity: id, def, phase, pose (p, yaw, pitch, roll),
@@ -144,6 +145,11 @@ export class Spatial {
   private gridsNow?: GridSet;
   private gridsLater: (() => GridSet) | null = null;
   epoch = 0;
+  /** Paged-ground counters (cheap integers, read by the server's load stats): syncs, rebuilds because only the windows
+   *  moved / because the static world changed, the ms those rebuilds took, and window grids built (and their ms). */
+  readonly stats = { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0, scans: 0, scanMs: 0, trusted: 0 };
+  /** Diagnostic (SIM_L4_SCAN_SITES=1): scans per calling function (the first frame outside this file). */
+  readonly scanSites: Map<string, number> | null = typeof process !== 'undefined' && (process as { env?: Record<string, string | undefined> }).env?.SIM_L4_SCAN_SITES === '1' ? new Map() : null;
   /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
   prof?: Profiler;
   /** Navigation-relevant snapshot of the static entities (in world order) at the last rebuild. */
@@ -196,6 +202,7 @@ export class Spatial {
     this.raster = new StaticRaster(this.base.obstacles, this.base.bounds, this.cell);
     this.scene = undefined as unknown as SpatialScene;
     this.snaps = [];
+    this.trustToken = -1;
     this.aroundCache.clear();
     this.narrowCache.clear();
     this.sync(world);
@@ -217,6 +224,7 @@ export class Spatial {
     }
     this.scene = undefined as unknown as SpatialScene;
     this.snaps = [];
+    this.trustToken = -1;
     this.aroundCache.clear();
     this.narrowCache.clear();
     this.sync(world);
@@ -355,7 +363,14 @@ export class Spatial {
     for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
     if (!units.length) clip(rectOf([[0, 0]]));
     const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    this.stats.pagedSyncs++;
     if (!changed && this.pages && this.pages.key === key) return false;
+    const t0 = performance.now();
+    // L4: only the windows moved (no static change, same entity-physics contribution): the scene lists are the same, so the
+    // last ones are kept (re-collecting every static footprint and contribution cost O(entities) per tile crossing).
+    const physics = world.entityPhysicsV1?.hash;
+    if (!changed && this.pages && this.pagesPhysics === physics) return this.pagedWindows(world, rects, key, { ...this.pages.all, bounds: g.boundsOf(rects[0]) }, false, t0);
+    this.pagesPhysics = physics;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
     const links: Link[] = [...this.base.links];
@@ -380,6 +395,14 @@ export class Spatial {
       g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
       g.setSolids(obstacles);
     }
+    return this.pagedWindows(world, rects, key, all, changed, t0);
+  }
+  /** Entity-physics hash the paged scene lists were last collected under. */
+  private pagesPhysics: string | undefined;
+  /** Paged: install the windows `rects` over the scene lists `all` (keeping the grids of unchanged rects when the static
+   *  world did not change) and focus the stepped actor's window. */
+  private pagedWindows(world: WorldState, rects: TileRect[], key: string, all: SpatialScene, changed: boolean, t0: number): boolean {
+    const g = this.ground!;
     let tiles = 0;
     for (const r of rects) tiles += (r[2] - r[0] + 1) * (r[3] - r[1] + 1);
     g.fineMax = Math.max(FINE_LRU_PAGED, tiles + 8); g.composedMax = rects.length + 4;
@@ -390,6 +413,8 @@ export class Spatial {
     // corridor, smoothing and single-file passages (narrowId: window-independent names) stay valid when windows move
     if (changed) { this.epoch++; this.aroundCache.clear(); }
     this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
+    if (changed) this.stats.pagedChanged++; else this.stats.pagedMoved++;
+    this.stats.pagedMs += performance.now() - t0;
     return true;
   }
 
@@ -411,8 +436,9 @@ export class Spatial {
     this.focusIdx = i;
     let set = pg.sets[i];
     if (!set) {
-      const build = () => this.ground!.gridsOver(pg.rects[i], pg.all);
+      const build = () => this.ground!.gridsOver(pg.rects[i], pg.all), t0 = performance.now();
       set = pg.sets[i] = this.prof ? this.prof.time('spatial.sync.grids', build) : build();
+      this.stats.gridBuilds++; this.stats.gridMs += performance.now() - t0;
       if (this.planner === 'corridor') prepareCorridor(set);
     }
     this.scene = pg.scenes[i];
@@ -507,12 +533,38 @@ export class Spatial {
     // so a world with a body does not look ~4,900 entities up by key every tick; elsewhere the table itself.
     // S1 r2: only its relevant entities (world/relevant.ts): a plain fixture is neither static (no phase, not a catalogue
     // obstacle) nor a body, so the bodies and the static entities come in the same order as from the whole list.
+    // L4: only nav-pure code ran since this table's last scan (nav-trust.ts): no static change; list the bodies again
+    const token = navTrustToken();
+    if (token >= 0 && this.trustToken === token && this.trustEntities === world.entities) {
+      if (navTrustChecking() && this.navScan(world, onBody)) throw new Error('nav-trust: a static entity changed under a nav-pure step');
+      else if (navTrustChecking()) { this.stats.trusted++; return false; }
+      if (onBody) { const ents = world.entities, ids = this.bodyIds; for (let i = 0; i < this.bodyN; i++) onBody(ents[ids[i]]); }
+      this.stats.trusted++;
+      return false;
+    }
+    const t0 = performance.now(), changed = this.navScan(world, onBody);
+    this.stats.scans++; this.stats.scanMs += performance.now() - t0;
+    if (this.scanSites) {
+      const f = (new Error().stack ?? '').split('\n').slice(2).find((l) => !l.includes('/spatial/service.ts')) ?? '?';
+      const k = f.trim().replace(/^at /, '').replace(/\(.*\/([^/]+:\d+):\d+\)$/, '$1');
+      this.scanSites.set(k, (this.scanSites.get(k) ?? 0) + 1);
+    }
+    this.trustToken = token; this.trustEntities = world.entities;
+    return changed;
+  }
+  /** The nav-trust token of the last scan (-1: made while trust was closed) and the table it scanned. */
+  private trustToken = -1;
+  private trustEntities: WorldState['entities'] | null = null;
+  /** The bodies the last scan met, in its order (a trusted sync lists them again for the windows). */
+  private bodyIds: string[] = [];
+  private bodyN = 0;
+  private navScan(world: WorldState, onBody?: (e: Entity) => void): boolean {
     const shared = passRelevant(world);
     if (shared) {
-      this.navN = 0; this.navChangedFlag = false;
+      this.navN = 0; this.navChangedFlag = false; this.bodyN = 0;
       for (let i = 0; i < shared.length; i++) this.navVisit(shared[i], onBody);
     } else {
-      this.navN = 0; this.navChangedFlag = false;
+      this.navN = 0; this.navChangedFlag = false; this.bodyN = 0;
       const ents = world.entities;
       for (const id in ents) this.navVisit(ents[id], onBody);
     }
@@ -523,7 +575,7 @@ export class Spatial {
   private navN = 0;
   private navChangedFlag = false;
   private navVisit(e: Entity, onBody?: (e: Entity) => void) {
-    if (onBody && e.kind === 'human' && e.human) { onBody(e); return; }
+    if (e.kind === 'human' && e.human) { this.bodyIds[this.bodyN++] = e.id; if (onBody) onBody(e); return; }
     if (!isStatic(e)) return;
     const snaps = this.snaps, s = snaps[this.navN];
     if (!s) { snaps.push(navSnap(e)); this.navChangedFlag = true; }

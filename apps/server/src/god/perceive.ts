@@ -47,6 +47,8 @@ export type BuiltState = { what: string; text: string; near: string[]; at: Vec2 
 
 export const BUILT_KIND = 'built';
 const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim().slice(0, n);
+/** A thing the layers tag (owned, gated, priced, scheduled): the only things whose object a layer change can move. */
+export const layered = (e: Entity) => !!(e.owner || e.access || e.price || e.schedule);
 /** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
  *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
 // VOCAB-MECH: a kind with actuator actions also shows its things' `state` (open, on, lit …); plain kinds are unchanged
@@ -196,7 +198,7 @@ export class GodPerceive {
     if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) return null;
     const text = signText(e, def), acts = this.h.commit ? actionsOf(def).length > 0 : false;
     // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
-    const lay = layersOn && (e.owner || e.access || e.price || e.schedule) ? this.h.layers!.tag(e) : '';
+    const lay = layersOn && layered(e) ? this.h.layers!.tag(e) : '';
     if (!e.name && text === null && !acts && !lay) return null;
     // seats and things to carry are perceived as seats and items already (unless they have actuators: a chest's lid)
     if ((c.seat || c.carryable) && !acts && !lay) return null;
@@ -269,8 +271,12 @@ export class GodPerceive {
       authoredRoots: values.filter(value => value & 1).length, engineRoots: values.filter(value => value & 2).length,
       otherRoots: values.filter(value => value & 4).length, running: this.run !== null, placesDone: this.placesDone };
   }
+  /** L4 item 5: things whose layer tag alone may have changed (a build event, the layers switching on or off): each is
+   *  recomputed itself, with no neighbourhood expansion (a tag is not a name, so no other object's `near` moves). */
+  noteRetag(ids: Iterable<string>) { for (const id of ids) this.retag.add(id); }
+  private retag = new Set<string>();
   /** Anything noted and not caught up yet (or a catch-up under way)? */
-  pending(): boolean { return this.needFull || this.roots.size > 0 || this.run !== null; }
+  pending(): boolean { return this.needFull || this.roots.size > 0 || this.retag.size > 0 || this.run !== null; }
 
   private cellAdd(id: string, at: Vec2) { const k = cellKey(Math.floor(at[0] / CELL), Math.floor(at[1] / CELL)); let s = this.cells.get(k); if (!s) this.cells.set(k, s = new Set()); s.add(id); }
   private cellDel(id: string, at: Vec2) { this.cells.get(cellKey(Math.floor(at[0] / CELL), Math.floor(at[1] / CELL)))?.delete(id); }
@@ -289,8 +295,9 @@ export class GodPerceive {
     const root = this.rootPlace(); if (!root) return null;
     if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, stateDigest(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
     const layersOn = !!this.h.layers?.active();
-    if (layersOn !== this.layersOn) { this.layersOn = layersOn; this.needFull = true; }
-    const full = this.needFull || !this.h.things, roots = this.roots; this.needFull = false; this.roots = new Set(); this.rootOrigins.clear(); this.fullOrigin = 0;
+    // L4 item 5: the layers switching on or off changes only what wantOne's `lay` reads: things with a layer field
+    if (layersOn !== this.layersOn) { this.layersOn = layersOn; for (const e of this.h.model.entities.values()) if (layered(e)) this.retag.add(e.id); }
+    const full = this.needFull || !this.h.things, roots = this.roots, retag = this.retag; this.needFull = false; this.roots = new Set(); this.retag = new Set(); this.rootOrigins.clear(); this.fullOrigin = 0;
     // the named things now (their outlines: what `near` measures to), against the last catch-up's
     const now = new Map<string, Box>();
     for (const t of this.h.things?.() ?? []) { const b = boxOf(t); if (!b) continue; const o = now.get(t.id); now.set(t.id, o ? [Math.min(o[0], b[0]), Math.min(o[1], b[1]), Math.max(o[2], b[2]), Math.max(o[3], b[3])] : b); }
@@ -307,6 +314,7 @@ export class GodPerceive {
         ids.add(id);
         for (const b of [this.regions.get(id), now.get(id)]) if (b) this.inBox([b[0] - NEAR, b[1] - NEAR, b[2] + NEAR, b[3] + NEAR], ids);
       }
+      for (const id of retag) ids.add(id);
     }
     this.regions = now;
     this.placed.clear();

@@ -133,10 +133,68 @@ export function helixEnds(path: Vec2[]): { foot: Vec2; head: Vec2; stepFrom: Vec
 
 export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** Highest level id levelFor hands out (default and most: MAX_LEVEL_ID; tests use fewer to reach the reuse path) */ maxLevel?: number; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
 
+/** Load lane L4: per-step ms of the bridge's tick work, the tick-ms distribution and the derived-work counters since the
+ *  last line. Only built with SIM_L4_STATS=1. */
+class BridgeStats {
+  private steps = new Map<string, { n: number; ms: number; max: number }>();
+  private lastReuse = 0;
+  private last = { spatial: { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0, scans: 0, scanMs: 0, trusted: 0 }, perceive: 0, spots: 0, wall: performance.now(), cpu: process.cpuUsage() };
+  /** A line is due a minute of wall time after the last (ticks may run slow). */
+  due(): boolean { return performance.now() - this.last.wall >= 60_000; }
+  add(name: string, t0: number): number {
+    const now = performance.now(), ms = now - t0; let s = this.steps.get(name); if (!s) this.steps.set(name, (s = { n: 0, ms: 0, max: 0 }));
+    s.n++; s.ms += ms; if (ms > s.max) s.max = ms; return now;
+  }
+  line(b: EngineBridge): string {
+    const sp = ((b.host.engine as unknown as { rt?: { services?: { spatial?: unknown } } }).rt?.services?.spatial as { stats?: BridgeStats['last']['spatial'] } | undefined)?.stats, now = performance.now(), cpu = process.cpuUsage();
+    const wallS = (now - this.last.wall) / 1000, cpuS = ((cpu.user - this.last.cpu.user) + (cpu.system - this.last.cpu.system)) / 1e6;
+    const ticks = [...b.host.tickMs].sort((x, y) => x - y), q = (f: number) => ticks.length ? Math.round(10 * ticks[Math.min(ticks.length - 1, Math.floor(f * ticks.length))]) / 10 : 0;
+    const steps = [...this.steps].filter(([, v]) => v.ms >= 1).sort((x, y) => y[1].ms - x[1].ms).map(([k, v]) => `${k}=${Math.round(v.ms)}/${v.n}/${Math.round(v.max)}`).join(' ');
+    const d = (k: keyof BridgeStats['last']['spatial']) => Math.round((sp?.[k] ?? 0) - this.last.spatial[k]);
+    const pr = b.perceive.stats.runs - this.last.perceive, ds = b.activitySpots.stats.derives - this.last.spots;
+    const out = `[l4] cpu ${(cpuS / wallS).toFixed(3)} core over ${Math.round(wallS)} s; tick p50 ${q(.5)} p99 ${q(.99)} max ${q(1)} ms (n ${ticks.length}); paged syncs ${d('pagedSyncs')} moved ${d('pagedMoved')} changed ${d('pagedChanged')} ${d('pagedMs')} ms, grids ${d('gridBuilds')} ${d('gridMs')} ms, nav scans ${d('scans')} ${d('scanMs')} ms trusted ${d('trusted')}; perceive runs ${pr} (last ${b.perceive.stats.lastIds}${b.perceive.stats.lastFull ? ' whole' : ''} ${b.perceive.stats.lastMs} ms); spots derives ${ds} (last ${b.activitySpots.stats.ms} ms); steps ms/n/max ${steps}`;
+    const sites = ((b.host.engine as unknown as { rt?: { services?: { spatial?: { scanSites?: Map<string, number> | null } } } }).rt?.services?.spatial)?.scanSites;
+    let extra = '';
+    if (sites) {
+      extra = `; scan sites ${[...sites].sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => `${k}=${v}`).join(' ')}`;
+      sites.clear();
+      const live = (b.host.engine as unknown as { rt?: { live?: Map<string, { rec: { verb: string } }> } }).rt?.live, verbs = new Map<string, number>();
+      for (const l of live?.values() ?? []) verbs.set(l.rec.verb, (verbs.get(l.rec.verb) ?? 0) + 1);
+      extra += `; live ${[...verbs].map(([k, v]) => `${k}=${v}`).join(' ') || 'none'}`;
+      const ents = (b.host.engine as unknown as { ents?: Record<string, unknown> }).ents;
+      if (ents) {
+        let t = performance.now(), k: string[] = []; for (let i = 0; i < 20; i++) k = Object.keys(ents); const keysUs = (performance.now() - t) * 50;
+        t = performance.now(); for (let i = 0; i < 20; i++) { const l = new Array(k.length); for (let j = 0; j < k.length; j++) l[j] = ents[k[j]]; } const fillUs = (performance.now() - t) * 50;
+        extra += `; table ${k.length} keys ${Math.round(keysUs)} us fill ${Math.round(fillUs)} us`;
+        const calls = ((b.host.engine as unknown as { constructor?: { tableWriteSitesV1?: Map<string, number> | null } }).constructor)?.tableWriteSitesV1;
+        if (calls) { extra += `; engine calls ${[...calls].sort((x, y) => y[1] - x[1]).slice(0, 14).map(([k, v]) => `${k}=${v}`).join(' ')}`; calls.clear(); }
+
+      }
+    }
+    const reuse = (b.host.engine as unknown as { tableReusesV1?: number }).tableReusesV1 ?? 0;
+    extra += `; table reused ${reuse - this.lastReuse} steps`; this.lastReuse = reuse;
+    if (sp) this.last.spatial = { ...sp }; this.last.perceive = b.perceive.stats.runs; this.last.spots = b.activitySpots.stats.derives; this.last.wall = now; this.last.cpu = cpu; this.steps.clear();
+    return out + extra;
+  }
+}
+
 export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
 const PERCEIVE_SLICE_MS = Number(process.env.PERCEIVE_SLICE_MS ?? 8);
+/** LOAD-CONTRACT dial (L4): background perception cadence per load level. `sliceMs` = tick-thread budget per slice,
+ *  `settle` = least ticks between the starts of two background catch-ups (green 20 = the old fixed spacing). Black runs no background catch-up (a Soul's read
+ *  still catches up at once through perceive.ensure, and the boot pass still runs). The radius stays 30 m at every level:
+ *  it is here.ts's SIGHT_RADIUS (L3's menu-radius dial owns shrinking what a Soul sees). */
+export const PERCEIVE_DIAL = {
+  green: { sliceMs: PERCEIVE_SLICE_MS, settle: 20 },
+  amber: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 2), settle: 40 },
+  red: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 4), settle: 100 },
+  black: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 4), settle: Infinity },
+} as const;
+export type LoadLevel = keyof typeof PERCEIVE_DIAL;
+/** Build notices that change nothing a Soul perceives (no step label, no closure): they never start a catch-up. */
+const PERCEPTION_QUIET_BUILD = new Set<string>(['alive', 'claimed', 'released', 'taken']);
 const WRITE_BACK_SLICE_MS = 8;
 type WriteBackUnit = { key: string; ops: Op[]; body?: string };
 type WriteBackBody = { pose: string; entity: Entity | undefined };
@@ -212,9 +270,13 @@ export class EngineBridge {
     this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
-    this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
+    // L4 (audit #8): only notices that change what a build's things are seen as (started, a new step, paused/resumed,
+    // done, abandoned, closure lifted, rewound) re-derive perception; the lead's `alive` heartbeat (sent on its ordinary
+    // requests) and claim hand-offs change no step and no closure, and each one forced a whole pass over ~5,000 things.
+    // L4 item 5: a build event moves only the layer tags of layered things under (or just out of) a closing site; was a whole pass
+    this.god.onBuild((e) => { if (!PERCEPTION_QUIET_BUILD.has(e.kind)) { const ids = this.layers.buildRetag(); if (ids.length) { this.perceive.noteRetag(ids); this.notePerceive([], false); } } });
     this.host.listeners.push({
-      afterTick: (tick, context) => { try { if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; } else { this.flush(); this.projectedEdits = this.godEdits; if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(context?.startedAtMs); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } } catch (error) { this.failProjection(error); throw error; } },
+      afterTick: (tick, context) => { try { this.afterTickWork(tick, context?.startedAtMs); } catch (error) { this.failProjection(error); throw error; } },
       onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
       afterTickComplete: () => { this.completedTicks++; this.completedEdits = this.projectedEdits; this.checkProjectionSoon(); },
       onClockUnavailable: () => this.failProjection(new Error('bridge.readiness.clock-unavailable')),
@@ -243,9 +305,9 @@ export class EngineBridge {
     // R8: residents near a visible map change hear of it once per request; a build near them, at start and at done.
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
     this.god.onBuild(e => this.buildNotice(e));
-    this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
-      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
-    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
+    this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, bodies: () => this.modelBodies(), levelAt: (x, z, y) => this.levelAt(x, z, y),
+      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), sliced: () => !!this.host.running, placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
+    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled || this.activitySpots.pendingFirst()) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
     if (this.edge) {
       const edge = this.edge;
       this.meals = new GodMeals({ db: this.god.db, worldId: this.host.worldId, spots: () => edge.spots, place: (id) => edge.places.byId.get(id) as never, day: () => this.layers.dayKey() });
@@ -762,6 +824,23 @@ export class EngineBridge {
     }
   }
 
+  /** The bridge's per-tick work (each step on its own cadence). With SIM_L4_STATS=1 every step is timed and one
+   *  `[l4] …` line a minute says where the tick thread went (load lane L4 measurements; off: no clock reads). */
+  private afterTickWork(tick: number, startedAtMs?: number) {
+    if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; return; }
+    const S = this.loadStats; let t = S ? performance.now() : 0;
+    this.flush(); this.projectedEdits = this.godEdits; if (S) t = S.add('flush', t);
+    if (tick % 10 === 0 || this.writeBackPass) { this.writeBack(WRITE_BACK_SLICE_MS); if (S) t = S.add('writeBack', t); }
+    this.perceiveStep(tick); if (S) t = S.add('perceive', t);
+    if (tick % 5 === 4 || this.activitySpots.deriving()) { this.spotsStep(); if (S) t = S.add('spots', t); }
+    if (tick % 40 === 7 || this.layerPlacesPending !== null) { this.layersStep(tick % 40 === 7); if (S) t = S.add('layers', t); }
+    if (tick % 20 === 13) { this.flushMapNotices(); if (S) t = S.add('mapNotices', t); }
+    if (!this.navWarm || this.navPending) { this.navStep(startedAtMs); if (S) t = S.add('nav', t); }
+    if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); if (S) t = S.add('evacuate', t); }
+    if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); if (S) t = S.add('rescue', t); }
+    if (S && S.due()) this.log(S.line(this));
+  }
+  private loadStats = process.env.SIM_L4_STATS === '1' ? new BridgeStats() : null;
   private perceiveSync(now = false) { try { if (now) this.perceive.sync(); else this.perceive.ensure(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
   /** G1 (tranche 2026-10-19): what Souls perceive of god edits (built objects, the places layer) catches up off the
    *  request path. An edit only notes what changed; the catch-up starts a second after the last edit, or ~2 s after the
@@ -781,9 +860,14 @@ export class EngineBridge {
     this.perceive.note(ids, all, origin);
     if (this.perceiveFirst < 0) this.perceiveFirst = tick; this.perceiveLast = tick;
   }
+  private perceiveDial: (typeof PERCEIVE_DIAL)[LoadLevel] = PERCEIVE_DIAL.green;
+  /** LOAD-CONTRACT: the load monitor sets the level; only the perception cadence changes (PERCEIVE_DIAL). */
+  setLoadLevel(level: LoadLevel) { this.perceiveDial = PERCEIVE_DIAL[level] ?? PERCEIVE_DIAL.green; }
   private perceiveStep(tick: number) {
+    const dial = this.perceiveDial;
     if (!this.perceiveRunning) {
       if (!this.perceive.pending() || tick - this.perceiveStarted < 20) return;
+      if (this.perceive.stats.runs && tick - this.perceiveStarted < dial.settle) return;   // amber/red/black: catch-ups start further apart
       // boot: the first catch-up is a whole pass (~0.4 s at 4,900 entities). A served world runs it in slices too (lane P5):
       // at once it held a cold-booted world's first visitor. A Soul's read before it ends catches up at once (perceive.ensure).
       // A world stepped by hand (tests, tools) runs it at once, as before.
@@ -792,7 +876,7 @@ export class EngineBridge {
       this.perceiveRunning = true; this.perceiveStarted = tick; this.perceiveFirst = -1; this.catchUp = { slices: 0, maxMs: 0, t0: performance.now() };
     }
     const t0 = performance.now();
-    try { if (this.perceive.step(PERCEIVE_SLICE_MS)) this.perceiveRunning = false; }
+    try { if (this.perceive.step(dial.sliceMs)) this.perceiveRunning = false; }
     catch (e) { this.perceiveRunning = false; this.log(`perceive: ${(e as Error).message}`); }   // retried on the next catch-up, never every tick
     const c = this.catchUp, ms = performance.now() - t0; c.slices++; if (ms > c.maxMs) c.maxMs = ms;
     // a slice that ran long (one place or the named things re-derived at once) is worth a line in the world's log
@@ -852,7 +936,8 @@ export class EngineBridge {
    *  Soul's listing (only when a listing has read them since the last such derive). */
   private spotsStep() {
     if (!this.edge || this.perceiveRunning || this.perceive.pending()) return;
-    try { if (this.activitySpots.warm()) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
+    // L4 item 6: a served world derives the spots in slices of the perception budget, one per tick until done
+    try { if (this.activitySpots.warm(this.perceiveDial?.sliceMs ?? PERCEIVE_SLICE_MS)) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
   }
   private navStep(tickStartedAtMs?: number) {
     try {
@@ -863,12 +948,20 @@ export class EngineBridge {
       // authoritative even at zero; the engine polls and invalidates without compiling a stale graph.
       const budgetMs = tickStartedAtMs === undefined ? 20
         : Math.min(20, Math.max(0, 40 - (performance.now() - tickStartedAtMs)));
+      const st = this.loadStats ? this.navProbe() : null, t0 = st ? performance.now() : 0;
       this.navWarm = E.navWarmV1(budgetMs);
+      if (st) { const ms = performance.now() - t0; if (ms > 50) { const now = this.navProbe(); this.log(`[l4] nav warm slice ${Math.round(ms)} ms: spatial paged ${Math.round(now.paged - st.paged)} grids ${Math.round(now.grids - st.grids)} scan ${Math.round(now.scan - st.scan)} ms; largest unit ${Math.round(now.unit)} ms (${now.phase})`); } }
       if (this.navWarm && this.navPending) {
         this.navPending = false; const spots = this.navDeferred; this.navDeferred = [];
         const lines = this.navLines(spots, this.navRescueSouls()); if (lines.length) this.navLater = [...this.navLater, ...lines].slice(-4);
       }
     } catch (e) { this.navWarm = true; this.navPending = false; this.log(`nav warm: ${(e as Error).message}`); }
+  }
+  /** L4 diagnostic (SIM_L4_STATS=1): the spatial ms counters and the connectivity build's largest unit so far. */
+  private navProbe() {
+    const rt = (this.engine as unknown as { rt?: { services?: { spatial?: { stats?: { pagedMs: number; gridMs: number; scanMs: number } } } }; conn?: { stats?: { maxStepMs: number; maxStepPhase: string } } });
+    const sp = rt.rt?.services?.spatial?.stats, c = rt.conn?.stats;
+    return { paged: sp?.pagedMs ?? 0, grids: sp?.gridMs ?? 0, scan: sp?.scanMs ?? 0, unit: c?.maxStepMs ?? 0, phase: c?.maxStepPhase ?? '' };
   }
   /** Last tick each Soul was stepped out (nav-connect/1): at most once a minute each, as the ledger's walk rescue. */
   private navRescuedAt = new Map<string, number>();
@@ -1101,7 +1194,7 @@ export class EngineBridge {
           this.layerPlacesPending = null;
         } else {
           this.layerPlacesPending ??= day;
-          if (!this.places.syncStep(PERCEIVE_SLICE_MS)) return;
+          if (!this.places.syncStep(this.perceiveDial?.sliceMs ?? PERCEIVE_SLICE_MS)) return;
           // Keep deferral through both syncStep's final sync() and the calendar lookup:
           // an edit/minute boundary during the pass must not force another full derive.
           // The completed list has the existing deferred-place semantics. If the day
@@ -1318,6 +1411,15 @@ export class EngineBridge {
   }
 
   /** Birth: the Soul's body becomes an entity (core/humanoid) with the engine's own id (spec 31 §3 rule 3). */
+  /** The model's body entities (L4: the activity-spot key leaves them out). Seeded by one scan, kept by births, retires
+   *  and commits; each read re-checks membership, so a body missed here only costs an extra derive. */
+  private bodyIds: Set<string> | null = null;
+  private modelBodies(): number {
+    const m = this.model;
+    if (!this.bodyIds) { this.bodyIds = new Set(); for (const [id, e] of m.entities) if (e.def === BODY_DEF) this.bodyIds.add(id); }
+    let n = 0; for (const id of this.bodyIds) if (m.entities.get(id)?.def === BODY_DEF) n++; else this.bodyIds.delete(id);
+    return n;
+  }
   bodyBorn(p: { entityId: string; soulId: string; name: string }) {
     if (this.model.entities.has(p.entityId) || !this.model.def(BODY_DEF)) return;
     const b = this.engine.world.entities[p.entityId];
@@ -1326,7 +1428,7 @@ export class EngineBridge {
     const name = this.model.names.has(`world/${slug}`) ? `${slug}-${p.entityId.slice(2, 6)}` : slug;
     const entity = { id: p.entityId, name, def: BODY_DEF, in: { parent: 'world' }, p: pos, r: 0, anchor: 'center', state: {}, by: 'engine', born: this.god.opts.tick(), v: 1 } as unknown as Entity;
     const r = this.engineAct([{ op: 'restore', entity } as Op], `birth: ${p.name}'s body`);
-    if (r.accepted) this.stats.bodies++; else this.log(`body entity for ${p.entityId} refused: ${JSON.stringify(r.failures).slice(0, 300)}`);
+    if (r.accepted) { this.stats.bodies++; this.bodyIds?.add(p.entityId); } else this.log(`body entity for ${p.entityId} refused: ${JSON.stringify(r.failures).slice(0, 300)}`);
   }
   bodyRetired(p: { entityId: string }) {
     if (!this.model.entities.has(p.entityId)) return;

@@ -53,6 +53,9 @@ export interface ActionDef<Params = unknown, Program = unknown, Exec = unknown> 
   schema: z.ZodType<Params>;
   /** Whether reserved hand resources drive hand poses. Defaults true; composites may reserve only, and transfers may drive only selected published phases. */
   drivesReservedHands?: boolean | ((record: ActionRecord) => boolean);
+  /** Its `step` moves only its own actor's body and never changes a static entity (an obstacle, a construction phase, a
+   *  support or connection): the runtime lets the walk planner skip its static-world scan meanwhile (spatial/nav-trust.ts). */
+  navPure?: boolean;
   /** Resources required (actors, entities, interaction slots, work zones). */
   reservations(world: WorldState, params: Params): Reservation[];
   /** Validate + plan against the current world. Pure w.r.t. world. */

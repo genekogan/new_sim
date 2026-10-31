@@ -223,6 +223,8 @@ export function planWalk(rt: Runtime, actor: Entity, goal: { level: number; p: V
 
 export const walkTo: ActionDef<WalkParams, Route, Exec> = {
   verb: 'walk_to',
+  // a walk moves its own body (and asks others to make way through their own actions); a holding walker fails at once
+  navPure: true,
   description:
     'Walk a person to (x, z) on a level (default: current level) along a planned corridor route, using completed stairs between levels. Fails with a diagnostic if no route exists.',
   get schema() { return walkSchemaNow(); },
