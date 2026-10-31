@@ -2,8 +2,8 @@
 
 `mars/` is a vendored, hard-forked world engine: a deterministic world and activity runtime in pure TypeScript
 (`mars/viewer/engine/`), a three.js viewer and Lab (`mars/viewer/app/`), and a Cloudflare Worker host
-(`mars/viewer/simulation/`). It was built for a model of a desert campus and its buildings; in Sim it runs behind
-the engine contract through `packages/engine-mars` (`ENGINE=mars`). See
+(`mars/viewer/simulation/`). It was built to model the Mars College desert campus and its buildings
+([campus](campus.md)); in Sim it runs behind the engine contract through `packages/engine-mars` (`ENGINE=mars`). See
 [the engine contract](../architecture/engine-contract.md) for the mapping.
 
 The long-term plan is to deprecate `mars/` and generalize its useful parts into Sim. These docs describe the
@@ -65,6 +65,7 @@ engine as it is, briefly; read the code for detail.
 | [construction.md](construction.md) | Frames, decks, stairs, hand-up, framing, solar, paint, generated builds |
 | [takes-and-plans.md](takes-and-plans.md) | Sequences, bound plans, takes, replay, rehearsal, snapshots |
 | [camera.md](camera.md), [camera-direction.md](camera-direction.md) | Shot planning; typed direction, self-correction, render verification |
+| [campus.md](campus.md) | The campus buildings and places, what each is for, and its recurring rhythms |
 | [campus-scene.md](campus-scene.md), [history.md](history.md) | Campus scene extraction; year scenes and component ids |
 | [studio-replay.md](studio-replay.md) | Take replay and camera direction in the studio |
 | [lab.md](lab.md) | The `/lab` sandbox |
