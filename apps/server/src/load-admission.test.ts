@@ -25,7 +25,8 @@ function fixture() {
 test('classes: C0 control, C1 writes, C2 personal reads, C3 public reads; everything else passes through', () => {
   const c = (m: string, p: string) => classify(m, p)?.cls ?? null;
   assert.equal(c('GET', '/healthz'), 'C0'); assert.equal(c('GET', '/v1/config'), 'C0');
-  for (const p of ['/v1/edge/here', '/v1/edge/observe', '/v1/edge/capabilities', '/v1/edge/around', '/v1/edge/view', '/v1/edge/objects/abc']) assert.equal(c('GET', p), 'C2', p);
+  for (const p of ['/v1/edge/here', '/v1/edge/observe', '/v1/edge/capabilities', '/v1/edge/view', '/v1/edge/objects/abc']) assert.equal(c('GET', p), 'C2', p);
+  assert.equal(c('GET', '/v1/edge/around'), 'C1', 'around records what it finds: a write');
   assert.equal(c('POST', '/v1/edge/resolve'), 'C2');
   for (const p of ['/v1/edge/act', '/v1/edge/say', '/v1/edge/converse', '/v1/edge/plan', '/v1/edge/objects/x1/act']) assert.equal(c('POST', p), 'C1', p);
   assert.equal(c('PATCH', '/v1/edge/plan/p1'), 'C1');

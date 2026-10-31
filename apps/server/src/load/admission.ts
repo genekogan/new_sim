@@ -13,7 +13,7 @@ export type RouteClass = {cls: Cls; id: string; god: boolean; deadlineMs: number
 export type Refusal = {status: 429 | 503; code: 'soul.busy' | 'soul.slow-down' | 'world.busy'; retryAfterS: number; message: string};
 
 const C1_MS = 20_000, GOD_C1_MS = 30_000, C2_MS = 8_000;
-const EDGE_READ = /^\/v1\/edge\/(here|observe|capabilities|around|view|objects(?:\/[^/]+)?)$/;
+const EDGE_READ = /^\/v1\/edge\/(here|observe|capabilities|view|objects(?:\/[^/]+)?)$/;
 const EDGE_WRITE = /^\/v1\/edge\/(act|say|converse|objects\/[^/]+\/act|plan(?:\/[^/]+)?)$/;
 const PUBLIC = /^\/v1\/(?:edge\/(?:map|rides|items|platforms)|world\/snapshot)$/;
 const GOD_READ = /^\/v1\/god\/(mirror|doctor|trace|recommend|layers|layers\/zone-suggest|defs\/unused)$/;
@@ -24,6 +24,8 @@ export function classify(method: string, path: string): RouteClass | null {
   if (PUBLIC.test(path)) return method === 'GET' ? {cls: 'C3', id: path, god: false, deadlineMs: 0} : null;
   let m: RegExpExecArray | null;
   if (path.startsWith('/v1/edge/')) {
+    // `around` explores: it records the places found and invalidates menus (around.ts), so it is a write (C1), not a read
+    if (method === 'GET' && path === '/v1/edge/around') return {cls: 'C1', id: 'edge:around', god: false, deadlineMs: C1_MS};
     if (method === 'GET' && (m = EDGE_READ.exec(path))) return {cls: 'C2', id: 'edge:' + m[1].replace(/\/.*/, '/:id'), god: false, deadlineMs: C2_MS};
     if (method === 'POST' && path === '/v1/edge/resolve') return {cls: 'C2', id: 'edge:resolve', god: false, deadlineMs: C2_MS};
     if (method !== 'GET' && (m = EDGE_WRITE.exec(path))) return {cls: 'C1', id: 'edge:' + m[1].replace(/\/[^/]+/, '/:id'), god: false, deadlineMs: C1_MS};
@@ -46,6 +48,8 @@ const COOL_MS = 60_000, FRAME_MS = 50, CAPACITY_MS = 2000, GOD_SHARE = 0.25, DEF
 type Job = {key: string; god: boolean; route: RouteClass; arrival: number; deadline: number; closed: () => boolean;
   settle: (v: 'run' | 'dropped' | Refusal) => void; finished: Promise<void>; finish: () => void};
 type Bucket = {tokens: number; at: number; seen: number};
+/** Socket-independent (Stage B): a job is (key = Soul or god, class, deadline, `closed()` = "has the asker gone", and the
+ *  ticket as its reply handle). The HTTP middleware below is one front end; a worker's MessagePort can be another. */
 export type Ticket = {refusal: Refusal} | {turn: Promise<'run' | 'dropped' | Refusal>; done: () => void; waitedMs: () => number};
 
 export class Admission {
