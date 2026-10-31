@@ -69,6 +69,8 @@ const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 // MENU_REACH_M covers SPOT_REACH: an activity spot is offered up to 200 m off, and a claim on it (an act whose target it
 // is) bumps the spot's cell, so every Soul that may list it rebuilds
 const MENU_MAX_AGE_TICKS = 2400, MENU_CELL_M = 32, MENU_REACH_M = SPOT_REACH;
+/** L3 (b): a kept words menu (wordsMenu) serves at most this long, and while my own position stays in one cell of this size. */
+const WORDS_MAX_AGE_TICKS = 200, WORDS_CELL_M = 2;
 /** L3 item 4 (a): why a focused build was not kept (counters `one.focus*`; key misses by the part of `menuKey` that moved,
  *  named from the key's end because the static/input parts may themselves hold '|'). */
 const KEY_TAIL = ['near', 'clock', 'faded', 'ride', 'pose', 'cells', 'together', 'menuGen'];
@@ -748,6 +750,84 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     return `${this.staticVersion()}|${this.menuInputs()}|${this.menuGen}|${this.together.version}|${this.cellsNear(x, z)}|${q(x)},${q(y)},${q(z)},${String(h?.activity ?? '')},${String(h?.baseActivity ?? '')},${String(h?.level ?? '')},${JSON.stringify(h?.seat ?? null)}|${ride ? `${ride.id},${ride.phase},${ride.riderPhase},${stepping?.code ?? ''}` : ''}|${this.faded.has(soul.soulId) ? 'f' : ''}|${this.clockMinute(tick)}|${near}`;
   }
+  /**
+   * L3 (b): the menu plain words are resolved against (POST /resolve, act in words, route/part lookups). Words choose an
+   * offer; they never act on this menu's copy of it: `exactWords` rebuilds the chosen offer exactly (bindOne) before it is
+   * reported or acted on. So this menu may be kept where the whole menu may not: other Souls by what they are to me (the
+   * radius bands the offers read: 8 m gesture reach, 20 m wave/follow reach, 60 m go-near/invite reach, enclosure, order by
+   * distance, activity, state) instead of where they stand, my own position by 2 m cell, and not over my own accepted acts
+   * or the 32 m cell versions (a claimed spot is a recorded read; the chosen offer's availability is checked exactly).
+   * Kept at most WORDS_MAX_AGE_TICKS. `exact`: this is the whole menu as `binds` would build it now.
+   * Oracle (EDGE_MENU_ORACLE=1): every resolution made on a kept words menu is compared with the same words on a fresh
+   * whole menu (`[words-oracle]`, counter words.oracleMiss).
+   */
+  wordsMenu(soul: EdgeSoul): {caps: EdgeCapability[]; plans: Plans; exact: boolean} {
+    const tick = this.host.engine.world.tick, hit = this.capCache.get(soul.soulId), sig = this.sameTickSig();
+    const exact = (v: {caps: EdgeCapability[]; plans: Plans}) => ({caps: v.caps, plans: v.plans, exact: true});
+    if (hit?.last?.tick === tick && hit.last.sig === sig) {menuStats.words.exact++; return exact(hit.last.value);}
+    if (hit && hit.key === this.menuKey(soul, tick) && tick - hit.tick < MENU_MAX_AGE_TICKS && this.readsHold(soul, hit.reads)) {menuStats.words.exact++; return exact(this.binds(soul));}
+    const key = this.wordsKey(soul, tick), w = this.wordsCache.get(soul.soulId);
+    if (w?.last?.tick === tick && w.last.sig === sig && w.key === key) {menuStats.words.kept++; return {...w.last.value, exact: false};}
+    if (w && w.key === key && tick - w.tick < WORDS_MAX_AGE_TICKS && this.readsHold(soul, w.reads)) {
+      menuStats.words.kept++; const value = this.bindsTail(soul, w.value); w.last = {tick, sig, value}; return {...value, exact: false};
+    }
+    menuStats.words.built++; const value = this.binds(soul), fresh = this.capCache.get(soul.soulId)!;
+    this.wordsCache.set(soul.soulId, {tick, key, reads: fresh.reads, value: fresh.value, last: {tick, sig, value}});
+    return exact(value);
+  }
+  private wordsCache = new Map<string, {tick: number; key: string; reads: MenuReads; value: {caps: EdgeCapability[]; plans: Plans}; last?: {tick: number; sig: string; value: {caps: EdgeCapability[]; plans: Plans}}}>();
+  private wordsKey(soul: EdgeSoul, tick: number): string {
+    const me = this.body(soul.entityId); if (!me || isRigidBody(me)) return `tick:${tick}`;
+    const [x, y, z] = me.pose.p, h = me.human as {activity?: unknown; baseActivity?: unknown; level?: unknown; seat?: unknown} | undefined;
+    const ride = this.aboard(soul.entityId), stepping = ride ? this.stepOutRefusal(soul.entityId) : null, c = (v: number) => Math.floor(v / WORDS_CELL_M);
+    // the bands every offer about another Soul reads (perceivedBodies' radius and enclosure, together's 8/20/60 m), in
+    // perceivedBodies' order (nearest first, its 0.1 m rounding)
+    const myEnc = this.enclosureOf(soul.soulId), near: {d: number; s: string}[] = [];
+    for (const o of this.host.minds.values()) {
+      if (o.soulId === soul.soulId || this.faded.has(o.soulId)) continue; const ob = this.body(o.entityId); if (!ob) continue;
+      const d = Math.hypot(ob.pose.p[0] - x, ob.pose.p[2] - z); if (d > GO_NEAR_RADIUS + 1) continue;
+      const r = Math.round(d * 10) / 10;
+      near.push({d: r, s: `${o.soulId}:${d <= GO_NEAR_RADIUS ? 1 : 0}${d <= NEAR_RADIUS ? 1 : 0}${r <= NEAR_RADIUS ? 1 : 0}${r <= 8 ? 1 : 0}${this.enclosureOf(o.soulId) === myEnc ? 1 : 0},${String(ob.human?.activity ?? '')},${String(ob.human?.baseActivity ?? '')},${stateOf(this.host, o.entityId)},${this.aboard(o.entityId)?.id ?? ''}`});
+    }
+    const order = near.sort((a, b) => a.d - b.d).map(n => n.s).join(';');
+    return `${this.staticVersion()}|${this.menuInputs()}|${this.menuGen}|${this.together.version}|${c(x)},${c(z)},${Math.round(y)},${String(h?.activity ?? '')},${String(h?.baseActivity ?? '')},${String(h?.level ?? '')},${JSON.stringify(h?.seat ?? null)}|${ride ? `${ride.id},${ride.phase},${ride.riderPhase},${stepping?.code ?? ''}` : ''}|${this.faded.has(soul.soulId) ? 'f' : ''}|${this.clockMinute(tick)}|${order}`;
+  }
+  /**
+   * L3 (b): what words resolved to on `menu` (a `wordsMenu`), as it is now: an offer taken from a kept words menu is built
+   * again exactly (bindOne), and when that offer is gone or its availability changed, the words are resolved again on the
+   * whole menu. Offers made on demand while resolving are built fresh and stay as they are. `plans` gets the exact plan.
+   */
+  exactWords(soul: EdgeSoul, menu: {caps: EdgeCapability[]; exact: boolean}, text: string, v: VocabResult, plans?: Plans): VocabResult {
+    if (menu.exact || v.kind === 'unknown' || !menu.caps.includes(v.cap)) {this.wordsOracle(soul, menu, text, v); return v;}
+    const one = this.bindOne(soul, v.cap.id);
+    if (one && one.cap.available === v.cap.available && one.cap.blocked?.code === v.cap.blocked?.code) {
+      menuStats.words.exactified++; if (plans && one.plan) plans.set(one.cap.id, one.plan); const out = {...v, cap: one.cap} as VocabResult;
+      this.wordsOracle(soul, menu, text, out); return out;
+    }
+    menuStats.words.fellBack++; const b = this.binds(soul), r = this.resolveOnDemand(soul, text, [...b.caps], new Map(b.plans)).v;
+    if (plans && r.kind !== 'unknown') {const p = b.plans.get(r.cap.id); if (p) plans.set(r.cap.id, p);}
+    return r;
+  }
+  /** L3 (b): what resolveOnDemand(id) on the whole menu answers for an exact capability id, without building that menu:
+   *  the one offer (bindOne; a secret one is not known here, as resolveOnDemand says), else the words menu, where the id
+   *  may be made on demand (a far part's walk). */
+  resolveIdV1(soul: EdgeSoul, id: string): VocabResult {
+    const one = this.bindOne(soul, id);
+    if (one) return this.secretOffer(soul, one.cap) ? {kind: 'unknown', code: 'capability.unknown', reason: 'That action is not known here.', didYouMean: []} : {kind: 'exact', cap: one.cap};
+    const w = this.wordsMenu(soul); return this.exactWords(soul, w, id, this.resolveOnDemand(soul, id, [...w.caps], new Map(w.plans)).v);
+  }
+  private wordsOracle(soul: EdgeSoul, menu: {exact: boolean}, text: string, v: VocabResult) {
+    if (!MENU_ORACLE || menu.exact) return;
+    const diff = this.wordsDiffV1(soul, text, v); if (diff) {menuStats.words.oracleMiss++; console.error('[words-oracle]', soul.soulId, JSON.stringify(text), diff);}
+  }
+  /** Debug (tests; EDGE_MENU_ORACLE=1): null when `v` (default: the words resolved on the words menu, as act and resolve
+   *  read them) is what the same words resolve to on a menu built fresh now, else both. Never writes a cache. */
+  wordsDiffV1(soul: EdgeSoul, text: string, v?: VocabResult): string | null {
+    if (!v) {const w = this.wordsMenu(soul); v = this.exactWords(soul, w, text, this.resolveOnDemand(soul, text, [...w.caps], new Map(w.plans)).v);}
+    const fresh = this.bindsTail(soul, this.bindsCore(soul)), r = this.resolveOnDemand(soul, text, [...fresh.caps], new Map(fresh.plans)).v;
+    const sum = (x: VocabResult) => JSON.stringify(x.kind === 'unknown' ? {kind: x.kind, code: x.code ?? null} : {kind: x.kind, cap: x.cap, params: (x as {params?: unknown}).params ?? null});
+    return sum(v) === sum(r) ? null : `kept ${sum(v).slice(0, 300)} | fresh ${sum(r).slice(0, 300)}`;
+  }
   /** L3 oracle (tests; EDGE_MENU_ORACLE=1 on every kept menu): null when `menu` (default: what binds returns now) equals
    *  a menu built fresh from the world as it is, else the first difference. Never writes the cache. */
   menuOracleV1(soul: EdgeSoul, menu = this.binds(soul)): string | null {
@@ -979,7 +1059,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   invalidateBodies(){this.dropMenus('invalidateBodies');}
   /** Every Soul's menu rebuilds on its next read (`site` names the cause, for menu-stats). */
-  private dropMenus(site: string) {countClear(site); this.menuGen++; this.capCache.clear(); this.focusCache.clear();}
+  private dropMenus(site: string) {countClear(site); this.menuGen++; this.capCache.clear(); this.focusCache.clear(); this.wordsCache.clear();}
   /** One Soul's menu rebuilds on its next read. */
   private dropMenu(site: string, soulId: string) {countClear(site, true); this.capCache.delete(soulId); this.focusCache.delete(soulId);}
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
@@ -1125,9 +1205,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** L3 item 4: the offers an act reads. An id the menu offers: that one offer (bindOne). Anything else (words, an id
    *  offered only on demand, `via` legs naming other places): the whole menu, as before. */
-  private actMenu(soul: EdgeSoul, asked: string, params: unknown): {caps: EdgeCapability[]; plans: Plans; partial?: true} {
+  private actMenu(soul: EdgeSoul, asked: string, params: unknown): {caps: EdgeCapability[]; plans: Plans; partial?: true; words?: {caps: EdgeCapability[]; exact: boolean}} {
     const via = !!params && typeof params === 'object' && (params as {via?: unknown}).via !== undefined;
     if (!via && /^[a-z][\w-]*:\S+$/i.test(asked)) {const one = this.bindOne(soul, asked); if (one) return {caps: [one.cap], plans: new Map(one.plan ? [[asked, one.plan]] : []), partial: true};}
+    // L3 (b): words resolve on the words menu; the offer they choose is rebuilt exactly before it is acted on (exactWords)
+    if (!via) {const w = this.wordsMenu(soul); return w.exact ? {caps: w.caps, plans: w.plans} : {caps: w.caps, plans: w.plans, words: w};}
     return this.binds(soul);
   }
   private async actOnce(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
@@ -1145,9 +1227,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       this.dropMenu('act-retry', soul.soulId);
     }
     // L3 item 4: an offered id builds that one offer (bindOne), never the whole menu; words and via legs read the menu
-    const bound = this.actMenu(soul, asked, input.params), partial = !!bound.partial;
+    const bound = this.actMenu(soul, asked, input.params), partial = !!bound.partial, words = bound.words;
     let {caps, plans} = bound;
-    const menu = () => partial ? this.binds(soul) : {caps, plans};
+    const menu = () => partial || words ? this.binds(soul) : {caps, plans};
     let params = (input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? {...input.params as Record<string, unknown>} : {}) as Record<string, unknown>;
     if(['read','write','use-computer','listen','paint','craft','post-letter'].includes(askedVerb)){try{outcomeParams(params);}catch{return refuse('capability.params','Content parameters must be bounded strings (book100, query200, title100, text2000).');}if(params.book!==undefined&&!EDEN_LIBRARY_CATALOGUE.some(b=>b.id===params.book))return refuse('content.book-unknown','Choose a book id from the published catalogue.');}
     // intents/1: plain words for the attention channel ("look at the fire", "turn to Bill") and face:<soul> never touch the body
@@ -1171,6 +1253,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // anything else is refused with the closest offered capabilities.
     let v: VocabResult;
     ({v, caps, plans} = this.resolveOnDemand(soul, text, caps, plans));
+    if (words) {plans = new Map(plans); v = this.exactWords(soul, words, text, v, plans);}
     if (v.kind === 'unknown') return {...refuse(v.code ?? 'capability.unknown', v.reason), did_you_mean: v.didYouMean};
     let cap = v.cap; capability = cap.id;
     const bodyIssue=bodyCapabilityProblem(this.body(soul.entityId),cap,plans.get(capability)?.steps);if(bodyIssue)return refuse(bodyIssue.code,bodyIssue.reason);
@@ -2172,7 +2255,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return {
       binds: (s: EdgeSoul) => self.binds(s),
       body: (entityId: string) => self.body(entityId),
-      resolveText: (s: EdgeSoul, text: string, caps: EdgeCapability[]) => self.resolveOnDemand(s, text, caps, self.binds(s).plans).v,
+      // L3 (b): words on the words menu (the offer they choose is rebuilt exactly: exactWords)
+      wordsMenu: (s: EdgeSoul) => self.wordsMenu(s),
+      exactWords: (s: EdgeSoul, menu: {caps: EdgeCapability[]; exact: boolean}, text: string, v: VocabResult) => self.exactWords(s, menu, text, v),
+      resolveText: (s: EdgeSoul, text: string, caps: EdgeCapability[]) => {const w = self.wordsMenu(s); return self.exactWords(s, w, text, self.resolveOnDemand(s, text, caps, w.plans).v);},
       isAncestor: (ancestor: string, id: string) => {for (let p = self.places.byId.get(id), n = 0; p?.parent && n < 20; p = self.places.byId.get(p.parent), n++) if (p.parent === ancestor) return true; return false;},
       targetPoint: (s: EdgeSoul, c: EdgeCapability) => self.vocabulary(s, [c]).target(c).at,
       detail: (id: string): Record<string, unknown> | null => {const r = self.rows('receipt_id=?', id)[0]; try {return r?.detail ? JSON.parse(r.detail) : null;} catch {return null;}},
