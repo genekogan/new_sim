@@ -621,8 +621,11 @@ export class HumanViews {
       const q=solvePosture(d,[toBody(r.target[0],r.target[1],r.target[2],r.hand==='left'?-1:1)],styleFor('reach',false));
       return {drop:q.drop*r.k,bend:q.bend*r.k,rise:q.rise*r.k,kneel:q.kneel*r.k};
     }
-    // A hand actuator (not a door) whose hand points are all at or above the hip joints is a standing reach: lean, never dip.
-    const style = styleFor(v.activity, walking), standing = style === 'knees' && !!v.handActuator && !v.handActuator.opening && ts.length > 0 && ts.every((t) => t.up >= d.hipH);
+    // A hand actuator whose hand points are all at or above the hip joints is a standing reach: lean, never dip.
+    // Entry 40: doors too (a door's knob at 1.04 m is above every rig's hips). Entry 31's close from the push side stands 3 cm
+    // farther from the leaf for wall clearance; under `knees` that 0.63 m push dipped the hips 0.17 m (0.086 before 31).
+    // A latch below the hips keeps its small bend (`knees`).
+    const style = styleFor(v.activity, walking), standing = style === 'knees' && !!v.handActuator && ts.length > 0 && ts.every((t) => t.up >= d.hipH);
     const pz = solvePosture(d, ts, standing ? 'stand' : style);
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
