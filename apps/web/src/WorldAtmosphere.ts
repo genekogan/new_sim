@@ -55,7 +55,7 @@ export type AtmosphereFrame={seconds:number;dt:number;daylight:number|null;camer
  indoors?:(x:number,y:number,z:number)=>boolean};
 /** A god's weather as set (apps/server god/world-env.ts): channels 0..1; kind 'storm' brings lightning. */
 export type SetWeather={kind:string;clouds:number;rain:number;wind:number;fog:number;intensity:number};
-export type AtmosphereInspection={bow:number;rainbowThings:number;rainbowThing:number;sun:number[];rainCover:number;profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
+export type AtmosphereInspection={bow:number;rainbowThings:number;rainbowThing:number;sun:number[];rainCover:number;profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;lightCollects:number;lightRefreshes:number;drawCalls:number};
 const SCAN_AT=[0,1.5,5,12,25,45];
 /** W2b: phones skip the sea fog banks (big alpha-blended puffs: fill rate). */
 /** Rainbow life after a shower stops (world seconds): full until HOLD, gone by GONE. */
@@ -109,13 +109,20 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  let bodies:SkyBodies|null=null,bodiesAt=-Infinity,bodiesClock='';
  const lightList:HaloSource[]=[],lv=new THREE.Vector3();
  const lightPublishers:{node:THREE.Object3D;list:unknown;offset:number;moveVersion:unknown}[]=[];
+ let lightCollects=0,lightRefreshes=0;
  /** Published night lights (lamps, lanterns, fires) in world space, for the glow sprites. */
- function collectLights(){lightList.length=0;lightPublishers.length=0;scene.updateWorldMatrix(true,false);
-  scene.traverse(o=>{if(o===root)return;const list=o.userData?.edenLightSources;if(!Array.isArray(list))return;lightPublishers.push({node:o,list,offset:lightList.length,moveVersion:o.userData.edenLightMoveVersion});o.updateWorldMatrix(true,false);
-   for(const a of list){if(!Array.isArray(a)||a.length<3)continue;lv.set(+a[0],+a[1],+a[2]).applyMatrix4(o.matrixWorld);lightList.push([lv.x,lv.y,lv.z,String(a[3]??'lamp'),a[4]===undefined?1:+a[4],a[5],a[6],a[7]]);}});
+ function publish(o:THREE.Object3D,list:unknown[]){lightPublishers.push({node:o,list,offset:lightList.length,moveVersion:o.userData.edenLightMoveVersion});o.updateWorldMatrix(true,false);
+   for(const a of list){if(!Array.isArray(a)||a.length<3)continue;lv.set(+a[0],+a[1],+a[2]).applyMatrix4(o.matrixWorld);lightList.push([lv.x,lv.y,lv.z,String(a[3]??'lamp'),a[4]===undefined?1:+a[4],a[5],a[6],a[7]]);}}
+ function finishLights(){
   // The commons campfire (native fixture) and the garden fire circle publish no anchors of their own.
   if(lightList.length&&profile==='eden')lightList.push([24,0,-7,'fire',1],[47,0,64,'fire',.8]);
   halos.setSources(lightList);}
+ function collectLights(){lightList.length=0;lightPublishers.length=0;scene.updateWorldMatrix(true,false);lightCollects++;
+  scene.traverse(o=>{if(o===root)return;const list=o.userData?.edenLightSources;if(Array.isArray(list))publish(o,list);});finishLights();}
+ /** M01: a known publisher replaced its list (a lamp switched): the same halos from the known publishers, in scene order,
+  *  without walking the whole scene. New publishers are still found by the periodic scan's collectLights. */
+ function refreshLights(){const known=lightPublishers.map(p=>p.node);lightList.length=0;lightPublishers.length=0;scene.updateWorldMatrix(true,false);lightRefreshes++;
+  for(const o of known){const list=o.userData?.edenLightSources;if(Array.isArray(list))publish(o,list);}finishLights();}
  /** Cached publishers supply only changed portable anchors; no scene traversal
   * or static light-list reconstruction for a lantern moving in one hand. */
  function moveLights(){for(const p of lightPublishers){const v=p.node.userData.edenLightMoveVersion;if(v===p.moveVersion)continue;p.moveVersion=v;
@@ -280,7 +287,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    if(seconds>=nextScan)scan(seconds);
    // Lamp switches publish a new source array. Refresh just the halos immediately;
    // unchanged frames compare a few publisher references, not every world entity.
-   else if(lightPublishers.some(p=>p.node.userData.edenLightSources!==p.list||p.node!==scene&&!p.node.parent))collectLights();
+   else if(lightPublishers.some(p=>p.node!==scene&&!p.node.parent))collectLights();
+   else if(lightPublishers.some(p=>p.node.userData.edenLightSources!==p.list))refreshLights();
    moveLights();
    // Any world can opt in using its admitted sky palette; no Mars identity special case.
    // Explicit owner weather wins over auto, unless a dust review override was requested.
@@ -360,7 +368,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
     try{api.update({...real,dt:0});}catch{/* next frame */}lastFlash=was.lastFlash;};
   },
   onLightning:null as ((strength:number,dir:THREE.Vector3)=>void)|null,
-  inspect(){return {bow:sky.uniforms.uBow.value.x,rainbowThings:rainbowThings.count,rainbowThing:rainbowThings.strength,sun:sunDir.toArray(),rainCover:COVER_A.value.w,profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
+  inspect(){return {bow:sky.uniforms.uBow.value.x,rainbowThings:rainbowThings.count,rainbowThing:rainbowThings.strength,sun:sunDir.toArray(),rainCover:COVER_A.value.w,profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,lightCollects,lightRefreshes,drawCalls:root.children.filter(o=>o.visible).length};},
   dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();for(const b of beacons)b.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},
  };
  // Review hook (only with ?weather=… or ?atmos in the URL): window.edenAtmosphere.inspect() in the console.

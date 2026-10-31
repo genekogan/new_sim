@@ -251,7 +251,9 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   for (const t of all) {const k = kindOf(t), n = taken.get(k) ?? 0; if (n < (k === 'seat' ? LIMITS.seats : 2) && picked.length < LIMITS.objects) {picked.push(t); taken.set(k, n + 1);} else more[k] = (more[k] ?? 0) + 1;}
   // Only six selected objects, at most 4 m away and in sight. No stored-state dump.
   const objects = picked.map(t => {
-    const state=t.kind==='object'&&t.distance<=4&&P.sameEnclosure(t.at)&&P.sees(t.at,t.id)?ledger.contactActuator?.facts(t.id):null;
+    // M01: the few facts first; enclosure and sightline (entity-world walls) only for a thing that has some.
+    const facts=t.kind==='object'&&t.distance<=4?ledger.contactActuator?.facts(t.id):null;
+    const state=facts&&Object.keys(facts).length&&P.sameEnclosure(t.at)&&P.sees(t.at,t.id)?facts:null;
     return ({
     id: t.id, kind: kindOf(t),
     ...(t.kind === 'seat' || t.kind === 'object' || t.kind === 'spot' || t.kind === 'item' ? {name: t.name} : {}),

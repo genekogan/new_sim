@@ -50,13 +50,25 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
 }
 export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');
 const issue=(code:string,message:string,subjects:string[]):Diagnostic=>({code:'contact.'+code,message,subjects});
-function blocked(rt:Runtime,p:HandActuatorParams,root:Vec3,angle:number):Diagnostic|null{
- const actor=rt.world.entities[p.actor],sp=rt.services.spatial as Spatial|undefined;
+type Obstacle=Spatial['scene']['obstacles'][number];
+/** M01: obstacles near the whole operation, per scene obstacle array (rebuilt, never mutated, when the scene changes).
+ *  Every root of one operation lies within `reach` of `centre`, so a farther obstacle can never block it. */
+const nearOps=new WeakMap<Exec,{of:readonly Obstacle[];near:Obstacle[]}>();
+export const handClearanceStats={obstaclesVisited:0,candidateBuilds:0};
+function nearObstacles(ex:Exec,all:readonly Obstacle[]){
+ const was=nearOps.get(ex);if(was?.of===all)return was.near;
+ const o=ex.p.opening,centre=o?o.hinge:ex.root,reach=o?o.radius+2:.5,near:Obstacle[]=[];
+ for(const b of all){if(b.id===ex.p.target||b.id.startsWith(ex.p.target+'#'))continue;if(Math.hypot(b.obb.c[0]-centre[0],b.obb.c[1]-centre[2])<=reach+Math.hypot(b.obb.half[0],b.obb.half[1])+HUMAN_RADIUS+.1)near.push(b);}
+ nearOps.set(ex,{of:all,near});handClearanceStats.candidateBuilds++;return near;
+}
+function blocked(rt:Runtime,ex:Exec,root:Vec3,angle:number):Diagnostic|null{
+ const p=ex.p,actor=rt.world.entities[p.actor],sp=rt.services.spatial as Spatial|undefined;
  if(!actor?.human)return issue('body-gone','The original body is gone.',[p.actor]);
  if(!sp)return issue('no-geometry','No authoritative clearance is available.',[p.actor]);
  sp.sync(rt.world);
- for(const o of sp.scene.obstacles){
-  if(o.id===p.target||o.id.startsWith(p.target+'#')||o.y1<=root[1]+.15||o.y0>=root[1]+1.75)continue;
+ for(const o of nearObstacles(ex,sp.scene.obstacles)){
+  handClearanceStats.obstaclesVisited++;
+  if(o.y1<=root[1]+.15||o.y0>=root[1]+1.75)continue;
   const c=dcos(o.obb.yaw),s=dsin(o.obb.yaw),dx=root[0]-o.obb.c[0],dz=root[2]-o.obb.c[1];
   const x=Math.max(0,Math.abs(dx*c+dz*s)-o.obb.half[0]),z=Math.max(0,Math.abs(-dx*s+dz*c)-o.obb.half[1]);
   if(Math.hypot(x,z)<HUMAN_RADIUS+.025)return issue('step-blocked',`There is no clear place to step while holding this handle beside ${o.label??o.id}.`,[p.actor,o.id]);
@@ -81,7 +93,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   ex.t+=dt;const f=handActuatorFrame(ex.motion,ex.t),point=ex.p.opening?actuatorPoint(ex.p.opening,f.angle):{hand:ex.p.at,root:ex.root};
   if(ex.p.opening&&Math.hypot(ex.root[0]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[0],ex.root[2]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
   if(ex.p.opening&&ex.t<HAND_REACH_SECONDS){const k=smooth(ex.t/HAND_REACH_SECONDS);point.root=[ex.root[0]+(point.root[0]-ex.root[0])*k,ex.root[1]+(point.root[1]-ex.root[1])*k,ex.root[2]+(point.root[2]-ex.root[2])*k];}
-  const bad=blocked(rt,ex.p,point.root,f.angle);if(bad){clear(rt,ex);return {status:'failed',diagnostic:bad};}
+  const bad=blocked(rt,ex,point.root,f.angle);if(bad){clear(rt,ex);return {status:'failed',diagnostic:bad};}
   const before=[...a.pose.p];a.pose.p=[...point.root];
   const face=ex.p.opening?heading([-dsin(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side,-dcos(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side]):heading([point.hand[0]-a.pose.p[0],point.hand[2]-a.pose.p[2]]),turn=((face-ex.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/.4);

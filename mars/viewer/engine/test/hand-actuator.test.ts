@@ -25,3 +25,26 @@ for(const side of [1,-1] as const)for(const radius of [.88,1.035,2])test(`natura
 });
 
 test('natural policy active door restores held contact and modest facing tick for tick',()=>{const f=fixture();f.scene.obstacles=[];f.rt.services.spatial=new Spatial(f.scene);const o={hinge:[-6,0,-6] as [number,number,number],yaw:0,radius:.88,height:2.1,handleY:1.04,from:0,to:HAND_OPEN_ANGLE,side:1 as const,bodyPolicy:'door-natural-v2' as const};f.rt.world.entities.a.pose.p=actuatorPoint(o,0).root;const r=f.rt.submit('hand_actuator_v1',{actor:'a',target:'door',at:[-6,1,-6],opening:o});for(let i=0;i<25;i++)f.rt.step();const copy=Runtime.restore(f.rt.snapshot(),f.registry,{spatial:new Spatial(f.scene)},DEFAULT_INVARIANTS);for(let i=0;i<150;i++){f.rt.step();copy.step();assert.equal(copy.stateHash(),f.rt.stateHash())}assert.equal(r.status,'completed');assert.deepEqual(f.rt.violations,[]);});
+
+import {handClearanceStats} from '../social/hand-actuator.ts';
+// M01: clearance reads obstacles near the operation once per scene, not every obstacle in the world every tick.
+function doorWith(obstacles:{id:string;obb:{c:[number,number];half:[number,number];yaw:number};y0:number;y1:number;kind:'component'}[]){
+ const f=fixture(),o={hinge:[-6,0,-6] as [number,number,number],yaw:0,radius:.88,height:2.1,handleY:1.04,from:0,to:HAND_OPEN_ANGLE,side:1 as const,bodyPolicy:'door-natural-v2' as const};
+ f.rt.services.spatial=new Spatial({...provingGround(),obstacles});f.rt.world.entities.a.pose.p=actuatorPoint(o,0).root;
+ return {...f,o,r:f.rt.submit('hand_actuator_v1',{actor:'a',target:'door',at:[-6,1,-6],opening:o})};
+}
+const box=(id:string,x:number,z:number,h=.1)=>({id,obb:{c:[x,z] as [number,number],half:[h,h] as [number,number],yaw:0},y0:0,y1:2,kind:'component' as const});
+test('M01: 400 distant obstacles add no per-tick clearance work; the door still completes',()=>{
+ const far=Array.from({length:400},(_,i)=>box('far'+i,20+(i%20)*2,20+Math.floor(i/20)*2));
+ const v0=handClearanceStats.obstaclesVisited,b0=handClearanceStats.candidateBuilds,{rt,r}=doorWith([...far,box('door#leaf',-5.6,-6),box('door',-6,-6)]);let steps=0;
+ while(rt.isActive(r.id)&&steps<300){rt.step();steps++;}
+ assert.equal(r.status,'completed');assert.deepEqual(rt.violations,[]);
+ assert.equal(handClearanceStats.obstaclesVisited-v0,0,'distant obstacles and the target leaf are never visited per tick');
+ assert.equal(handClearanceStats.candidateBuilds-b0,1,'one candidate filter for an unchanged scene');
+});
+test('M01: a nearby obstacle in the operating path still refuses with the same step-blocked diagnostic',()=>{
+ const o={hinge:[-6,0,-6] as [number,number,number],yaw:0,radius:.88,height:2.1,handleY:1.04,from:0,to:HAND_OPEN_ANGLE,side:1 as const,bodyPolicy:'door-natural-v2' as const};
+ const end=actuatorPoint(o,HAND_OPEN_ANGLE).root,far=Array.from({length:200},(_,i)=>box('far'+i,30+i,30));
+ const {rt,r}=doorWith([...far,box('crate',end[0],end[2],.15)]);while(rt.isActive(r.id))rt.step();
+ assert.equal(r.status,'failed');assert.equal(r.diagnostic?.code,'contact.step-blocked');assert.deepEqual(r.diagnostic?.subjects,['a','crate']);
+});
