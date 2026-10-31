@@ -293,6 +293,9 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         ex.to = ex.target;
       }
       a.human!.activity = 'reach';
+      // Soul Actions 34: a handle-held item's reach and release are recorded, so the drawn arm blends on their timeline
+      const opted = itemReachSeconds(it);
+      if (opted !== undefined && ex.phase === 'reach' && ex.t === 0) a.human!.handTransferV1 = { mode: ex.mode, hand: ex.hand, startTick: rt.tick, reach: opted };
       ex.t++;
       const reachTicks = ticks(itemReachSeconds(it) ?? REACH_TIME);
       const k = smooth(ex.t / reachTicks);
@@ -342,6 +345,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         return { status: 'running', phase: 'withdraw' };
       }
       if (ex.mode === 'put') setHand(a, ex.hand, undefined);
+      delete a.human!.handTransferV1;
       if (a.human!.task === ex.id) { a.human!.task = undefined; a.human!.activity = 'idle'; }
       return { status: 'completed', outputs: { item: ex.item, hand: ex.hand, support: rt.world.entities[ex.item].support } };
     },
@@ -350,6 +354,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       // light items: stop at once; an item already grasped stays in hand (hold_items keeps it there)
       if (a?.human) {
         if (!inHand(rt.world, ex.actor, ex.hand)) setHand(a, ex.hand, undefined);
+        delete a.human.handTransferV1;
         if (a.human.task === ex.id) { a.human.task = undefined; a.human.activity = 'idle'; }
       }
       return { ok: true };

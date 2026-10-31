@@ -22,7 +22,9 @@ const EMPTY_L = 0.25, GRACE_TICKS = 1200;
 /** At the hook the body stands this far behind the handle (m). */
 const HOOK_STAND = 0.5;
 /** Pour: the hand holds the can out at the side over the bed (body frame, m), the stream lands this far past the rose. */
-const POUR_HAND = { fwd: 0.42, side: 0.3, rose: 0.22 }, STREAM_RUN = 0.08, SWEEP = 0.18;
+const POUR_HAND = { fwd: 0.42, side: 0.3, rose: 0.22 }, STREAM_RUN = 0.2, SWEEP = 0.16;
+/** The can's opening sits this far under the tap's nozzle while it fills (m). */
+const CATCH_BELOW = 0.05;
 
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 const shapesOf = (def: StoredDef) => (def.make.kind === 'gen' ? (def.make.args as { shapes?: { tint?: string; at?: number[] }[] })?.shapes ?? [] : []);
@@ -115,11 +117,13 @@ export function createWatering(h: WateringHost) {
       for (const t of ix.taps) { const e = m.entities.get(t); if (!e) continue; const q = m.worldPose(e), d = Math.hypot(q.x - canAt.x, q.z - canAt.z); if (d < best) { best = d; tap = t; } }
       if (!tap) return { code: 'water.no-tap', reason: `The watering can is empty and there is no garden tap within ${WATERING_REACH} m of it to fill it at.` };
       const tdef = defOf(tap)!, twp = pose(tap)!, sh = shapesOf(tdef), valve = sh.find((s) => s.tint === 'valve')!.at!, nozzle = sh.find((s) => s.tint === 'nozzle')!.at!;
-      // the can's filler opening goes where the tap's stream lands, 12.5 cm under the nozzle; the body stands beside the
-      // basin on the tap's −x side, clear of its footprint, facing +x (the can in the right hand on the stream's side)
-      const openTop = nozzle[1] - 0.125, landZ = nozzle[2] + streamRun(0.125), half = tdef.size.box[0] / 2;
+      // the can's filler opening goes where the tap's stream lands, just under the nozzle (held high, the arm reaches it
+      // standing: no crouch); the body stands beside the basin on the tap's −x side, clear of its footprint, facing +x
+      // (the can in the right hand on the stream's side)
+      const openTop = nozzle[1] - CATCH_BELOW, landZ = nozzle[2] + streamRun(CATCH_BELOW), half = tdef.size.box[0] / 2;
       const grip: Vec3 = [nozzle[0] - (CAN_OPENING[0] - CAN_GRIP[0]), openTop - (CAN_OPENING[1] + 0.008) + CAN_GRIP[1], landZ];
-      const stand = toWorld(twp, [-(half + HUMAN_RADIUS + 0.03), 0, landZ - 0.155]);
+      let stand = toWorld(twp, [-(half + HUMAN_RADIUS + 0.01), 0, landZ - 0.155]);
+      if (!clear(stand)) stand = toWorld(twp, [-(half + HUMAN_RADIUS + 0.04), 0, landZ - 0.155]);
       if (!clear(stand)) return { code: 'water.tap-blocked', reason: `There is no room to stand beside ${m.pathOf(tap)} to fill the watering can.` };
       const face = heading(twp, [1, 0]);
       steps.push({ verb: 'mars:walk_to', params: { x: r3(stand[0]), z: r3(stand[2]), level: 0, face: r3(face) } },

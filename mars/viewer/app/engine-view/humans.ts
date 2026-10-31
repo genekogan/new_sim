@@ -1,5 +1,5 @@
 import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
-import {wateringFrame,type WateringMotion} from '../../engine/items/watering.ts';
+import {wateringFrame,transferWeight,type HandTransfer,type WateringMotion} from '../../engine/items/watering.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -79,6 +79,9 @@ type View = {
   /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
   watering?:WateringMotion;
   wateringTime?:number;
+  /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
+  transfer?:HandTransfer;
+  transferTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -216,6 +219,9 @@ export type SampledHuman = {
   /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
   watering?:WateringMotion;
   wateringTime?:number;
+  /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
+  transfer?:HandTransfer;
+  transferTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -497,7 +503,7 @@ export class HumanViews {
       v.shore = undefined;
       v.shoreTime = undefined;
       v.waterTransition = undefined;
-      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;v.watering=e.human?.wateringV1;v.wateringTime=world.tick*DT;
+      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;v.watering=e.human?.wateringV1;v.wateringTime=world.tick*DT;v.transfer=e.human?.handTransferV1;v.transferTime=world.tick*DT;
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
@@ -597,6 +603,7 @@ export class HumanViews {
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
     if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
+    if(v.transfer){const k=transferWeight(v.transfer,(v.transferTime??0)-v.transfer.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
 
     // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
     return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
@@ -683,7 +690,7 @@ export class HumanViews {
       if(!f.bodyModel)this.syncAppearance(v,f.publicSoulKey);
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
-      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;v.watering=f.watering;v.wateringTime=f.wateringTime;
+      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;v.watering=f.watering;v.wateringTime=f.wateringTime;v.transfer=f.transfer;v.transferTime=f.transferTime;
       v.sleepPose = f.sleepPose;
       v.shore = f.shore;
       v.shoreTime = f.shoreTime;
@@ -821,10 +828,13 @@ export class HumanViews {
     const reachS = v.handActuator ? (v.handActuatorTime ?? tSec) - v.handActuator.startTick * DT : 0;
     const handoff = v.handActuator ? handActuatorFrame(v.handActuator, reachS) : null;
     // Over GESTURE_FADE, not the 0.65 s reach: folded arms opening in 0.65 s still swung the free hand 0.13 m per 50 ms (0.084 over 1.2 s).
-    const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE) : 0;
+    const transferS = v.transfer ? (v.transferTime ?? tSec) - v.transfer.startTick * DT : -1;
+    // Soul Actions 34: an idle gesture fades out the same way over a hand-held item's reach (take_item / put_item)
+    const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE)
+      : v.transfer && transferS >= 0 && transferS < GESTURE_FADE ? 1 - smooth(transferS / GESTURE_FADE) : 0;
     // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
-    const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
-    const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : 1;
+    const idleFree = (v.activity === 'idle' || GAIT_ACTS.has(v.activity) || ((v.activity === 'operate' || v.activity === 'reach') && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0) && freeBody && !lib.cur;
+    const idleHandoff = handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : v.transfer && transferS >= 0 ? reachFade : 1;
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
@@ -1042,7 +1052,9 @@ export class HumanViews {
       // Soul Actions 34: the can hand stays on the can; the free hand blends in to the valve and back out to the clip
       // between take frames: the frame's own time plus how far the render is past it (the hands interpolate the same way)
       const wf=v.watering?wateringFrame(v.watering,(v.wateringTime!==undefined?v.wateringTime+(tSec-b.expressionT):tSec)-v.watering.startTick*DT):null;
-      const armW=(i:number)=>wf?(armSide(v,i)==='left'?wf.left:1):weight;
+      // a handle-held item's reach blends that arm in from (and its release back out to) the clip's own pose
+      const tw=v.transfer?transferWeight(v.transfer,(v.transferTime!==undefined?v.transferTime+(tSec-b.expressionT):tSec)-v.transfer.startTick*DT).weight:null;
+      const armW=(i:number)=>wf?(armSide(v,i)==='left'?wf.left:1):tw!==null&&armSide(v,i)===v.transfer!.hand?tw:weight;
       h.userData.wateringTilt=wf?.tilt??0;h.userData.wateringFlow=wf?.flow??0;
       const armBase=v.arms.some((_,i)=>armW(i)<1)?v.arms.flatMap((arm,i)=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand].map(o=>({o,w:armW(i)}))).map(({o,w})=>({o,w,q:o.quaternion.clone(),p:o.position.clone()})):[];
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
