@@ -1,0 +1,18 @@
+#!/bin/sh
+# pre-commit: keep secrets, databases, media and private values out of commits in a public repository.
+# Installed by `pnpm install` (the `prepare` script, .github/scripts/install-hooks.mjs). It runs:
+#   gitleaks  over the staged changes with .gitleaks.toml, when gitleaks is installed (CI always runs it)
+#   guards    .github/scripts/guards.mjs staged: path guard + scrub guard on what the commit would record
+# A finding blocks the commit: fix the staged change. Do not bypass the hook.
+set -e
+top=$(git rev-parse --show-toplevel)
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --redact --no-banner --log-level warn --config "$top/.gitleaks.toml" "$top"
+else
+  echo "pre-commit: gitleaks not installed; skipping the secret scan (CI runs it)." >&2
+fi
+if command -v node >/dev/null 2>&1; then
+  node "$top/.github/scripts/guards.mjs" staged
+else
+  echo "pre-commit: node not found; skipping the path and scrub guards (CI runs them)." >&2
+fi

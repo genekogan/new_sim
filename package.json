@@ -16,7 +16,8 @@
     "check": "pnpm typecheck && pnpm test",
     "test:mars": "pnpm --filter mars-campus-viewer test:engine",
     "test:mars:release": "pnpm --filter mars-campus-viewer gate",
-    "test:client": "node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs"
+    "test:client": "node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs",
+    "prepare": "node .github/scripts/install-hooks.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

@@ -3,6 +3,8 @@
 //
 //   node .github/scripts/guards.mjs paths                      every tracked file: no databases, client state files,
 //                                                              .env files, or binary media outside the allowlist
+//   node .github/scripts/guards.mjs staged                     both guards over what `git commit` would record now
+//                                                              (the pre-commit hook, .github/hooks/pre-commit)
 //   node .github/scripts/guards.mjs scrub --base <ref> [--head <ref>]
 //                                                              lines added since <base>: no home paths, private
 //                                                              workspace paths, non-documentation IPs, private host
@@ -121,12 +123,18 @@ function main([mode, ...argv]) {
     const lines = addedLines(git('diff', '-U0', '--no-color', '--no-ext-diff', `${base}...${head}`));
     problems = checkScrub(lines);
     console.log(`scrub guard: ${lines.length} added line(s) since ${base}, ${problems.length} problem(s)`);
+  } else if (mode === 'staged') {
+    const files = git('diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z').split('\0').filter(Boolean);
+    const allow = readAllowlist(readFileSync(resolve(ROOT, '.github/guards/media-allowlist.txt'), 'utf8'));
+    const lines = addedLines(git('diff', '--cached', '-U0', '--no-color', '--no-ext-diff'));
+    problems = [...checkPaths(files, allow, sniffBinary), ...checkScrub(lines)];
+    console.log(`guards (staged): ${files.length} file(s), ${lines.length} added line(s), ${problems.length} problem(s)`);
   } else {
-    console.error('usage: guards.mjs paths | scrub --base <ref> [--head <ref>]');
+    console.error('usage: guards.mjs paths | staged | scrub --base <ref> [--head <ref>]');
     return 2;
   }
   for (const p of problems) console.log(process.env.GITHUB_ACTIONS ? `::error::${p}` : `  ${p}`);
-  if (problems.length && mode === 'scrub') console.log('Replace private values with env vars, config or neutral wording (or mark a deliberate fixture line with `scrub-guard: allow`).');
+  if (problems.length && mode !== 'paths') console.log('Replace private values with env vars, config or neutral wording (or mark a deliberate fixture line with `scrub-guard: allow`).');
   return problems.length ? 1 : 0;
 }
 
