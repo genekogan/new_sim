@@ -22,6 +22,7 @@ function onScene(k: string) {
   const ms = performance.now() - t0, w0 = performance.now(); replica.connectivityV1();   // labels complete (as a poll would need)
   builds.push({ key: k, kind: builds.length ? 'rebuild' : 'build', ms: +ms.toFixed(1), warmMs: +(performance.now() - w0).toFixed(1) });
   key = k;
+  for (const old of [...scenes.keys()]) if (old !== k) scenes.delete(old);   // records name scenes in order: an older one never returns
 }
 function setBodies(bodies: ReplicaBody[]) {
   const now = new Set(bodies.map((b) => b.id)), gone = [...lastBodies].filter((id) => !now.has(id));

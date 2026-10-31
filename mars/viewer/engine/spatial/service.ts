@@ -255,7 +255,7 @@ export class Spatial {
    */
   static fromStaticScene(s: StaticSceneV1, world: WorldState, field?: GroundField): Spatial {
     const sp = new Spatial(staticBase(s), { cell: s.cell, baseId: s.baseId, planner: s.planner });
-    sp.ownSurfaces = new Set(s.own);
+    sp.ownSurfaces = new Set(s.own); sp.tileReads = true;
     if (s.ground) {
       if (!field) throw new Error('spatial.static-scene: a ground scene needs its field');
       sp.setGround(field, world, [], { paged: s.ground.paged });
@@ -483,7 +483,7 @@ export class Spatial {
     const g = this.ground!;
     let tiles = 0;
     for (const r of rects) tiles += (r[2] - r[0] + 1) * (r[3] - r[1] + 1);
-    g.fineMax = Math.max(FINE_LRU_PAGED, tiles + 8); g.composedMax = rects.length + 4;
+    g.fineMax = this.tileReads ? FINE_LRU_PAGED : Math.max(FINE_LRU_PAGED, tiles + 8); g.composedMax = this.tileReads ? 2 : rects.length + 4;
     // a window whose rect is unchanged keeps its grids when the static world did not change
     const old = !changed && this.pages ? new Map(this.pages.rects.map((r, i) => [r.join(','), this.pages!.sets[i]])) : null;
     this.pages = { rects, key, sets: rects.map((r) => old?.get(r.join(',')) ?? null), scenes: rects.map((r) => ({ ...all, bounds: g.boundsOf(r) })), all };
@@ -539,6 +539,7 @@ export class Spatial {
       const i = this.pageAt(p), r = this.pages.rects[i], tx = Math.floor(p[0] / 64), tz = Math.floor(p[1] / 64);
       // a point no window holds (a recovery target, a far arrival, a far thing a Soul is offered): its own small window, the engine's focus unchanged
       if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.outsideLevel(id, p);
+      if (this.tileReads) return this.ground!.levelOver(r, id, this.pages.all);
       this.focusPage(i);
     }
     return this.grids.levels.get(id);
@@ -554,6 +555,7 @@ export class Spatial {
     if (level === 0 && this.ground?.paged && this.pages) {
       const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
       if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceReader(rectOf([at]), this.pages.all.obstacles);
+      if (this.tileReads) return this.ground.clearanceReader(r, this.pages.all.obstacles);
     }
     const g = this.levelAt(level, at);
     return g ? (q) => clearanceAt(g, q) : null;
@@ -565,6 +567,7 @@ export class Spatial {
     if (level === 0 && this.ground?.paged && this.pages) {
       const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
       if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceCapped(rectOf([at]), this.pages.all.obstacles, cap);
+      if (this.tileReads) return this.ground.clearanceCapped(r, this.pages.all.obstacles, cap);
     }
     const g = this.levelAt(level, at);
     return g ? (q) => Math.min(clearanceAt(g, q), cap) : null;
@@ -606,6 +609,13 @@ export class Spatial {
     if (this.ground?.paged) this.sync(world);
   }
   private pinnedPages?: TileRect[];
+  /**
+   * Stage B (lane B-spatial), paged ground: answer a read inside a window from the ground's tiles over that window's rect
+   * (GroundNav.clearanceReader / clearanceCapped / levelOver: exactly the window grid's values, 0 beyond its rect) instead
+   * of composing the window's grids and facing it. For a replica that plans no routes (which window is faced never
+   * matters to it): the window grids are the bulk of its memory. Off (the engine): unchanged.
+   */
+  tileReads = false;
 
   /** Paged ground diagnostics: the windows (tile rects) and the bytes their built grids hold. */
   pagesInfo(): { rects: TileRect[]; built: number; bytes: number } | null {
