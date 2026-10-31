@@ -112,3 +112,62 @@ test('read worker mode 2: here, observe, capabilities (incl. ?all=1) and view?al
   for (const q of ['view', 'view?gaze=left&alt=only']) {const {j} = await get(q); assert.deepEqual(j, {main: true}, q);}
   assert.equal(forwarded.length, 2);
 });
+
+test('read worker mode 2: here?view= is main\'s (body view answered by main\'s hereBodyFrame, a bad view gets main\'s 400)', {timeout: 300000}, async t => {
+  const {ReadPool, deltaSource} = await import('./read-pool.ts');
+  const {hereBodyFrame} = await import('../edge/perception/here.ts');
+  const {Hono} = await import('hono'), {mountEdgeRoutes} = await import('../edge/routes.ts'), {EdgeError} = await import('../edge/contract.ts');
+  const dir = mkdtempSync(join(tmpdir(), 'read-w2v-')), path = join(dir, 'sim.db');
+  const f = fixture(path, factory);
+  f.brain.quiesce();
+  const edge = new EdgeLedger(f.host, f.db);
+  const settle = async (n = 1) => {for (let i = 0; i < n; i++) {f.host.tickOnce(); if (i % 20 === 0) {await setImmediate(); f.host.drainInputs();}}};
+  await settle(3);
+  await invite(f, 'mira');
+  const row = await accept(f.host, f.souls.create('dev:mira', {name: 'Mira', description: 'worker view'}));
+  await settle(5);
+  const mind = f.host.minds.get(row.id)!, soul = {soulId: row.id, entityId: mind.entityId, name: 'Mira', owner: 'dev:mira'} as never;
+  // main: the real edge routes (as main.ts runs a forwarded job through its app)
+  const app = new Hono();
+  const comms = mountEdgeRoutes(app, {host: f.host, db: f.db, souls: f.souls, ledger: edge,
+    soul: c => {if (c.req.header('authorization') !== 'Bearer sim_mira') throw new EdgeError(401, 'unauthorized', 'test token'); return soul;}} as never);
+  const source = await deltaSource(f.host, edge, {SIM_READ_WORKER: '1'});
+  const forwarded: string[] = [];
+  const p = new ReadPool({workers: 1, mode: 2, worldPath: '/w/eden', init: source.init, ask: source.ask, writes: source.writes, world: {dbPath: path, worldId: f.host.worldId},
+    auth: token => token === 'sim_mira' ? {soulId: row.id, account: 'acct'} : {soulId: null},
+    run: async fw => {
+      forwarded.push(fw.url);
+      const r = await app.request(fw.url, {method: fw.method, headers: fw.headers});
+      return {status: r.status, headers: [...r.headers.entries()], body: await r.arrayBuffer()};
+    },
+    log: () => {}}).start();
+  source.onDelta(d => p.delta(d), () => p.reinit());
+  t.after(async () => {await p.close(); comms.close(); f.brain.quiesce(); f.host.stop(); f.db.close(); rmSync(dir, {recursive: true, force: true});});
+  const until = async (ok: () => boolean, ms = 60000) => {const t0 = Date.now(); while (!ok()) {if (Date.now() - t0 > ms) throw new Error('timeout'); await new Promise(r => setTimeout(r, 20));}};
+  await until(() => p.slots[0].ready && p.slots[0].port > 0);
+  await until(() => p.lagGens() === 0);
+  const port = p.slots[0].port;
+  const get = async (route: string) => {const r = await fetch(`http://127.0.0.1:${port}/w/eden/v1/edge/${route}`, {headers: {authorization: 'Bearer sim_mira'}}); return {r, j: await r.json() as Record<string, unknown>};};
+  // the rich frame stays the worker's
+  const rich = await get('here');
+  assert.equal(rich.r.headers.get('x-sim-read'), 'worker');
+  assert.deepEqual(forwarded, []);
+  // view=body: main answers with the body projection, not the worker's rich frame
+  const body = await get('here?view=body');
+  assert.equal(body.r.status, 200);
+  assert.equal(body.r.headers.get('x-sim-read'), null, 'not the worker\'s own answer');
+  const here = body.j.here as Record<string, unknown>;
+  assert.deepEqual(Object.keys(here), ['tick', 'view', 'me']);
+  assert.equal(here.view, 'body');
+  assert.equal(here.objects, undefined);
+  assert.deepEqual(diffFields(hereBodyFrame(edge, soul) as never, here as never), []);
+  // a bad view, and body with rich context: main's 400
+  for (const q of ['here?view=unknown', 'here?view=body&include=doHere']) {
+    const {r, j} = await get(q);
+    assert.equal(r.status, 400, q);
+    assert.equal((j.error as {code: string}).code, 'invalid', q);
+  }
+  assert.deepEqual(forwarded, ['/v1/edge/here?view=body', '/v1/edge/here?view=unknown', '/v1/edge/here?view=body&include=doHere']);
+  const h = await (await fetch(`http://127.0.0.1:${port}/w/eden/healthz/read`)).json() as {read: {served: number; fallbacks: Record<string, number>}};
+  assert.equal(h.read.fallbacks['here-view'], 3, JSON.stringify(h.read.fallbacks));
+});

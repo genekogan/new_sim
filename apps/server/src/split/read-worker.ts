@@ -118,6 +118,8 @@ const byRead: Record<Read2, {served: number; cpuMs: number; maxCpuMs: number}> =
 function body2(kind: Read2, soul: EdgeSoul, q: URLSearchParams): {body: object; world: boolean} | string {
   const L = RL!, M2 = read2.mods!;
   if (kind === 'here') {
+    // ?view= (body, or a bad value main refuses with 400) is main's route (edge/routes.ts: hereBodyFrame)
+    if (q.has('view')) return 'here-view';
     const modern = (q.get('include') ?? '').split(',').includes('doHere');
     return {body: {tick: RW!.mw.world.tick, here: M2.hereFrame(L, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {}), ...(read2.debug ? {_debug: read2.debug.fireFacts(L, soul)} : {})}, world: true};
   }
