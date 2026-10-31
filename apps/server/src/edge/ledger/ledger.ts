@@ -39,6 +39,7 @@ import {resolveCapability, tokens, placeMatch, placeMatchTier, typoFix, type Voc
 import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import type {ContactActuatorIntent,ContactActuatorService} from '../../god/contact-actuator.ts';
+import type {DoorPassage,DoorPassageRefusal} from '../../god/door-passage.ts';
 import type {PaintingIntent, PaintingService} from '../../art/painting-completion.ts';
 import {humanoidDims} from '../../../../../mars/viewer/engine/bodies/humanoid.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
@@ -90,6 +91,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** World-engine easels only; installed alongside the existing art media routes. */
   painting?: PaintingService;
   contactActuator?: ContactActuatorService;
+  /** Soul Actions entry 31 (god worlds, god/door-passage.ts): a plain walk a closed, permitted door walls off goes through it. */
+  doorPassage?: (soul: EdgeSoul, steps: Program['steps'], what: string) => DoorPassage | DoorPassageRefusal | null;
   /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
    *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */
   placeWalkable?: (placeId: string) => boolean;
@@ -332,7 +335,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // Open receipts from a previous process: a started one whose programme the snapshot carries is still followed;
     // a waiting one with its plan is re-armed (fresh one-minute wait); anything else cannot be followed honestly.
     for (const r of this.rows("phase IN ('waiting','started')")) {
-      const detail=r.detail?JSON.parse(r.detail):{};if(detail.contactActuatorV1?.motionV1&&!detail.contactAppliedV1)this.contactPending.add(r.receipt_id);
+      const detail=r.detail?JSON.parse(r.detail):{};if(detail.contactActuatorV1?.motionV1&&!detail.contactAppliedV1||detail.doorPassageV1)this.contactPending.add(r.receipt_id);
       const m = host.minds.get(r.soul_id);
       if (r.phase === 'started' && r.program_id && m && host.engine.programOf(m.entityId) === r.program_id) continue;
       const plan = r.phase === 'waiting' && r.plan ? JSON.parse(r.plan) as {label: string; steps: Program['steps']} : null;
@@ -512,11 +515,18 @@ export class EdgeLedger implements EdgeLedgerHooks {
     else this.update(r.receipt_id, {phase: 'failed', code: ev.code ?? 'action.failed', reason: ev.message ?? humanBlockedExplanationV1(ev.code, 'That action')});
   }
   private contactPending=new Set<string>();
+  /** entry 31: passage contacts already applied (receipt|hand action), before their commit's detail write lands. */
+  private passageApplied=new Set<string>();
   private contactTicks(tick:number){
     for(const id of this.contactPending){
-      const r=this.rows('receipt_id=?',id)[0],detail=r?.detail?JSON.parse(r.detail):{},intent=detail.contactActuatorV1 as ContactActuatorIntent|undefined;
-      if(!r||!intent||detail.contactAppliedV1){this.contactPending.delete(id);continue;}
+      const r=this.rows('receipt_id=?',id)[0],detail=r?.detail?JSON.parse(r.detail):{},passage=detail.doorPassageV1 as {door:string;open:ContactActuatorIntent;applied:string[]}|undefined;
+      let intent=detail.contactActuatorV1 as ContactActuatorIntent|undefined;
+      if(!r||(!intent&&!passage)||detail.contactAppliedV1||passage&&!OPEN.includes(r.phase)){this.contactPending.delete(id);continue;}
       const m=this.host.minds.get(r.soul_id),body=m&&this.body(m.entityId),motion=body?.human?.handActuator;
+      // entry 31: a passage walk binds two hand contacts on its door (open before the doorway, close after); each applies once
+      if(passage){if(!m||!motion?.passage||motion.target!==passage.door||!motion.actionId||passage.applied.includes(motion.actionId)||this.passageApplied.has(id+'|'+motion.actionId))continue;
+        intent=motion.passage.mode==='open'?passage.open:this.contactActuator?.prepare({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},passage.door,'close')??undefined;if(!intent)continue;}
+      if(!intent)continue;
       if(!motion||motion.target!==intent.target){if(!OPEN.includes(r.phase))this.contactPending.delete(id);continue;}
       if(motion.actionId&&(!r.program_id||this.host.engine.programAction?.(r.program_id)?.action.id!==motion.actionId))continue;
       const frame=handActuatorFrame(motion,(tick-motion.startTick)*this.host.engine.dt);
@@ -524,8 +534,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const row=this.db.soul(r.soul_id);
       const identity=m&&row&&row.retired_at===null&&row.entity_id===intent.actor&&row.owner===intent.owner&&!['sleeping','absent'].includes(stateOf(this.host,intent.actor));
       if(!identity||!this.contactActuator){this.contactPending.delete(id);this.update(id,{phase:'failed',code:'contact.identity-changed',reason:'The original awake Soul/body changed before contact.'});continue;}
-      try{const result=this.contactActuator.complete({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},intent,()=>this.setDetail(id,{contactAppliedV1:{tick}}));
-        this.contactPending.delete(id);if(!result.ok){this.update(id,{phase:'failed',code:result.code,reason:result.reason});if(r.program_id)this.host.engine.stop(r.program_id);}
+      try{const applied=passage?[...passage.applied,motion.actionId!]:null,result=this.contactActuator.complete({soulId:m.soulId,entityId:m.entityId,name:m.name,owner:m.owner},intent,()=>this.setDetail(id,applied?{doorPassageV1:{...passage,applied}}:{contactAppliedV1:{tick}}));
+        if(!passage)this.contactPending.delete(id);else{this.passageApplied.add(id+'|'+motion.actionId);if(this.passageApplied.size>256)this.passageApplied.delete(this.passageApplied.values().next().value!);}if(!result.ok){this.update(id,{phase:'failed',code:result.code,reason:result.reason});if(r.program_id)this.host.engine.stop(r.program_id);}
       }catch{this.contactPending.delete(id);this.update(id,{phase:'failed',code:'contact.failed',reason:'The world could not apply the bound contact.'});}
     }
   }
@@ -1127,6 +1137,17 @@ export class EdgeLedger implements EdgeLedgerHooks {
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
     }
+    // Soul Actions entry 31: a plain walk a closed door walls off goes through it when the door is hand-operated and this
+    // Soul may open it (opened by hand on the way, closed behind); a locked or private door on the only way refuses here,
+    // naming it, rather than walking round to the nearest point behind the wall. Before nav-connect/1: a Soul in a
+    // closed room is not cut off when its door opens.
+    let passage: DoorPassage | undefined;
+    if (issue?.code === 'route.unreachable' && this.doorPassage && steps.every(s => s.verb === 'walk_to' || s.verb === 'stand') && !isVerificationProbe(soul.soulId)) {
+      const what = label.replace(/^(walk|run|jog|go|head|stroll|cycle|wander)( over| back| down| up)? (to|into|onto|towards?) /i, '') || 'there';
+      const p = this.doorPassage(soul, steps, what);
+      if (p && 'refuse' in p) return {...refuse(p.code, p.reason), ...resolved};
+      if (p) {const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: p.steps}); if (!again || WAIT_CODES.has(again.code)) {steps = p.steps; issue = again; passage = p;}}
+    }
     // nav-connect/1 (lane NAV): no walk from where it stands, because it stands cut off from the walkable world (an edit
     // closed a pocket round it, a floor lost its stairs): it steps to the nearest open ground of the main area first (a
     // logged edge-relocate, at most once a minute each), then starts. A destination no walk reaches still refuses.
@@ -1164,7 +1185,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (moved) {const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: alt}); if (!again || WAIT_CODES.has(again.code)) {steps = alt; issue = again;}}
     }
     // BS3 (a): a jog or run the water refuses (the way runs through the shallows, or the body stands in them) walks instead
-    let note: string | undefined, approach: Record<string, unknown> | undefined;
+    let note: string | undefined = passage?.note, approach: Record<string, unknown> | undefined;
     if (issue?.code === 'gait.dry-ground-required' && steps.some(s => s.verb === 'walk_to' && s.params?.gait && s.params.gait !== 'walk')) {
       const walked = steps.map(s => s.verb === 'walk_to' && s.params?.gait ? {...s, params: Object.fromEntries(Object.entries(s.params).filter(([k]) => k !== 'gait'))} : s);
       const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: walked});
@@ -1191,6 +1212,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const remember = (id: string) => {
       if (note) this.update(id, {reason: note});
       if (approach) this.setDetail(id, {approach});
+      if (passage) {this.setDetail(id, {doorPassageV1: {door: passage.door, open: passage.open, applied: []}}); this.contactPending.add(id);}
       this.launched.set(id, {soul, capability, label, steps}); if (this.launched.size > 512) this.launched.delete(this.launched.keys().next().value!);
     };
     if (issue) {
