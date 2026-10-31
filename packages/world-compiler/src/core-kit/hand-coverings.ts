@@ -17,17 +17,19 @@ const wall = (): Shape[] => [
   { kind: 'box', at: [0, (SILL + HEAD) / 2, 0], size: [OW, 0.04, 0.05], round: 0.004, tint: 'frame' },
   { kind: 'box', at: [0, (SILL + HEAD) / 2, 0], size: [OW, HEAD - SILL, 0.012], round: 0, tint: 'glass', material: 'glass' },
 ];
-// the pull cord hangs from the rod on the right; its tassel at 1.2 m is where the hand goes
+// the pull cord hangs from the rod on the right; its tassel at 1.25 m is where the hand goes (at 1.17 m the knees bent a little, visual-02)
 const cord = (x: number, top: number): Shape[] => [
-  { kind: 'cyl', at: [x, (top + 1.2) / 2, 0.15], r: 0.004, h: top - 1.2, segments: 4, tint: 'cord' },
-  { kind: 'cyl', at: [x, 1.17, 0.15], r: 0.018, h: 0.08, segments: 8, r2: 0.012, tint: 'valve' },
+  { kind: 'cyl', at: [x, (top + 1.29) / 2, 0.15], r: 0.004, h: top - 1.29, segments: 4, tint: 'cord' },
+  { kind: 'cyl', at: [x, 1.25, 0.15], r: 0.018, h: 0.08, segments: 8, r2: 0.012, tint: 'valve' },
 ];
-// a panel of six pleats (alternating depth), from the rod's end at x0 to the middle; all pleats share the end pivot
-const panel = (role: string, x0: number): Shape[] => Array.from({ length: 6 }, (_, i) => {
-  const w = 0.8 / 6, x = x0 + Math.sign(-x0) * (w / 2 + i * w);
-  return { kind: 'box', at: [x, (0.95 + 2.3) / 2, 0.12 + (i % 2) * 0.03], size: [w + 0.012, 2.3 - 0.95, 0.02], round: 0.006, tint: i % 2 ? 'cloth' : 'cloth2', role, pivot: [x0, 2.3, 0.13] };
+// a panel of ten folds from the rod's end at x0 past the middle (the panels overlap 5 cm): each fold is turned a little,
+// alternately, so the cloth zigzags like hanging fabric; all folds share the end pivot, so drawing the panel back (scale x)
+// steepens the zigzag as the cloth bunches
+const panel = (role: string, x0: number): Shape[] => Array.from({ length: 10 }, (_, i) => {
+  const span = Math.abs(x0) + 0.05, w = span / 10, x = x0 + Math.sign(-x0) * (w / 2 + i * w), turn = (i % 2 ? 1 : -1) * 0.42;
+  return { kind: 'box', at: [x, (0.95 + 2.3) / 2, 0.125], size: [w / Math.cos(turn) + 0.004, 2.3 - 0.95, 0.012], round: 0.004, yaw: turn, tint: i % 2 ? 'cloth' : 'cloth2', role, pivot: [x0, 2.3, 0.125] };
 });
-const palette = { plaster: '#d9d2c3', frame: '#f1ede4', glass: '#a9c7d6', cloth: '#9a5b46', cloth2: '#8a4f3d', blind: '#e6dcc6', cord: '#e8e2d2', valve: '#c9b98f', rod: '#5b4a3a' };
+const palette = { plaster: '#d9d2c3', frame: '#f1ede4', glass: '#a9c7d6', cloth: '#a35f48', cloth2: '#8c4e3b', blind: '#e6dcc6', cord: '#e8e2d2', valve: '#c9b98f', rod: '#5b4a3a' };
 const params = Object.fromEntries(Object.entries(palette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour${k === 'valve' ? ' (the pull cord tassel; the hand goes here)' : ''}` }]));
 const actions = (noun: string) => [
   { name: 'open', label: `Open the ${noun}`, roles: 'anyone', reach: 'touch', params: {}, when: [{ field: 'open', is: false }], then: [{ op: 'set', field: 'open', value: true }] },

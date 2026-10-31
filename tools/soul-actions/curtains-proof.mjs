@@ -4,12 +4,12 @@
 import {createRequire} from 'node:module';import {mkdirSync,writeFileSync} from 'node:fs';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import assert from 'node:assert/strict';import {installFrameStamp} from './frame-stamp.mjs';
 const scene=process.env.SOUL_CURTAINS_SCENE??'<team>/soul-actions/day-23/scene',out=process.env.SOUL_CURTAINS_OUT??'<team>/soul-actions/day-23/visual-01',base='http://127.0.0.1:7865/w/soul-curtains';mkdirSync(out,{recursive:true});
 const NAMES=['curtains','blind'];
-const IN=[[2.9,1.6,2.0],[0.7,1.35,3.7]],OUT=[[0.6,1.9,9.6],[0,1.5,4]];
+const IN=[[-1.6,1.75,0.6],[0.8,1.35,3.7]],OUT=[[0.9,1.8,9.4],[0.2,1.5,4]];
 const STEPS=JSON.parse(process.env.SOUL_CURTAINS_STEPS??'null')??[
  {words:'close the curtains',eye:IN[0],at:IN[1],hold:3500},
  {words:'close the blind',eye:OUT[0],at:OUT[1],hold:4500},
  {words:'open the curtains',eye:OUT[0],at:OUT[1],hold:4500},
- {words:'open the blind',eye:IN[0],at:IN[1],hold:3500}];
+ {words:'open the blind',eye:[1.7,1.75,0.5],at:[-0.9,1.35,3.7],hold:3500}];
 const require=createRequire(new URL('../../mars/viewer/package.json',import.meta.url)),{chromium}=require('@playwright/test'),browser=await chromium.launch({channel:'chrome',headless:true,args:[]}),ctx=await browser.newContext({viewport:{width:1440,height:1080},recordVideo:{dir:out+'/raw',size:{width:1440,height:1080}}}),page=await ctx.newPage();const errors=[],samples=[],commands=[];page.on('pageerror',e=>errors.push(String(e)));let timer,busy=false,pass=false;
 const token=(await(await fetch(base+'/v1/god/mint',{method:'POST',headers:{authorization:'Bearer dev:admin','content-type':'application/json'},body:JSON.stringify({label:'curtains-proof'})})).json()).token;
 const post=async(path,data)=>{const j=await(await fetch(base+path,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(data)})).json();assert.equal(j.accepted,true,JSON.stringify(j));};
