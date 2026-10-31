@@ -1,31 +1,75 @@
 name: Tranche / epic
-description: A planned body of work that groups several issues and PRs
+description: A planned body of work in milestones, each its own issue and PR, with review stops
 labels: ["type:epic", "needs:gene"]
 body:
-  - type: textarea
-    id: goal
+  - type: markdown
     attributes:
-      label: Goal
-      description: The outcome in one or two sentences, as a visitor would notice it.
+      value: |
+        This issue is the tranche's plan and index; the PRs are its journal. Each milestone is one issue and one PR with
+        its own acceptance and proof. How agents run it: `.claude/skills/epic/SKILL.md`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: The outcome in one to three sentences, as a visitor would notice it, and why now.
     validations: { required: true }
   - type: textarea
-    id: scope
+    id: milestones
     attributes:
-      label: Scope and non-goals
+      label: Milestones
+      description: |
+        In order, one line each: a human-readable outcome someone can watch, then its issue once filed. Easy reusable
+        pieces first; dependencies named. Each milestone ends with validated code, proof and a PR.
+      value: |
+        - [ ] **M1** <outcome a visitor can see> — #
+        - [ ] **M2** <outcome> — # (depends on M1)
+        - [ ] **M3** <outcome> — #
     validations: { required: true }
-  - type: textarea
-    id: items
-    attributes:
-      label: Items
-      description: One line per issue or lane; link issues as they are filed.
-      placeholder: |
-        - [ ] #123 ...
-        - [ ] ...
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance and proof
-      description: The bar for calling it done, and the proof tier (docs/process/PROOF-POLICY.yml) each item needs.
+      label: Acceptance criteria
+      description: The bar for the whole tranche, beyond each milestone's own. Include the cumulative checks that only make sense once milestones combine.
+      value: |
+        - [ ] **A1** 
+        - [ ] **A2** Combined: unrelated journeys and existing features still pass with every milestone merged
+        - [ ] **A3** Long tail: the combined cost when the features are absent, distant and in use is measured and bounded
+    validations: { required: true }
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Highest tier
+      description: The highest tier any milestone needs (docs/process/PROOF-POLICY.yml); each milestone PR is checked at its own tier.
+      options:
+        - "T1: logic with no visible change"
+        - "T2: visible UI or behaviour"
+        - "T3: Soul behaviour, navigation, engine, shared or brittle code"
+    validations: { required: true }
+  - type: dropdown
+    id: cadence
+    attributes:
+      label: Review cadence
+      description: When work stops for the maintainer's review. Never continue past a stop on unreviewed dependent work.
+      options:
+        - "After every milestone"
+        - "After every 2 milestones (policy default, review_after_milestones)"
+        - "After a stated batch, reviewed together (say which below)"
+    validations: { required: true }
+  - type: textarea
+    id: externalities
+    attributes:
+      label: Long-tail and externality checks
+      description: What every milestone measures besides its feature (payload or context bytes absent / distant / in use, idle work, wakeups, unrelated instructions still followed).
+  - type: textarea
+    id: touches
+    attributes:
+      label: Files and areas likely touched
+      description: So parallel agents and other tranches can spot overlap.
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Deferred ambitions stay listed here, never silently dropped.
     validations: { required: true }
   - type: textarea
     id: risks

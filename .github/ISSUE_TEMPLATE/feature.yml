@@ -1,28 +1,71 @@
-name: Feature request
-description: A new capability or an improvement to an existing one
+name: Feature
+description: A new capability or an improvement, specified before work starts
 labels: ["type:feature"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Acceptance is written **before** the work, here in the issue. The PR copies it, marks each criterion met or
+        unmet with evidence, and links the proof. How agents run it: `.claude/skills/journal/SKILL.md`.
   - type: textarea
     id: problem
     attributes:
-      label: Problem
-      description: Who is this for, and what can't they do today?
+      label: Problem statement
+      description: Who is this for, and what can't they do today? One to three sentences, as a visitor or world builder would say it.
     validations: { required: true }
   - type: textarea
     id: proposal
     attributes:
       label: Proposal
       description: What should happen instead. Sketches, clips and references welcome.
-    validations: { required: true }
   - type: textarea
     id: acceptance
     attributes:
-      label: Done when
-      description: Observable acceptance criteria, as a visitor or world builder would check them.
-      placeholder: |
-        - [ ] ...
+      label: Acceptance criteria
+      description: |
+        Observable pass/fail criteria, one box each, with an id. Include what must NOT change (unrelated journeys keep
+        working) and the long-tail check: the feature's cost when it is absent, distant and in use.
+      value: |
+        - [ ] **A1** 
+        - [ ] **A2** 
+        - [ ] **A3** Unrelated journeys still work: 
+        - [ ] **A4** Long tail: with the feature absent or far away, nothing extra is sent, computed or shown: 
+    validations: { required: true }
   - type: dropdown
-    id: area
+    id: tier
     attributes:
-      label: Area
-      options: [web client, world server, Souls, engine / navigation, world building, Mars, assets / CDN, release / ops, not sure]
+      label: Tier
+      description: "From docs/process/PROOF-POLICY.yml. The PR's computed tier (`node tools/proof/tier.mjs`) can raise it, never lower it."
+      options:
+        - "T0: docs, tools, process, CI"
+        - "T1: logic with no visible change"
+        - "T2: visible UI or behaviour"
+        - "T3: Soul behaviour, navigation, engine, shared or brittle code"
+        - "T4: release head"
+        - "Not sure (triage decides)"
+    validations: { required: true }
+  - type: markdown
+    attributes:
+      value: |
+        **Proof required by tier** (the `proof-ok` check enforces it on the PR):
+        T0 a problem statement · T1 + every criterion ticked with evidence, focused `node --test` and typecheck, a self-audit ·
+        T2 + an uncut, real-speed clip of the changed journey (phone too when layout changed) and a `proof.json` summary ·
+        T3 + a scenario playtest with two repeats per arm, a reviewer-agent pass and maintainer sign-off.
+  - type: textarea
+    id: proof
+    attributes:
+      label: Proof plan
+      description: Which journey the clip shows, which world template, which numbers the long-tail check measures. Optional for T0/T1.
+  - type: textarea
+    id: touches
+    attributes:
+      label: Files and areas likely touched
+      description: So parallel agents can spot overlap before they start. Paths or globs, one per line.
+      placeholder: |
+        apps/web/src/hud/*
+        packages/protocol/src/seat.ts
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: What this issue deliberately does not do (follow-ups get their own issues).
