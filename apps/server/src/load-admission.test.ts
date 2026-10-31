@@ -91,14 +91,16 @@ test('black: personal reads are shed at once, acts wait for their deadline answe
   f.adm.close();
 });
 
-test('budget: under contention a read over its Soul budget gets soul.slow-down + Retry-After; 3 in a minute → 60 s cool-down', async () => {
+test('budget: under contention a read over its Soul budget gets soul.slow-down + Retry-After; 3 impolite in a minute → 60 s cool-down', async () => {
   const f = fixture();
   // alone in a calm world A is never slowed, but its bucket is still charged: here learns ~500 ms, A spends its 2 s
   for (let i = 0; i < 12; i++) { const x = f.ask('A', route('GET', '/v1/edge/here'), 500); await tick(); await tick(); assert.equal(x.result, 'run'); f.advance(1000); }
   f.adm.setLoadLevel('red');   // budgets bind at red even for one Soul
   const slow: {retryAfterS: number; code: string}[] = [];
-  for (let i = 0; i < 3; i++) { const x = f.ask('A', route('GET', '/v1/edge/here')); if (typeof x.result === 'object') slow.push(x.result as never); }
-  assert.equal(slow.length, 3, JSON.stringify(slow)); assert.equal(slow[0].code, 'soul.slow-down'); assert.ok(slow[0].retryAfterS >= 1);
+  // the first refusal is polite (A was given no Retry-After yet); the next three ignore the one they were given: 3 strikes
+  // (re-pinned by srv-admission-calib: strikes count only impolite requests)
+  for (let i = 0; i < 4; i++) { const x = f.ask('A', route('GET', '/v1/edge/here')); if (typeof x.result === 'object') slow.push(x.result as never); }
+  assert.equal(slow.length, 4, JSON.stringify(slow)); assert.equal(slow[0].code, 'soul.slow-down'); assert.ok(slow[0].retryAfterS >= 1);
   const cooled = f.ask('A', route('POST', '/v1/edge/act'));
   assert.deepEqual([(cooled.result as {code: string}).code, (cooled.result as {retryAfterS: number}).retryAfterS], ['soul.slow-down', 60], 'cooled: even acts wait out the minute');
   f.advance(5000); const other = f.ask('B', route('GET', '/v1/edge/here')); await tick();
@@ -280,4 +282,27 @@ test('a 35 ms box: 4 Souls fit (budget 9 ms/frame = 180 ms/s); 12 are refused wi
   assert.ok(Object.values(twelve.codes).reduce((x, y) => x + y, 0) > 0, 'over capacity: refused with Retry-After ' + JSON.stringify(twelve.codes));
   assert.equal(twelve.cooled, 0, 'honest Souls are never cooled');
   assert.ok(twelve.ran * 150 <= 180 * 240 * 1.05 + 2000 * 12, `requests stayed within the budget's throughput: ${twelve.ran} reads`);
+});
+
+test('strikes only for impolite requests: a Soul that honours every Retry-After is never cooled; one that ignores it is, in 3', async () => {
+  // production numbers at green (budget 22.8 ms/frame = 456 ms/s); B holds a request in flight (contention), and A keeps
+  // asking for 400 ms reads: the dispatcher could serve A 456 ms/s, its bucket refills 200 ms/s, so A is over budget
+  for (const polite of [true, false]) {
+    let now = 0; const adm = new Admission({now: () => now, yieldTurn: () => new Promise(() => {}), quietTickMs: () => 12});
+    const hold = adm.request({key: 'B', god: false, route: route('GET', '/v1/edge/here')}); assert.ok('turn' in hold);
+    let at = 0, ran = 0, refused = 0, cooledAt = -1, strikesBeforeCool = 0;
+    for (; now < 600_000; now += 100) {
+      if (now < at || adm.outstanding.has('A')) { await adm.drain(); continue; }
+      const t = adm.request({key: 'A', god: false, route: route('GET', '/v1/edge/here')});
+      if ('refusal' in t) {
+        refused++;
+        if (t.refusal.retryAfterS === 60 && /in a minute/.test(t.refusal.message) && cooledAt < 0) { cooledAt = now; strikesBeforeCool = refused - 1; }
+        at = now + (polite ? t.refusal.retryAfterS * 1000 : 200);
+      } else { at = now; void t.turn.then(v => { if (v === 'run') { now += 400; ran++; t.done(); } }); }
+      await adm.drain(); await Promise.resolve();
+    }
+    adm.close();
+    if (polite) { assert.equal(adm.shed.cooled, 0, `polite: never cooled (${refused} refusals, ${ran} reads)`); assert.ok(refused > 0 && ran > 0, `over budget and still served: ${refused} refused, ${ran} ran`); }
+    else { assert.ok(adm.shed.cooled > 0, 'impolite: cooled'); assert.equal(strikesBeforeCool, 4, 'one polite refusal, then 3 impolite → the cool-down'); }
+  }
 });

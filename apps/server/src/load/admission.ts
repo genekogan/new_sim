@@ -65,6 +65,7 @@ const COOL_MS = 60_000, CAPACITY_MS = 2000, GOD_SHARE = 0.25, DEFAULT_EST_MS = 2
 type Job = {key: string; god: boolean; route: RouteClass; arrival: number; deadline: number; closed: () => boolean;
   settle: (v: 'run' | 'dropped' | Refusal) => void; finished: Promise<void>; finish: () => void};
 type Bucket = {tokens: number; at: number; seen: number};
+type Strikes = {slow: number[]; busy: number[]; coolUntil: number; retryUntil: number};
 /** Socket-independent (Stage B): a job is (key = Soul or god, class, deadline, `closed()` = "has the asker gone", and the
  *  ticket as its reply handle). The HTTP middleware below is one front end; a worker's MessagePort can be another. */
 export type Ticket = {refusal: Refusal} | {turn: Promise<'run' | 'dropped' | Refusal>; done: () => void; waitedMs: () => number};
@@ -85,7 +86,8 @@ export class Admission {
    *  budget, and every job's measured time is debited, so a job longer than the budget is paid back by the frames
    *  after it. Whatever the sum of the per-Soul budgets, requests never take more than budget/50 of the thread. */
   private credit = FRAME_BUDGET_MS.green; private creditAt = 0;
-  private strikes = new Map<string, {slow: number[]; busy: number[]; coolUntil: number}>();
+  /** Per principal: strike times, the cool-down's end, and when the Retry-After it was last given elapses (retryUntil). */
+  private strikes = new Map<string, Strikes>();
   private share = {god: 0, souls: 0};   // decaying ms spent, for the god's reserve
   private draining = false; private wake: NodeJS.Timeout | null = null; private soon: NodeJS.Immediate | null = null; private sweeper: NodeJS.Timeout | null = null;
   private now: () => number;
@@ -126,14 +128,17 @@ export class Admission {
     const now = this.now(), read = r.route.cls === 'C2';
     const cool = this.cooling(r.key, now);
     if (cool) { this.shed.slow++; if (read) this.shed.reads++; else this.shed.acts++; return {refusal: {status: 429, code: 'soul.slow-down', retryAfterS: cool, message: 'this Soul has asked for too much in a short time; the world answers it again in a minute'}}; }
-    if (this.outstanding.has(r.key)) { this.shed.busy++; if (read) this.shed.reads++; this.strike(r.key, r.god, 'busy', now); return {refusal: {status: 429, code: 'soul.busy', retryAfterS: 1, message: 'a previous request from this Soul is still being answered'}}; }
+    if (this.outstanding.has(r.key)) { this.shed.busy++; if (read) this.shed.reads++; this.strike(r.key, r.god, 'busy', now); return this.told(r.key, r.god, now, {status: 429, code: 'soul.busy', retryAfterS: 1, message: 'a previous request from this Soul is still being answered'}); }
     const b = this.bucket(r.key, r.god, now); b.seen = now;
     const est = this.estimate(r.route.id);
-    if (read && this.level === 'black') { this.shed.reads++; return {refusal: busyRefusal(this.level)}; }
+    if (read && this.level === 'black') { this.shed.reads++; return this.told(r.key, r.god, now, busyRefusal(this.level)); }
     if (read && b.tokens < est && this.contended(r.key)) {
-      this.shed.slow++; this.shed.reads++; this.strike(r.key, r.god, 'slow', now);
+      // §2b strike only for an impolite request: one that came back before the Retry-After it was last given had
+      // elapsed. A Soul that waited and is still over budget is refused again with a Retry-After, but not struck
+      // (eden2, 2026-10-31: honest Souls collected 3 strikes and a 60 s cool-down, 45-59 % of all read wall time)
+      this.shed.slow++; this.shed.reads++; if (this.impolite(r.key, now)) this.strike(r.key, r.god, 'slow', now);
       const rate = this.refill(r.god);
-      return {refusal: {status: 429, code: 'soul.slow-down', retryAfterS: Math.min(COOL_MS / 1000, Math.max(1, Math.ceil((est - b.tokens) / Math.max(rate, 1e-6) / 1000))), message: 'this Soul has asked for a lot in a short time; the world can answer it again shortly'}};
+      return this.told(r.key, r.god, now, {status: 429, code: 'soul.slow-down', retryAfterS: Math.min(COOL_MS / 1000, Math.max(1, Math.ceil((est - b.tokens) / Math.max(rate, 1e-6) / 1000))), message: 'this Soul has asked for a lot in a short time; the world can answer it again shortly'});
     }
     const deadline = now + Math.min(r.route.deadlineMs, r.hintMs && r.hintMs > 0 ? r.hintMs : Infinity);
     // a read that cannot start before its deadline (the time already queued, paid at the frame budget) is answered now,
@@ -141,7 +146,7 @@ export class Admission {
     if (read && this.queue.length) {
       let ahead = 0; for (const j of this.queue) ahead += this.estimate(j.route.id);
       const wait = ahead * FRAME_MS / Math.max(1, this.frameBudget());
-      if (now + wait + est + ANSWER_MARGIN_MS >= deadline) { this.shed.reads++; return {refusal: {...busyRefusal(this.level), retryAfterS: Math.max(busyRefusal(this.level).retryAfterS, Math.ceil(wait / 1000))}}; }
+      if (now + wait + est + ANSWER_MARGIN_MS >= deadline) { this.shed.reads++; return this.told(r.key, r.god, now, {...busyRefusal(this.level), retryAfterS: Math.max(busyRefusal(this.level).retryAfterS, Math.ceil(wait / 1000))}); }
     }
     let settle!: Job['settle'], finish!: () => void;
     const turn = new Promise<'run' | 'dropped' | Refusal>(res => { settle = res; });
@@ -170,15 +175,22 @@ export class Admission {
     const b = this.bucket(key, god, startedAt + ms); b.tokens -= ms;
     const e = this.est.get(id); this.est.set(id, e === undefined ? ms : e * 0.8 + ms * 0.2);
   }
-  /** §2b cool-down: over budget 3× (or 20 refusals for overlapping requests) in a minute → 60 s of slow-down.
+  /** §2b cool-down: over budget impolitely 3× (or 20 refusals for overlapping requests) in a minute → 60 s of slow-down.
    *  The god is never cooled (it is never starved; its share is the reserve). */
   private strike(key: string, god: boolean, kind: 'slow' | 'busy', now: number) {
     if (god) return;
-    let s = this.strikes.get(key); if (!s) { s = {slow: [], busy: [], coolUntil: 0}; this.strikes.set(key, s); }
-    const xs = s[kind]; xs.push(now); while (xs.length && now - xs[0] > 60_000) xs.shift();
+    const s = this.strikesOf(key), xs = s[kind]; xs.push(now); while (xs.length && now - xs[0] > 60_000) xs.shift();
     if (s.slow.length >= 3 || s.busy.length >= 20) { s.coolUntil = now + COOL_MS; s.slow.length = 0; s.busy.length = 0; this.shed.cooled++; }
-    if (this.strikes.size > 4096) for (const [k, x] of this.strikes) if (x.coolUntil < now && !x.slow.length && !x.busy.length) this.strikes.delete(k);
+    if (this.strikes.size > 4096) for (const [k, x] of this.strikes) if (x.coolUntil < now && x.retryUntil < now && !x.slow.length && !x.busy.length) this.strikes.delete(k);
   }
+  private strikesOf(key: string) { let s = this.strikes.get(key); if (!s) { s = {slow: [], busy: [], coolUntil: 0, retryUntil: 0}; this.strikes.set(key, s); } return s; }
+  /** A refusal given to a principal: remember when its Retry-After elapses (the politeness test of the next refusal). */
+  private told(key: string, god: boolean, now: number, refusal: Refusal): {refusal: Refusal} {
+    if (!god) this.strikesOf(key).retryUntil = now + refusal.retryAfterS * 1000;
+    return {refusal};
+  }
+  /** Did this request arrive before the Retry-After this principal was last given had elapsed? */
+  private impolite(key: string, now: number) { const s = this.strikes.get(key); return !!s && now < s.retryUntil; }
   /** Seconds left of this principal's cool-down, or 0. */
   private cooling(key: string, now: number) { const s = this.strikes.get(key); return s && s.coolUntil > now ? Math.ceil((s.coolUntil - now) / 1000) : 0; }
   /** Answer what can no longer be answered in time, drop what nobody waits for. */
@@ -189,7 +201,7 @@ export class Admission {
       if (now + Math.min(this.estimate(j.route.id), 1000) + ANSWER_MARGIN_MS >= j.deadline) {
         this.queue.splice(i, 1); this.outstanding.delete(j.key);
         if (j.route.cls === 'C2') this.shed.reads++; else this.shed.acts++;
-        j.settle(busyRefusal(this.level));
+        j.settle(this.told(j.key, j.god, now, busyRefusal(this.level)).refusal);
       }
     }
   }
