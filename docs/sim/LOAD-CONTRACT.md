@@ -77,5 +77,59 @@ As built (L1, `tools/world-launcher/guard.mjs` + `children.mjs`): liveness asks 
 
 `sim_world_last_heartbeat_seconds{world}` · `sim_world_event_loop_delay_p99_seconds` · `sim_world_elu` · `sim_world_gc_seconds_total` · `sim_world_heap_used_bytes` / `sim_world_heap_limit_bytes` · `sim_world_tick_seconds` (histogram) · `sim_world_ticks_late_total` · `sim_world_active_souls` / `_waiting` / `_connected` · `sim_world_queue_depth` · `sim_world_queue_oldest_seconds` · `sim_world_shed_total{class}` · `sim_world_last_boot_seconds` · `sim_world_restarts_total{reason=exit|wedged|crashloop|planned}` · `sim_world_level{level}` (0/1) · `sim_client_errors_total{kind}`. Labels: `world` always; no Soul ids, no account ids (privacy).
 
-## 6. What this contract does not do
+## 6. WorldDelta v1 (Stage B, lane B-delta; as built, dark behind `SIM_READ_WORKER=1`)
+
+The tick thread publishes the world's replicated state to read workers as one **WorldInit** followed by one **WorldDelta
+per tick**. Code: `apps/server/src/split/{delta,world-init,read-model}.ts`; oracle `split/delta-oracle.ts`.
+
+**Position.** Every message carries `{v: 1, gen, seq, tick, logSeq}`. `gen` changes only when the stream restarts (the
+engine was replaced, the comms object table reloaded or was replaced, a tap fault); `seq` counts deltas within a gen,
+one per completed tick, contiguous from the init's `seq`; `logSeq` = `host.seq`. A replica applies a delta only when it
+is the same gen and `seq = its seq + 1` (`Replica.apply` returns false otherwise, and nothing is applied).
+
+**Resumable.** The tap keeps the last 1,200 deltas (60 s). `since(gen, seq)` returns the deltas after `seq`, or null when
+the gen differs or they have left the ring: the consumer loads a new WorldInit. On a restart every subscriber gets
+`{t: 'resnapshot', gen, reason}` and must load a new WorldInit.
+
+**WorldInit** (plain structured-clone data, no closures): `entities` (L5's shared snapshot view, one copy per tick and
+log seq), `env`, `living` (day clock), `static` (the static layer below), `minds`, `faded`, open `receipts`, `programs`,
+`holds`, `objects` = L8 `table.snapshot()` `{gen, records}`, placed `items`, `togetherVersion`, `menuInputs`, and for
+B-spatial `scene`/`sceneKey`/`pages`/`navReady`. One WorldInit is built per stream state (gen, seq, log seq, object gen,
+receipts seen, together version, faded and minds counts) and shared by every consumer asking then. It may be served at
+any point between ticks: each delta section is an absolute row or an idempotent upsert (objects skip `gen <=` the
+replica's), so the deltas after its `seq` apply exactly even when a write landed between that delta and the init.
+
+**WorldDelta sections** (each present only when non-empty / changed):
+
+| Section | Content | Source on main (never a scan) |
+|---|---|---|
+| `bodies` | `[id, x, y, z, yaw]` or `[..., human.speed]`, exact numbers | the tracked set: humans, carriers, any entity the tick named |
+| `ents` | whole entities: new ones, and ones whose non-pose fields changed | entities the tick named (paths, changes, programme events, receipts) |
+| `gone` | entity ids removed | `present: null` changes, tracked ids that vanished |
+| `env`, `living` | whole, when changed | `world.env` (its datetime moves every tick), `host.living` |
+| `minds`, `mindsGone`, `faded` | mind rows `{soulId, entityId, name, owner, native}`; faded = the whole set | `host.minds`, `ledger.faded` |
+| `receipts` | every phase change since the last delta, in order `{id, soulId, capability, phase, acceptedTick, startedTick, endedTick, code, programId}`; open = waiting/started | `ledger.onReceipt` |
+| `programs`, `holds` | `[entityId, programId, step, actionId, verb]`; `[entityId, [{action, slot}]]` | `engine.programOf/programAction`, `nativeSeatHoldsV1`, re-read when the tick named the body |
+| `objects` | `{gen, deltas: [{gen, id, record or null}]}` | L8 `table.changes(since)`; null = restart the stream; an unsettled transaction waits |
+| `items`, `togetherVersion` | the placed-items list when it changed | read when `together.version` moved |
+| `static` | `{epoch, places, shells, solids, fires, regions, spots}` | read when `engine.staticEpochV1()` or `ledger.staticVersion()` moved; checked only when a sync-free key moved (spatial epoch, place writes, spots object, bumpStatic, navReady) |
+| `menuInputs` | the ledger's menu-input strings (a god world: commit version, closing sites) | `addMenuInput` sources |
+| `scene`, `sceneKey`, `pages`, `navReady` | B-spatial's static scene export (structured clone, not JSON) when the spatial epoch or `entityPhysicsV1.hash` moved; `pageRectsV1()`; `conn.ready` | engine |
+
+Carriers are entities (their `carrier` state rides in `ents`); the replica derives `engine.carriers()` from them.
+Not replicated: a programme action's status/phase (they move inside a step with no event), receipt plan/detail/outcome
+(written without a receipt notification); B-facade reads those on main or adds them with a notification.
+
+**The tap.** `WorldHost.splitTap(tick, out)` runs right after a completed tick, before `afterTickComplete`, with the
+tick's own `paths`/`changes`/`programs` (the arrays the viewer Batch accumulates: one per-tick batch for both). It only
+reads. Installed by `installDeltaStream(host, ledger)` when `SIM_READ_WORKER=1`; otherwise nothing runs.
+
+**Measured** (live-copy fixture eden-2026, 4,543 entities, 11,584 objects, 7 Souls of which 6 walk, laptop, CPU =
+`threadCpuUsage` of the tick thread; 10-min soak `team/scratch/srv/b-delta/run13`, with every write path driven and a
+forced resnapshot mid-run): oracle **879/879** checks equal (replica vs a fresh read of every table), 0 diffs, 0 refused.
+Tap per tick (11,728 ticks): CPU **p50 0.060 ms, p99 0.143 ms, mean 0.090 ms**; JSON size **p50 662 B, p99 1,562 B**.
+The static layer (1.1 MB) is resent only when the static epoch moves (24 times in 10 min with 15 god commits).
+postMessage of a delta to a worker: p50 0.015 ms. WorldInit: 19.5–22.5 ms to build, 8.7 MB as JSON.
+
+## 7. What this contract does not do
 No server-side Soul mind (queue, delay, refuse — never choose or retry an act for a Soul). No travel or overflow instances. The waking limit (`world.crowded`) ships dark behind `SIM_WAKING_LIMIT=1` until Gene turns it on. Carryables stay opt-in. The god is never starved.
