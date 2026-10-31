@@ -585,7 +585,10 @@ export async function openLauncher(cfg = {}) {
     if (held?.scope?.startsWith('load:') && readTarget(slug, w, edgeRest, req.method, url.search, { maxLagGens: READ_SHED_LAG_GENS })) held = null;
     if (held) { ceilings.note(slug, held.code, held.scope); json(res, 503, { ok: false, code: held.code, slug, message: held.message, retry_after: held.s }, { 'retry-after': String(held.s), 'cache-control': 'no-store' }); return; }
     // lane L1: the Soul API's ceilings (flood.mjs soulCeilings), answered at once without the world
-    const gated = retried ? null : ceilings.check(req, slug, url.pathname.slice(wp(slug).length) || '/', behindProxy);
+    // lane B-serve: a C2 read the world's read workers will answer is exempt from the world budget (main's share); it is
+    // charged if it reaches main after all (no worker by the time it is routed, a fallback, a worker that forwarded it)
+    const toWorker = !retried && !!readTarget(slug, w, edgeRest, req.method, url.search);
+    const gated = retried ? null : ceilings.check(req, slug, url.pathname.slice(wp(slug).length) || '/', behindProxy, { toWorker });
     if (gated?.refuse) { json(res, gated.refuse.status, gated.refuse.body, gated.refuse.headers); return; }
     if (gated) res.once('close', gated.release);
     // P2: one flooding visitor or agent is refused here (every world shares this loop), before its world is contacted: a
@@ -616,7 +619,8 @@ export async function openLauncher(cfg = {}) {
     const opts = { tee, retry: again, soul: gated?.soul, slug, maxBody: rest.startsWith('/v1/edge/') && !rest.startsWith('/v1/edge/body/uploads') ? lim.maxBodyKb * 1024 : 0 };
     // Stage B (lane B-port): a C2 read the world's read workers answer goes to their port (only with read workers on)
     const rp = retried ? null : readTarget(slug, w, rest, req.method, url.search);
-    if (rp) { proxyRead(req, res, slug, rp, p, opts); return; }
+    if (rp) { proxyRead(req, res, slug, rp, p, { ...opts, worldDeferred: !!gated?.worldDeferred }); return; }
+    if (gated?.worldDeferred) { const no = ceilings.chargeWorld(slug); if (no) { json(res, no.refuse.status, no.refuse.body, no.refuse.headers); return; } }
     proxyHttp(req, res, p, opts);
   }
   // ---------- Stage B (lane B-port; LOAD-CONTRACT §4 readPort): C2 reads to the world's read workers. Only for a world
@@ -628,6 +632,7 @@ export async function openLauncher(cfg = {}) {
   // apply to a read the workers answer while their lag is ≤ READ_SHED_LAG_GENS (cfg.readShedLagGens, default 2).
   const READ_TIMEOUT_MS = 2000, READ_LIVE_MS = 1000, READ_LIVE_MAX_AGE_MS = 10_000, READ_SHED_LAG_GENS = cfg.readShedLagGens ?? 2;
   const READ_GET = /^\/v1\/edge\/(here|observe|capabilities|view)$/;
+  const captionOnly = (search) => { const q = new URLSearchParams(search ?? ''); return ['only', '1', 'true'].includes(q.get('alt') ?? '') && !q.has('gaze'); };
   const readStats = new Map();   // slug -> { routed, fallback, lastFallback }
   const readLives = new Map();   // slug -> { at, pid, live, rr }
   function readTarget(slug, w, rest, method, search, { maxLagGens = Infinity } = {}) {
@@ -644,24 +649,33 @@ export async function openLauncher(cfg = {}) {
     const r = e.live?.read, ports = Array.isArray(r?.ports) ? r.ports.filter((x) => Number.isInteger(x) && x > 0) : [];
     if (!r || !ports.length || now - e.live.at > READ_LIVE_MAX_AGE_MS) return null;
     if (name !== 'healthz' && (!r.routes?.includes(name) || (r.subset && search))) return null;
+    // a view's picture is drawn by main's render worker (and served from main), a gaze is an attention write: main's.
+    // The workers compute the caption (?alt=only) only (lane B-serve)
+    if (name === 'view' && !captionOnly(search)) return null;
     if (!(Number(r.lagGens) <= maxLagGens)) return null;
     return ports[e.rr++ % ports.length];
   }
   function proxyRead(req, res, slug, readPort, mainPort, opts) {
     if (clientGone(req, res)) return;
-    let st = readStats.get(slug); if (!st) readStats.set(slug, st = { routed: 0, routedBy: {}, fallback: 0, lastFallback: null });
+    let st = readStats.get(slug); if (!st) readStats.set(slug, st = { routed: 0, routedBy: {}, fallback: 0, lastFallback: null, mainAnswered: 0, fallbackRefused: 0 });
     st.routed++; const lv = levelOf(slug); st.routedBy[lv] = (st.routedBy[lv] ?? 0) + 1;
     let settled = false, fellBack = false;
     const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
     const fallback = (why) => {
       if (settled) return; settled = fellBack = true; clearTimeout(timer); up.destroy();
       st.fallback++; st.lastFallback = { why, at: Date.now() };
-      if (!clientGone(req, res)) proxyHttp(req, res, mainPort, opts);
+      if (clientGone(req, res)) return;
+      // a worker fallback is main's work: it takes the world budget (refused when that is spent)
+      if (opts.worldDeferred) { const no = ceilings.chargeWorld(slug); if (no) { st.fallbackRefused++; json(res, no.refuse.status, no.refuse.body, no.refuse.headers); return; } }
+      proxyHttp(req, res, mainPort, opts);
     };
     const up = request({ agent: WORLD_AGENT, hostname: '127.0.0.1', port: readPort, path: req.url, method: req.method, headers: { ...hopless(req.headers), 'x-forwarded-for': xff } }, (r) => {
       if (settled) { r.resume(); return; }
       if ((r.statusCode ?? 502) >= 500 && r.statusCode !== 503) { r.resume(); fallback(`status ${r.statusCode}`); return; }
       settled = true; clearTimeout(timer);
+      // the worker handed it to main itself (over its intents port: not ready, lagging, a main-only read): main's work,
+      // counted against the world budget after the fact (the answer is already main's)
+      if (opts.worldDeferred && r.headers['x-sim-read'] !== 'worker') { ceilings.chargeWorld(slug, { force: true }); st.mainAnswered++; }
       const { connection: _c, 'keep-alive': _k, 'x-sim-account': account, ...headers } = r.headers;
       if (opts.soul && account) ceilings.learn(opts.soul, account);
       sawLoad(slug, r.headers['x-sim-load']);

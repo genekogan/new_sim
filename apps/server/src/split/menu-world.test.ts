@@ -30,7 +30,7 @@ test('grep: no engine reach in the read code (ledger read methods, perception, t
   assert.deepEqual(ledger, [], 'ledger read methods reach host.engine');
   for (const f of ['edge/perception/here.ts', 'edge/perception/around.ts', 'edge/perception/knowledge.ts', 'edge/perception/route.ts',
     'edge/perception/geometry.ts', 'edge/ledger/together.ts', 'edge/ledger/activities.ts', 'edge/ledger/places.ts', 'edge/ledger/vocabulary.ts',
-    'edge/ledger/focus.ts', 'edge/ledger/listing.ts', 'human-capabilities.ts', 'deck.ts'])
+    'edge/ledger/focus.ts', 'edge/ledger/listing.ts', 'human-capabilities.ts', 'deck.ts', 'edge/eyes/view.ts'])
     assert.deepEqual([...reaches(f, /host\.engine|\.engine\.canPerform/g)], [], `${f} reaches host.engine`);
   assert.deepEqual([...reaches('god/nav.ts', /\.h\.engine\b|\.reachV1\(/g)].filter(([m]) => m !== 'E'), [], 'god/nav.ts reaches its engine outside the facade getter');
   const bridge = reaches('god/engine-bridge.ts', /this\.engine\b/g);

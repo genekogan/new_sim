@@ -4,6 +4,7 @@ import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
 import {EdgeError, type EdgeSoul} from '../contract.ts';
 import {stateOf, type EdgeLedger} from '../ledger/ledger.ts';
+import {menuWorldOf} from '../../split/menu-world.ts';
 import {centroid,inPoly} from '../ledger/places.ts';
 import {visualFloorOffset} from './platforms.ts';
 import {humanoidDims} from '../../../../../mars/viewer/engine/bodies/humanoid.ts';
@@ -63,9 +64,9 @@ export function resolveGaze(ledger: EdgeLedger, soul: EdgeSoul, me: SightBody, g
   if (!/^[A-Za-z0-9][A-Za-z0-9._:#-]{0,120}$/.test(g)) throw new EdgeError(400, 'invalid', 'gaze must be forward, left, right, behind, a Soul id or a thing id');
   const at = (p: V2, name: string, y = 0.9) => ({mode: 'target', yaw: Math.atan2(p[1] - me.p[2], p[0] - me.p[0]), target: name, aim: [p[0], y, p[1]] as [number, number, number]});
   const near = ledger.perceivedBodies(soul.soulId, 60).find(o => o.soulId === g || o.entityId === g);
-  if (near) {const b = (ledger.host.engine.world as NativeWorld).entities[near.entityId]; if (b) return at([b.pose.p[0], b.pose.p[2]], near.name, b.pose.p[1]+visualFloorOffset(ledger,b as never)+(b.body?.family==='floater'?(b.body.hoverHeight??1.45):1.3*humanoidDims(b.body as never).scale));}
+  if (near) {const b = (menuWorldOf(ledger.host).world as NativeWorld).entities[near.entityId]; if (b) return at([b.pose.p[0], b.pose.p[2]], near.name, b.pose.p[1]+visualFloorOffset(ledger,b as never)+(b.body?.family==='floater'?(b.body.hoverHeight??1.45):1.3*humanoidDims(b.body as never).scale));}
   if (ledger.host.minds.get(g)) throw new EdgeError(404, 'gaze.not-visible', 'That Soul is not near you (or is inside somewhere else), so you cannot turn to look at it.');
-  const e = (ledger.host.engine.world as NativeWorld).entities[g];
+  const e = (menuWorldOf(ledger.host).world as NativeWorld).entities[g];
   if (e && e.kind !== 'human') {
     const d = Math.hypot(e.pose.p[0] - me.p[0], e.pose.p[2] - me.p[2]);
     if (d <= 60 && enclosureAt(ledger, e.pose.p[0], e.pose.p[2]) === me.enclosure) return at([e.pose.p[0], e.pose.p[2]], fixtureName(e as never), e.pose.p[1] + 0.4);
@@ -79,7 +80,7 @@ export function resolveGaze(ledger: EdgeLedger, soul: EdgeSoul, me: SightBody, g
 
 /** Everything the view route needs for one Soul, now. */
 export function planView(ledger: EdgeLedger, soul: EdgeSoul, request: ViewRequest): ViewPlan {
-  const host = ledger.host, world = host.engine.world as NativeWorld & {env?: {datetime?: string; weather?: Record<string, number>}};
+  const host = ledger.host, world = menuWorldOf(host).world as NativeWorld & {env?: {datetime?: string; weather?: Record<string, number>}};
   const m = host.minds.get(soul.soulId), body = m ? world.entities[m.entityId] : undefined;
   if (!m || !body) throw new EdgeError(404, 'not-found', 'this Soul has no body in the world');
   if (ledger.faded.has(soul.soulId)) throw new EdgeError(409, 'soul.faded', 'This Soul has faded out; act again to come back, then look.');
@@ -123,7 +124,7 @@ export function planView(ledger: EdgeLedger, soul: EdgeSoul, request: ViewReques
   const sight = computeSight({me, pose, gaze: {mode: gaze.mode, yaw: gaze.yaw, ...(gaze.target ? {target: gaze.target} : {})}, light, place: path[0]?.name ?? null, enclosureName: enc?.name ?? null, others, fixtures, spots,
     places: ledger.enclosurePlaces(), containing, occluders: occludersOf(ledger)});
   if (request.mode === 'map') sight.alt = mapCaption(sight, me);
-  return {sight, tick: host.engine.world.tick, me, request,
+  return {sight, tick: world.tick, me, request,
     render: {mode: request.mode, w: request.w, h: request.h, pose, self: me.entityId, show: sight.souls.map(s => s.entityId), ...(request.mode === 'map' ? {span: MAP_SPAN} : {})}};
 }
 

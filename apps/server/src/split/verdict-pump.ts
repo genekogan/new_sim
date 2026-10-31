@@ -10,6 +10,7 @@
 // (scope-'' keys, e.g. a seat taken), under a CPU budget per tick, so a verdict is never older than its inputs for long.
 import type {Program, RuntimeView} from '@sim/engine-contract';
 import {CATALOG} from '../../../../mars/viewer/engine/world/catalog.ts';
+import {livePlatforms} from '../edge/eyes/platforms.ts';
 import {LiveFeasibility, planKey, type ActionRow, type ClaimRow, type LedgerEnv, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow, type VerdictRow, type MenuWorld} from './menu-world.ts';
 
 /** The record verbs the read code reads from `runtime.records` (held seats, berths, slots). */
@@ -22,7 +23,15 @@ type LedgerLike = {weatherNow?: () => unknown; recentStrikesV1?: () => unknown; 
 type Host = {minds: Map<string, {soulId: string; entityId: string}>; mindByEntity?: Map<string, {soulId: string}>; kernel?: unknown; extra?: Record<string, unknown>};
 
 export class VerdictPump {
-  private mw: MenuWorld & {feasibility: LiveFeasibility}; private host: Host;
+  private mwOf: () => MenuWorld & {feasibility: LiveFeasibility}; private mwNow: (MenuWorld & {feasibility: LiveFeasibility}) | null = null; private host: Host;
+  /** main's MenuWorld for its CURRENT engine (menuWorldOf is one per engine): a host whose engine is replaced (a quiet
+   *  renewal, a restore) must be read through the new one, or every action row, record, static and verdict shipped from
+   *  then on is the old engine's (lane B-serve: the replica diverged after the tap's 'engine replaced' restart). */
+  private get mw() {
+    const m = this.mwOf();
+    if (m !== this.mwNow) {this.mwNow = m; m.feasibility.fresh ??= [];}
+    return m;
+  }
   private actionKeys = new Map<string, string>(); private recordKeys = new Map<string, string>();
   private shipped = new Map<string, {actor: string; program: Program; scope: string; v: string}>();
   private asks = new Map<string, {program: Program; scope: string}>();
@@ -33,9 +42,9 @@ export class VerdictPump {
   readonly cost = {ticks: 0, cpuMs: 0, maxCpuMs: 0, verdicts: 0, reasks: 0, asks: 0, actions: 0, records: 0, statics: 0, kernels: 0};
 
   private L?: LedgerLike; private envKeys: Record<string, string> = {}; private spotsRef: unknown = undefined;
-  constructor(mw: MenuWorld & {feasibility: LiveFeasibility}, host: Host, L?: LedgerLike) {
-    this.mw = mw; this.host = host; this.L = L;
-    mw.feasibility.fresh = [];
+  constructor(mw: (MenuWorld & {feasibility: LiveFeasibility}) | (() => MenuWorld & {feasibility: LiveFeasibility}), host: Host, L?: LedgerLike) {
+    this.mwOf = typeof mw === 'function' ? mw : () => mw; this.host = host; this.L = L;
+    this.mw.feasibility.fresh = [];
     for (const a of this.actionRows()) this.actionKeys.set(a.actor, JSON.stringify(a));
     for (const r of this.recordRows()) this.recordKeys.set(r.id, JSON.stringify(r));
     const s = this.statics(); this.staticsRef = this.refs(); this.staticsKey = JSON.stringify([s.anchors, s.newcomer ?? null, s.deliveries ?? null, s.groundV1, s.physical, s.upperFloors]); this.kernelKey = JSON.stringify(s.kernel); this.namesKey = JSON.stringify(s.names);
@@ -92,8 +101,23 @@ export class VerdictPump {
     if (bc) {const j = JSON.stringify([...bc]); if (all || j !== this.envKeys.boarding) {this.envKeys.boarding = j; out.boarding = Object.fromEntries(JSON.parse(j));}}
     // the ground swim offers' recipe and deep-middle answers (main's engine answers each once per water)
     if (L.groundEnvV1) {const v = tryOr(() => L.groundEnvV1!(), null), j = JSON.stringify(v); if (all || j !== this.envKeys.ground) {this.envKeys.ground = j; out.ground = JSON.parse(j);}}
+    // Eyes (lane B-serve): the render platforms' answer (edge/eyes/platforms.ts livePlatforms), recomputed only when
+    // its inputs move (the engine's accepted render fact, the nav, the base scene); null = no render fact (the worker
+    // derives the current-live-activities answer from the shipped spots, as main does)
+    {const e = (this.mw as {engine?: {renderPlatformMetadata?: unknown; renderPlatformsV1?: () => unknown; world?: {navV1?: unknown; base?: {staticHash?: string}}}}).engine;
+      if (e && typeof e.renderPlatformsV1 === 'function') {
+        // (a MarsEngine keeps the fact by reference; any other engine is keyed by its answer's JSON)
+        const fact = 'renderPlatformMetadata' in e ? e.renderPlatformMetadata : JSON.stringify(tryOr(() => e.renderPlatformsV1!(), null) ?? null);
+        const refs = [fact, e.world?.navV1, e.world?.base?.staticHash];
+        if (all || refs.some((r, i) => r !== this.platformRefs[i])) {
+          this.platformRefs = refs;
+          const v = this.L ? tryOr(() => livePlatforms(this.L as never), null) : null;
+          out.platforms = v && (v as {source?: string}).source === 'accepted-render-fact' ? structuredClone(v) : null;
+        }
+      }}
     return Object.keys(out).length ? out : undefined;
   }
+  private platformRefs: unknown[] = [];
   /** What the engine's movementVerb / placeLevelV1 read besides the shipped world: groundV1, the physical-shore mode, upper floors. */
   private movement() {
     const e = (this.mw as {engine?: {physical?: unknown}}).engine, w = this.mw.world as unknown as {groundV1?: unknown; upperFloorsV1?: unknown};

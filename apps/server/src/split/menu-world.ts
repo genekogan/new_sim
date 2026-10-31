@@ -164,7 +164,8 @@ export type MenuStatics = {regions: unknown; navV1: unknown; rulesVersion: strin
 export type ClaimRow = [slot: string, actor: string];
 /** The ledger's god-fed reads (main-only providers): weatherNow(), the recent lightning strikes, the god's activity spots.
  *  A key present = its new value (null = none); resent when it changed. */
-export type LedgerEnv = {weather?: unknown; strikes?: unknown; spots?: unknown; /** the god bridge's physics facts (engine-bridge readPhysicsV1), when its hash moved */ physics?: unknown; /** the ground swim offers' recipe and deep-middle answers (ground-host GroundEnvV1) */ ground?: unknown; /** main ledger's ride boarding checks {carrier: {tick, route, issue}} */ boarding?: unknown};
+export type LedgerEnv = {weather?: unknown; strikes?: unknown; spots?: unknown; /** the god bridge's physics facts (engine-bridge readPhysicsV1), when its hash moved */ physics?: unknown; /** the ground swim offers' recipe and deep-middle answers (ground-host GroundEnvV1) */ ground?: unknown; /** main ledger's ride boarding checks {carrier: {tick, route, issue}} */ boarding?: unknown;
+  /** Eyes: main's livePlatforms() answer when the world has an accepted render fact (edge/eyes/platforms.ts), else null */ platforms?: unknown};
 /** `assets`: the CATALOG entries main's engine registered at runtime (entity-world defs, `ew:` ids, from its entity physics):
  *  a worker's CATALOG has only the built-in ones (the read code looks seats, fires, beds and labels up there). */
 export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics; claims?: ClaimRow[]; env?: LedgerEnv; assets?: Record<string, unknown>};

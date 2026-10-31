@@ -31,13 +31,13 @@ const server = createServer((req, res) => {
   if (path === '/wedge') { res.end('stuck'); setTimeout(() => { for (;;) { /* a stuck main thread (lane L1 guard tests) */ } }, 10); return; }
   if (path.startsWith('/level')) { L[3] = LEVELS.indexOf(new URL(req.url, 'http://x').searchParams.get('l') ?? 'green'); return res.end('ok'); }
   // Stage B (lane B-port) tests. FAKE_EDGE=1: the C2 reads answer {from: 'main'} here; /busy?ms= holds the main thread
-  // that long; /read-fail?m=ok|error|500|slow sets how the read worker (below) answers its next requests; /read-lag?n=
+  // that long; /read-fail?m=ok|error|500|slow|relay sets how the read worker (below) answers its next requests; /read-lag?n=
   // the lagGens live.json reports.
   if (process.env.FAKE_EDGE === '1' && /^\/v1\/edge\/(here|observe|capabilities|view|around)(\?|$)/.test(path)) return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ from: 'main', path }));
   if (path.startsWith('/busy')) { const ms = Number(new URL(req.url, 'http://x').searchParams.get('ms') ?? 2000); res.end('busy'); setTimeout(() => { const end = Date.now() + ms; while (Date.now() < end) { /* the main thread is held */ } }, 20); return; }
   if (path === '/read-env') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(Object.fromEntries(['SIM_READ_WORKER', 'SIM_READ_WORKERS', 'SIM_READ_PORTS', 'SIM_READ_MODE'].map((k) => [k, process.env[k] ?? null]))));
   if (path.startsWith('/read-lag')) { L[7] = Number(new URL(req.url, 'http://x').searchParams.get('n') ?? 0); return res.end('ok'); }
-  if (path.startsWith('/read-fail')) { L[6] = ['ok', 'error', '500', 'slow'].indexOf(new URL(req.url, 'http://x').searchParams.get('m') ?? 'ok'); return res.end('ok'); }
+  if (path.startsWith('/read-fail')) { L[6] = ['ok', 'error', '500', 'slow', 'relay'].indexOf(new URL(req.url, 'http://x').searchParams.get('m') ?? 'ok'); return res.end('ok'); }
   if (path === '/crash') { res.end('bye'); setTimeout(() => process.exit(3), 10); return; }
   // a crash whose open connections outlive the process for a while (their fds handed to a short-lived helper): the
   // launcher sees the exit before the in-flight requests drop, as when a world restarts under a long-poll
@@ -81,6 +81,8 @@ if (process.env.SIM_READ_WORKER === '1') { L[5] = process.env.FAKE_READ_MODE ===
   const s = require('node:http').createServer((q, r) => {
     const f = L[6]; if (f === 1) return q.socket.destroy(); if (f === 2) return r.writeHead(500).end('{}');
     const answer = () => r.writeHead(200, { 'content-type': 'application/json', 'x-sim-read': 'worker', 'x-sim-load': ['green', 'amber', 'red', 'black'][L[3]] ?? 'green' }).end(JSON.stringify({ from: 'worker', url: q.url, auth: q.headers.authorization ?? null }));
+    // relay: the worker hands the read to main (Stage B: not ready, lagging, a main-only read) and relays main's answer
+    if (f === 4) return r.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ from: 'main-via-worker', url: q.url }));
     if (f === 3) setTimeout(answer, 3000); else answer();
   });
   s.listen(w.port, '127.0.0.1', () => { L[4] = s.address().port; });
