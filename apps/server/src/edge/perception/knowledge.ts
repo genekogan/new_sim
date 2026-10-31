@@ -145,7 +145,7 @@ export class PlaceKnowledge {
   }
   /** The district summary and the far-away names, for `here`. Short: a few dozen tokens. */
   scales(soulId: string, placePath: readonly string[], pos: V2 | null, minuteOfDay: number | null) {
-    this.touch(soulId, placePath, this.L.host.engine.world.tick);
+    this.touch(soulId, placePath, this.L.mw.world.tick);
     const district = this.districtOf(placePath[0] ?? null), mem = this.memory(soulId);
     let summary: {name: string; people: number; busy?: string[]; on?: string[]} | undefined;
     if (district) {

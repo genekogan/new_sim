@@ -7,6 +7,7 @@
 // The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
+import { menuWorldOf, type MenuWorld } from '../split/menu-world.ts';
 import { deckRaised, railGaps, rasterOf } from '@sim/generators';
 import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, buildWorldEditPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
@@ -328,6 +329,8 @@ export class EngineBridge {
     if (this.edge && (o.worldLore ?? !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) installWorldLore(this.edge, this.god);
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
+  /** B-facade: the Soul listing (`capabilities`) reads the world through the read-only facade (split/menu-world.ts). */
+  private get mw(): MenuWorld { return menuWorldOf(this.host); }
   private get model(): WorldModel { return this.god.model; }
 
   /** True only at a completed normal tick frontier, with every derived draft accepted by this engine.
@@ -1632,7 +1635,7 @@ export class EngineBridge {
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
     // L1: the walk listing only reads the world; the engine's planner syncs once for all of it (readPassV1). S2: so does
     // the rest of this listing (the standing points beside near items, seats, layers): one sync and one list of bodies.
-    const list = () => this.listCapabilities(soul, caps, plans), eng = this.engine as unknown as { readPassV1?: (f: () => void) => void };
+    const list = () => this.listCapabilities(soul, caps, plans), eng = this.mw;
     if (eng.readPassV1) eng.readPassV1(list); else list();
   }
   private listCapabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
@@ -1642,7 +1645,7 @@ export class EngineBridge {
     releaseBigScratch();   // L1: room-reach searches inside a multi-storey house share one ~110 MB workspace; not kept after
     try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
-    const ents = this.engine.world.entities, me = ents[soul.entityId]; if (!me?.human) return;
+    const ents = this.mw.world.entities as Record<string, any>, me = ents[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
     const held = Object.values(ents).find((x: any) => x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId) as any;
     const name = (id: string) => (this.model.entities.has(id) ? this.model.pathOf(id) : String(ents[id]?.label ?? id));
@@ -1658,7 +1661,7 @@ export class EngineBridge {
       .sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1)).slice(0, FAR_SEATS));
     const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
       const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
-      const at = this.engine.standableNearV1([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
+      const at = this.mw.standableNearV1!([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
       return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
     };
     const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
@@ -1668,7 +1671,7 @@ export class EngineBridge {
       const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
       const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
       if (asset.slots?.some((s) => s.kind === 'seat')) {
-        const u = this.engine.bodyUsesV1(x.id), mine = u?.body === soul.entityId;
+        const u = this.mw.bodyUsesV1!(x.id), mine = u?.body === soul.entityId;
         const seats = asset.slots.filter((s) => s.kind === 'seat').length, taken = this.seatTakers(x.id), others = taken.filter((b) => b !== soul.entityId);
         // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
         // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
@@ -1684,7 +1687,7 @@ export class EngineBridge {
         const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
         // floors (2026-10-26): the sitter's feet rest on the floor under the seat (the terrain, or a floor plate on it); a
         // thing standing higher than that floor (on a deck the world does not walk on) would seat the body inside it
-        const feet = levelOf(x) === 0 ? this.engine.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
+        const feet = levelOf(x) === 0 ? this.mw.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
         // a floating thing (a moored canoe, party S8) rides above the pond floor by design and is boarded from its side
         const afloat = !!ent && isFloatingDef(this.model.resolvedDef(ent.def) as { components: Record<string, unknown> });
         const inside = !afloat && lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
@@ -1701,7 +1704,7 @@ export class EngineBridge {
       // mattress, rest, get up); a bed no adult fits on is not offered at all (bedUseRefusal names it if asked by id)
       const berths = x.support?.kind !== 'in-hand' && this.isBed(x.id) ? this.berthsOf(x.id) : 0;
       if (berths) {
-        const occ = (this.engine as unknown as { seatOccupantsV1?: (id: string, kind?: string) => { body: string }[] }).seatOccupantsV1?.call(this.engine, x.id, 'berth') ?? [];
+        const occ = this.mw.seatOccupantsV1?.(x.id, 'berth') ?? [];
         const mine = occ.some((o) => o.body === soul.entityId), others = occ.filter((o) => o.body !== soul.entityId).map((o) => o.body);
         const block = mine ? { code: 'bed.yours', reason: `You are lying on ${name(x.id)} already; stand:here to get up.` }
           : others.length >= berths ? { code: 'bed.taken', reason: `${others.map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} lying there.` } : null;

@@ -13,6 +13,7 @@ import {afterCommit} from '../comms/store.ts';
 //   body's prop), give them (the other accepts), put them down (a small lasting object others can pick up; capped per
 //   place, cleared after a while), eat or drink consumables. Items live in this ledger's table; the body only carries
 //   the visible prop (human.holding), changed when a pose completes, so both agree.
+import {menuWorldOf} from '../../split/menu-world.ts';
 import {randomUUID} from 'node:crypto';
 import {isRigidBody} from '../body/actions.ts';
 import type {Program} from '@sim/engine-contract';
@@ -146,15 +147,15 @@ export class Together {
       if (rec && (rec.phase === 'started' || rec.phase === 'waiting')) this.follows.set(f.receipt, f); else this.dropFollow(f.receipt);
     }
   }
-  private get w() {return this.p.host.engine.world as NativeWorld;}
-  private get tick() {return this.p.host.engine.world.tick;}
+  private get w() {return menuWorldOf(this.p.host).world as NativeWorld;}
+  private get tick() {return menuWorldOf(this.p.host).world.tick;}
   private mindOf(soulId: string) {return this.p.host.minds.get(soulId);}
   private posOf(soulId: string): V2 | null {const m = this.mindOf(soulId), b = m ? this.p.body(m.entityId) : undefined; return b ? [b.pose.p[0], b.pose.p[2]] : null;}
   private seated(entityId: string) {const h = this.p.body(entityId)?.human; return !!h && (h.activity === 'sit' || h.baseActivity === 'sit');}
   private standFirst(entityId: string): Steps {return this.seated(entityId) ? [{verb: 'stand', params: {}}] : [];}
   /** A clear straight line between two standing points (nothing solid between two people about to touch). */
   private lineClear(a: V2, b: V2): boolean {
-    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number}; if (!e.clearanceAtV1) return true;
+    const e = menuWorldOf(this.p.host) as unknown as {clearanceAtV1?: (x: number, z: number) => number}; if (!e.clearanceAtV1) return true;
     const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.1));
     for (let i = 1; i < n; i++) if (e.clearanceAtV1(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n) < 0.24) return false;
     return true;
@@ -174,7 +175,7 @@ export class Together {
   meetSteps(me: string, other: string, standoff = 1.1, gap = 0.8, otherAt?: V2): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return [{verb: 'walk_to', params: {to: other, standoff}}];
     const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = otherAt ?? [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
-    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    const e = menuWorldOf(this.p.host) as unknown as {clearanceAtV1?: (x: number, z: number) => number};
     const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
     // hotfix: where both will stand for the gesture (`gap` apart, meeting between) and the way there stay clear of bystanders
     const roomFor = (p: V2) => {
@@ -252,7 +253,7 @@ export class Together {
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
     for (const s of this.p.spots().shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
-    const engine = this.p.host.engine as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
+    const engine = menuWorldOf(this.p.host) as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
     for (const place of [...this.p.places.byId.values()].sort((a, b) => a.id.localeCompare(b.id))) {
       // places come from the place registry (a mars-engine world keeps its places there, not in world.regions)
       if (!place.polygon?.length || place.kind === 'water' || place.carrier) continue;
@@ -395,7 +396,7 @@ export class Together {
     return true;
   }
   private followSteps(me: string, target: string, gap = 0): Steps {
-    const tb = this.p.body(target), engine = this.p.host.engine as unknown as {movementVerb?: (actor: string, x: number, z: number) => string};
+    const tb = this.p.body(target), engine = menuWorldOf(this.p.host) as unknown as {movementVerb?: (actor: string, x: number, z: number) => string};
     // jogging is dry-ground only: a shore or water leg with a gait would fail the follow
     const dry = !tb || (engine.movementVerb?.(me, tb.pose.p[0], tb.pose.p[2]) ?? 'walk_to') === 'walk_to';
     const legs: Steps = [], jog = gap > CATCH_UP && dry && this.p.body(me)?.body?.family !== 'floater';
@@ -709,7 +710,7 @@ export class Together {
   }
   /** Every second: invitations lapse; follows whose target faded end; placed items are cleared after a while. */
   sweep() {
-    const tick = this.tick, carriers = (this.p.host.engine as unknown as {carriers?: () => {id: string; state: {phase: string; hold?: unknown}}[]}).carriers?.() ?? [];
+    const tick = this.tick, carriers = (menuWorldOf(this.p.host) as unknown as {carriers?: () => {id: string; state: {phase: string; hold?: unknown}}[]}).carriers?.() ?? [];
     for (const inv of this.pending()) {
       // a ride invitation closes once the basket has gone (or stopped keeping the place)
       const gone = inv.kind === 'ride' && (() => {

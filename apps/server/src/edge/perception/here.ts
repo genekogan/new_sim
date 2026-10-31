@@ -2,6 +2,7 @@
 // perceive from where it stands. Strictly local: Souls and things in the same enclosed place (or, outdoors, not
 // inside one) within sight radius and with a clear sightline (nav/1 solids); never other places, never conversation
 // content, never owner data. Read-only; deterministic for a given world state. No model calls.
+import {menuWorldOf} from '../../split/menu-world.ts';
 import {whereLine} from './semantic-location.ts';
 import {isCampfire} from '../ledger/fire.ts';
 import {clockAt} from '@sim/brain';
@@ -31,7 +32,7 @@ export class Perception {
   readonly L: EdgeLedger; readonly soul: EdgeSoul; readonly w: NativeWorld; readonly tick: number;
   readonly pos: V2 | null; readonly heading: number; readonly enclosure: string | null; private solidsCache?: readonly Solid[];
   constructor(ledger: EdgeLedger, soul: EdgeSoul) {
-    this.L = ledger; this.soul = soul; this.w = ledger.host.engine.world as NativeWorld; this.tick = ledger.host.engine.world.tick;
+    this.L = ledger; this.soul = soul; this.w = ledger.mw.world as NativeWorld; this.tick = ledger.mw.world.tick;
     const b = this.w.entities[soul.entityId];
     this.pos = b ? [b.pose.p[0], b.pose.p[2]] : null; this.heading = b ? headingOfYaw(b.pose.yaw) : 0;
     this.enclosure = ledger.enclosureOf(soul.soulId);
@@ -63,7 +64,7 @@ export class Perception {
   /** How many places of each seat fixture are held by someone else's live sit action or claimed by another Soul's open
    *  act (walking there); a seat is free while that is below its seat slots (a 6 ft bench has 3). */
   private takenSeats(): Map<string, number> {
-    const out = new Map<string, number>(), rt = this.L.host.engine.runtime, live = new Set(rt.liveIds()), add = (id: string) => out.set(id, (out.get(id) ?? 0) + 1);
+    const out = new Map<string, number>(), rt = this.L.mw.runtime, live = new Set(rt.liveIds()), add = (id: string) => out.set(id, (out.get(id) ?? 0) + 1);
     for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor !== this.soul.entityId) {const v = typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : null; if (v) add(v);}}
     for (const m of this.L.host.minds.values()) if (m.soulId !== this.soul.soulId) for (const r of this.L.openReceipts(m.soulId)) if (r.capability.startsWith('sit:')) add(r.capability.slice(4));
     return out;
@@ -74,7 +75,7 @@ export class Perception {
     for (const c of caps) {
       if (c.verb !== 'sit' || !c.target || c.id === 'sit:here') continue;
       const ent = (this.L.host.kernel.things[c.target.id]?.traits.entity as string | undefined) ?? c.target.id, e = this.w.entities[ent]; if (!e) continue;
-      const levels=(this.L.host.engine as typeof this.L.host.engine&{nativeSeatLevelsV1?:(id:string)=>number[]}).nativeSeatLevelsV1?.(ent)??(e.support?.kind==='ground'&&e.pose.p[1]===0?[0]:[]);if(levels.length!==1)continue;
+      const levels=(this.L.mw).nativeSeatLevelsV1?.(ent)??(e.support?.kind==='ground'&&e.pose.p[1]===0?[0]:[]);if(levels.length!==1)continue;
       const at: V2 = [e.pose.p[0], e.pose.p[2]], d = this.dist(at); if (d > radius) continue;
       out.push({kind: 'seat', id: c.target.id, name: c.label, at, entityId: ent, free: c.available && (taken.get(c.target.id) ?? taken.get(ent) ?? 0) < this.seatSlots(ent), capability: c.id, distance: d,level:levels[0]});
     }
@@ -160,7 +161,7 @@ export class Perception {
   }
   /** The seat (fixture id, as in sit:<id>) this body holds, from the engine's live sit action. */
   seat(): string | null {
-    const rt = this.L.host.engine.runtime, live = new Set(rt.liveIds());
+    const rt = this.L.mw.runtime, live = new Set(rt.liveIds());
     for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; slot?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor === this.soul.entityId) return typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : typeof p.slot === 'string' ? p.slot : null;}
     return null;
   }
@@ -244,10 +245,10 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   const weather = skyOf(ledger.weatherNow?.() ?? (P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
   // my current body act and how long its timed step has left
   const open = ledger.openReceipts(soul.soulId).filter(r => (r as {channel?: string}).channel !== 'attention');
-  const program = host.engine.programOf(soul.entityId), action = program ? host.engine.programAction?.(program) : null;
+  const program = menuWorldOf(host).programOf(soul.entityId), action = program ? menuWorldOf(host).programAction?.(program) : null;
   let endsIn: string | undefined;
   if (action) {
-    const rec = host.engine.runtime.records.get(action.action.id) as {params?: {seconds?: unknown}; history?: {tick: number; status: string}[]; requestedTick?: number} | undefined;
+    const rec = menuWorldOf(host).runtime.records.get(action.action.id) as {params?: {seconds?: unknown}; history?: {tick: number; status: string}[]; requestedTick?: number} | undefined;
     const secs = typeof rec?.params?.seconds === 'number' ? rec.params.seconds : null, started = rec?.history?.find(h => h.status === 'running')?.tick ?? rec?.requestedTick;
     if (secs !== null && started !== undefined) endsIn = durationWord(Math.max(0, secs - (tick - started) / 20));
   }
