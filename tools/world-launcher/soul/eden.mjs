@@ -173,7 +173,7 @@ export function slowedSentence(list, ch = "requests", at = Date.now()) {
   const recent = (list ?? []).filter((x) => at - x.at < SLOWED_WINDOW_MS);
   if (!recent.length) return null;
   const last = recent.at(-1), n = recent.length, span = secs(at - recent[0].at), why = `${last.reason} (${last.code})`;
-  const left = last.ms != null ? last.at + last.ms - at : null, when = left == null ? "shortly" : left < 1000 ? "now" : `in ${secs(left)}`;
+  const left = last.ms != null ? last.at + last.ms - at : null, when = left == null ? "shortly" : left <= 0 ? "now" : `in ${secs(left)}`;
   const lead = ch === "listen" ? (n === 1 ? `My listen for your messages was just refused: ${why}` : `My listen for your messages was refused ${n} times in the last ${span}: ${why}`)
     : SLOW_CODES.has(last.code) ? (n === 1 ? `The world asked me to slow down${last.ms ? ` for ${secs(last.ms)}` : ""}: ${why}` : `The world asked me to slow down ${n} times in the last ${span}: ${why}`)
     : n === 1 ? `My last request was refused: ${why}` : `My last ${n} requests were refused in the last ${span}: ${why}`;
