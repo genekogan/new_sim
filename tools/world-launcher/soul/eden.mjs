@@ -160,7 +160,7 @@ async function call(path, { method, body, as = "soul", timeoutMs, recoverRead = 
     } else if (isBusy(r.status, r.data) && cls !== "none" && busy < RETRY.busyWaits) {
       busy++;
       const ms = statedJitter(r.retryAfterMs ?? Math.max(1_000, fullJitter(busy + 1)));
-      calm(`${WAITING[codeOf(r.data)] ?? "the world is busy"}; waiting ${secs(ms)}`);
+      process.stderr.write(`${WAITING[codeOf(r.data)] ?? "the world is busy"}; waiting ${secs(ms)}\n`);
       await pause(ms); continue;
     }
     if (r.status === 0 && cls === "none") r.data.error.notRetried = true;
