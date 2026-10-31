@@ -1,0 +1,70 @@
+# gitleaks config for this repository (gitleaks >= 8.25; tested with 8.30.1). Run in CI by .github/workflows/security.yml.
+# Default rules stay on. Custom rules add Sim-issued token shapes and whole-file classes that must never
+# be committed. Allowlists cover only the fixtures the 2026-10-31 audit classified as obviously fake.
+title = "new_sim"
+
+[extend]
+useDefault = true
+
+# ---------- custom rules ----------
+
+[[rules]]
+id = "sim-soul-token"
+description = "Sim Soul seat token as issued by newSoulToken(): sim_<soulId>_<24 random bytes base64url>"
+regex = '''\bsim_s_[0-9a-f]{10}_[A-Za-z0-9_-]{32}(?:[^A-Za-z0-9_-]|$)'''
+keywords = ["sim_s_"]
+
+[[rules]]
+id = "sim-god-token"
+description = "Sim god token as issued for a world: god_<slug>-<n>_<32 random chars>"
+regex = '''\bgod_[a-z0-9][a-z0-9-]*-\d+_[A-Za-z0-9_-]{32}(?:[^A-Za-z0-9_-]|$)'''
+keywords = ["god_"]
+
+[[rules]]
+id = "eden-agent-state-file"
+description = "Soul/god client state file (holds a live token); must never be committed"
+path = '''(^|/)\.eden-(agent|god)\.json$'''
+
+[[rules]]
+id = "sqlite-database-file"
+# NOTE: gitleaks skips binary content in both git and dir mode, so this path rule only catches text-like
+# files. CI must also run a path guard, e.g. git ls-files | grep -E "\\.(db|sqlite3?)(-wal|-shm)?$" && exit 1.
+description = "SQLite world/state database or its WAL/SHM sidecar"
+path = '''\.(db|sqlite|sqlite3|db-wal|db-shm|sqlite-wal|sqlite-shm)$'''
+
+[[rules]]
+id = "dotenv-file"
+description = "A real .env file (only .env.example may be committed)"
+path = '''(^|/)\.(env|dev\.vars)(\.[^/]+)?$'''
+  [[rules.allowlists]]
+  paths = ['''(^|/)\.env\.example$''']
+
+[[rules]]
+id = "wrangler-local-state"
+description = "Wrangler/miniflare local state directory"
+path = '''(^|/)\.wrangler/'''
+
+# ---------- allowlists for obviously fake fixtures ----------
+
+[[allowlists]]
+description = "Named fake fixture values in tests (idempotency keys, steward secret, synthetic tokens, Stripe-shaped strings used by redaction tests)"
+regexes = [
+  '''^(wren-idempotency-01|test-idempotency-0001|clerk-fixture-00001)$''',
+  '''^steward-secret-123456$''',
+  '''^sim_SYNTHETIC_[A-Z0-9_]+$''',
+  '''sk_live_abc(123def456ghi789|defghijkl)''',
+]
+
+[[allowlists]]
+description = "localStorage key names flagged by generic-api-key"
+regexes = ['''^(w11-surface-v[0-9]+|eden-atmos-wind-v[0-9]+)$''']
+
+[[allowlists]]
+description = "Placeholders written by the history rewrite's replace-text.txt"
+regexes = ['''REDACTEDREDACTEDREDACTEDREDACTED''']
+
+[[allowlists]]
+description = "sha256 file pins in Mars eden-expansion-assets release notes"
+condition = "AND"
+paths = ['''mars/viewer/app/engine-view/content/assets/eden-expansion-assets/[^/]+\.md$''']
+regexes = ['''^[0-9a-f]{64}$''']
