@@ -48,7 +48,7 @@ const CLI_FILE = resolve(opt('cli', join(ROOT, 'tools/world-launcher/soul/eden.m
 if (VIA && CLI_FILE !== resolve(join(ROOT, 'tools/world-launcher/soul/eden.mjs'))) throw new Error('--via-launcher: the launcher serves its own root\'s eden.mjs; drop --cli');
 if (VIA && SLICE) throw new Error('--via-launcher with --slice is not built yet (the slice would wrap the launcher, not the world); use --cpus');
 const LOAD = opt('load', 'v1'), RW_MODES = opt('read-worker', '').split(',').filter(Boolean), RW_N = Number(opt('read-workers', 1)), CLI_SOULS = Number(opt('cli-souls', 3));
-const VIEWERS = Number(opt('viewers', 6)), BUDGET = opt('world-budget-rps', LOAD === 'stageb' ? '200' : ''), ORACLE_RATE = Number(opt('oracle-rate', 0.01)), JOIN_PAR = Number(opt('join-concurrency', LOAD === 'stageb' ? 4 : 1)), CPUS = opt('cpus', '');
+const VIEWERS = Number(opt('viewers', 6)), BUDGET = ((b) => (b === 'default' ? '' : b))(opt('world-budget-rps', LOAD === 'stageb' ? '200' : '')), ORACLE_RATE = Number(opt('oracle-rate', 0.01)), JOIN_PAR = Number(opt('join-concurrency', LOAD === 'stageb' ? 4 : 1)), CPUS = opt('cpus', '');
 if (!['v1', 'stageb'].includes(LOAD)) throw new Error('--load v1|stageb');
 if ((RW_MODES.length || LOAD === 'stageb' || CPUS) && !VIA) throw new Error('--load stageb, --read-worker and --cpus run through the launcher: add --via-launcher');
 if (RW_MODES.some((m) => m !== 'on' && m !== 'off')) throw new Error('--read-worker off|on|off,on');
@@ -241,7 +241,9 @@ async function join_(run, i) {
   const soul = { i, dir };
   const a = await runCli(soul, ['register', BASE], 60_000);
   // v2: a create the proxy answered 502/503 (a slow world under N concurrent creates) is tried again, up to 3 times
-  let b; for (let k = 0; k < (LOAD === 'stageb' ? 3 : 1); k++) { b = await runCli(soul, ['create', `Bench${i}`], 120_000); if (existsSync(join(dir, '.eden-agent.json')) && JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) break; run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(5000); }
+  // (a fresh name per try: a create whose answer was lost may have made the Soul, and the same name then answers 409
+  // name-taken with exit 0 and no token)
+  let b; for (let k = 0; k < (LOAD === 'stageb' ? 3 : 1); k++) { b = await runCli(soul, ['create', k ? `Bench${i}t${k}` : `Bench${i}`], 120_000); if (existsSync(join(dir, '.eden-agent.json')) && JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) break; run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(5000); }
   if (!JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
   soul.token = JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token;
   return soul;
