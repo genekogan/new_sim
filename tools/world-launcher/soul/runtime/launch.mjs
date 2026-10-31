@@ -178,6 +178,19 @@ function createControllerOwner({ state, inspectProcess = inspectOwnedProcess, in
     }
   };
   const absent = (target) => strictProcessAbsent(target, killProcess);
+  const groupGone = async (pgid, deadline) => {
+    for (; ; ) {
+      try {
+        killProcess(-pgid, 0);
+        return false;
+      } catch (e) {
+        if (e.code === "ESRCH") return true;
+        if (e.code !== "EPERM") throw fault("CONTROLLER_ABSENCE_UNKNOWN");
+      }
+      if (now() >= deadline) throw fault("CONTROLLER_HOST_CLEANUP_UNVERIFIED");
+      await sleep(25);
+    }
+  };
   const anchor = (host) => {
     const leader = inspectProcess(host.birth.pid);
     if (!leader) throw fault("CONTROLLER_HOST_LEADER_GONE");
@@ -201,7 +214,7 @@ function createControllerOwner({ state, inspectProcess = inspectOwnedProcess, in
       if (host.closeProof?.hostPid !== host.birth.pid || host.closeProof.groupClosed !== true || host.closeProof.groupVerification !== "absent") throw fault("CONTROLLER_HOST_CLOSURE_INVALID");
       return "prior-verified";
     }
-    if (absent(-host.birth.pgid)) {
+    if (await groupGone(host.birth.pgid, deadline)) {
       if (host.state !== "closed" && !absent(host.birth.pid)) throw fault("CONTROLLER_HOST_BIRTH_CHANGED");
       return;
     }
@@ -211,25 +224,25 @@ function createControllerOwner({ state, inspectProcess = inspectOwnedProcess, in
       try {
         members = anchor(host);
       } catch (e) {
-        if (e.code !== "CONTROLLER_HOST_LEADER_GONE") throw e;
+        if (e.code !== "CONTROLLER_HOST_LEADER_GONE" && !(await groupGone(host.birth.pgid, deadline) && absent(host.birth.pid))) throw e;
         while (now() < deadline) {
-          if (absent(-host.birth.pgid) && absent(host.birth.pid)) return;
+          if (await groupGone(host.birth.pgid, deadline) && absent(host.birth.pid)) return;
           await sleep(25);
         }
-        if (absent(-host.birth.pgid) && absent(host.birth.pid)) return;
+        if (await groupGone(host.birth.pgid, deadline) && absent(host.birth.pid)) return;
         throw fault("CONTROLLER_HOST_CLEANUP_UNVERIFIED");
       }
       try {
         killProcess(-host.birth.pgid, signal);
       } catch (e) {
-        if (e.code !== "ESRCH") throw fault("CONTROLLER_CLEANUP_SIGNAL_UNKNOWN");
+        if (e.code !== "ESRCH" && e.code !== "EPERM") throw fault("CONTROLLER_CLEANUP_SIGNAL_UNKNOWN");
       }
       const end = Math.min(deadline, now() + grace);
       while (now() < end) {
-        if (absent(-host.birth.pgid) && members.every((p) => absent(p.pid))) return;
+        if (await groupGone(host.birth.pgid, deadline) && members.every((p) => absent(p.pid))) return;
         await sleep(25);
       }
-      if (absent(-host.birth.pgid) && members.every((p) => absent(p.pid))) return;
+      if (await groupGone(host.birth.pgid, deadline) && members.every((p) => absent(p.pid))) return;
     }
     throw fault("CONTROLLER_HOST_CLEANUP_UNVERIFIED");
   };
