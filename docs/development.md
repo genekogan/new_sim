@@ -13,11 +13,23 @@ pnpm install --frozen-lockfile
 pnpm assets:pull                      # media from assets.eden.art; pnpm assets:check verifies without network
 cp .env.example .env
 pnpm --filter @sim/web build
+pnpm --filter mars-campus-viewer build:static
 BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=.local/dev node --env-file=.env apps/server/src/main.ts
 ```
 
-Open <http://localhost:4500/?dev=1>. With `DEV_AUTH=1` the page offers a dev sign-in; the name `admin` is an admin.
-Variables given on the command line win over `.env`.
+Open <http://localhost:4500/w/toy/?dev=1>: a world is served under `WORLD_PATH` (`/w/<key>`), and the root `/` is the
+multi-world homepage, which lists only a launcher's worlds. With `DEV_AUTH=1` the page offers a dev sign-in; the name
+`admin` is an admin. `.env.example` sets `INVITE_REQUIRED=1`, so creating a Soul (**New Soul**, `POST /v1/souls`)
+answers `invite-required` for any other name until you use `admin` or set `INVITE_REQUIRED=0`. Variables given on the
+command line win over `.env`; to use another port set both `PORT` and `PUBLIC_URL`, since `.env.example` pins
+`PUBLIC_URL` to :4500.
+
+The viewer build puts the humanoid kit and the character models and animations (`/modular/...`) in
+`mars/viewer/dist/client` (`MARS_WEB_DIR`). The server mounts that directory only if it exists when it starts.
+Without it, those requests fall through to the web app's HTML. The world then shows "The world could not be
+prepared: Person … could not be prepared" and draws no Souls. If you build it later, restart the server. Use
+`build:static`, not `build`: `build` also writes the Cloudflare worker bundle, which needs a
+`.cloudflare/large-assets.json` that a fresh clone does not have.
 
 For front-end work, `pnpm dev` runs the server with `--watch` and Vite on :5173, which proxies `/v1`, `/ws`,
 `/skill.md`, `/cards.md`, `/mcp` and `/healthz` to :4500.
@@ -76,8 +88,9 @@ WORLD_KEY=mars ENGINE=mars ENABLE_LIVING_WORLD=1 BRAIN_MODE=fake DEV_AUTH=1 DATA
 ```
 
 Use `WORLD_KEY=littlemartians` or `eden` for the other authored worlds. Use one `DATA_DIR` per world and engine: a
-snapshot is bound to its engine's rules version. Build the engine's viewer assets with
-`pnpm --filter mars-campus-viewer build` (served from `MARS_WEB_DIR`, default `mars/viewer/dist/client`).
+snapshot is bound to its engine's rules version. The engine's viewer assets come from the same
+`pnpm --filter mars-campus-viewer build:static` as the first run (served from `MARS_WEB_DIR`, default
+`mars/viewer/dist/client`).
 
 Many worlds on one origin, as in production, run under the world launcher:
 
@@ -86,7 +99,11 @@ node tools/world-launcher/launcher.mjs --port 4980 --data .local/launcher
 ```
 
 It keeps a registry of worlds, runs one server per world on a private port and fronts them all, with the homepage,
-`POST /__sim/worlds` to create a world and `/__sim/healthz`. See [worlds](architecture/worlds.md). For the local edge
+`POST /__sim/worlds` to create a world and `/__sim/healthz`. Its children are fake-minded and accept dev names. They
+take ports from `--range` (default `5101-5149`), which must not include `--port`. A world you create with
+`curl -X POST -H 'authorization: Bearer dev:<name>' -H 'content-type: application/json'
+-d '{"name":"My world","template":"hello-hamlet"}' localhost:4980/__sim/worlds` is claimed by `<name>` as its god;
+`GET /__sim/worlds.json` lists the worlds and templates. See [worlds](architecture/worlds.md). For the local edge
 worlds behind a loopback proxy, see `tools/core/multiworld/README.md`.
 
 ## Layout
