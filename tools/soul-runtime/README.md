@@ -181,7 +181,10 @@ ahead of it by a lead of 10% of the remaining time, bounded to 120..600 s
 the requested wake). When the early wake is consumed, the requested wake is
 restored; a re-request inside the lead window is kept as asked. Null
 (event-only) waits and Souls without dated owner intent are unchanged, and the
-prompt carries no extra text.
+prompt carries no extra text. By design an event-only wait (null `wakeAt`) can
+still sleep past a dated deadline: the lead only moves wakes the Soul requested.
+If the commitment leaves owner intent (its task closes), a kept early wake falls
+back to the requested wake.
 
 An urgent owner/addressed/conversation observation arriving after a prompt, or
 a saved future wake becoming due during that turn, first steers the same host.

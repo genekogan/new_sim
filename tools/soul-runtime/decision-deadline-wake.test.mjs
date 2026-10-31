@@ -71,6 +71,17 @@ test('an open owner task deadline counts; its accepted result removes it',async 
  assert.equal((await decide(j,fence,wait(iso(deadline)),{retainedAt:now})).wakeAt,iso(deadline));
 });
 
+test('closing the dated owner task drops a kept early wake and restores the requested wake',async t=>{
+ const now=Date.now(),deadline=now+400000,requested=iso(deadline+60000);
+ const {j,fence}=fixture(t,'Help your owner.');
+ j.ingest({source:'owner',after:null,cursor:'m1',events:[{id:'m1',text:`Bring the lantern to the pavilion by ${iso(deadline)}`,sentAt:now}]});
+ const v=await decide(j,fence,wait(requested),{retainedAt:now});assert.equal(v.wakeAt,iso(deadline-120000));assert.equal(v.deadlineWakeV1.deadlineAt,iso(deadline));
+ retainDecision(j,fence,{plan:'Report',call:{type:'write',command:'result',args:{id:'m1',outcome:'done',text:'Lantern delivered'}},wakeAt:null});
+ await applyPendingDecision(j,fence,{write:async()=>({inbox:{latest:{id:'m1',state:'acknowledged',result:'Lantern delivered',outcome:'done',resultAt:now}}})});
+ const after=j.control.checkpoint().value;assert.equal(j.openOwnerTasks().totalOpen,0);
+ assert.equal(after.wakeAt,requested);assert.equal(after.deadlineWakeV1,undefined);
+});
+
 test('the early wake survives replies, is consumed once, then restores the requested wake without re-firing',async t=>{
  const now=Date.now(),deadline=now+531000,lead=deadline-120000;
  const {j,fence}=fixture(t,`Finish by ${iso(deadline)}.`);
