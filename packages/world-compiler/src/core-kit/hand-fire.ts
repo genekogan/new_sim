@@ -30,7 +30,7 @@ const candleStand: DefInput = {
   params: { iron: { type: 'color', default: '#2e2a27', doc: 'iron colour' }, wax: { type: 'color', default: '#f1e7d0', doc: 'wax colour' }, valve: { type: 'color', default: '#2b2623', doc: 'wick colour (the hand goes here)' }, flame: { type: 'color', default: '#ffb347', doc: 'flame colour' } } as DefInput['params'],
   palette: { iron: '#2e2a27', wax: '#f1e7d0', valve: '#2b2623', flame: '#ffb347' },
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
-  components: { light: { color: '#ffb860', range: 3, on: true, at: [0, 1.27, 0] } } as DefInput['components'],
+  components: { light: { color: '#ffb860', range: 2, on: true, at: [0, 1.27, 0] } } as DefInput['components'],   // the smallest pool: one candle
   size: { box: [0.34, 1.3, 0.34] },
   actions: fireActions('Light the candle', 'Put out the candle') as DefInput['actions'],
 } as DefInput;
@@ -42,10 +42,12 @@ const stringLights: DefInput = {
   description: `${lightsV1.description} A Soul switches them on and off by hand at the switch box on the left post.`,
   tags: [...lightsV1.tags!, 'hand-operated', 'local-fixture'],
   make: { ...lightsV1.make, args: { ...(lightsV1.make as unknown as { args: object }).args, shapes: [...shapesOf(lightsV1),
-    { kind: 'box', at: [-4, 1.2, 0.085], size: [0.08, 0.12, 0.05], round: 0.008, tint: 'valve' }] } } as unknown as DefInput['make'],
+    { kind: 'box', at: [-4, 1.2, -0.085], size: [0.08, 0.12, 0.05], round: 0.008, tint: 'valve' }] } } as unknown as DefInput['make'],
   params: { ...lightsV1.params, valve: { type: 'color', default: '#9c2f24', doc: 'switch box colour (the hand goes here)' } } as DefInput['params'],
   palette: { ...lightsV1.palette, valve: '#9c2f24' },
   state: { on: { type: 'bool', default: false } } as DefInput['state'],
+  // four small lights along the sag (bulb height), so the halo sits on the festoon, not one orb over its middle
+  components: { ...Object.fromEntries(Object.entries(lightsV1.components ?? {}).filter(([k]) => k !== 'light')), lights: [-3, -1, 1, 3].map((x) => ({ color: '#ffd9a0', range: 4, on: true, at: [x, Math.abs(x) === 3 ? 2.66 : 2.48, 0] })) } as DefInput['components'],
   actions: switches('Switch on the string lights', 'Switch off the string lights') as DefInput['actions'],
 } as DefInput;
 

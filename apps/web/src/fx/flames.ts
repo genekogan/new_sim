@@ -98,8 +98,10 @@ registerFx('fire', {
   set(on) { flameStats.enabled = on; for (const f of live) show(f, on && f.level > 0 ? f.level as 1 | 2 : 0); },
   stats() { return { ...flameStats }; },
 });
-/** Mount a fire on every flame cluster under `obj`; returns false when there is none. */
-export function mountFlames(obj: THREE.Object3D, id: string): boolean {
+/** Mount a fire on every flame cluster under `obj`; returns false when there is none. `catchUp`: a fire a Soul just lit
+ *  by hand (a hand-operated def is rebuilt at the contact) catches and grows to full over IGNITE seconds. */
+const IGNITE = 1.6;
+export function mountFlames(obj: THREE.Object3D, id: string, catchUp = false): boolean {
   const fires: Mounted[] = [];
   obj.traverse((pivot) => {
     const clusters = pivot.userData?.flames as FlameCluster[] | undefined; if (!clusters?.length) return;
@@ -116,9 +118,14 @@ export function mountFlames(obj: THREE.Object3D, id: string): boolean {
   if (!fires.length) return false;
   flameStats.mounted += fires.length;
   const at = new THREE.Vector3();
+  // the layer ticks a rebuilt thing only after its edit ease-in, so the catch-up starts small here and is timed from the
+  // mount (epoch seconds, the clock `t` below is on), not from the first tick
+  const t0 = Date.now() / 1000;
+  if (catchUp) for (const f of fires) { f.fire.update(0, 0.12); for (const s of f.standIns) s.visible = false; }
   obj.userData.fx = (t: number) => {
     phone ??= (globalThis as { __simQuality?: { tier?: string } }).__simQuality?.tier === 'phone';
     const time = reduced?.matches ? 7.3 : t;
+    const k = catchUp && !reduced?.matches ? Math.min(1, Math.max(0, (t - t0) / IGNITE)) : 1, strength = 0.12 + 0.88 * k * k * (3 - 2 * k);
     for (const f of fires) {
       at.setFromMatrixPosition(f.fire.group.matrixWorld);
       const d = at.distanceTo(cam), [r1, r2] = REACH[f.kind];
@@ -128,7 +135,7 @@ export function mountFlames(obj: THREE.Object3D, id: string): boolean {
         if (f.level > 0) flameStats.near--; if (level > 0) flameStats.near++;
         f.level = level; show(f, level);
       }
-      if (level > 0) f.fire.update(time, 1);
+      if (level > 0) f.fire.update(time, strength);
     }
   };
   obj.addEventListener('removed', function gone() {

@@ -239,7 +239,7 @@ registerMesh({
     if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {}, flameHint: flameHint(ctx.def), plant: isPlantDef(ctx.def), smokeFx: !ctx.def.components.route && !ctx.def.tags.includes('moving') }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
-    if (ctx.params.condition !== 'construction') mountFlames(obj, ctx.entity.id); // W2: flame parts burn (fx/flames.ts); not on a building site
+    if (ctx.params.condition !== 'construction') mountFlames(obj, ctx.entity.id, ctx.def.tags.includes('hand-operated')); // W2: flame parts burn (fx/flames.ts); not on a building site; a fire lit by hand catches
     return obj;
   },
   instanceKey(ctx) { const a = parseKitArgs(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },
