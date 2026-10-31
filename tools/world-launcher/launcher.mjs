@@ -7,6 +7,7 @@
 //        [--auth-env <clerk.env> --public-origin https://sim.eden.art] [--soul-cli <eden-agent.mjs>] [--soul-skill <skill.md>] [--soul-instructions <instructions.md>]
 //
 //   GET  /                       the web app (homepage: worlds + New world)
+//   GET  /changelog              the public changelog: CHANGELOG.md rendered into the web build (apps/web/changelog.html)
 //   GET  /__sim/worlds.json      local-worlds/1, extended with slug/name/template/god/entities
 //   GET  /__sim/templates.json   genesis templates (worlds/templates/*.json) + the empty plain
 //   POST /__sim/worlds           {name, template} → creates, waits for /healthz → {slug, url}
@@ -733,6 +734,8 @@ export async function openLauncher(cfg = {}) {
       }
       if (req.method === 'GET' || req.method === 'HEAD') {
         if (path === '/' || path === '/index.html') { if (serveFile(res, join(webDir, 'index.html'), 'no-cache')) return; res.writeHead(500, { 'content-type': 'text/plain' }).end('The web app is not built: pnpm --filter @sim/web build'); return; }
+        // #388: the public changelog page, static HTML made from CHANGELOG.md by the web build (no script, no runtime fetch)
+        if ((path === '/changelog' || path === '/changelog/') && serveFile(res, join(webDir, 'changelog.html'), 'no-cache', req)) return;
         // lane P4: the installable-app manifest beside the world list (apps/web/src/pwa-manifest.ts)
         if (path === '/manifest.webmanifest' && serveFile(res, join(webDir, 'manifest.webmanifest'), 'public, max-age=3600', req)) return;
         if (path.startsWith('/assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable', req)) return; }  // P1: req = ETag/304 + precompressed .br/.gz
