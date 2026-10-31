@@ -8,5 +8,5 @@ const encode=(name,from,to,crf=23)=>{const o=`${d}/clips/${name}.mp4`;const args
  execFileSync(ff,args);const mb=statSync(o).size/1e6;if(mb>15&&crf<40)return encode(name,from,to,crf+4);return {name,frames:[from,to],seconds:+((to-from+1)/fps).toFixed(1),mb:+mb.toFixed(2),crf};};
 const out=[encode('door-passage-full',frames[0].frame,frames.at(-1).frame)];
 const scenes=[['1-in','in'],['2-contention','contention'],['3-out','out'],['4-following','following'],['5-locked','locked']];
-for(let i=0;i<scenes.length;i++){const m=marks.find(x=>x.label===scenes[i][0]),n=marks.find(x=>x.label===(scenes[i+1]?.[0]??'end'));if(m&&n)out.push(encode(scenes[i][1],frameAt(m.tick),frameAt(n.tick)));}
+for(let i=0;i<scenes.length;i++){const m=marks.find(x=>x.label===scenes[i][0]),n=marks.find(x=>x.label===(scenes[i+1]?.[0]??'end'));if(m)out.push(encode(scenes[i][1],frameAt(m.tick),n?frameAt(n.tick):frames.at(-1).frame));}
 rmSync(d+'/stamp.gray',{force:true});console.log(JSON.stringify({fps,out},null,1));

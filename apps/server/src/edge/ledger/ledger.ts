@@ -1146,7 +1146,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const what = label.replace(/^(walk|run|jog|go|head|stroll|cycle|wander)( over| back| down| up)? (to|into|onto|towards?) /i, '') || 'there';
       const p = this.doorPassage(soul, steps, what);
       if (p && 'refuse' in p) return {...refuse(p.code, p.reason), ...resolved};
-      if (p) {const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: p.steps}); if (!again || WAIT_CODES.has(again.code)) {steps = p.steps; issue = again; passage = p;}}
+      if (p) for (const legs of [p.steps, p.direct]) {const again = this.host.engine.canPerform({actor: soul.entityId, label, steps: legs}); if (!again || WAIT_CODES.has(again.code)) {steps = legs; issue = again; passage = p; break;}}
     }
     // nav-connect/1 (lane NAV): no walk from where it stands, because it stands cut off from the walkable world (an edit
     // closed a pocket round it, a floor lost its stairs): it steps to the nearest open ground of the main area first (a

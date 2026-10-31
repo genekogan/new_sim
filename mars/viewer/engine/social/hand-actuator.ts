@@ -52,7 +52,9 @@ export function actuatorPoint(o:NonNullable<HandActuatorParams['opening']>,angle
   return {hand,root:[centre[0]+dcos(o.yaw)*ox+dsin(o.yaw)*oz,y,centre[2]-dsin(o.yaw)*ox+dcos(o.yaw)*oz] as Vec3};
  }
  const along=o.side<0?(o.bodyPolicy==='door-natural-v2'?-.35:-.5):0;
- const root:Vec3=[centre[0]+s*(o.bodyPolicy==='door-natural-v2'?.37:.42)*o.side+c*along,y,centre[2]+c*(o.bodyPolicy==='door-natural-v2'?.37:.42)*o.side-s*along];
+ // (entry 31: .40 from the leaf, was .37: the drawn body trails its native root by 2-3 cm, which left 0.347 m drawn)
+ const off=o.bodyPolicy==='door-natural-v2'?.40:.42;
+ const root:Vec3=[centre[0]+s*off*o.side+c*along,y,centre[2]+c*off*o.side-s*along];
  return {hand,root};
 }
 export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');

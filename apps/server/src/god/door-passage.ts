@@ -10,10 +10,12 @@ import {isContactActuator,type ContactActuatorIntent,type ContactActuatorService
 
 type Step={verb:string;params:Record<string,unknown>};
 type Engine={closedDoorsOnWalkV1?:(actor:string,steps:Step[])=>{goal:[number,number];doors:string[]}|null;walkFromReachesV1?:(actor:string,from:[number,number],steps:Step[])=>boolean};
-export type DoorPassage={door:string;name:string;steps:Step[];open:ContactActuatorIntent;note:string};
+export type DoorPassage={door:string;name:string;steps:Step[];direct:Step[];open:ContactActuatorIntent;note:string};
 export type DoorPassageRefusal={refuse:true;code:string;reason:string};
 /** How far past the door line the close is planned from (its far side). */
 const FAR=1;
+/** Where the walk stops before the hand takes over: door-local (along the wall to the latch side, out from it), metres. */
+const STAGE=[.7,1.65];
 
 export function createDoorPassage(d:{engine:()=>Engine;model:()=>WorldModel;contact:ContactActuatorService;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null}){
  /** The passage for a plain walk (`steps`) whose destination no walk reaches now; null when no closed door explains it. */
@@ -37,8 +39,11 @@ export function createDoorPassage(d:{engine:()=>Engine;model:()=>WorldModel;cont
    const passage={door:[wp.x,wp.z] as [number,number],from:o.side};
    const rest=steps[0]?.verb==='stand'?steps.slice(1):steps,openAt=actuatorPoint(o,o.from).root,closeAt=actuatorPoint(c,HAND_OPEN_ANGLE).root;
    const walk=(p:number[]):Step=>({verb:'walk_to',params:{to:[p[0],p[2]],standoff:0}});
-   return {door:id,name,open:intent,note:`Through ${name}: opened it by hand on the way, and closed it behind unless someone was following.`,
-    steps:[{verb:'stand',params:{}},walk(openAt),{verb:'mars:hand_actuator_v1',params:{...open.params,passage:{mode:'open',...passage}}},walk(closeAt),{verb:'mars:hand_actuator_v1',params:{...close.params,passage:{mode:'close',...passage}}},...rest]};
+   // The walk ends a step short of the door, in front of the latch side (out of the swing and of the way through); the hand
+   // step takes the last metre itself once nobody else is at the door (a follower never walks into the leader's swing).
+   const u=[Math.cos(wp.yaw),-Math.sin(wp.yaw)],stage=[wp.x+u[0]*STAGE[0]+n[0]*o.side*STAGE[1],0,wp.z+u[1]*STAGE[0]+n[1]*o.side*STAGE[1]];
+   const legs=(first:number[]):Step[]=>[{verb:'stand',params:{}},walk(first),{verb:'mars:hand_actuator_v1',params:{...open.params,passage:{mode:'open',...passage}}},walk(closeAt),{verb:'mars:hand_actuator_v1',params:{...close.params,passage:{mode:'close',...passage}}},...rest];
+   return {door:id,name,open:intent,note:`Through ${name}: opened it by hand on the way, and closed it behind unless someone was following.`,steps:legs(stage),direct:legs(openAt)};
   }
   return refusal;
  };
