@@ -4,7 +4,7 @@ import { ClockCatchUp } from './clock-catchup.ts';
 import {edenSteeringModeV1,installEdenSteeringModeV1} from './eden-steering-mode.ts';
 import {TakeArchive,r2Store} from './take-archive.ts';
 import { createServer } from 'node:http';
-import { readdirSync, unlinkSync } from 'node:fs';
+import { existsSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { getRequestListener } from '@hono/node-server';
 import { recordedToyFactory } from './toy-takes.ts';
@@ -248,6 +248,8 @@ server.listen(config.port, config.host, () => {
   console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`);
   const s = (ms: number) => (ms / 1000).toFixed(2);
   console.log(`[boot] listening ${s(performance.now())} s after start: code ${s(bootAt.code)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
+  // Issue #395: without the Mars web assets (the people's character set under /modular) every world draws no people.
+  if (!existsSync(join(config.marsWebDir, 'modular/humanoid/kit.json'))) console.warn(`[http] no character set in ${config.marsWebDir} (MARS_WEB_DIR): people will not render. Run pnpm build:viewer, then restart`);
   if (process.env.SIM_STANDBY === '1') console.log(`[boot] listening ${s(performance.now() - bootAt.go)} s after the standby go: database ${s(bootAt.db - bootAt.go)}, factory ${s(bootAt.open - bootAt.db)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
 });
 

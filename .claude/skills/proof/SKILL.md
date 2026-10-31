@@ -24,7 +24,7 @@ Get the tier of the current diff with `node tools/proof/tier.mjs --base origin/m
 
 ## 1. Boot a fake-mind world
 
-Needs a built web client (`pnpm install --frozen-lockfile && pnpm --filter @sim/web build`; skip if
+Needs a built web client (`pnpm install --frozen-lockfile && pnpm build`; skip if
 `apps/web/dist/index.html` exists and is current for your change). In a fresh clone the build's prebuild check fails
 until the web media are in place: `node tools/assets/pull.mjs --only 'apps/web/**'` (a few files) is enough for it.
 

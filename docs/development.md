@@ -12,8 +12,7 @@
 pnpm install --frozen-lockfile
 pnpm assets:pull                      # media from assets.eden.art; pnpm assets:check verifies without network
 cp .env.example .env
-pnpm --filter @sim/web build
-pnpm --filter mars-campus-viewer build:static
+pnpm build
 BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=.local/dev node --env-file=.env apps/server/src/main.ts
 ```
 
@@ -24,15 +23,21 @@ answers `invite-required` for any other name until you use `admin` or set `INVIT
 command line win over `.env`; to use another port set both `PORT` and `PUBLIC_URL`, since `.env.example` pins
 `PUBLIC_URL` to :4500.
 
-The viewer build puts the humanoid kit and the character models and animations (`/modular/...`) in
-`mars/viewer/dist/client` (`MARS_WEB_DIR`). The server mounts that directory only if it exists when it starts.
-Without it, those requests fall through to the web app's HTML. The world then shows "The world could not be
-prepared: Person … could not be prepared" and draws no Souls. If you build it later, restart the server. Use
-`build:static`, not `build`: `build` also writes the Cloudflare worker bundle, which needs a
-`.cloudflare/large-assets.json` that a fresh clone does not have.
+`pnpm build` builds the web app (`apps/web/dist`) and then the Mars viewer's static site, `mars/viewer/dist/client`
+(`MARS_WEB_DIR`), which holds the humanoid kit and the character models and animations the server serves under
+`/modular`. The viewer step (`pnpm build:viewer`, `tools/assets/mars-web.mjs`) is skipped when nothing under
+`mars/viewer` changed since the last build (a stamp of input paths, sizes and times), so it costs well under a second
+when the site is current. `pnpm dev` runs it too. The server mounts the site only if it exists when it starts and
+warns at startup when the character set is missing: without it every world shows "The world could not be prepared:
+Person … could not be prepared" and draws no people. If you build it while the server runs, restart the server.
+`pnpm --filter mars-campus-viewer build` is the same static build; the standalone Mars site's Cloudflare worker is
+`build:cloudflare`, which needs a release staged by `mars/viewer/deploy/prepare.py`.
 
-For front-end work, `pnpm dev` runs the server with `--watch` and Vite on :5173, which proxies `/v1`, `/ws`,
-`/skill.md`, `/cards.md`, `/mcp` and `/healthz` to :4500.
+For front-end work, `pnpm dev` runs the server with `--watch` and Vite on :5173; open
+<http://localhost:5173/w/toy/?dev=1>. Vite proxies the server's routes to it: everything under a world's path except
+the page itself, and at the root `/v1`, `/ws`, `/__sim`, `/skill.md`, `/cards.md`, `/mcp`, `/healthz` and the Mars web
+assets (`/modular`, `/mars-assets`, `/engine`, …). The proxy follows `PORT` (default 4500) when it is set in the
+environment; `WEB_PORT` moves Vite, for example `PORT=4600 PUBLIC_URL=http://localhost:4600 WEB_PORT=5200 pnpm dev`.
 
 `pnpm dev` warns, and `pnpm test` and the web build stop, when the media they need is not in place. Media is listed by
 repository path in `tools/assets/manifest.json`; see `tools/assets/README.md` and [the CDN](operations/cdn.md).
@@ -89,7 +94,7 @@ WORLD_KEY=mars ENGINE=mars ENABLE_LIVING_WORLD=1 BRAIN_MODE=fake DEV_AUTH=1 DATA
 
 Use `WORLD_KEY=littlemartians` or `eden` for the other authored worlds. Use one `DATA_DIR` per world and engine: a
 snapshot is bound to its engine's rules version. The engine's viewer assets come from the same
-`pnpm --filter mars-campus-viewer build:static` as the first run (served from `MARS_WEB_DIR`, default
+`pnpm build` (or `pnpm build:viewer`) as the first run (served from `MARS_WEB_DIR`, default
 `mars/viewer/dist/client`).
 
 Many worlds on one origin, as in production, run under the world launcher:
