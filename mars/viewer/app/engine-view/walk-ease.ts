@@ -9,8 +9,9 @@
 // moment the body starts or stops; at a steady speed the weight is what it was (the kernel integrates to 1).
 import { POS_Q, type PoseSample } from '../../engine/take/types.ts';
 
-/** Seconds a walk start or stop takes to blend the Walk clip in or out. */
-export const WALK_EASE = 0.35;
+/** Seconds a walk start or stop takes to blend the Walk clip in or out (smoothstep; 10–90 % in 0.3 s). At 0.35 s the
+ *  frozen-stride arms still moved 0.097 m per 50 ms mid-stop on the real client (entry 39, take 1). */
+export const WALK_EASE = 0.5;
 /** The Walk weight of a full stride; the idle-variety onset clock restarts from the last moment the weight was above it. */
 export const WALK_FULL = 0.98;
 /** Instantaneous Walk share of a ground speed (m/s): the replay's per-sample map (engine WALK_MIN ~0.06; full from 0.31). */
@@ -55,7 +56,12 @@ export function walkWeightAt(s: GaitSegments, tick: number, dt: number): number 
     if (b2 > a2 && g > 0) sum += g * (F((b2 - lo) / D) - F((a2 - lo) / D));
   };
   add(-Infinity, s.t[0], s.g[0]);
-  add(s.t[n], Infinity, s.g[n - 1]);
+  // Past the last sample (a live take window whose successor has not arrived): a slowing body keeps slowing at its last
+  // rate, otherwise its last share holds. Holding a decelerating 0.2 m/s step kept the weight at 0.75 for the three
+  // frames the client sat at a window's end, then dropped it to 0 when the next window came (entry 39, take 1).
+  const slope = n > 1 ? (s.g[n - 1] - s.g[n - 2]) / Math.max(1, s.t[n] - s.t[n - 1]) : 0; // per tick, over the last step
+  if (slope >= 0) add(s.t[n], Infinity, s.g[n - 1]);
+  else for (let a0 = Math.max(lo, s.t[n]), step = 0.25; a0 < hi; a0 += step) add(a0, a0 + step, Math.max(0, s.g[n - 1] + slope * (a0 + step / 2 - s.t[n])));
   // first step that ends after the window opens
   let a = 0, b = n - 1;
   while (a < b) { const m = (a + b) >> 1; if (s.t[m + 1] <= lo) a = m + 1; else b = m; }

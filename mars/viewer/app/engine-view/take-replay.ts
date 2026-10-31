@@ -27,7 +27,7 @@ import { GAIT_ACTS, GESTURE_FADE, HumanViews, REST_ACTS, type Hands, type Sample
 import { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 import type { Template } from './people.ts';
 import { walkCum } from './take-walk.ts';
-import { gaitSegments, lastFullStride, walkWeightAt, type GaitSegments } from './walk-ease.ts';
+import { WALK_EASE, gaitSegments, lastFullStride, walkWeightAt, type GaitSegments } from './walk-ease.ts';
 import type { DepictionBeat } from './station-depiction.ts';
 import {shoreDepiction} from './recorded-shore.ts';
 import {matchedStairFlights,type SupplementalStair} from './stair-frame.ts';
@@ -386,9 +386,12 @@ export class TakePeople {
 
   /**
    * Pose everything at take time t (seconds). `clock`: the time the views animate on (idle loops, fire flicker); a
-   * chapter set passes its set time so it runs on across a chapter boundary. Poses depend only on t.
+   * chapter set passes its set time so it runs on across a chapter boundary. Poses depend only on t. `ahead`: a live
+   * client's depicted time when it has run past this take's end while the next window is still on its way (t is then
+   * the end); the Walk ease runs on to it, so a body that stopped at a window's end finishes its stop instead of
+   * holding mid-stride until the next window arrives.
    */
-  show(t: number, clock = t,stationBeat:DepictionBeat|null=null) {
+  show(t: number, clock = t,stationBeat:DepictionBeat|null=null,ahead=t) {
     const s0 = performance.now();
     const nativeFrame=sampleTake(this.take,t);
     this.humans.setSupplementalStairs(matchedStairFlights(this.supplementalStairs,nativeFrame,this.allRecords(),this.take.entities0??{},this.supplementalLiveTakeId?{liveTakeId:this.supplementalLiveTakeId,take:this.take}:undefined));
@@ -427,7 +430,7 @@ export class TakePeople {
       const g = st.grip;
       // eased over WALK_EASE (walk-ease.ts): the per-sample speed map snapped stride → stand in one 65 ms sample
       const gs = w && !carriedRide ? this.gaitSteps(id) : null;
-      const walk = climbing ? 1 : gs ? walkWeightAt(gs, frame.tick, dt) : 0;
+      const walk = climbing ? 1 : gs ? walkWeightAt(gs, frame.tick + Math.min(WALK_EASE / dt, Math.max(0, (ahead - t) / dt)), dt) : 0;
       this.lastGait.set(id, { dist, walk });
       // prone receiver (mars-take/4, W32): the lying heading in integer mrad and the phase progress in integer % → rad, 0–1
       const proneYaw = typeof st.proneYaw === 'number' ? st.proneYaw / ANG_Q : undefined;
