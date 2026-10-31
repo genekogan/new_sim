@@ -37,4 +37,26 @@ const whiteboard: DefInput = {
   actions: boardActions('whiteboard'),
 } as DefInput;
 
-export const WRITABLE_BOARDS: DefInput[] = [whiteboard, noticeBoard];
+// Entry 19: a notice board several Souls pin notes on at once. `text` holds one note per line ("words — Name") and
+// `textBy` the authors' soul ids in the same order, so the face, the read and the depicted-tick gate see one field.
+// The `then` below is the naive form; the hand actuator composes the list (pinPatch in apps/server/src/god/actuators.ts)
+// and lets only a note's author take it down.
+export const PIN_NOTES_MAX = 6, PIN_TEXT_MAX = 60, PIN_PER_SOUL = 2;
+/** Where note i sits on the cork face (face-local metres, x right, y up): three across, two down. Shared by the viewer's
+ *  cards and the hand that pins or takes it down. */
+export const pinSlot = (i: number): [number, number] => [(i % 3 - 1) * 0.39, i < 3 ? 0.19 : -0.19];
+const pinMake = structuredClone(noticeV1.make) as unknown as { args: { shapes: { tint?: string }[]; faces: unknown[] } };
+pinMake.args.shapes = pinMake.args.shapes.filter(sh => !/^note/.test(sh.tint ?? ''));   // the printed notes give way to real ones
+pinMake.args.faces = [{ at: [0, 1.35, 0.066], w: 1.2, h: 0.8, bg: '#b88a5a', ink: '#2a2622' }];
+const pinBoard: DefInput = { ...structuredClone(noticeV1), make: pinMake as unknown as DefInput['make'], version: 3, tags: [...(noticeV1.tags ?? []), 'hand-writable', 'pinboard'],
+  description: `A roofed notice board on two posts. Souls pin short notes on it by hand (up to ${PIN_NOTES_MAX}, each signed); only a note's author takes it down.`,
+  state: { text: { type: 'string', max: PIN_NOTES_MAX * (PIN_TEXT_MAX + 44), default: '' }, textBy: { type: 'string', max: PIN_NOTES_MAX * 41, default: '' } } as DefInput['state'],
+  components: { ...structuredClone(noticeV1.components), sign: { lines: [] } },
+  actions: [
+    { name: 'pin', label: 'Pin a note on the notice board', params: { text: { type: 'string', max: PIN_TEXT_MAX, doc: `your note: one line, up to ${PIN_TEXT_MAX} characters; it is signed with your name` } },
+      then: [{ op: 'set', field: 'text', value: { param: 'text' } }, { op: 'set', field: 'textBy', value: '' }] },
+    { name: 'unpin', label: 'Take down your note from the notice board', when: [{ field: 'text', not: '' }],
+      then: [{ op: 'set', field: 'text', value: '' }, { op: 'set', field: 'textBy', value: '' }] },
+  ] as NonNullable<DefInput['actions']> };
+
+export const WRITABLE_BOARDS: DefInput[] = [whiteboard, noticeBoard, pinBoard];

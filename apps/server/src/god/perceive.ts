@@ -27,7 +27,7 @@ import { supportY } from './nav.ts';
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
 type Want = { name: string; kind: string; description: string; params: BuiltState & { paintingWhat?: true } };
-type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string; writable?: boolean };
+type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string; writable?: boolean; pinboard?: boolean };
 /** x0, z0, x1, z1 */
 type Box = [number, number, number, number];
 type Run = { queue: string[]; i: number; changed: string[]; made: number; root: string; layersOn: boolean; full: boolean; ms: number };
@@ -228,7 +228,7 @@ export class GodPerceive {
     const w: Want = { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, ...(painting ? { paintingWhat: true as const } : {}), text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
     if (text === null) return { w };
     // read from in front of its face (entity frame: the front is +z, turned by the yaw)
-    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text, ...(def.tags.includes('hand-writable') ? { writable: true } : {}) } };
+    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text, ...(def.tags.includes('hand-writable') ? { writable: true } : {}), ...(def.tags.includes('pinboard') ? { pinboard: true } : {}) } };
   }
   private at(e: Entity, def: StoredDef): Vec2 | null {
     const sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
@@ -434,7 +434,8 @@ export class GodPerceive {
       const words = s.text.replace(/\s*\n\s*/g, ' / ');
       // A Soul-written board offers a read only when written on, and never carries its words: they come with the read.
       if (s.writable && !words) continue;
-      const label = s.writable ? `Read ${s.name} (a board with writing on it, ${Math.round(d)} m)` : `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
+      const pinned = s.pinboard ? s.text.split('\n').length : 0;
+      const label = pinned ? `Read ${s.name} (${pinned} pinned note${pinned > 1 ? 's' : ''}, ${Math.round(d)} m)` : s.writable ? `Read ${s.name} (a board with writing on it, ${Math.round(d)} m)` : `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
       caps.push({ id, verb: 'read', label, target: { id: s.id, kind: 'object' }, available: true });
       plans.set(id, { label: `Read ${s.name}`, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), ...(Math.hypot(s.front[0] - here[0], s.front[1] - here[1]) > 0.8 ? [{ verb: 'walk_to', params: { to: s.front, standoff: 0 } }] : []), { verb: 'wave', params: { at: s.id, seconds: 1 } }] });
     }

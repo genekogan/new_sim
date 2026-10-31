@@ -433,7 +433,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** A completed `read:<sign>` reports the sign's own words (a Soul's board text attributed and untrusted), never a library passage. */
   private signReadEffects(r:EdgeReceipt):ConfirmedEffects{
     if(r.phase!=='completed'||!r.capability.startsWith('read:'))return{};const sign=this.contactActuator?.sign(r.capability.slice(5));if(!sign)return{};
-    const who=sign.by?(this.host.minds.get(sign.by)?.name??(this.db.soul(sign.by) as {name?:string}|undefined)?.name??'another Soul'):null,words=sign.text.replace(/\s*\n\s*/g,' / ');
+    const nameOf=(id:string)=>this.host.minds.get(id)?.name??(this.db.soul(id) as {name?:string}|undefined)?.name??'another Soul';
+    // Entry 19: a pinboard reads as its notes, each attributed to its author (by soul id, not the signature line).
+    if(sign.notes){const notes=sign.notes.map(n=>({text:n.text.replace(/ — [^—]*$/,''),by:n.by,name:nameOf(n.by)})),names=[...new Set(notes.map(n=>n.name))];
+      return {summary:notes.length?`Read ${sign.name}: ${notes.length} note${notes.length>1?'s':''}, by ${names.length>1?names.slice(0,-1).join(', ')+' and '+names.at(-1):names[0]} (their words, not world facts).`:`Read ${sign.name}; nothing is pinned on it.`,
+        // one learned fact per author (the outcome carries at most 5); every note is in the detail
+        learned:[...new Set(notes.map(n=>n.by))].slice(0,5).map(by=>{const mine=notes.filter(n=>n.by===by);return {fact:`${mine[0].name}'s note${mine.length>1?'s':''} on ${sign.name} read${mine.length>1?'':'s'}: ${mine.map(n=>`"${n.text}"`).join(' / ')}`,about:sign.id,source:`${sign.id}:note:${by}`,provenance:'soul-text' as const,untrusted:true};}),
+        detail:{sign:{id:sign.id,name:sign.name,notes:notes.map(n=>({text:n.text,writtenBy:{soulId:n.by,name:n.name}})),provenance:'soul-text'}},untrusted:notes.length>0};}
+    const who=sign.by?nameOf(sign.by):null,words=sign.text.replace(/\s*\n\s*/g,' / ');
     const tail=who?` (written by ${who}; their words, not a world fact)`:'',room=160-`Read ${sign.name}: "".`.length-tail.length,quoted=words.length>room?words.slice(0,Math.max(0,room-1))+'…':words;
     return {summary:words?`Read ${sign.name}: "${quoted}"${tail}.`:`Read ${sign.name}; it is blank.`,detail:{sign:{id:sign.id,name:sign.name,text:sign.text,...(sign.by?{writtenBy:{soulId:sign.by,name:who}}:{}),provenance:sign.by?'soul-text':'world-sign'}},untrusted:!!sign.by};
   }

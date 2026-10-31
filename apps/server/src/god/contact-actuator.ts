@@ -3,9 +3,9 @@
 import {actuatorPoint,strokePoint,strokeRoot,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
-import { opSchema, contactStateKey, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
+import { opSchema, contactStateKey, pinSlot, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
-import { actionsOf, actuatedState, boardTextProblem, thenPatch, whenRefusal } from './actuators.ts';
+import { actionPatch, actionsOf, actuatedState, boardTextProblem, isPinAction, pinNotes, pinProblem, whenRefusal } from './actuators.ts';
 export const CONTACT_REACH = .8;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true; params?:Record<string,string> };
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
@@ -21,12 +21,14 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // Stand square in front of the board's face; the hand works across the face from its centre.
     const face=(def.make.kind==='gen'?(def.make.args as {faces?:{at?:number[];w?:number;h?:number}[]})?.faces?.[0]:undefined);if(!face?.at)return null;
     const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[fx,fy,fz]=face.at.map(v=>v*wp.s),centre:[number,number,number]=[wp.x+fx*c+fz*s,wp.y+fy,wp.z-fx*s+fz*c];
-    const text=typeof input.text==='string'?input.text.trim():'',lines=action==='write'?Math.min(3,Math.max(text.split('\n').length,Math.ceil(text.length/34),1)):1;
+    const text=typeof input.text==='string'?input.text.trim():'',lines=action==='write'?Math.min(3,Math.max(text.split('\n').length,Math.ceil(text.length/34),1)):1,pin=action==='pin'||action==='unpin';
     // Work across the upper part of the face, near shoulder height, not at the hip.
     const lift=Math.min(.12,(face.h??.4)*wp.s*.2);params.at=[centre[0]+s*.04,centre[1]+lift,centre[2]+c*.04];
+    // A pinned note goes to (or comes down from) its own place on the cork, the slot the viewer draws it in.
+    if(pin){const notes=pinNotes(actuatedState(e,def)),i=action==='pin'?notes.length:notes.map(n=>n.by).lastIndexOf(soul.soulId),[dx,dy]=pinSlot(Math.max(0,i)).map(v=>v*wp.s);params.at=[centre[0]+dx*c+s*.04,centre[1]+dy,centre[2]-dx*s+c*.04];}
     // Stand clear of the board's own footprint (its depth beyond the face) with a body radius to spare.
     const stand=Math.min(.7,Math.max(STROKE_STAND,(def.size.box[2]/2-(face.at[2]??0))*wp.s+HUMAN_RADIUS+.06-.04));
-    params.stroke={kind:action==='erase'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:1.2+1.6*lines};
+    params.stroke=pin?{kind:action==='unpin'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.22,(face.w??.6)*wp.s*.25),height:.06,lines:1,seconds:action==='unpin'?1.2:1.6}:{kind:action==='erase'?'wipe':'write',yaw:wp.yaw,stand,width:Math.min(.55,(face.w??.6)*wp.s*.6),height:Math.min(.3,(face.h??.4)*wp.s*.5),lines,seconds:action==='erase'?2.4:1.2+1.6*lines};
     root=strokeRoot(params.at,params.stroke,wp.y);
    }else if(def.components.opening){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];tint?:string}[]})?.shapes:undefined;
@@ -43,7 +45,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   sign(target:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),sign=def?.components.sign as {lines?:string[]}|undefined;if(!e||!def||!sign)return null;
    const text=typeof e.state?.text==='string'&&e.state.text.trim()?e.state.text:(sign.lines??[]).join('\n');
-   return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,by:typeof e.state?.textBy==='string'&&e.state.textBy?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
+   return {id:e.id,name:e.name??def.name.replace(/^core-/,''),text,...(def.tags?.includes('pinboard')?{notes:pinNotes(e.state??{})}:{}),by:typeof e.state?.textBy==='string'&&e.state.textBy?e.state.textBy:null,writable:!!def.tags?.includes('hand-writable')};
   },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){
@@ -70,8 +72,8 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    const expected=motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def),bad=whenRefusal(a,state,e.name??'object');if(bad)return fail(bad.code,bad.reason);
-   const text=contactStateKey(def,a.name)==='text'&&a.name==='write'?boardTextProblem(intent.params?.text):null;if(text)return fail(text.code,text.reason);
-   const patch=thenPatch(a,state,intent.params??{});if(contactStateKey(def,a.name)==='text'&&a.name==='write')patch.textBy=soul.soulId;
+   const text=isPinAction(def,a)?pinProblem(a,state,soul,a.name==='pin'?intent.params?.text:undefined):contactStateKey(def,a.name)==='text'&&a.name==='write'?boardTextProblem(intent.params?.text):null;if(text)return fail(text.code,text.reason);
+   const patch=actionPatch(def,a,state,intent.params??{},soul);if(contactStateKey(def,a.name)==='text'&&a.name==='write')patch.textBy=soul.soulId;
    const r=d.commit([opSchema.parse({op:'set',id:e.id,state:patch})],`${soul.soulId} ${a.name} ${e.name??e.id}`,()=>{d.record(soul,e.id,a.name,intent.params??{});done();});
    return r.accepted?{ok:true as const}:fail('contact.commit-refused','The world refused the interaction.');
   }

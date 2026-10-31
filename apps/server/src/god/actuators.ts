@@ -4,7 +4,7 @@
 // `object:<entity>:switch-off`, walks up to it, reaches out, and the lamp's state changes in the world (an engine edit:
 // in the ledger, broadcast to viewers, never the god's to undo). Nothing in the edge changes: the object framework's own
 // capabilities, admission, receipts and body plans carry it.
-import type { Entity, StoredDef } from '@sim/world-compiler';
+import { PIN_NOTES_MAX, PIN_PER_SOUL, PIN_TEXT_MAX, type Entity, type StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { isContactActuator, CONTACT_REACH } from './contact-actuator.ts';
 import { afterCommit } from '../edge/comms/store.ts';
@@ -116,6 +116,39 @@ export function boardTextProblem(v: unknown, max = 100, lines = 3): Refusal | nu
   if (t.split('\n').length > lines) return { code: 'capability.params', reason: `At most ${lines} lines fit on the board.` };
   return null;
 }
+/** Entry 19: a pinboard's notes, one per line of `text`, with the authors' soul ids in `textBy` (same order). */
+export const isPinAction = (def: StoredDef, a: { name: string }) => !!def.tags?.includes('pinboard') && (a.name === 'pin' || a.name === 'unpin');
+export function pinNotes(state: Record<string, unknown>): { text: string; by: string }[] {
+  const lines = typeof state.text === 'string' && state.text ? state.text.split('\n') : [], by = typeof state.textBy === 'string' && state.textBy ? state.textBy.split(',') : [];
+  return lines.map((text, i) => ({ text, by: by[i] ?? '' }));
+}
+/** Why this Soul cannot pin (with these words) or take down a note here now; null = it can. `text` undefined = availability only. */
+export function pinProblem(a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, text?: unknown): Refusal | null {
+  const notes = pinNotes(state), mine = notes.filter(n => n.by === soul.soulId).length;
+  if (a.name === 'unpin') return mine ? null : { code: 'object.not-yours', reason: 'You have no note on this board; only its author takes a note down.' };
+  if (notes.length >= PIN_NOTES_MAX) return { code: 'object.state', reason: `The board is full (${PIN_NOTES_MAX} notes); a note comes down only when its author takes it down.` };
+  if (mine >= PIN_PER_SOUL) return { code: 'object.state', reason: `You already have ${PIN_PER_SOUL} notes on this board; take one down first.` };
+  if (text === undefined) return null;
+  const bad = boardTextProblem(text, PIN_TEXT_MAX, 1); if (bad) return bad.reason.startsWith('At most') ? { ...bad, reason: 'A note is one line.' } : bad;
+  return null;
+}
+/** The pinboard's next `text`/`textBy` after this Soul pins a signed note or takes down its latest one. */
+export function pinPatch(a: { name: string }, state: Record<string, unknown>, soul: EdgeSoul, text: unknown): Record<string, unknown> {
+  const notes = pinNotes(state), name = (soul.name || 'a Soul').replace(/[\n,—]/g, ' ').slice(0, 40);
+  if (a.name === 'pin') notes.push({ text: `${String(text).trim()} — ${name}`, by: soul.soulId });
+  else { const i = notes.map(n => n.by).lastIndexOf(soul.soulId); if (i >= 0) notes.splice(i, 1); }
+  return { text: notes.map(n => n.text).join('\n'), textBy: notes.map(n => n.by).join(',') };
+}
+/** After pinning or taking down a note a Soul steps back from the cork, so the next Soul can reach its own note. */
+function stepBack(def: StoredDef, a: Action, motion: { root: [number, number, number]; params: Record<string, unknown> }) {
+  const yaw = (motion.params.stroke as { yaw?: number } | undefined)?.yaw;
+  if (!isPinAction(def, a) || typeof yaw !== 'number') return [];
+  return [{ verb: 'walk_to', params: { to: [motion.root[0] + Math.sin(yaw) * 0.8, motion.root[2] + Math.cos(yaw) * 0.8], standoff: 0 } }];
+}
+/** A def action's state patch: the `then` ops, or a pinboard's composed list. */
+export function actionPatch(def: StoredDef, a: Action, state: Record<string, unknown>, params: Record<string, unknown>, soul: EdgeSoul): Record<string, unknown> {
+  return isPinAction(def, a) ? pinPatch(a, state, soul, params.text) : thenPatch(a, state, params);
+}
 /** The Soul-facing params of a def action: its declared string params (board text). */
 function actionParams(a: Action): Record<string, { type: 'string'; maxLength: number; description?: string }> {
   const out: Record<string, { type: 'string'; maxLength: number; description?: string }> = {};
@@ -135,21 +168,22 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
       const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
-      return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));
+      const state = (s.key && host.stateOf?.(s.key)) || s.state || {};
+      return whenRefusal(a, state, nameOf(s)) ?? (isPinAction(def, a) ? pinProblem(a, state, ctx.soul) : null);
     };
     out[a.name] = {
       label: a.label, roles: 'anyone', reach: 'anywhere', params: actionParams(a), movesBody: true,
       available: (s: BuiltLike, ctx: any) => check(s, ctx),
-      validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
+      validate: (s: BuiltLike, p: Record<string, unknown>, ctx: any) => check(s, ctx) ?? (isPinAction(def, a) ? pinProblem(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, ctx.soul, a.name === 'pin' ? p?.text : undefined) : null) ?? (a.name === 'write' && 'text' in actionParams(a) ? boardTextProblem(p?.text, actionParams(a).text.maxLength) : null),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
         const contact = host.deferContacts && isContactActuator(def, a);
         const motion=contact&&s.key?host.contactPlan?.(ctx.soul,s.key,a.name,params):null;
         if(motion){const me=host.bodyAt(ctx.soul)!,far=(motion.level??0)>0||Math.hypot(me[0]-motion.root[0],me[1]-motion.root[2])>.1;
-          return {state:s,result:{action:a.name,set:thenPatch(a,(s.key&&host.stateOf?.(s.key))||s.state||{},params)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0||motion.params.stroke?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params}]}]};}
+          return {state:s,result:{action:a.name,set:actionPatch(def,a,(s.key&&host.stateOf?.(s.key))||s.state||{},params,ctx.soul)},bodies:[{label:a.label,steps:[{verb:'stand',params:{}},...(far?[(motion.level??0)>0||motion.params.stroke?{verb:'mars:walk_to',params:{x:motion.root[0],z:motion.root[2],level:motion.level}}:{verb:'walk_to',params:{to:[motion.root[0],motion.root[2]],standoff:0}}]:[]),{verb:'mars:hand_actuator_v1',params:motion.params},...stepBack(def,a,motion)]}]};}
 
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > (contact ? CONTACT_REACH : ACT_REACH);
         const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;
-        const patch = water && !isRefusal(water) ? { litres: water.litres } : thenPatch(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, params);
+        const patch = water && !isRefusal(water) ? { litres: water.litres } : actionPatch(def, a, (s.key && host.stateOf?.(s.key)) || s.state || {}, params, ctx.soul);
         // A door works from either side. Prefer the side the Soul already occupies,
         // so "close behind me" cannot silently walk it back out of the room.
         const front=contact&&def.components.opening&&s.front&&s.at
@@ -183,7 +217,7 @@ export function wrapAct(objects: { act(id: string, soul: EdgeSoul, input: Record
       try { if (db0) afterCommit(db0 as never, go); else setImmediate(go); } catch { setImmediate(go); }
       return out;
     }
-    const patch = thenPatch(a, t.state, (input.params ?? {}) as Record<string, unknown>);
+    const patch = actionPatch(t.def, a, t.state, (input.params ?? {}) as Record<string, unknown>, soul);
     if (!Object.keys(patch).length) return out;
     // the object act runs inside the ledger's transaction (and may still roll back with the body's admission): change the
     // world only once that transaction has committed, never inside it (the world store has its own transaction)
