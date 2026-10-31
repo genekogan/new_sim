@@ -6,6 +6,7 @@
 import {createHash} from 'node:crypto';
 import type {Context, MiddlewareHandler} from 'hono';
 import type {Level} from './shared.ts';
+import {crowdedNote} from './waking.ts';
 
 export type Cls = 'C0' | 'C1' | 'C2' | 'C3';
 export type RouteClass = {cls: Cls; id: string; god: boolean; deadlineMs: number};
@@ -199,7 +200,8 @@ export const accountTag = (owner: string) => createHash('sha256').update('sim-ac
 
 /** `account(token)` → the token's account (Soul owner) for `x-sim-account`, which the launcher's per-account ceilings read
  *  and strip (LOAD-CONTRACT §2b). Cached per token for a minute (a token lookup reads the database). */
-export function admissionMiddleware(adm: Admission, level: () => Level, bearer: (c: Context) => string | undefined, account?: (token: string) => string | undefined): MiddlewareHandler {
+export function admissionMiddleware(adm: Admission, level: () => Level, bearer: (c: Context) => string | undefined, account?: (token: string) => string | undefined,
+  crowded?: (token: string) => {position: number; eta_s: number} | null): MiddlewareHandler {
   const tags = new Map<string, {tag: string | null; at: number}>();
   const tagOf = (token: string) => {
     const now = Date.now(), hit = tags.get(token);
@@ -220,6 +222,10 @@ export function admissionMiddleware(adm: Admission, level: () => Level, bearer: 
     const lv = level(); (c.set as (k: string, v: unknown) => void)(LOAD_KEY, lv);
     const r = classify(c.req.method, path), token = bearer(c);
     if (!r || !token || (r.cls !== 'C1' && r.cls !== 'C2')) { await next(); stamp(c, lv, token); return; }
+    // waking limit (dark): a Soul waiting its turn has its acts answered world.crowded; its reads still answer
+    const line = r.cls === 'C1' && !r.god ? crowded?.(token) : null;
+    if (line) { stamp(c, lv, token); c.header('Cache-Control', 'no-store'); c.header('Retry-After', String(Math.max(1, Math.min(line.eta_s, 60))));
+      return c.json({contract: 'eden-edge/1', error: {code: 'world.crowded', message: crowdedNote(line), position: line.position, eta_s: line.eta_s}, world: worldBlock(lv, Math.max(1, Math.min(line.eta_s, 60)))}, 503); }
     if (c.req.method !== 'GET' && c.req.method !== 'HEAD') await c.req.text().catch(() => '');   // read the body before the turn: its I/O is not request CPU
     const raw = c.req.raw, hint = Number(c.req.header('x-sim-timeout-ms'));
     const t = adm.request({key: r.god ? 'god' : 'soul:' + token, god: r.god, route: r, hintMs: Number.isFinite(hint) ? hint : undefined, closed: () => raw.signal?.aborted === true});

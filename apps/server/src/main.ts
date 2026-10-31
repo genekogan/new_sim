@@ -41,6 +41,7 @@ import { startWatchdog, writeLiveNow } from './load/watchdog.ts';
 import { bootPhase } from './load/boot-progress.ts';
 import { LoadMonitor } from './load/monitor.ts';
 import { Admission } from './load/admission.ts';
+import { WakingLimit } from './load/waking.ts';
 
 // Lane P5: when the boot's phases end (ms since the process started; the first is this release's code load)
 const bootAt: Record<string, number> = { code: performance.now() };
@@ -174,11 +175,21 @@ if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entit
 const admission = process.env.SIM_ADMISSION === '0' ? undefined : new Admission();
 const drill = process.env.SIM_LOAD_DRILL_LEVEL as 'amber' | 'red' | 'black' | undefined;   // drill: hold a level (L1 tests 'planned' restarts with black)
 const monitor = new LoadMonitor({ host, drill: drill && ['amber', 'red', 'black'].includes(drill) ? drill : undefined, blackLimitMs: Number(process.env.SIM_LOAD_BLACK_MS) || 60_000, queue: () => admission?.queueStats() ?? { depth: 0, oldestMs: 0 }, shed: () => ({ reads: admission?.shed.reads ?? 0, acts: admission?.shed.acts ?? 0 }),
-  souls: () => { let awake = 0, connected = 0; for (const id of host.minds.keys()) { const st = host.publicBodyOf?.(id)?.state; if (st === 'awake') awake++; if (st && st !== 'asleep') connected++; } return { awake, waiting: 0, connected }; },
+  souls: () => { let awake = 0, connected = 0; for (const id of host.minds.keys()) { const st = host.publicBodyOf?.(id)?.state; if (st === 'awake') awake++; if (st && st !== 'asleep') connected++; } return { awake, waiting: waking?.waiting() ?? 0, connected }; },
   onBlackTooLong: () => { console.log(`[load] black for ${Math.round((Number(process.env.SIM_LOAD_BLACK_MS) || 60_000) / 1000)} s: planned restart (snapshot, exit 75)`); void shutdown('load:black', 75).catch(() => process.exit(75)); } });
 if (admission) monitor.register('admission', (l) => admission.setLoadLevel(l));
 monitor.register('hub', (l) => hub.setLoadLevel(l));
-const app = buildApp({ load: { admission, monitor }, cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
+// Waking limit: DARK unless SIM_WAKING_LIMIT=1 (tranche §5.1); bound below, once the edge body rule exists.
+let waking: WakingLimit | undefined;
+const app = buildApp({ load: { admission, monitor, crowded: (soulId) => waking?.position(soulId) ?? null }, cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
+if (process.env.SIM_WAKING_LIMIT === '1' && edge?.bodyRule) {
+  const rule = edge.bodyRule;
+  waking = new WakingLimit({ maxAwake: Number(process.env.SIM_MAX_AWAKE) || 12, owner: () => god?.owner ?? config.ownerId ?? null,
+    view: { awake: (id) => rule.view(id)?.state === 'awake', souls: () => [...host.minds.values()].filter((m) => !m.native).map((m) => ({ soulId: m.soulId, owner: m.owner })) } });
+  rule.mayWake = (id) => waking!.mayWake(id);
+  monitor.register('waking', (l) => waking!.setLoadLevel(l));
+  console.log(`[load] waking limit ON: ${Number(process.env.SIM_MAX_AWAKE) || 12} awake`);
+}
 if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
 const listener = getRequestListener(app.fetch);
 // G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)

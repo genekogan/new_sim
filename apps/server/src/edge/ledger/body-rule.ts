@@ -139,10 +139,12 @@ export class BodyRule {
     r.last_act = now; r.woke_at = Math.max(r.woke_at, now);
     if (s && r.state !== 'awake') this.set(s, r, 'awake', null, now); else this.save(r);
   }
+  /** Waking limit (load/waking.ts, SIM_WAKING_LIMIT=1 only): false = this connected Soul waits its turn, body asleep. */
+  mayWake?: (soulId: string) => boolean;
   /** A listen opened: wake a zombie or sleeper (stand up in place). */
   listen(soulId: string) {
     const s = this.port.souls().find(x => x.soulId === soulId), r = this.row(soulId); if (!s || !r) return;
-    if (r.state === 'zombie' || r.state === 'asleep') this.wake(s, r, this.now());
+    if ((r.state === 'zombie' || r.state === 'asleep') && this.mayWake?.(soulId) !== false) this.wake(s, r, this.now());
   }
   /** An owner message delivered or a conversation turn addressed to the Soul: ends the idle reflex (a doze stands up). */
   poke(soulId: string) {
@@ -174,7 +176,11 @@ export class BodyRule {
     const k = this.knobs(s.soulId, r), p = this.port.presence(s.soulId);
     const sign = Math.max(p.at ?? -Infinity, r.last_act, r.woke_at);
     if (p.listening || now - sign < k.sleepGraceMs) {
-      if (r.state === 'zombie' || r.state === 'asleep') return this.wake(s, r, now);
+      if (r.state === 'zombie' || r.state === 'asleep') {
+        if (this.mayWake?.(s.soulId) !== false) return this.wake(s, r, now);
+        if (r.state === 'asleep') return;   // waiting its turn: the body sleeps where it is
+        r.next_at = now; this.set(s, r, 'asleep', this.sleepDoing(s), now); return this.settle(s, r, now);
+      }
       if (this.port.agentBusy(s.soulId)) {r.busy_at = now; if (r.state === 'idle') this.set(s, r, 'awake', null, now); else this.save(r); return;}
       const quiet = Math.max(r.last_act, r.poke_at, r.woke_at, r.busy_at);
       if (r.state === 'awake' && now - quiet >= k.idleStartMs) {r.idle_from = now; r.next_at = now; const at = this.port.pose(s.entityId); r.anchor_x = at?.x ?? null; r.anchor_z = at?.z ?? null; this.set(s, r, 'idle', this.restingWord(s), now);}
