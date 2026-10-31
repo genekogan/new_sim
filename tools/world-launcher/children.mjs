@@ -281,10 +281,12 @@ export class ChildPool {
     if (out.length < n) this.log(`world ${k.slug}: ${out.length} of ${n} read-worker ports free in ${lo}-${hi}; the rest on ports the OS picks`);
     k.readPorts = out; return out;
   }
-  /** The read-worker env of a world's next process (nothing at all while its read workers are off: flag off = as before). */
+  /** The read-worker env of a world's next process (nothing at all while its read workers are off: flag off = as before).
+   *  SIM_READ_MODE: 2 (B-facade: the worker runs the read code itself) unless the launcher runs with SIM_READ_MODE=1 (the
+   *  spike's subset, whose answers are not main's frames); children never inherit the launcher's env, so it is set here. */
   readEnv(k) {
     const n = this.o.readWorkers?.(k.world) ?? 0;
-    return n ? { SIM_READ_WORKER: '1', SIM_READ_WORKERS: String(n), ...(k.readPorts?.length ? { SIM_READ_PORTS: k.readPorts.join(',') } : {}) } : {};
+    return n ? { SIM_READ_WORKER: '1', SIM_READ_WORKERS: String(n), SIM_READ_MODE: process.env.SIM_READ_MODE === '1' ? '1' : '2', ...(k.readPorts?.length ? { SIM_READ_PORTS: k.readPorts.join(',') } : {}) } : {};
   }
   async pickPort(prefer, self) {
     const [lo, hi] = this.o.range, used = this.usedPorts(self);

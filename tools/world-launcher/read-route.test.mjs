@@ -42,7 +42,7 @@ test('flag off: no read env reaches the world, and even an advertised readPort i
   const { L, make, call, hit } = await launcher({ port: 5239, range: [5237, 5238], on: false });
   try {
     const plain = await make('Plain');
-    assert.deepEqual((await call(plain, '/read-env')).body, { SIM_READ_WORKER: null, SIM_READ_WORKERS: null, SIM_READ_PORTS: null });
+    assert.deepEqual((await call(plain, '/read-env')).body, { SIM_READ_WORKER: null, SIM_READ_WORKERS: null, SIM_READ_PORTS: null, SIM_READ_MODE: null });
     // a world that starts read workers on its own (forced by its command env) is still not routed to
     const forced = await launcher({ port: 5240, range: [5235, 5236], on: false, env: { SIM_READ_WORKER: '1' } });
     try {
@@ -63,7 +63,7 @@ test('flag on (subset): here/capabilities to the worker, the rest to main; fallb
   try {
     const slug = await make('Readers');
     const env = (await call(slug, '/read-env')).body;
-    assert.equal(env.SIM_READ_WORKER, '1'); assert.equal(env.SIM_READ_WORKERS, '1'); assert.equal(env.SIM_READ_PORTS, '5234', 'the read port comes from the range top');
+    assert.equal(env.SIM_READ_WORKER, '1'); assert.equal(env.SIM_READ_WORKERS, '1'); assert.equal(env.SIM_READ_PORTS, '5234', 'the read port comes from the range top'); assert.equal(env.SIM_READ_MODE, '2', 'mode 2 (B-facade) unless the launcher says SIM_READ_MODE=1');
     assert.equal(await advertised(L, slug), 5234);
     assert.deepEqual(L.pool.status(slug).readPorts, [5234]);
     const to = async (path, init) => { const r = await call(slug, path, init); return r.body?.from ?? (r.headers.get('x-sim-read') === 'worker' ? 'worker' : String(r.status)); };

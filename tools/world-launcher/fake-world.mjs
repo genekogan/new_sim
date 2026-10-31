@@ -35,7 +35,7 @@ const server = createServer((req, res) => {
   // the lagGens live.json reports.
   if (process.env.FAKE_EDGE === '1' && /^\/v1\/edge\/(here|observe|capabilities|view|around)(\?|$)/.test(path)) return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ from: 'main', path }));
   if (path.startsWith('/busy')) { const ms = Number(new URL(req.url, 'http://x').searchParams.get('ms') ?? 2000); res.end('busy'); setTimeout(() => { const end = Date.now() + ms; while (Date.now() < end) { /* the main thread is held */ } }, 20); return; }
-  if (path === '/read-env') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(Object.fromEntries(['SIM_READ_WORKER', 'SIM_READ_WORKERS', 'SIM_READ_PORTS'].map((k) => [k, process.env[k] ?? null]))));
+  if (path === '/read-env') return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(Object.fromEntries(['SIM_READ_WORKER', 'SIM_READ_WORKERS', 'SIM_READ_PORTS', 'SIM_READ_MODE'].map((k) => [k, process.env[k] ?? null]))));
   if (path.startsWith('/read-lag')) { L[7] = Number(new URL(req.url, 'http://x').searchParams.get('n') ?? 0); return res.end('ok'); }
   if (path.startsWith('/read-fail')) { L[6] = ['ok', 'error', '500', 'slow'].indexOf(new URL(req.url, 'http://x').searchParams.get('m') ?? 'ok'); return res.end('ok'); }
   if (path === '/crash') { res.end('bye'); setTimeout(() => process.exit(3), 10); return; }
