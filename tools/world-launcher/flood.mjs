@@ -106,6 +106,8 @@ export function soulCeilings({ limitsFor = () => null, now = Date.now, log = (l)
   const soulOf = (req) => { const t = /^Bearer\s+(sim_\S+)/i.exec(req.headers.authorization ?? '')?.[1]; return t ? short(t) + short(t + '.') : null; };
   return {
     limits, refused: (slug) => ({ ...(refused.get(slug) ?? {}) }), soulOf,
+    /** Count (and log, once a minute per world) a refusal made elsewhere: the launcher's boot and load admission. */
+    note: (slug, code, scope) => note(slug, code, scope),
     /** The world says which account a Soul token belongs to (an opaque id): its Souls share the account's ceilings. */
     learn(soul, account) { if (soul && account) { accounts.set(soul, short(String(account))); if (accounts.size > 50_000) accounts.clear(); } },
     /** A WebSocket from `ip` (behind the proxy): admitted, or refused; release() when it closes. */
