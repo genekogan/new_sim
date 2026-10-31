@@ -1,4 +1,4 @@
-import {handActuatorFrame,posterLocal,twoHanded,HAND_REACH_SECONDS,HAND_RELEASE_SECONDS,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
+import {handActuatorFrame,posterLocal,strokeWork,twoHanded,HAND_REACH_SECONDS,HAND_RELEASE_SECONDS,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
 import { posterTexture, sheetGeometry, sheetLift as sheetLiftAt, tapeStrips, rollMesh, PAPERS } from './poster-sheet.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
@@ -1435,19 +1435,20 @@ function heldSheet(v: View, h: THREE.Object3D, tSec: number) {
   // the wall frame: at the slot centre, turned to the wall (engine yaw is Three's rotation.y), 1.5 mm proud of the wall poster
   _sheetM.makeRotationY(s.yaw).setPosition(m.at[0], m.at[1], m.at[2]); _sheetM.multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.0015));
   sh.group.matrix.copy(_inv.copy(h.matrixWorld).invert()).multiply(_sheetM); sh.group.matrixWorldNeedsUpdate = true;
-  const local = posterLocal(s, Math.max(0, Math.min(1, u)));
+  const local = posterLocal(s, Math.max(0, Math.min(1, u)), m.at);
+  const w = strokeWork(s, u);   // the work's own progress (negative while the lead brings the hands up to the chest)
   const yH = local.y;   // the palms' height on the sheet (face-local)
   // how much of the sheet lies flat on the wall: [from, to] in v (0 = bottom edge, 1 = top edge)
   let from = 1, to = 1, rolled = 1;
   if (s.kind === 'poster') {
-    if (u >= .45) { from = 0; rolled = 0; } else if (u > .09) { from = Math.max(0, Math.min(1, (yH - .006 + H / 2) / H)); rolled = from; } else { from = 1; rolled = 1; }
+    if (w >= .45) { from = 0; rolled = 0; } else if (w > .09) { from = Math.max(0, Math.min(1, (yH - .006 + H / 2) / H)); rolled = from; } else { from = 1; rolled = 1; }
   } else {
-    if (u < .15) { from = 0; to = 1; rolled = 0; } else if (u < .55) { from = 0; to = Math.max(0, Math.min(1, (yH + .006 + H / 2) / H)); rolled = 1 - to; } else { from = 0; to = 0; rolled = 1; }
+    if (w < .15) { from = 0; to = 1; rolled = 0; } else if (w < .55) { from = 0; to = Math.max(0, Math.min(1, (yH + .006 + H / 2) / H)); rolled = 1 - to; } else { from = 0; to = 0; rolled = 1; }
   }
   const flatOn = to - from > .002;
   sh.flat.visible = flatOn; if (flatOn) sheetGeometryRange(sh.flat.geometry as THREE.BufferGeometry, W, H, from, to, age);
   // tape: putting up, bottom corners at u .50, top at .83 (the presses in posterLocal); taking down, top comes off at .12, bottom at .55
-  const tapeOn = (i: number) => s.kind === 'poster' ? (i >= 2 ? u >= .5 : u >= .83) : (i >= 2 ? u < .55 : u < .12);
+  const tapeOn = (i: number) => s.kind === 'poster' ? (i >= 2 ? w >= .5 : w >= .83) : (i >= 2 ? w < .55 : w < .12);
   sh.tapes.forEach((t, i) => { t.visible = tapeOn(i) && !(i === 3 && age >= 1.8); });
   // the roll: between the drawn palms, a paper tube as long as the sheet is wide; its radius follows how much is rolled
   const L = palmSide(v, 'left'), R = palmSide(v, 'right');

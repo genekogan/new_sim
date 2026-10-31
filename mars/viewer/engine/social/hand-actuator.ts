@@ -15,7 +15,7 @@ const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(
 // Soul Actions entry 38: a poster is put up (or taken down) with both hands: `width`/`height` are the sheet's, `at` its centre on
 // the wall's surface, and `sheet` what is printed on it (so every viewer draws the same paper in the hands as on the wall).
 const sheet=z.object({title:z.string().max(40),detail:z.string().max(80),name:z.string().max(40).optional(),paper:z.number().int().min(0).max(15),age:z.number().min(0).max(99).optional()}).strict();
-const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),release:z.number().min(.7).max(1.6).optional(),sheet:sheet.optional()}).strict();
+const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),release:z.number().min(.7).max(1.6).optional(),lead:z.object({y:z.number().finite(),out:z.number().min(0).max(.5)}).strict().optional(),sheet:sheet.optional()}).strict();
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
@@ -63,8 +63,19 @@ export const twoHanded=(s?:HandActuatorParams['stroke'])=>s?.kind==='poster'||s?
  *  bottom corners, smooth back up the sides and press (tape) the top corners. Taking down: hands to the top corners, peel, roll
  *  the sheet up from the top as the hands go down, then lift the roll away toward the chest. Continuous at u=0 and u=1. */
 export const POSTER_ON=.035,POSTER_OFF=.07;
-export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number):{x:number;y:number;o:number;spread:number}{
- const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.06,yB=-s.height/2+.045,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
+/** Entry 38 (take 3): a stroke with a `lead` first brings the hand(s) up to the front of the chest (world height `lead.y`,
+ *  `lead.out` from the face) and only then to where the work starts, so the 0.65 s reach covers the short way from the side
+ *  (a hand raised straight from the hip to above the shoulder in 0.65 s moved 0.15 m per 50 ms). STROKE_LEAD of the stroke. */
+export const STROKE_LEAD=.2;
+/** The stroke's own progress (0..1) at u; negative while the lead is still bringing the hands up. */
+export const strokeWork=(s:NonNullable<HandActuatorParams['stroke']>,u:number)=>!s.lead?u:(Math.max(0,Math.min(1,u))-STROKE_LEAD)/(1-STROKE_LEAD);
+const leadMix=(s:NonNullable<HandActuatorParams['stroke']>,u:number)=>s.lead&&u<STROKE_LEAD?smooth(Math.max(0,u)/STROKE_LEAD):1;
+export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number,at?:Vec3):{x:number;y:number;o:number;spread:number}{
+ if(s.lead&&u<STROKE_LEAD){const to=posterBase(s,0),f=leadMix(s,u),ly=s.lead.y-(at?.[1]??s.lead.y+.2);return {x:0,y:ly+(to.y-ly)*f,o:s.lead.out+(to.o-s.lead.out)*f,spread:.8+(to.spread-.8)*f};}
+ return posterBase(s,strokeWork(s,u));
+}
+function posterBase(s:NonNullable<HandActuatorParams['stroke']>,u:number):{x:number;y:number;o:number;spread:number}{
+ const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.07,yB=-s.height/2+.045,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
  if(s.kind==='unposter'){
   if(k<.15)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.15)),spread:1};
   if(k<.55){const f=seg(.15,.55);return {x:0,y:lerp(yT,yB,f),o:lerp(POSTER_ON,.06,f),spread:1};}
@@ -72,20 +83,24 @@ export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number
  }
  if(k<.09)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.09)),spread:1};
  if(k<.45)return {x:0,y:lerp(yT,yB,seg(.09,.45)),o:POSTER_ON,spread:1};
- if(k<.56)return {x:0,y:yB,o:POSTER_ON-.012*dsin(Math.PI*(k-.45)/.11),spread:1};
+ if(k<.56)return {x:0,y:yB,o:POSTER_ON-.006*dsin(Math.PI*(k-.45)/.11),spread:1};
  if(k<.78){const f=(k-.56)/.22;return {x:0,y:lerp(yB,yT,smooth(f)),o:POSTER_ON+.03*dsin(Math.PI*f),spread:1};}
- if(k<.88)return {x:0,y:yT,o:POSTER_ON-.012*dsin(Math.PI*(k-.78)/.10),spread:1};
+ if(k<.88)return {x:0,y:yT,o:POSTER_ON-.006*dsin(Math.PI*(k-.78)/.10),spread:1};
  // last, the palms slide off the top corners down the sheet's sides to chest height and come away, so the arms are lowered
  // from there and not from above the shoulders
  const f=seg(.88,1);return {x:0,y:lerp(yT,-.06,f),o:lerp(POSTER_ON,.11,f),spread:lerp(1,.86,f)};
 }
 export function strokeHands(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):{left:Vec3;right:Vec3}{
- const right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],l=posterLocal(s,u),half=(s.width/2-.04)*l.spread;
+ const right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],l=posterLocal(s,u,at),half=(s.width/2-.04)*l.spread;
  const p=(x:number):Vec3=>[at[0]+right[0]*x+out[0]*l.o,at[1]+l.y,at[2]+right[1]*x+out[1]*l.o];
  return {left:p(-half),right:p(half)};
 }
 export function strokePoint(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):Vec3 {
  if(twoHanded(s))return strokeHands(at,s,u).right;
+ if(s.lead&&u<STROKE_LEAD){const to=strokePoint({...at},{...s,lead:undefined},0),out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],f=leadMix(s,u);
+  // the lead point: in front of the chest, below the start of the work, out from the face
+  const from:Vec3=[to[0]+out[0]*(s.lead.out-.04),s.lead.y,to[2]+out[1]*(s.lead.out-.04)];return [from[0]+(to[0]-from[0])*f,from[1]+(to[1]-from[1])*f,from[2]+(to[2]-from[2])*f];}
+ if(s.lead)u=strokeWork(s,u);
  const k=Math.max(0,Math.min(1,u)),right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)];
  let x:number,y:number,lift=0;
  if(s.kind==='wipe'){const pass=Math.min(2,Math.floor(k*3)),f=k*3-pass,dir=pass%2?-1:1;x=dir*(f-.5)*s.width;y=s.height*.3*(1-2*k)+.03*Math.sin(f*Math.PI*6);}
