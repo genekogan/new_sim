@@ -296,7 +296,7 @@ export class NavConnectivity {
       }
       for (const id of [...this.tiles.keys()]) if (!seen.has(id)) { this.tiles.delete(id); this.dirty = true; }
       const ver = `${g.field.id}|${sp.baseId}|${sp.epoch}`;
-      if (this.dirty || this.version === '') { this.join(); this.dirty = false; }
+      if (this.dirty || this.version === '') { yield* this.join(); this.dirty = false; }
       this.version = ver;
       yield 'join';
     }
@@ -315,7 +315,8 @@ export class NavConnectivity {
   private trimLru() { while (this.lru.size > 8) this.lru.delete(this.lru.keys().next().value!); }
 
   /** Union the tiles' components across seams; find the main component. */
-  private join() {
+  /** L4 (b): sliced — one row of tiles (and up to 64 tiles of root sizes) per yield, same unions in the same order. */
+  private *join(): Generator<BuildPhase, void> {
     let total = 0;
     this.base.clear();
     for (const [id, t] of this.tiles) { this.base.set(id, total); total += t.n; }
@@ -323,14 +324,21 @@ export class NavConnectivity {
     for (let i = 0; i < total; i++) parent[i] = i;
     const per = this.per, [x0, z0, x1, z1] = this.ext;
     const edge = (t: TileLabels, side: 0 | 1 | 2 | 3, k: number) => (t.uniform === 1 ? 0 : t.uniform === 2 ? -1 : t.border[side * per + k]);
-    for (let tz = z0; tz <= z1; tz++) for (let tx = x0; tx <= x1; tx++) {
-      const a = this.tiles.get(`${tx},${tz}`)!; if (!a.n) continue;
-      const ba = this.base.get(`${tx},${tz}`)!;
-      if (tx < x1) { const b = this.tiles.get(`${tx + 1},${tz}`)!; if (b.n) { const bb = this.base.get(`${tx + 1},${tz}`)!; this.seam(a, b, ba, bb, 3, 2, edge); } }
-      if (tz < z1) { const b = this.tiles.get(`${tx},${tz + 1}`)!; if (b.n) { const bb = this.base.get(`${tx},${tz + 1}`)!; this.seam(a, b, ba, bb, 1, 0, edge); } }
+    for (let tz = z0; tz <= z1; tz++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const a = this.tiles.get(`${tx},${tz}`)!; if (!a.n) continue;
+        const ba = this.base.get(`${tx},${tz}`)!;
+        if (tx < x1) { const b = this.tiles.get(`${tx + 1},${tz}`)!; if (b.n) { const bb = this.base.get(`${tx + 1},${tz}`)!; this.seam(a, b, ba, bb, 3, 2, edge); } }
+        if (tz < z1) { const b = this.tiles.get(`${tx},${tz + 1}`)!; if (b.n) { const bb = this.base.get(`${tx},${tz + 1}`)!; this.seam(a, b, ba, bb, 1, 0, edge); } }
+      }
+      yield 'join';
     }
     this.rootSize.clear();
-    for (const [id, t] of this.tiles) { const b = this.base.get(id)!; for (let k = 0; k < t.n; k++) { const r = this.find(b + k); this.rootSize.set(r, (this.rootSize.get(r) ?? 0) + t.sizes[k]); } }
+    let n = 0;
+    for (const [id, t] of this.tiles) {
+      const b = this.base.get(id)!; for (let k = 0; k < t.n; k++) { const r = this.find(b + k); this.rootSize.set(r, (this.rootSize.get(r) ?? 0) + t.sizes[k]); }
+      if (++n % 64 === 0) yield 'join';
+    }
     this.findMain();
   }
   private seam(a: TileLabels, b: TileLabels, ba: number, bb: number, sa: 0 | 1 | 2 | 3, sb: 0 | 1 | 2 | 3, edge: (t: TileLabels, s: 0 | 1 | 2 | 3, k: number) => number) {
