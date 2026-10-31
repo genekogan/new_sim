@@ -22,11 +22,19 @@ export type GaitSegments = { t: number[]; g: number[]; peak: number };
 
 /**
  * Walking-share steps of one person over the current take and, when given, its adjacent takes (a live client's take
- * windows), on the current take's tick axis. `parts`: each track with the offset (ticks) that moves it onto that axis.
+ * windows), on the current take's tick axis. `parts`: each track with the offset (ticks) that moves it onto that axis,
+ * and `end`, its take's length in ticks: the recorder writes no sample for a hold that lasts to the take's end (a stop's
+ * track ends at its arrival keyframe), so the body is known to stand there until `end`. Without it a stop was read as
+ * unknown from the arrival on and extrapolated until the next window arrived, when the weight dropped to standing in
+ * one frame (entry 31 retest on M04: 0.47 → 0.13 in 50 ms, legs and arms snapping at a queued stop).
  */
-export function gaitSegments(parts: readonly { track: readonly PoseSample[]; offset: number }[], dt: number): GaitSegments {
+export function gaitSegments(parts: readonly { track: readonly PoseSample[]; offset: number; end?: number }[], dt: number): GaitSegments {
   const pts: [number, number, number][] = [];
-  for (const { track, offset } of parts) for (const s of track) pts.push([s[0] + offset, s[1], s[3]]);
+  for (const { track, offset, end } of parts) {
+    for (const s of track) pts.push([s[0] + offset, s[1], s[3]]);
+    const last = track[track.length - 1];
+    if (last && end !== undefined && end > last[0]) pts.push([end + offset, last[1], last[3]]);
+  }
   pts.sort((a, b) => a[0] - b[0]);
   const u: [number, number, number][] = [];
   for (const p of pts) { if (u.length && u[u.length - 1][0] === p[0]) u[u.length - 1] = p; else u.push(p); }
