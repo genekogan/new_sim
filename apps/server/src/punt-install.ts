@@ -8,7 +8,8 @@ type SearchResult={state:'pending'}|{state:'cancelled'}|{state:'done';candidates
 type SearchJob={advance(budgetMs:number):SearchResult;cancel():unknown};
 const SEARCH_SLICE_MS=8;
 
-export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:string)=>void=()=>{}){
+/** `onInstalled` runs after an install run that added at least one punt (and published its ride). */
+export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:string)=>void=()=>{},onInstalled?:()=>void){
   const current=()=>host.engine as typeof host.engine&{puntCandidatesV1?():CarrierInstallSpec[];puntCandidatesJobV1?():SearchJob;carriers?():{id:string;def:string;label:string;state:{bank?:{door:number[]}}}[]};
   if(!current().puntCandidatesV1)return {close(){}};
   let busy=false,closed=false,lastSource='',retryAt=0;
@@ -29,7 +30,7 @@ export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:s
     busy=true;
     // Host owns sequencing and durable publication. Never mutate engine entities from a presentation hook.
     // Both host preview and engine fold still validate against live geometry after this speculative search.
-    void (async()=>{for(const spec of missing){if(closed||host.engine!==engine)break;try{await host.installCarrierV1(spec);log(`rowing punt installed: ${spec.id}`);}catch(error){log(`rowing punt refused: ${error instanceof Error?error.message:String(error)}`);}}if(host.engine===engine)publish();})()
+    void (async()=>{let added=0;for(const spec of missing){if(closed||host.engine!==engine)break;try{await host.installCarrierV1(spec);added++;log(`rowing punt installed: ${spec.id}`);}catch(error){log(`rowing punt refused: ${error instanceof Error?error.message:String(error)}`);}}if(host.engine===engine)publish();if(added&&!closed)onInstalled?.();})()
       .finally(()=>{busy=false;});
   };
   const reconcile=()=>{

@@ -163,7 +163,10 @@ if (god) installLightning(god, edge, () => host.engine.world.tick);  // GOD-ENV:
 if (god) installGovernance(god, { host, edge });  // GOVERN: versioned constitution, amendments, prayer states (god/governance.ts)
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} own defs + library ${god.model.library ? `${god.model.library.id}@${god.model.library.version} (${god.model.library.all().length})` : 'none'}, owner ${god.owner ?? '(unclaimed)'}`);
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god, contextReady: engineBridge ? ()=>engineBridge.contextReady() : undefined, contextWait: engineBridge ? signal=>engineBridge.waitForContext({signal}) : undefined, contextLevelAt: engineBridge ? (x,z,y)=>engineBridge.levelAt(x,z,y) : undefined });
-if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
+// A punt install moves the static world (new carriers and rides), so the caches warmed before listening are rebuilt in
+// their own turn shortly after, not by the next Soul's `here`.
+const rewarm=()=>{if(closing||!edge)return;const w=edge.prepareForServing();console.log(`[activities] edge capability caches rebuilt in ${w.ms} ms for ${w.souls} Souls at tick ${host.engine.world.tick}`);};
+if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`),engineBridge?()=>{setTimeout(rewarm,1000).unref();}:undefined);
 const listener = getRequestListener(app.fetch);
 // G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)
 // is answered before the snapshot is saved and the process exits, instead of dying with its connection (the god's CLI
@@ -231,6 +234,8 @@ if (engineBridge) {
     const prepareAt = performance.now();
     host.engine.prepareForServing?.();
     console.log(`[boot] serving cache preparation ${Math.round(performance.now() - prepareAt)} ms at tick ${host.engine.world.tick}`);
+    // The first rich `here` after a restart otherwise builds these on its own request (~1.5 s blocked on Eden 2026).
+    if (edge) { const w = edge.prepareForServing(); console.log(`[boot] edge capability caches ${w.ms} ms for ${w.souls} Souls${w.failed ? ` (${w.failed} failed)` : ''} at tick ${host.engine.world.tick}`); }
   } catch (error) {
     closing = true; console.error('[boot] initial physics unavailable; HTTP was not opened', error);
     try {

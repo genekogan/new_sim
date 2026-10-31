@@ -815,6 +815,20 @@ export class EdgeLedger implements EdgeLedgerHooks {
     try{return this.exactWalkBindings(soul,input);}finally{this.exactAuthoredAreaWalkRef=area;}
   }
   invalidateBodies(){this.capCache.clear();}
+  /** Before HTTP opens, and again once boot-time world changes (punt installs) have landed: list live Souls' capabilities
+   *  (the first with a body, then more in creation order while within `budgetMs`), so the derived caches a rich `here`
+   *  otherwise builds lazily (room reaches, fine nav tiles, spatial and place indexes, activity spots) are ready instead
+   *  of costing the next request's event-loop turn (~1.5 s on Eden 2026 after a restart). A read: the same listing a
+   *  Soul's `here` makes; per-tick and short-lived caches recompute as before. */
+  prepareForServing(budgetMs = 0): {souls: number; failed: number; ms: number} {
+    const t0 = performance.now(); let souls = 0, failed = 0;
+    for (const row of this.db.liveSouls(this.host.worldId)) {
+      if (souls + failed && performance.now() - t0 >= budgetMs) break;
+      const m = this.host.minds.get(row.id); if (!m || !this.body(m.entityId)?.human) continue;
+      try { this.capabilities({soulId: row.id, entityId: m.entityId, name: m.name, owner: row.owner}); souls++; } catch { failed++; }
+    }
+    return {souls, failed, ms: Math.round(performance.now() - t0)};
+  }
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
   bodyVerbProblem(soul:EdgeSoul,verb:string){return bodyVerbProblem(this.body(soul.entityId),verb);}
   /** Walks and ride boardings advertise `with` (quality cases 21/27: the invitation was there but undiscoverable). */
