@@ -32,7 +32,7 @@ import {applyUpperFloorsV1,placeLevelOf,previewUpperFloorsV1,type UpperFloorsFac
 import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
 import {searchArrival,arrivalPocket,type ArrivalGround,type ArrivalPocket,type ArrivalSpot} from './arrival-search.ts';
-import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standOn,groundArrival,inDeepWater,destinationInDeepWater} from './ground-bridge.ts';
+import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standOn,groundArrival,groundRecipe,inDeepWater,destinationInDeepWater} from './ground-bridge.ts';
 // The Mars engine behind Sim's engine contract.
 //
 // The shell speaks a small BODY LANGUAGE (walk_to, sit, stand, rest, wave,
@@ -76,7 +76,7 @@ import { acknowledgeRelocation } from '../../../mars/viewer/engine/runtime/invar
 import { listTable, stableIndices, withEntityList, type EntityTable } from '../../../mars/viewer/engine/world/entity-list.ts';
 import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import { HUMAN_PROFILE as HUMAN_PROFILE_V1 } from '../../../mars/viewer/engine/spatial/types.ts';
-import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
+import type { Spatial, StaticExportV1 } from '../../../mars/viewer/engine/spatial/service.ts';
 import { NavConnectivity, NAV_CONNECT_POLICY, NAV_RESCUE_MAX_POCKET, CONNECT_CLEAR, type ConnPoint, type ConnVerdict } from '../../../mars/viewer/engine/spatial/connectivity.ts';
 /** lane NAV: a body in one of these activities is anchored to furniture (seat, bed, berth): never relocated as cut off. */
 const NAV_ANCHORED=new Set<unknown>(['sit','lie','nap','sleep']);
@@ -1948,6 +1948,14 @@ export class MarsEngine implements Engine {
   staticEpochV1():number{const sp=this.rt.services.spatial as Spatial;sp.sync(this.rt.world);
     if(sp!==this.epochSpatial||sp.epoch!==this.epochSeen){this.epochSpatial=sp;this.epochSeen=sp.epoch;this.staticEpoch++;}return this.staticEpoch;}
   connectivityV1():NavConnectivity{this.navWarmV1(Infinity);return this.conn!;}
+  /** Stage B (lane B-spatial): everything the spatial service's static reads need at the current static epoch, as plain
+   *  data (structured-clone it), so a read worker can build its own instance (split/spatial-replica.ts) with no engine.
+   *  Pure read after the usual sync; the lists are the service's own (shared, never mutate them). */
+  exportStaticScene():StaticExportV1{
+    const sp=this.rt.services.spatial as Spatial,epoch=this.staticEpochV1(),s=sp.staticScene(this.rt.world),g=this.rt.world.groundV1 as {recipeHash:string}|undefined;
+    const arrival:[number,number]=g?groundArrival(this.rt,this.cfg.arrival):[this.cfg.arrival[0],this.cfg.arrival[1]];
+    return {...s,epoch,recipeHash:g?.recipeHash??null,recipe:g?groundRecipe(g.recipeHash)??null:null,arrival,physical:!!this.physical,seatDefs:Object.keys(CATALOG).filter(d=>(CATALOG[d]?.slots??[]).some((x:any)=>x.kind==='seat')),physicsHash:(this.rt.world.entityPhysicsV1?.hash as string|undefined)??null};
+  }
   /** lane NAV: is each standing point connected to the main walkable area (levels and stairs as the planner sees them)?
    *  Points off the main component, and upper floors, are settled by the planner (reachV1 to the nearest main point). */
   navCheckV1(points:ConnPoint[]):ConnVerdict[]{return this.connectivityV1().check(points);}
@@ -2388,7 +2396,7 @@ const TABLE_PURE: ReadonlySet<string> = new Set<string>([
   // read every tick by the server and the step itself (SIM_L4_SCAN_SITES=1 engine calls on the live copy); each only reads
   // the table (spatial syncs and connectivity labels are derived state outside it)
   'takeChunks', 'composedRules', 'renderContextKeyV1', 'carrierOf', 'carriers', 'stallProbeV1', 'placeLevelV1', 'programOf',
-  'poseSampleOf', 'staticEpochV1', 'lyingRoomAtV1', 'navWarmV1', 'connectivityV1', 'navCheckV1',
+  'poseSampleOf', 'staticEpochV1', 'lyingRoomAtV1', 'navWarmV1', 'connectivityV1', 'navCheckV1', 'exportStaticScene',
 ]);
 const TABLE_COUNT = process.env.SIM_L4_SCAN_SITES === '1' ? new Map<string, number>() : null;
 (MarsEngine as unknown as { tableWriteSitesV1?: Map<string, number> | null }).tableWriteSitesV1 = TABLE_COUNT;   // diagnostic (SIM_L4_SCAN_SITES=1): calls per method

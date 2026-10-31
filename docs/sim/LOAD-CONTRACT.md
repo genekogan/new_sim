@@ -73,9 +73,76 @@ Launcher rules (L1): **wedged** = `at` older than 30 s, or `loop.lastTurnAgeMs` 
 
 As built (L1, `tools/world-launcher/guard.mjs` + `children.mjs`): liveness asks the world's watchdog port (`SIM_HEALTH_PORT`, a second child port, given only where the range has two per running world) and falls back to the main `/healthz`, where any answer counts as alive; live.json is believed only when its `pid` is the child's, and is not judged while a world is frozen or within 30 s of waking. A boot with no live.json is judged by its output (5 min of silence). Exit **75** = planned restart: at once, reason `planned`, never a breaker failure. Visitor-started boots that fail count toward the breaker. `ensure()` refusals reach clients as `503 world.held` (Retry-After 60) and `503 world.starting` (Retry-After 5). Resume a held world with `op.mjs resume-world --slug <slug>`. `pool.problems()` codes `wedged` · `held` · `crashloop` (≥ 2 failures in 30 min) · `bootSlow` (> 15 s) go into `/__sim/healthz` `hostCodes` at once (texts loopback-only, `worldProblems`) and into `<data>/world-problems.json` every 10 s for `deploy/host-health.mjs`. Restart counts: `restartsByReason` {exit, wedged, planned, boot, boot-stalled, capacity} and `lastBootMs` in the pool status (L7 metrics). Proxy admission (before the ceilings, never waiting on the world), for `/v1/edge/*` only: a world `starting`/`restarting` → `503 world.starting` Retry-After 5 (visitors' pages and a handover's pause still wait); for 60 s after a *restart* (not a first or idle-wake boot) C1/C2 are admitted for a share of Souls growing 25 % → 100 %, picked by a hash of the Soul token so a Soul is either in or out (`503 world.busy`, Retry-After = when its share comes); level from `X-Sim-Load` on the world's answers in the last 10 s, else live.json: at red/black C2 → `503 world.busy` (Retry-After 2 red, 5 black), C3 micro-cache TTL ≥ 2 s; C1 still goes to the world (its own admission decides). Refusals are counted in the ceilings' `refused` per world.
 
+### 4b. Read workers: `readPort`, `readWorkers` (Stage B, lane B-port; DARK unless on)
+
+As built (`apps/server/src/split/read-pool.ts`, `split/read-worker.ts`, `load/admission.ts` `admissionPort`; launcher `children.mjs` `pickReadPorts`/`readEnv`, `launcher.mjs` `readTarget`/`proxyRead`):
+
+- **On/off, per world.** Registry `readWorkers` (0 = off, 1–4; `op.mjs set-read-workers --slug <s> --n 0-4|default`, from the next boot) wins; otherwise 1 when the launcher runs with `SIM_READ_WORKER=1`, else off. Off = the world gets no read env, live.json has no read fields, and the launcher routes nothing (a world that advertises a `readPort` anyway is ignored). Flag-off identity: 12/12 requests byte-identical to the R2 launcher (`team/scratch/srv/b-port/identity.mjs`).
+- **World env.** `SIM_READ_WORKER=1`, `SIM_READ_WORKERS=n`, `SIM_READ_PORTS=a,b,…` (one per worker, picked from the child range's top past the watchdog port, held across adopt/handover like `healthPort`; fewer free than workers: the rest listen where the OS puts them).
+- **The pool.** n `worker_threads`, each with its own loopback HTTP port, each fed one `WorldInit` and then one `WorldDelta` per tick (generation `gen`, +1 per message; source today: the spike's `DeltaTap`, B-delta's WorldDelta v1 when it lands). Per-worker applied `gen` lives in a SharedArrayBuffer, so lag = main gen − worker gen from any thread. A worker that exits is restarted after 1 s and every worker gets a fresh init.
+- **live.json** (only while a pool runs): `"readPort": 5235, "read": {"ports": [5235, …], "workers": 1, "lagGens": 0, "subset": true, "routes": ["here", "capabilities"]}`. `ports` lists only live, ready workers. `subset: true` = the spike's subset (mode 1); B-facade's full read set is mode 2, routes `here, observe, capabilities, resolve, view`.
+- **What a worker answers itself** (subset): `GET /v1/edge/here` and `GET /v1/edge/capabilities` with no query, for a Soul its replica has a body for, with `subset: true` and header `x-sim-read: worker`. It also answers `GET /healthz` and `/healthz/read` (its own `{ok, worker, gen, lagGens, tick, subset}`, O(1)). Everything else it forwards over its `intents` MessagePort as an Admission job. That job gets the same `Admission.request` (key, class, deadline) as the HTTP middleware, with `closed()` signalled through the port. Main then runs it through the app already admitted, and the answer (an act's receipt) comes back the same way. Token → Soul comes from main: fresh for 30 s, then re-asked in the background and used for up to 10 min.
+- **Launcher routing.** Only for an on world whose live.json (pid-checked, re-read at most once a second, `at` < 10 s old) lists ports. It routes `GET` routes named in `read.routes` (subset: only without a query) and `/healthz/read` to the ports round-robin. `around` and every C1 stay on main, and so does `POST resolve` until a full-mode worker exists (the proxy does not buffer bodies for a retry). On a worker connection error, a 5xx other than 503, or no response headers in 2 s, the request goes to main once and the fallback is counted. The ceilings run before routing, unchanged. **Shedding is for a world that cannot answer:** at red/black, a C2 read the workers answer (as above, and `read.lagGens` ≤ 2, launcher option `readShedLagGens`) goes to them instead of the proxy's `503 world.busy`. Reads they do not answer, a lagging pool, and the post-restart ramp still shed as before. Routed reads are counted by the level at the time (`sim_world_read_routed_total{world,level}`). `around` is **C1** in the launcher's `requestClass` too (it records places and invalidates menus, as in-world `classify` says), so it is never shed as a read.
+- **Metrics** (`/__sim/metrics`): `sim_world_read_workers`, `sim_world_read_lag_gens` (from live.json), `sim_world_read_routed_total{level}`, `sim_world_read_fallback_total` (launcher counters; present only for worlds with read workers).
+- **Measured** on the Eden 2026 live copy through the launcher: during a 2 s main busy-loop, 16 `here` all answered by the worker, p50 4.4 ms / max 5.1 ms; `/healthz/read` max 1.3 ms; the world's own `/healthz` 2011 ms. Worker killed → the next read was answered by main (counted); the worker was back in 2.4 s. Pool 1 → 4: every worker answered at the same gen. Worker subset vs main: `me.pos` and `near` were equal for the 5 of 7 Souls main answered (the other 2 got main's own `world.busy`).
+
 ## 5. Metrics names (L7, prom-client, launcher loopback `/__sim/metrics`)
 
-`sim_world_last_heartbeat_seconds{world}` · `sim_world_event_loop_delay_p99_seconds` · `sim_world_elu` · `sim_world_gc_seconds_total` · `sim_world_heap_used_bytes` / `sim_world_heap_limit_bytes` · `sim_world_tick_seconds` (histogram) · `sim_world_ticks_late_total` · `sim_world_active_souls` / `_waiting` / `_connected` · `sim_world_queue_depth` · `sim_world_queue_oldest_seconds` · `sim_world_shed_total{class}` · `sim_world_last_boot_seconds` · `sim_world_restarts_total{reason=exit|wedged|crashloop|planned}` · `sim_world_level{level}` (0/1) · `sim_client_errors_total{kind}`. Labels: `world` always; no Soul ids, no account ids (privacy).
+`sim_world_last_heartbeat_seconds{world}` · `sim_world_event_loop_delay_p99_seconds` · `sim_world_elu` · `sim_world_gc_seconds_total` · `sim_world_heap_used_bytes` / `sim_world_heap_limit_bytes` · `sim_world_tick_seconds` (histogram) · `sim_world_ticks_late_total` · `sim_world_active_souls` / `_waiting` / `_connected` · `sim_world_queue_depth` · `sim_world_queue_oldest_seconds` · `sim_world_shed_total{class}` · `sim_world_last_boot_seconds` · `sim_world_restarts_total{reason=exit|wedged|crashloop|planned}` · `sim_world_level{level}` (0/1) · `sim_client_errors_total{kind}` · `sim_world_read_workers` / `sim_world_read_lag_gens` / `sim_world_read_routed_total` / `sim_world_read_fallback_total` (Stage B, §4b). Labels: `world` always; no Soul ids, no account ids (privacy).
 
-## 6. What this contract does not do
+## 6. WorldDelta v1 (Stage B, lane B-delta; as built, dark behind `SIM_READ_WORKER=1`)
+
+The tick thread publishes the world's replicated state to read workers as one **WorldInit** followed by one **WorldDelta
+per tick**. Code: `apps/server/src/split/{delta,world-init,read-model}.ts`; oracle `split/delta-oracle.ts`.
+
+**Position.** Every message carries `{v: 1, gen, seq, tick, logSeq}`. `gen` changes only when the stream restarts (the
+engine was replaced, the comms object table reloaded or was replaced, a tap fault); `seq` counts deltas within a gen,
+one per completed tick, contiguous from the init's `seq`; `logSeq` = `host.seq`. A replica applies a delta only when it
+is the same gen and `seq = its seq + 1` (`Replica.apply` returns false otherwise, and nothing is applied).
+
+**Resumable.** The tap keeps the last 1,200 deltas (60 s). `since(gen, seq)` returns the deltas after `seq`, or null when
+the gen differs or they have left the ring: the consumer loads a new WorldInit. On a restart every subscriber gets
+`{t: 'resnapshot', gen, reason}` and must load a new WorldInit.
+
+**WorldInit** (plain structured-clone data, no closures): `entities` (L5's shared snapshot view, one copy per tick and
+log seq), `env`, `living` (day clock), `static` (the static layer below), `minds`, `faded`, open `receipts`, `programs`,
+`holds`, `objects` = L8 `table.snapshot()` `{gen, records}`, placed `items`, `togetherVersion`, `menuInputs`, and for
+B-spatial `scene`/`sceneKey`/`pages`/`navReady`. One WorldInit is built per stream state (gen, seq, log seq, object gen,
+receipts seen, together version, faded and minds counts) and shared by every consumer asking then. It may be served at
+any point between ticks: each delta section is an absolute row or an idempotent upsert (objects skip `gen <=` the
+replica's), so the deltas after its `seq` apply exactly even when a write landed between that delta and the init.
+
+**WorldDelta sections** (each present only when non-empty / changed):
+
+| Section | Content | Source on main (never a scan) |
+|---|---|---|
+| `bodies` | `[id, x, y, z, yaw]` or `[..., human.speed]`, exact numbers | the tracked set: humans, carriers, any entity the tick named |
+| `ents` | whole entities: new ones, and ones whose non-pose fields changed | entities the tick named (paths, changes, programme events, receipts) |
+| `gone` | entity ids removed | `present: null` changes, tracked ids that vanished |
+| `env`, `living` | whole, when changed | `world.env` (its datetime moves every tick), `host.living` |
+| `minds`, `mindsGone`, `faded` | mind rows `{soulId, entityId, name, owner, native}`; faded = the whole set | `host.minds`, `ledger.faded` |
+| `receipts` | every phase change since the last delta, in order `{id, soulId, capability, phase, acceptedTick, startedTick, endedTick, code, programId}`; open = waiting/started | `ledger.onReceipt` |
+| `programs`, `holds` | `[entityId, programId, step, actionId, verb]`; `[entityId, [{action, slot}]]` | `engine.programOf/programAction`, `nativeSeatHoldsV1`, re-read when the tick named the body |
+| `objects` | `{gen, deltas: [{gen, id, record or null}]}` | L8 `table.changes(since)`; null = restart the stream; an unsettled transaction waits |
+| `items`, `togetherVersion` | the placed-items list when it changed | read when `together.version` moved |
+| `static` | `{epoch, places, shells, solids, fires, regions, spots}` | read when `engine.staticEpochV1()` or `ledger.staticVersion()` moved; checked only when a sync-free key moved (spatial epoch, place writes, spots object, bumpStatic, navReady) |
+| `menuInputs` | the ledger's menu-input strings (a god world: commit version, closing sites) | `addMenuInput` sources |
+| `scene`, `sceneKey`, `pages`, `navReady` | B-spatial's static scene export (structured clone, not JSON) when the spatial epoch or `entityPhysicsV1.hash` moved; `pageRectsV1()`; `conn.ready` | engine |
+
+Carriers are entities (their `carrier` state rides in `ents`); the replica derives `engine.carriers()` from them.
+Not replicated: a programme action's status/phase (they move inside a step with no event), receipt plan/detail/outcome
+(written without a receipt notification); B-facade reads those on main or adds them with a notification.
+
+**The tap.** `WorldHost.splitTap(tick, out)` runs right after a completed tick, before `afterTickComplete`, with the
+tick's own `paths`/`changes`/`programs` (the arrays the viewer Batch accumulates: one per-tick batch for both). It only
+reads. Installed by `installDeltaStream(host, ledger)` when `SIM_READ_WORKER=1`; otherwise nothing runs.
+
+**Measured** (live-copy fixture eden-2026, 4,543 entities, 11,584 objects, 7 Souls of which 6 walk, laptop, CPU =
+`threadCpuUsage` of the tick thread; 10-min soak `team/scratch/srv/b-delta/run13`, with every write path driven and a
+forced resnapshot mid-run): oracle **879/879** checks equal (replica vs a fresh read of every table), 0 diffs, 0 refused.
+Tap per tick (11,728 ticks): CPU **p50 0.060 ms, p99 0.143 ms, mean 0.090 ms**; JSON size **p50 662 B, p99 1,562 B**.
+The static layer (1.1 MB) is resent only when the static epoch moves (24 times in 10 min with 15 god commits).
+postMessage of a delta to a worker: p50 0.015 ms. WorldInit: 19.5–22.5 ms to build, 8.7 MB as JSON.
+
+## 7. What this contract does not do
 No server-side Soul mind (queue, delay, refuse — never choose or retry an act for a Soul). No travel or overflow instances. The waking limit (`world.crowded`) ships dark behind `SIM_WAKING_LIMIT=1` until Gene turns it on. Carryables stay opt-in. The god is never starved.

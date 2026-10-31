@@ -14,7 +14,8 @@
 // sim_world_gc_seconds_total); heap.usedMb/limitMb → bytes; tick.p99Ms → sim_world_tick_p99_seconds (a summary quantile:
 // live.json carries a p99, not buckets); tick.lateTotal → sim_world_ticks_late_total; tick.service5s →
 // sim_world_tick_service_ratio; souls.* → active/waiting/connected; queue.*; shed.{reads,acts,...} →
-// sim_world_shed_total{class}; level → sim_world_level{level} 0/1; phase → sim_world_phase{phase} 0/1; boot.tick/target.
+// sim_world_shed_total{class}; level → sim_world_level{level} 0/1; phase → sim_world_phase{phase} 0/1; boot.tick/target;
+// read.workers/lagGens → sim_world_read_workers / sim_world_read_lag_gens (Stage B, only with read workers).
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -88,6 +89,9 @@ export function metricsText({ worlds = [], launcher = {}, clientErrors = null, n
       if (/^[a-z][a-z0-9_.]{0,31}$/.test(cls)) c('sim_world_refused_total', 'Requests the launcher refused for this world (its ceilings), by class.', { world, class: cls }, n);
     }
     g('sim_world_last_boot_seconds', 'Seconds the world\'s last boot took (start to healthy).', L, num(w.lastBootMs) === null ? null : w.lastBootMs / 1000);
+    // Stage B (lane B-port): C2 reads the launcher sent to the world's read workers, and those it then asked main (a
+    // worker error, a 5xx or no answer in 2 s); only for worlds with read workers on
+    if (w.read) { for (const [level, n] of Object.entries(w.read.routedBy ?? {})) if (LEVELS.includes(level)) c('sim_world_read_routed_total', 'C2 reads the launcher routed to the world\'s read workers, by the world\'s load level then (at red/black: reads not shed).', { world, level }, n); c('sim_world_read_fallback_total', 'Routed reads asked of the main thread instead (worker error, 5xx or 2 s timeout).', L, w.read.fallback); }
 
     const v = w.live; if (!v) continue;
     const at = num(v.at);
@@ -115,6 +119,8 @@ export function metricsText({ worlds = [], launcher = {}, clientErrors = null, n
     }
     if (typeof v.level === 'string') for (const lv of LEVELS) g('sim_world_level', 'Load level (1 = current).', { world, level: lv }, v.level === lv ? 1 : 0);
     if (typeof v.phase === 'string') for (const ph of PHASES) g('sim_world_phase', 'Process phase (1 = current).', { world, phase: ph }, v.phase === ph ? 1 : 0);
+    const read = v.read && typeof v.read === 'object' ? v.read : null;
+    if (read) { g('sim_world_read_workers', 'Read workers alive and serving (Stage B).', L, read.workers); g('sim_world_read_lag_gens', 'Largest delta gap between the main thread and a read worker (generations).', L, read.lagGens); }
     g('sim_world_boot_tick', 'Replay progress while booting: tick reached.', L, boot.tick);
     g('sim_world_boot_target_tick', 'Replay progress while booting: tick to reach.', L, boot.target);
   }

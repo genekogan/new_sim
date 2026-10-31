@@ -24,7 +24,10 @@ export function recentStrikes(god: GodMode, tick: number, windowTicks = 1200): S
 
 /** What a Soul at (x, z) perceived of the lightning in the last minute, in words (null: none). */
 export function lightningNear(god: GodMode, x: number, z: number, tick: number, names?: (x: number, z: number) => string | null): { last: string; strikes: number; nearest: number } | null {
-  const list = recentStrikes(god, tick);
+  return lightningFrom(recentStrikes(god, tick), x, z, tick, names);
+}
+/** lightningNear over a strike list (Stage B: a read worker holds main's recent strikes, shipped per tick). */
+export function lightningFrom(list: readonly Strike[], x: number, z: number, tick: number, names?: (x: number, z: number) => string | null): { last: string; strikes: number; nearest: number } | null {
   if (!list.length) return null;
   const last = list[list.length - 1], d = Math.hypot(last.x - x, last.z - z), ago = (tick - last.tick) / 20, delay = d / SOUND_MPS;
   const by = names?.(last.x, last.z);
@@ -62,6 +65,8 @@ export function strike(god: GodMode, at: unknown, tick: number) {
 export function installLightning(god: GodMode, edge: EdgeLedger | undefined, tick: () => number) {
   if (!edge) return;
   (edge as EdgeLedger & { lightningNear?: (x: number, z: number) => unknown }).lightningNear = (x: number, z: number) => lightningNear(god, x, z, tick());
+  // Stage B (split/verdict-pump.ts): the strikes a read worker's lightningNear reads
+  (edge as EdgeLedger & { recentStrikesV1?: () => Strike[] }).recentStrikesV1 = () => recentStrikes(god, tick());
 }
 
 export function mountLightningRoutes(app: Hono, d: { god: GodMode; requireGod: (c: Context) => unknown; tick: () => number }) {

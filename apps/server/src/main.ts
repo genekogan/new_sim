@@ -39,6 +39,7 @@ import { setKitViewerContract } from '@sim/generators';
 import { rehearseRestore, standby } from './standby.ts';
 import { coreLibrary } from '@sim/world-compiler';
 import { startWatchdog, writeLiveNow } from './load/watchdog.ts';
+import { sharedLoad } from './load/shared.ts';
 import { LoadMonitor } from './load/monitor.ts';
 import { Admission } from './load/admission.ts';
 import { WakingLimit } from './load/waking.ts';
@@ -200,6 +201,26 @@ if (process.env.SIM_WAKING_LIMIT === '1' && edge?.bodyRule) {
   console.log(`[load] waking limit ON: ${Number(process.env.SIM_MAX_AWAKE) || 12} awake`);
 }
 if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`));
+// Stage B (lane B-port): the read-worker pool, DARK unless SIM_READ_WORKER=1 (split/read-pool.ts; nothing is imported
+// otherwise). SIM_READ_WORKERS = pool size (registry `readWorkers`, 1–4, default 1); SIM_READ_PORTS = the launcher's ports.
+if (process.env.SIM_READ_WORKER === '1' && edge) {
+  const { ReadPool, readPorts, deltaSource } = await import('./split/read-pool.ts');
+  const { accountTag } = await import('./load/admission.ts');
+  const source = await deltaSource(host, edge);
+  // SIM_READ_MODE=2 (B-facade): the worker runs the read code itself over a replica + a read-only view of the database
+  const readMode = process.env.SIM_READ_MODE === '2' ? 2 : 1;
+  const pool = new ReadPool({ workers: Number(process.env.SIM_READ_WORKERS) || 1, ports: readPorts(process.env.SIM_READ_PORTS), mode: readMode, worldPath: config.worldPath,
+    ...(readMode === 2 ? { world: { dbPath: db.path, worldId: host.worldId } } : {}), shared: sharedLoad, admission, init: source.init, ask: source.ask, writes: source.writes,
+    inbox: (soulId) => { const ib = (app as unknown as { agentInbox?: { touch(s: object): void; view(s: object): unknown } }).agentInbox, m = host.minds.get(soulId); if (!ib || !m) return null; const scope = { scope: `soul:${soulId}`, owner: m.owner }; ib.touch(scope); return ib.view(scope); },
+    auth: (token) => { const s = souls.soulFromToken(token); return s && !s.retired_at && s.world_id === host.worldId ? { soulId: s.id, account: accountTag(s.owner) } : { soulId: null }; },
+    run: async (f) => { const r = await app.fetch(new Request('http://127.0.0.1' + f.url, { method: f.method, headers: f.headers, ...(f.body && f.method !== 'GET' && f.method !== 'HEAD' ? { body: f.body } : {}) }), { simAdmitted: true });
+      return { status: r.status, headers: [...r.headers], body: await r.arrayBuffer() }; } }).start();
+  source.onDelta((d) => pool.delta(d), () => pool.reinit());
+  (globalThis as { __simReadPool?: unknown }).__simReadPool = pool;   // tests and the harness read pool.status()
+  // SIM_READ_ORACLE=1 (B-facade item 5, lane only): the five reads answered by main and by a replica ledger, compared
+  if (process.env.SIM_READ_ORACLE === '1') { const { installReadOracle } = await import('./split/read-oracle.ts'); await installReadOracle(host, edge, source as never, db.path); console.log('[read-oracle] on'); }
+  console.log(`[read] ${pool.size} read worker(s), mode ${readMode === 2 ? 'read code (here)' : 'subset (here, capabilities)'}`);
+}
 const listener = getRequestListener(app.fetch);
 // G9 (lane Z1): a write in flight when the world is told to stop (a release hands it over, the launcher puts it to sleep)
 // is answered before the snapshot is saved and the process exits, instead of dying with its connection (the god's CLI

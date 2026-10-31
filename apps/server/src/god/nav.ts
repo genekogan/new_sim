@@ -10,6 +10,7 @@
 // "sit on the bench by the pond") to them. No edge contract change: no new verbs, fields or routes.
 //
 // Pure reads over the entity model and the engine's standing grids; nothing here is logged or changes the world.
+import {menuWorldOf, type MenuWorld} from '../split/menu-world.ts';
 import { deckRaised } from '@sim/generators';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
@@ -157,6 +158,8 @@ export class GodNav {
   private cache: { key: string; things: Thing[]; byRef: Map<string, Thing> } | null = null;
   private goals = new Map<string, { tick: number; key: string; goal: { p: Vec2; level: number } | null }>();
   constructor(h: NavHost) { this.h = h; }
+  /** B-facade: the world this read code reaches (split/menu-world.ts); `h.engine` may be the engine or a MenuWorld. */
+  private get E(): MenuWorld { return menuWorldOf(this.h); }
 
   // ------------------------------------------------------------------ what is there
 
@@ -327,7 +330,7 @@ export class GodNav {
 
   /** Where a Soul standing at `me` goes for this thing: a clear standing point on a level (null: no standing room). */
   goal(t: Thing, me: Vec2, except?: string): { p: Vec2; level: number } | null {
-    const E = this.h.engine, tick = E.world.tick;
+    const E = this.E, tick = E.world.tick;
     // a Soul-dependent goal (the shore nearest me, the nearest point of a road) is never cached
     // MARSLIVED: a room's goal is refined live round whoever already stands there (roomGoal itself is cached per version)
     const mine = t.kind === 'water' || t.kind === 'room' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1 || t.level > 0;
@@ -335,7 +338,7 @@ export class GodNav {
     // very spot another Soul stands on, and which one a listing got depended on who asked first in the last 50 ticks)
     const key = `${t.ref}|${except ?? ''}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
     const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
-    const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
+    const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1!(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
     // WALK3: a ground goal off the main walkable ground (a fenced court, a dense wood, a mountain band, a hill) moves to the
     // nearest open spot of the main ground within r of it, else of `alt`; only once the engine's labels are ready (a
     // listing never waits for them)
@@ -425,7 +428,7 @@ export class GodNav {
 
   /** RESOLVE2: the nearest connected (walkable both ways from the main ground) standing spot on `g`'s level within 4 m. */
   private roofReach(g: { p: Vec2; level: number }): { p: Vec2; level: number } | null {
-    const E = this.h.engine, pts: { id: string; p: Vec2; level: number }[] = [];
+    const E = this.E, pts: { id: string; p: Vec2; level: number }[] = [];
     for (let dz = -4; dz <= 4; dz += 0.5) for (let dx = -4; dx <= 4; dx += 0.5) if (Math.hypot(dx, dz) <= 4) pts.push({ id: `${dx},${dz}`, p: [r2(g.p[0] + dx), r2(g.p[1] + dz)], level: g.level });
     let best: Vec2 | null = null, bd = Infinity;
     for (const v of E.navCheckV1!(pts) as { id: string; ok: boolean }[]) {
@@ -439,9 +442,9 @@ export class GodNav {
    *  its centre if reachable, else the reachable spot inside nearest the centre; null (and `blocked`) when furniture
    *  closes the whole room off. Cached per navigation epoch and room (furniture moves the epoch). */
   private roomGoal(t: Thing, near: (at: Vec2, level: number, ring?: number) => { p: Vec2; level: number } | null): { p: Vec2; level: number } | null {
-    const E = this.h.engine;
+    const E = this.E;
     const centre = near(t.at, t.level, 40);
-    if (!t.entry || !E.reachV1) return centre;
+    if (!t.entry || !E.feasibility.reaches) return centre;
     // S2: kept per navigation epoch (the static world the reach checks route over) and the room's own outline, door and
     // frame, not per god edit: a calendar entry or opening hours (half a busy god's edits) re-reached every room in 80 m
     this.index(); const ep = this.navEpoch(), rv = ep === undefined ? `${this.h.staticVersion?.() ?? this.cache?.key}` : `ep${ep}`;
@@ -475,8 +478,8 @@ export class GodNav {
   }
   /** Does the room's front door reach p (on the room's level)? True when there is no door or no reach check to ask. */
   private entryReaches(t: Thing, p: Vec2): boolean {
-    const E = this.h.engine;
-    return !t.entry || !E.reachV1 || E.reachV1({ p: t.entry.p, level: t.entry.level }, { p, level: t.level }).ok;
+    const E = this.E;
+    return !t.entry || !E.feasibility.reaches || E.feasibility.reach({ p: t.entry.p, level: t.entry.level }, { p, level: t.level })!.ok;
   }
   private rooms = new Map<string, { p: Vec2; level: number } | null>();
   private roomsOf: string | undefined;
@@ -487,7 +490,7 @@ export class GodNav {
 
   /** `walk:<path>` for the nearest named things and the rooms of near buildings (plus any this Soul asked for). */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, focus?: MenuFocus | null) {
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return;
+    const me = this.E.world.entities[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
     const all = this.things();
@@ -532,7 +535,7 @@ export class GodNav {
    *  capability the listing would give it from here. Ground-floor things and rooms only (an upper floor's rooms need a
    *  multi-floor reach check; walk to the building first). True when a capability was added. */
   walkOnDemand(soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Plans): boolean {
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
+    const me = this.E.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
     // RESOLVE2: an upstairs room is walked to as well (in at the front door, up its stair): ground-floor rooms first
     const low = (t: Thing) => t.kind !== 'room' || t.level === 0 || (t.rise ?? 0) < LOW_RISE_M;
     const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId).sort((a, b) => +low(b) - +low(a));
@@ -545,13 +548,13 @@ export class GodNav {
   /** RESOLVE2: a re-sent walk id of a named thing or room (`walk:seafront-hotel-4/seafront-hotel-4-roof-bench`, offered by
    *  thingOnDemand for one resolution) offered again by its ref: it was refused capability.unknown. */
   walkRefOnDemand(soul: EdgeSoul, ref: string, caps: EdgeCapability[], plans: Plans): boolean {
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return false;
+    const me = this.E.world.entities[soul.entityId]; if (!me?.human) return false;
     const t = this.things().find((x) => x.ref === ref); if (!t) return false;
     return this.offerOnDemand(soul, t, caps, plans);
   }
 
   private offerOnDemand(soul: EdgeSoul, t: Thing, caps: EdgeCapability[], plans: Plans): boolean {
-    const me = this.h.engine.world.entities[soul.entityId]!, all = this.things();
+    const me = this.E.world.entities[soul.entityId]!, all = this.things();
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human!.level ?? 0;
     const exit = myLevel === 0 ? null : all.find((r) => r.kind === 'room' && r.level === myLevel && r.poly && inPoly(here[0], here[1], r.poly) && r.entry && r.entry.level === 0)?.entry ?? null;
     const seated = me.human!.activity === 'sit' || me.human!.baseActivity === 'sit', n = caps.length;
@@ -571,7 +574,7 @@ export class GodNav {
    *  such thing, added for this resolution. Rooms are left to their buildings. Null when no such thing has standing room
    *  within reach of it. */
   thingOnDemand(soul: EdgeSoul, ask: string[], caps: EdgeCapability[], plans: Plans, hit: (w: string, set: string[]) => boolean): { id: string; count: number } | null {
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !ask.length) return null;
+    const me = this.E.world.entities[soul.entityId]; if (!me?.human || !ask.length) return null;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     // its own name and kind, the last word of the asked words naming the head of either ("go to the school" is not a school-desk)
     const own = (t: Thing) => [...words(t.name.split('/').pop()!), ...words(t.what.replace(/\s+in\s+\S+$/, ''))];
@@ -609,7 +612,7 @@ export class GodNav {
    *  words, a building without that floor gives way to the nearest so named that has it (said in the note). From the
    *  ground it walks to the front door first, then up. */
   floorOnDemand(soul: EdgeSoul, q: { ask: string[]; prefer?: string; floor: 'up' | 'down' | 'top' | number }, caps: EdgeCapability[], plans: Plans, hit: (w: string, set: string[]) => boolean): { id: string; note: string } | { code: string; reason: string } {
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return { code: 'floor.no-body', reason: 'This Soul has no body to walk with.' };
+    const me = this.E.world.entities[soul.entityId]; if (!me?.human) return { code: 'floor.no-body', reason: 'This Soul has no body to walk with.' };
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0, all = this.things();
     const roomsOf = (b: Thing) => (b.rooms ?? []).map((r) => this.thing(r)).filter((r): r is Thing => !!r && !!r.poly);
     const inRoom = all.find((r) => r.kind === 'room' && r.level === myLevel && !!r.poly && inPoly(here[0], here[1], r.poly));
@@ -663,7 +666,7 @@ export class GodNav {
    *  outside, then the walk inside as offered. A thing with no door stand, or a Soul already at the door or upstairs, gets
    *  the walk at that gait as it is. True when `<gait>:<placeId>` was added. */
   gaitOnDemand(soul: EdgeSoul, placeId: string, gait: 'jog' | 'run', caps: EdgeCapability[], plans: Plans): boolean {
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
+    const me = this.E.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
     const id = `${gait}:${placeId}`; if (caps.some((c) => c.id === id)) return false;
     let walk = caps.find((c) => c.verb === 'walk' && c.target?.kind === 'place' && c.target.id === placeId);
     if (!walk && this.walkOnDemand(soul, placeId, caps, plans)) walk = caps.find((c) => c.verb === 'walk' && c.target?.kind === 'place' && c.target.id === placeId);
@@ -687,7 +690,7 @@ export class GodNav {
     const g0 = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
     // RESOLVE2: a goal up on a roof (or a raised floor) the main ground has no way up to is never offered as available
     // (a roof bench with no stair: the walk 'completed' in the lobby below)
-    const E = this.h.engine, cut = !!g0 && (g0.level > 0 || !!t.semanticPart) && !!E.navCheckV1 && !!E.navWarmV1?.(0) && E.navCheckV1([{ id, ...g0 }])[0]?.ok === false;
+    const E = this.E, cut = !!g0 && (g0.level > 0 || !!t.semanticPart) && !!E.navCheckV1 && !!E.navWarmV1?.(0) && E.navCheckV1([{ id, ...g0 }])[0]?.ok === false;
     const goal = cut ? null : g0;
     const cap: EdgeCapability = { id, verb: 'walk', label: where, ...(t.aliases?.length?{aliases:t.aliases}:{}), target: t.semanticPart?.entity ? { id: t.semanticPart.entity, kind: 'object' } : place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
       ...(goal ? {} : { blocked: cut ? { code: 'route.unreachable', reason: `${t.ref} is up where no stair or ramp from the ground reaches.` } : this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
@@ -731,8 +734,8 @@ export class GodNav {
   /** The engine's navigation epoch, read once per tick and world version (each read syncs the planner, ~0.5 ms). */
   private epochMemo: { at: string; ep: number | undefined } | null = null;
   private navEpoch(): number | undefined {
-    const at = `${this.h.engine.world.tick}|${this.h.version?.() ?? this.h.model.editSeq}`;
-    if (this.epochMemo?.at !== at) this.epochMemo = { at, ep: this.h.engine.navEpochV1?.() };
+    const at = `${this.E.world.tick}|${this.h.version?.() ?? this.h.model.editSeq}`;
+    if (this.epochMemo?.at !== at) this.epochMemo = { at, ep: this.E.navEpochV1?.() };
     return this.epochMemo.ep;
   }
   private strollSpots(ref: string, poly: Vec2[]): Vec2[] {
@@ -741,8 +744,8 @@ export class GodNav {
     // re-derived every area's spots (~200 nav tiles rebuilt, 6–10 s on Eden 2026)
     const ep = this.navEpoch(), key = ep === undefined ? this.cache?.key ?? '' : `${this.h.staticVersion?.() ?? this.cache?.key}|${ep}`;
     const hit = this.strolls.get(ref); if (hit?.key === key) return hit.spots;
-    const f = (this.h.engine as unknown as { clearSpotsV1?: (p: Vec2[], n: number) => Vec2[] }).clearSpotsV1;
-    const spots = (f ? f.call(this.h.engine, poly, 5) : []).map(([x, z]) => [r2(x), r2(z)] as Vec2);
+    const f = this.E.clearSpotsV1;
+    const spots = (f ? f.call(this.E, poly, 5) : []).map(([x, z]) => [r2(x), r2(z)] as Vec2);
     // (L1: was cleared past 200 areas; Eden 2026's listing reads more than that, so every listing recomputed them all)
     this.strolls.set(ref, { key, spots }); if (this.strolls.size > 4096) this.strolls.delete(this.strolls.keys().next().value!);
     return spots;
