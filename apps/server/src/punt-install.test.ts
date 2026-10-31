@@ -71,6 +71,32 @@ test('search exceptions release pending state and retry after one second; a comp
   epoch=2;for(let n=5001;n<5200;n++)f.tick(n);assert.equal(f.generations(),2,'the settled key is looked at every 200 ticks');f.tick(5200);assert.equal(f.generations(),3,'a static change searches again at the next look');f.handle.close();
 });
 
+// R2 gate (2026-10-31): the two baseline ids L4 renamed, kept for what of their contracts still holds under L4's cancel
+// backoff and negative cache (the renamed tests above pin the new timings). A cancellation by engine replacement is still
+// restarted on the next tick, even inside a cancel backoff; an empty completed search is still held at least a minute.
+test('cancellation restarts on the next tick, engine replacement cancels old work, and close prevents publication',async()=>{
+  const cancelled:number[]=[],advanced:number[]=[];
+  const f=fixture(g=>({advance(){advanced.push(g);return g===1?{state:'cancelled'}:{state:'pending'};},cancel(){cancelled.push(g);}}),false);
+  f.tick(20);f.tick(21);f.tick(22);assert.deepEqual(advanced,[1],'a self-cancelled search is in its L4 backoff');
+  f.host.engine=f.engine();f.tick(23);
+  assert.deepEqual(advanced,[1,2],'a replacement engine cancels the backoff and its search starts on the next tick');
+  assert.deepEqual(cancelled,[],'the old search had already ended; nothing to cancel');
+  f.tick(24);assert.deepEqual(advanced,[1,2,2]);
+  f.host.engine=f.engine();f.tick(25);assert.deepEqual(cancelled,[2],'replacement cancels the old engine\'s pending work');assert.deepEqual(advanced,[1,2,2,3]);
+  f.handle.close();f.tick(26);await settle();
+  assert.deepEqual(cancelled,[2,3]);assert.equal(f.host.listeners.length,0);assert.equal(f.requests.length,0);assert.equal(f.objects.size,0);
+});
+
+test('search exceptions release pending state and retry after one second; completed empty search retains minute backoff',()=>{
+  const cancelled:number[]=[];
+  const f=fixture(g=>({advance(){if(g===1)throw Error('fixture search failure');return {state:'done',candidates:[]};},cancel(){cancelled.push(g);}}),false);
+  f.tick(20);assert.deepEqual(cancelled,[1]);assert.match(f.logs[0],/search failed: fixture search failure/);
+  for(let n=21;n<40;n++)f.tick(n);assert.equal(f.generations(),1,'held for one second after an exception');
+  f.tick(40);assert.equal(f.generations(),2,'and retried at one second');
+  for(let n=41;n<=40+20*60;n++)f.tick(n);assert.equal(f.generations(),2,'an empty completed search is not repeated within a minute');
+  f.handle.close();
+});
+
 test('new ground source bypasses retry backoff, and live admission refusal creates no ride object',async()=>{
   const f=fixture(()=>({advance:()=>({state:'done',candidates:[spec]}),cancel(){}}),false);
   f.tick(20);f.requests[0].reject();await settle();
