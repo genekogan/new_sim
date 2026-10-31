@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const helper = fileURLToPath(new URL('./deploy/old-worlds/compact-copy.py', import.meta.url));
+const helper = fileURLToPath(new URL('./deploy/ship/compact-copy.py', import.meta.url));
 const python = (code, ...args) => spawnSync('python3', ['-c', code, ...args], { encoding: 'utf8' });
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'sim-compact-release-')), source = join(root, 'source.db');

@@ -164,7 +164,7 @@ fi
 if step backup "compact backups of production + legacy, quick_check every db"; then
   remember_prev
   x "$SCP" -q "$SHIPD/compact-backup.sh" "$HOST:/tmp/compact-backup.sh" || die "scp compact-backup.sh failed"
-  x "$SCP" -q "$HERE/old-worlds/compact-copy.py" "$HOST:/tmp/compact-copy.py" || die "scp compact-copy.py failed"
+  x "$SCP" -q "$HERE/ship/compact-copy.py" "$HOST:/tmp/compact-copy.py" || die "scp compact-copy.py failed"
   x "$SCP" -q "$SHIPD/quick-check.mjs" "$HOST:/tmp/sim-quick-check.mjs" || die "scp quick-check.mjs failed"
   x_to "$OUT/backup-production.txt" "$SSH" "$HOST" "bash /tmp/compact-backup.sh pre-r$LABEL production" || die "production backup failed"
   x_to "$OUT/backup-legacy.txt" "$SSH" "$HOST" "bash /tmp/compact-backup.sh pre-r$LABEL legacy" || die "legacy backup failed"
