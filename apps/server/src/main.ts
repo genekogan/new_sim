@@ -1,6 +1,7 @@
 import {closeContextViews} from './god/context-views.ts';
 import { Attention, unwatchedPace } from './attention.ts';
 import { ClockCatchUp } from './clock-catchup.ts';
+import { bootPhase } from './load/boot-progress.ts';
 import {edenSteeringModeV1,installEdenSteeringModeV1} from './eden-steering-mode.ts';
 import {TakeArchive,r2Store} from './take-archive.ts';
 import { createServer } from 'node:http';
@@ -215,6 +216,7 @@ if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
 let closing = false;
 if (engineBridge) {
   const waitAt = performance.now(), abort = new AbortController();
+  bootPhase('boot:projection', host.engine.world.tick);
   const stopped = (signal: string) => abort.abort(new Error(`boot interrupted: ${signal}`));
   const term = () => stopped('SIGTERM'), interrupt = () => stopped('SIGINT');
   process.on('SIGTERM', term); process.on('SIGINT', interrupt);
@@ -226,10 +228,11 @@ if (engineBridge) {
       await engineBridge.waitForInitialProjection({ signal: abort.signal, timeoutMs: remaining });
     }
     while (!engineBridge.initialProjectionReady());
-    console.log(`[boot] initial physics coherent at tick ${host.engine.world.tick}; readiness wait ${Math.round(performance.now() - waitAt)} ms`);
+    console.log(`[boot] projection ${Math.round(performance.now() - waitAt)} ms initial physics coherent at tick ${host.engine.world.tick}`);
     const prepareAt = performance.now();
+    bootPhase('boot:prepare', host.engine.world.tick);
     host.engine.prepareForServing?.();
-    console.log(`[boot] serving cache preparation ${Math.round(performance.now() - prepareAt)} ms at tick ${host.engine.world.tick}`);
+    console.log(`[boot] prepare ${Math.round(performance.now() - prepareAt)} ms serving caches at tick ${host.engine.world.tick}`);
   } catch (error) {
     closing = true; console.error('[boot] initial physics unavailable; HTTP was not opened', error);
     try {
@@ -245,6 +248,7 @@ if (engineBridge) {
   }
 }
 server.listen(config.port, config.host, () => {
+  bootPhase('serving', host.engine.world.tick);
   console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`);
   const s = (ms: number) => (ms / 1000).toFixed(2);
   console.log(`[boot] listening ${s(performance.now())} s after start: code ${s(bootAt.code)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
@@ -253,6 +257,7 @@ server.listen(config.port, config.host, () => {
 
 const shutdown = async (sig: string) => {
   if (closing) return; closing = true;
+  bootPhase('stopping', host.engine.world.tick);
   if (writesInFlight.size) {
     const n = writesInFlight.size, t = performance.now();
     await Promise.race([Promise.all(writesInFlight), new Promise((r) => setTimeout(r, WRITE_DRAIN_MS))]);

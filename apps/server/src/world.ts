@@ -43,6 +43,7 @@ import { emptyIntentHistoryV2, foldIntentHistoryV2, type IntentHistoryV2 } from 
 import { IntentObservations } from './intent-observations.ts';
 import { foldStationFactV1, stationGenesisIdV1, type StationHistoryV1 } from './station-history.ts';
 import { initialStationHistoryV2,foldStationFactV2,type StationHistoryV2 } from './station-history-v2.ts';
+import { bootPhase, bootTick } from './load/boot-progress.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 
@@ -96,6 +97,7 @@ export class PersistedIntentAdmissionFault extends Error {
   constructor(decisionSeq:number) { super('decision and admission persisted; physical application requires reconciliation'); this.decisionSeq=decisionSeq; }
 }
 type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void; purpose?: PurposeRef; stationEra?:boolean; atomicObjectDecision?:boolean };
+export type BootStats = { from: 'genesis' | 'snapshot'; restoreMs: number; readMs: number; replayMs: number; baselineMs: number; replayTicks: number; replayEvents: number; fromTick: number; toTick: number; minds: number };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
@@ -144,6 +146,8 @@ export class WorldHost {
   lastSnapshotTick = 0;
   extra: Record<string, unknown> = {};       // module state persisted with snapshots (narrator schedule etc.)
   tickMs: number[] = [];
+  /** The last boot's phases (lane L5): restore = snapshot read + decode + engine restore; replay = stepping logged history to its head. */
+  bootStats: BootStats | null = null;
   private queue: Pending[] = [];
   private intentControllerFaults = new Set<string>();
   private intentObservations: IntentObservations;
@@ -185,6 +189,7 @@ export class WorldHost {
   // ------------------------------------------------------------ boot
   /** Load the latest snapshot and fast-forward through later log events, or start from genesis. */
   boot(): { from: 'genesis' | 'snapshot'; replayed: number } {
+    const tBoot = performance.now(); bootPhase('boot:restore');
     this.cancelPeriodicSnapshot(); this.recoveryCapture = null; this.recoveryBaseline = null;
     let w = this.db.world(this.worldId);
     if (!w) {
@@ -195,7 +200,9 @@ export class WorldHost {
     const clock=this.clockFrontiers.read(this.worldId);
     if(clock&&!this.durableClockV1)throw new Error('clock-frontier.reader-required');
     if(clock&&this.factory.canReplayHistory?.(clock.rulesVersion)===false)throw new Error('clock-frontier.rules-incompatible');
+    const tRead = performance.now();
     const snap = this.db.latestSnapshot(this.worldId);
+    const readMs = performance.now() - tRead;
     // Snapshot rejection is not permission to reinterpret history from genesis.
     // Check both durable identities before constructing or stepping any engine.
     for(const version of [w.rules_version,...(snap?[snap.rulesVersion]:[])])
@@ -224,13 +231,15 @@ export class WorldHost {
     const lastRepair = this.db.lastRecoverySeq(this.worldId, this.seq);
     let later = this.db.events(this.worldId, lastRepair === null ? this.seq : lastRepair - 1);
     let checkedClock=false;
+    const restoredAt = performance.now(), fromTick = this.engine.world.tick;
+    let replayTicks = 0;
     if(clock&&this.seq>clock.throughSeq){
       if(this.engine.world.tick<clock.tick)throw new Error('clock-frontier.snapshot-prefix-differs');
       checkedClock=true; // A later exact durable snapshot supersedes this prefix.
     }
     const stepReplay=()=>{
       const before=this.engine.runtime.violations.length;
-      const out=this.engine.step();this.advanceLives();
+      const out=this.engine.step();this.advanceLives();replayTicks++;bootTick(this.engine.world.tick);
       if(this.durableClockV1){
         if(this.engine.runtime.violations.length>before)throw new Error('clock-frontier.replay-violates');
         this.kernel.tick=this.engine.world.tick;sweep(this.kernel);
@@ -256,6 +265,8 @@ export class WorldHost {
       }
       later=later.slice(repaired+1);
     }
+    const target = Math.max(this.engine.world.tick, later.length ? later[later.length - 1].tick : 0, clock && !checkedClock ? clock.tick : 0);
+    bootPhase('boot:replay', this.engine.world.tick, target);
     for (const e of later) {
       if(clock&&!checkedClock&&e.seq>clock.throughSeq)verifyClock();
       while (this.engine.world.tick < e.tick) stepReplay();
@@ -265,6 +276,7 @@ export class WorldHost {
     verifyClock();
     this.factory.validateHistoryHead?.(this.engine,this.db.world(this.worldId)!.rules_version);
     if(this.extra.stationV1)this.stationPhysicalHeadV1();
+    const replayedAt = performance.now();
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
     // After a logged recovery the baseline is the replayed head, so the next fault neither rereads nor nests its recipe.
@@ -274,6 +286,12 @@ export class WorldHost {
     // Write this world's starting vocabulary into its log once, so its history never depends on what the code's set becomes.
     if (!this.db.hasVocabulary(this.worldId)) void this.enqueue('rules', 'system', { vocabulary: structuredClone(baseVocabulary(this.kernel)), why: 'the vocabulary this world began with' });
     if (this.pendingBootstrap) { void this.enqueue('rules', 'system', { kernelBootstrap: this.pendingBootstrap, why: 'the kernel begins here for a world that predates it' }); this.pendingBootstrap = null; }
+    const end = performance.now();
+    const stats: BootStats = { from, restoreMs: Math.round(restoredAt - tBoot), readMs: Math.round(readMs), replayMs: Math.round(replayedAt - restoredAt), baselineMs: Math.round(end - replayedAt),
+      replayTicks, replayEvents: later.length, fromTick, toTick: this.engine.world.tick, minds: this.minds.size };
+    this.bootStats = stats;
+    console.log(`[boot] restore ${stats.restoreMs} ms from ${from} tick ${fromTick} (snapshot read+decode ${stats.readMs} ms, ${stats.minds} minds)`);
+    console.log(`[boot] replay ${stats.replayMs} ms ${replayTicks} ticks ${later.length} events to tick ${stats.toTick} (${replayTicks ? (stats.replayMs / replayTicks).toFixed(2) : '0'} ms/tick; recovery baseline ${stats.baselineMs} ms)`);
     return { from, replayed: later.length };
   }
 
