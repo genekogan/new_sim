@@ -31,6 +31,10 @@ export const wateringParams = z.object({
   spoutYaw: z.number().min(-1.6).max(1.6).optional(),
   tilt: z.number().min(0.3).max(1.4).optional(),
   tiltMore: z.number().min(0).max(0.3).optional(),
+  /** The tilts (rad) where water first reaches the outlet and where it runs fully (a kettle's spout only near its pour
+   *  tilt: from entry 34's 25/35°, a kettle's stream ran full at 33° and overshot the cup). */
+  flowFrom: z.number().min(0.1).max(1.4).optional(),
+  flowFull: z.number().min(0.1).max(1.4).optional(),
   /** The can's level after this stage (0..1): a full can is carried a little lower. */
   levelAfter: z.number().min(0).max(1),
   /** Litres this stage moves (the server's book-keeping; the motion does not read it). */
@@ -102,7 +106,8 @@ export function wateringFrame(m: WateringMotion, s: number): WateringFrame {
   const end = outStart + W.pourOut;
   // entry 43: the free hand comes to the cup with the pouring hand and leaves it as that hand goes back (one ease each)
   const left = m.steady ? right : 0;
-  return { right, left, sweepK: m.sweep ? Math.sin(2 * Math.PI * u) : 0, tilt, flow: smooth((tilt - FLOW_FROM) / (FLOW_FULL - FLOW_FROM)), yaw: (m.spoutYaw ?? 0) * right, done: s >= end, end };
+  const f0 = m.flowFrom ?? FLOW_FROM, f1 = m.flowFull ?? FLOW_FULL;
+  return { right, left, sweepK: m.sweep ? Math.sin(2 * Math.PI * u) : 0, tilt, flow: smooth((tilt - f0) / (f1 - f0)), yaw: (m.spoutYaw ?? 0) * right, done: s >= end, end };
 }
 
 /** A handle-held item taken or put by hand (take_item / put_item): the reach and the hand back, `reach` s each. */
@@ -126,14 +131,14 @@ export function wateringEvents(m: WateringMotion): WateringEvent[] {
     if (m.abortedAt !== undefined && m.abortedAt < c.on) return [];
     return [{ key: 'valve-on', at: c.on, data: { on: true } }, { key: 'valve-off', at: c.off, data: { on: false, level: m.levelAfter } }];
   }
-  const w = pourWindow(m), flowAt = w.tilt0 + smoothAt(FLOW_FROM / (m.tilt ?? TILT)) * W.tiltIn;
+  const F0 = m.flowFrom ?? FLOW_FROM, w = pourWindow(m), flowAt = w.tilt0 + smoothAt(F0 / (m.tilt ?? TILT)) * W.tiltIn;
   if (w.untilt <= flowAt) return [];
   const out: WateringEvent[] = [{ key: 'pour-start', at: flowAt, data: {} }];
   let done = 0;
   for (const k of [1, 2, 3]) { const at = w.start + k / 3 * m.seconds; if (at <= w.untilt + 1e-9) { out.push({ key: 'pour-' + k, at, data: { fraction: 1 / 3 } }); done = k; } }
   const reached = Math.max(0, Math.min(1, (w.untilt - w.start) / m.seconds));
   if (done < 3) out.push({ key: 'pour-abort', at: w.untilt, data: { fraction: Math.max(0, reached - done / 3) } });
-  const tu = rawTilt(m, w.untilt), endAt = w.untilt + (tu > FLOW_FROM ? smoothAt(1 - FLOW_FROM / tu) * W.untilt : 0);
+  const tu = rawTilt(m, w.untilt), endAt = w.untilt + (tu > F0 ? smoothAt(1 - F0 / tu) * W.untilt : 0);
   out.push({ key: 'pour-end', at: endAt, data: { level: done === 3 ? m.levelAfter : undefined, poured: done === 3 ? 1 : reached } });
   return out;
 }

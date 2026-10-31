@@ -28,7 +28,7 @@ export const KETTLE_FILL_SECONDS = 3.0, CUP_POUR_SECONDS = 2.6;
 const EDGE_GAP = HUMAN_RADIUS + 0.04;
 /** The kettle's tilt while pouring: 46°, rising 4° as the cup fills; the stream leaves the spout at this speed (m/s). The
  *  viewer's spout stream (fx/water-jets.ts `spout`) uses the same speed, so the planned and drawn landing agree. */
-export const KETTLE_TILT = 46 * Math.PI / 180, KETTLE_TILT_MORE = 4 * Math.PI / 180;
+export const KETTLE_TILT = 46 * Math.PI / 180, KETTLE_TILT_MORE = 4 * Math.PI / 180, KETTLE_FLOW_FROM = 39 * Math.PI / 180;
 /** Pour: the tea's surface is this far under the spout tip (m); the kettle hand is this far right of the body axis. */
 const SPOUT_DROP = 0.07, POUR_HAND_RIGHT = 0.17;
 /** The kettle's opening sits this far under the tap's nozzle while it fills (m). */
@@ -142,7 +142,7 @@ export function createTea(h: TeaHost) {
     const after = Math.max(0, levelNow - CUP_LITRES / litres);
     const steps: Step[] = [];
     if (!held) steps.push(walk(kAt!.st, kAt!.face), LET_GO, { verb: 'mars:take_item', params: { item: kettle, hand: 'right' } });
-    steps.push(walk(S, cAt.face), { verb: 'mars:watering_can_v1', params: { item: kettle, target: cup, stage: 'pour', face: r3(cAt.face), hold: grip.map(r3), steady: steady.map(r3), spoutYaw: r3(turn), tilt: r3(KETTLE_TILT), tiltMore: r3(KETTLE_TILT_MORE), seconds: CUP_POUR_SECONDS, levelAfter: r3(after), litres: CUP_LITRES } });
+    steps.push(walk(S, cAt.face), { verb: 'mars:watering_can_v1', params: { item: kettle, target: cup, stage: 'pour', face: r3(cAt.face), hold: grip.map(r3), steady: steady.map(r3), spoutYaw: r3(turn), tilt: r3(KETTLE_TILT), tiltMore: r3(KETTLE_TILT_MORE), flowFrom: r3(KETTLE_FLOW_FROM), flowFull: r3(KETTLE_TILT), seconds: CUP_POUR_SECONDS, levelAfter: r3(after), litres: CUP_LITRES } });
     if (kAt) steps.push(walk(kAt.st, kAt.face), { verb: 'mars:put_item', params: { item: kettle, surfaceSlot: `${kAt.owner}#${kAt.slot}` } });
     return steps;
   }

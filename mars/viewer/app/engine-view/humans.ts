@@ -1,5 +1,5 @@
 import {handActuatorFrame,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
-import {itemPresentation,type ItemPresentation} from '../../engine/items/presentation.ts';
+import {itemPoseOf,type ItemPoseView} from '../../engine/items/presentation.ts';
 import {wateringFrame,transferWeight,TRANSFER_HANDOFF,type HandTransfer,type WateringMotion} from '../../engine/items/watering.ts';
 import type {LetGoV1} from '../../engine/items/let-go.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
@@ -78,7 +78,7 @@ type View = {
   activity: string;
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
-  itemPose?:ItemPresentation;
+  itemPose?:ItemPoseView;
   /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
   watering?:WateringMotion;
   wateringTime?:number;
@@ -222,7 +222,7 @@ export type SampledHuman = {
   phaseK?: number;
   handActuator?:HandActuatorMotion;
   handActuatorTime?:number;
-  itemPose?:ItemPresentation;
+  itemPose?:ItemPoseView;
   /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
   watering?:WateringMotion;
   wateringTime?:number;
@@ -514,7 +514,7 @@ export class HumanViews {
       v.shoreTime = undefined;
       v.waterTransition = undefined;
       v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;v.watering=e.human?.wateringV1;v.wateringTime=world.tick*DT;v.letGo=e.human?.letGoV1;v.letGoTime=world.tick*DT;v.transfer=e.human?.handTransferV1;v.transferTime=world.tick*DT;
-      v.itemPose=itemPresentation(e.human?.itemTransferV1,e.human?.heldItemsV1,world.tick,DT);
+      v.itemPose=itemPoseOf(e.human?.itemTransferV1,e.human?.heldItemsV1,world.tick,DT);
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
@@ -621,15 +621,18 @@ export class HumanViews {
       return {drop:q.drop*r.k,bend:q.bend*r.k,rise:q.rise*r.k,kneel:q.kneel*r.k};
     }
     // Entry 43: a handle-held vessel's fill or pour leans toward its one fixed hold point (under the tap, over the cup),
-    // eased with the hand on the stage's own clock. Solved per frame against the moving hand it hopped between grid minima:
+    // eased with the hand on the stage's own clock ('hips', as 34's per-frame solve: 'lean' squatted 0.16 m under a
+    // 1.33 m hold close to the chest). Solved per frame against the moving hand it hopped between grid minima:
     // a 0.26 m one-frame dip as the kettle hand passed 1.2 m on its way up to a pour.
-    if(v.watering&&!v.handActuator&&!walking){const m=v.watering,k=wateringFrame(m,(v.wateringTime??0)-m.startTick*DT).right,q=solvePosture(d,[toBody(m.hold[0],m.hold[1],m.hold[2],1)],'lean');return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
+    if(v.watering&&!v.handActuator&&!walking){const m=v.watering,k=wateringFrame(m,(v.wateringTime??0)-m.startTick*DT).right,q=solvePosture(d,[toBody(m.hold[0],m.hold[1],m.hold[2],1)],'hips');return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
     // entry 43: taking or putting a handle-held thing (a kettle) leans like the vessel stages: 'hips' flickered its hips 4 cm
     const pz = solvePosture(d, ts, v.transfer && v.transfer.endTick === undefined && v.activity === 'reach' && !walking ? 'lean' : styleFor(v.activity, walking));
     // A low latch may need a small bend as well as a hand reach. Ease the whole
     // solved posture on the same timeline so the torso cannot pop in/out.
     if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
-    if(v.transfer){const k=transferWeight(v.transfer,(v.transferTime??0)-v.transfer.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
+    // entry 43: a put's posture rises over its reach and settles over the hand's way back (a hump, as 29's item reach);
+    // at the put's full arm weight from its first frame the free arm swung 0.099 m in one sample as the bend switched on
+    if(v.transfer){const ts=(v.transferTime??0)-v.transfer.startTick*DT,r=v.transfer.reach,k=v.transfer.mode==='put'?(ts<r?smooth(ts/r):1-smooth((ts-r)/r)):transferWeight(v.transfer,ts).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
 
     // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
     return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
