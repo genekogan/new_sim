@@ -68,7 +68,8 @@ deploy.env
 /worlds/littlemartians/buildings/previews/
 /mars/scripts/reconstruct
 /mars/docs/engineering/data/campus-2026-frames.svg
-# dropped, never published or committed
+# Mars year-scene texture crops (on the CDN, in tools/assets/manifest.json); the archive photo gallery that once
+# lived beside them is dropped, never published or committed
 /mars/viewer/public/history/
 /mars/viewer/public/2020/
 # the small own-work binaries that stay in git (tools/assets/manifest.test.mjs holds the same list)
