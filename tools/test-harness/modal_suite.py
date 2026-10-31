@@ -34,6 +34,15 @@ image = (
     .run_commands("corepack enable && corepack prepare pnpm@10.27.0 --activate && pnpm --version" if int(NODE.split(".")[0]) < 25
                   else "npm install -g pnpm@10.27.0 && pnpm --version")
 )
+# Media layer (tools/assets): remote-suite.sh stages the source ref's asset manifest + pull.mjs in <stage>/assets. Copied into
+# the image they key a cached layer holding the content-addressed media cache (/asset-cache, filled from the asset CDN and
+# sha256-checked), so the media is downloaded once per manifest change; prep() then pulls each tree from it. Placed before
+# the dependency layer so a lockfile change does not download the media again.
+ASSETS = os.path.join(SRC, "assets") if SRC else None
+if ASSETS and os.path.exists(os.path.join(ASSETS, "manifest.json")):
+    image = image.add_local_dir(ASSETS, "/assets-in", copy=True).run_commands(
+        "node /assets-in/pull.mjs --manifest /assets-in/manifest.json --dest /tmp/assets-tree --cache /asset-cache --quiet"
+        " && rm -rf /tmp/assets-tree && echo \"cached assets $(sha256sum /assets-in/manifest.json | cut -d' ' -f1)\"")
 # Prebuilt dependency layer (lane gate-cost, 2026-10-26, MODAL-POLICY rule 3): remote-suite.sh stages the source ref's
 # pnpm-lock.yaml (+ pnpm-workspace.yaml, whose overrides the lockfile records) in <stage>/deps. Copied into the image,
 # they key a cached layer holding the `pnpm fetch` store for exactly that lockfile, so a container only links
@@ -55,6 +64,12 @@ prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 re
   mkdir -p "$2" && tar xzf "$1" -C "$2" && cd "$2" || return 1
   # The invocation's committed harness tests both source refs with identical rules.
   tar xzf /in/harness.tgz -C "$2" || return 1
+  # media (tools/assets): this tree's own manifest, from the image's asset cache (network only for objects it lacks)
+  if [ -f tools/assets/manifest.json ] && [ -f tools/assets/pull.mjs ]; then
+    local alog="/out/assets-$(basename "$2").log"
+    node tools/assets/pull.mjs --cache /asset-cache > "$alog" 2>&1 || { echo "asset pull $(basename "$2") failed"; tail -n 20 "$alog"; return 1; }
+    tail -n 1 "$alog"
+  fi
   git init -q -b main && git add -A && git -c user.email=suite@local -c user.name=suite commit -qm "$(basename "$2")" || return 1
   if [ -f /in/historical-inputs.pack ]; then
     git index-pack --stdin < /in/historical-inputs.pack || return 1
