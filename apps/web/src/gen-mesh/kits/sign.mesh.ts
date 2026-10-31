@@ -9,7 +9,7 @@ import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
 import { apiPath } from '../../world-path.ts';
 import { artOf, brokenLinkLines, coverWhenReady, imageBroken, imageFailed, imageLoaded, videoTexture, whenImageFails } from '../art-media.ts';
-import { frameMediaKind, pinSlot, signupSlot, pollSlot, pollOptions } from '@sim/world-compiler';
+import { frameMediaKind, gameSquare, gameStatus, pinSlot, signupSlot, pollSlot, pollOptions } from '@sim/world-compiler';
 
 type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean; slot?: number };
 const texCache = new Map<string, THREE.Texture>();
@@ -127,6 +127,28 @@ export function pollTexture(title: string, options: string[], counts: number[], 
   });
   return done(c, key);
 }
+/** Soul Actions entry 27: noughts and crosses in chalk: the grid, each X and O at its square (gameSquare, where the hand went),
+ *  drawn a little differently per square, and a line through a winning row. */
+export function tictactoeTexture(grid: string, f: Face): THREE.Texture {
+  const key = JSON.stringify(['ttt', grid, f.w, f.h, f.bg]); const hit = texCache.get(key); if (hit) return hit;
+  const c = document.createElement('canvas'); c.width = 840; c.height = Math.round(840 * f.h / f.w); const g = c.getContext('2d')!, cw = c.width, ch = c.height, px = cw / f.w;
+  let seed = 5; const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 13), 1103515245) + 12345 | 0) >>> 0) / 4294967296;
+  g.fillStyle = f.bg ?? '#2b322e'; g.fillRect(0, 0, cw, ch);
+  for (let i = 0; i < 700; i++) { g.fillStyle = `rgba(240,240,230,${0.03 + rnd() * 0.06})`; g.fillRect(rnd() * cw, rnd() * ch, 1.5, 1.5); }
+  const X = (fx: number) => (fx / f.w + 0.5) * cw, Y = (fy: number) => (0.5 - fy / f.h) * ch, cell = 0.17 * px;
+  g.strokeStyle = 'rgba(244,242,232,0.9)'; g.lineCap = 'round'; g.lineWidth = 7;
+  for (const k of [-0.5, 0.5]) { g.beginPath(); g.moveTo(X(k * 0.17) + (rnd() - 0.5) * 4, Y(0.26)); g.lineTo(X(k * 0.17) + (rnd() - 0.5) * 4, Y(-0.26)); g.stroke(); g.beginPath(); g.moveTo(X(-0.26), Y(k * 0.17)); g.lineTo(X(0.26), Y(k * 0.17) + (rnd() - 0.5) * 4); g.stroke(); }
+  const gg = (grid || '').padEnd(9, '.').slice(0, 9);
+  for (let i = 0; i < 9; i++) {
+    const [sx, sy] = gameSquare(i), x = X(sx), y = Y(sy), r = cell * 0.3, j = () => (rnd() - 0.5) * 5;
+    g.lineWidth = 8; g.strokeStyle = gg[i] === 'X' ? '#f6efe0' : '#f3e3b0';
+    if (gg[i] === 'X') { g.beginPath(); g.moveTo(x - r + j(), y - r + j()); g.lineTo(x + r + j(), y + r + j()); g.moveTo(x + r + j(), y - r + j()); g.lineTo(x - r + j(), y + r + j()); g.stroke(); }
+    else if (gg[i] === 'O') { g.beginPath(); g.ellipse(x + j(), y + j(), r * 1.05, r * 0.95, rnd(), 0.15, Math.PI * 2.05); g.stroke(); }
+  }
+  const st = gameStatus(gg);
+  if (st.line) { const [a, , b] = st.line, [ax, ay] = gameSquare(a), [bx, by] = gameSquare(b), ex = (bx - ax) * 0.18, ey = (by - ay) * 0.18; g.strokeStyle = 'rgba(232,120,96,0.95)'; g.lineWidth = 9; g.beginPath(); g.moveTo(X(ax - ex), Y(ay - ey)); g.lineTo(X(bx + ex), Y(by + ey)); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; texCache.set(key, t); return t;
+}
 function paintingTexture(seed: number, bg: string): THREE.Texture {
   const key = `painting:${seed}:${bg}`; const hit = texCache.get(key); if (hit) return hit;
   const c = document.createElement('canvas'); c.width = 128; c.height = 96; const g = c.getContext('2d')!;
@@ -161,6 +183,7 @@ registerMesh({
       else if (f.media && f.slot !== undefined) map = textTexture([''], f);
       else if (f.media && text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
       else if (f.media) map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');
+      else if (ctx.def.tags.includes('tictactoe')) map = tictactoeTexture(typeof st.text === 'string' ? st.text : '', f);
       else if (ctx.def.tags.includes('pinboard')) map = pinboardTexture(typeof st.text === 'string' ? st.text.split('\n') : [], f);
       else if (ctx.def.tags.includes('signup')) map = signupTexture(String(st.title ?? ''), typeof st.text === 'string' && st.text ? st.text.split('\n') : [], f);
       else if (ctx.def.tags.includes('poll')) { const opts = pollOptions(st), votes = typeof st.textBy === 'string' && st.textBy ? st.textBy.split(',').map((v) => Number(v.split(':')[1])) : []; map = pollTexture(String(st.title ?? ''), opts, opts.map((_, i) => votes.filter((v) => v === i).length), f); }

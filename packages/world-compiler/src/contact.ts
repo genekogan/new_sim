@@ -3,7 +3,7 @@
 export function contactStateKey(def:{tags?:readonly string[];components?:{light?:unknown;lights?:unknown;opening?:unknown;sign?:unknown};state?:Record<string,unknown>},action?:string):'on'|'open'|'text'|null {
   if((def.components?.light||def.components?.lights)&&(!action||['switch-on','switch-off'].includes(action)))return 'on';
   if(def.components?.opening&&def.tags?.includes('hand-operated')&&(!action||['open','close'].includes(action)))return 'open';
-  if(def.components?.sign&&def.tags?.includes('hand-writable')&&(!action||['write','erase','pin','unpin','sign','unsign','vote'].includes(action)))return 'text';
+  if(def.components?.sign&&def.tags?.includes('hand-writable')&&(!action||['write','erase','pin','unpin','sign','unsign','vote','mark'].includes(action)))return 'text';
   // Opted-in drawn coverings without a hinge (curtains, a roller blind): open/close at a pull cord, the same contact.
   if(!def.components?.opening&&def.tags?.includes('hand-operated')&&def.state&&Object.hasOwn(def.state,'open')&&(!action||['open','close'].includes(action)))return 'open';
   // Opted-in hand switches without a light (a tap, a shower valve): the same on/off contact.

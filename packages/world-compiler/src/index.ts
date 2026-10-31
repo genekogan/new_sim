@@ -1,5 +1,6 @@
 export * from './schemas.ts';
 export {contactStateKey} from './contact.ts';
+export { gameSquare, gameSquareOf, gameStatus, GAME_LINES } from './core-kit/writable-boards.ts'; // Soul Actions entry 27
 export { WorldModel, definitionRefs, nearHash, obbOverlap, type OBB, type AssetInfo, type AssetLookup } from './model.ts';
 export { plan, applyBatch, checkFields, aimOf, boundsOf, onAbsoluteDeck, type Plan, type PlanOptions, type UsesHook, type Diff } from './compile.ts';
 export { padResettle, RESETTLE_TOL_M } from './pad-resettle.ts';
