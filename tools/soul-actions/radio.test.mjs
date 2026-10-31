@@ -41,7 +41,7 @@ test('radio: power and tuning knobs by hand, station cycle, refusal, interruptio
  const near=await here(),row0=near.objects.find(o=>o.id===id('radio'));
  assert.deepEqual(row0?.state,{on:false},'an off radio shows only that it is off');
  const act=async(cap,accepted=true)=>{const r=await accept(f.host,app.request('/v1/edge/act',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({capability:cap})}));const b=await r.json();assert.equal(b.accepted,accepted,JSON.stringify(b));return b;};
- const finish=async(r,name,field,want,limit=600)=>{let motion=null,early=false,root=null;for(let n=0;n<limit;n++){const m=body().human?.handActuator;if(m){motion=m;root=[...body().pose.p];if((f.host.engine.world.tick-m.startTick)*f.host.engine.dt<0.6&&state(name)[field]===want)early=true;}const ph=edge.receipt(soul.soulId,r.receipt.id)?.phase;if(['completed','failed','cancelled','replaced'].includes(ph))break;await tick(1);}return {motion,early,root,phase:edge.receipt(soul.soulId,r.receipt.id).phase};};
+ const finish=async(r,name,field,want,limit=600)=>{let motion=null,early=false,root=null;for(let n=0;n<limit;n++){const m=body().human?.handActuator;if(m){motion=m;root=[...body().pose.p];if((f.host.engine.world.tick-m.startTick)*f.host.engine.dt<(m.reach??0.65)-0.05&&state(name)[field]===want)early=true;}const ph=edge.receipt(soul.soulId,r.receipt.id)?.phase;if(['completed','failed','cancelled','replaced'].includes(ph))break;await tick(1);}return {motion,early,root,phase:edge.receipt(soul.soulId,r.receipt.id).phase};};
  await act('object:radio:switch-off',false);
  await act('object:radio:change-station',false);
  // interruption before contact: nothing changes
@@ -65,7 +65,7 @@ test('radio: power and tuning knobs by hand, station cycle, refusal, interruptio
  for(const w of ['change the station','change the radio station','tune the radio','change station on the radio'])assert.equal(words[w],`object:${id('radio')}:change-station`,`"${w}": ${words[w]}`);
  assert.equal(words['turn off the radio'],`object:${id('radio')}:switch-off`);
  const tuned=[];
- for(const want of ['dance band','evening talk','quiet piano','dance band']){const x=await run('object:radio:change-station','radio','station',want,'tuner');tuned.push(x);assert.equal(x.motion.hold,0.9,'the hand holds the tuning knob while it turns');}
+ for(const want of ['dance band','evening talk','quiet piano','dance band']){const x=await run('object:radio:change-station','radio','station',want,'tuner');tuned.push(x);assert.equal(x.motion.hold,0.9,'the hand holds the tuning knob while it turns');assert.equal(x.motion.reach,1,'a deliberate reach to the knob');}
  const nearOn=await here(),onRow2=nearOn.objects.find(o=>o.id===id('radio'));assert.deepEqual(onRow2?.state,{on:true,station:'dance band'});
  // power and tuning are worked from one place: no shuffle between the knobs
  const roots=results.filter(r=>r.knob).map(r=>r.root),spread=Math.max(...roots.map(p=>Math.hypot(p[0]-roots[0][0],p[2]-roots[0][2])));

@@ -11,11 +11,13 @@ export const HAND_IDLE_HANDOFF_SECONDS=1.2;
 export const HAND_OPEN_ANGLE=-Math.PI*.48;
 const vec=z.tuple([z.number().finite(),z.number().finite(),z.number().finite()]);
 const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(.2).max(2),height:z.number().min(.3).max(3),handleY:z.number().min(.3).max(2),from:z.number().min(-1.6).max(0),to:z.number().min(-1.6).max(0),side:z.union([z.literal(1),z.literal(-1)]),bodyPolicy:z.literal('door-natural-v2').optional()}).strict();
-// Entry 37: `hold` keeps the hand on a switch for a while after contact (a radio's tuning knob turns while the dial sweeps).
-export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),hold:z.number().min(0).max(2).optional()}).strict();
+// Entry 37: `hold` keeps the hand on a switch for a while after contact (a radio's tuning knob turns while the dial sweeps);
+// `reach` is a slower, deliberate reach to a small knob (default HAND_REACH_SECONDS), contact at its end.
+export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),hold:z.number().min(0).max(2).optional(),reach:z.number().min(.3).max(2).optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
 const smooth=(v:number)=>{const k=Math.max(0,Math.min(1,v));return k*k*(3-2*k);};
+export const handReachSeconds=(m:Pick<HandActuatorMotion,'reach'>)=>m.reach??HAND_REACH_SECONDS;
 export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'hold'>){
  const o=m.opening;if(!o)return m.hold??0;
  if(o.bodyPolicy==='door-natural-v2')return Math.max(HAND_SWING_SECONDS,(Math.abs(o.to-o.from)*(o.radius+.42)+.35)*1.5/1.2);
@@ -23,12 +25,12 @@ export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'hold'>){
  return Math.max(HAND_SWING_SECONDS,Math.abs(o.to-o.from)*Math.hypot(o.radius+(o.side<0?-.5:0),.42)*1.5/1.2);
 }
 export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
- const swing=handSwingSeconds(m),releaseAt=HAND_REACH_SECONDS+swing;
- const commitAt=m.opening?.to===0?releaseAt:HAND_REACH_SECONDS;
- const k=smooth(((m.abortedAt??seconds)-HAND_REACH_SECONDS)/(swing||1));
+ const R=handReachSeconds(m),swing=handSwingSeconds(m),releaseAt=R+swing;
+ const commitAt=m.opening?.to===0?releaseAt:R;
+ const k=smooth(((m.abortedAt??seconds)-R)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0;
  const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/HAND_RELEASE_SECONDS))
-   :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/HAND_RELEASE_SECONDS));
+   :smooth(seconds/R)*(1-smooth((seconds-releaseAt)/HAND_RELEASE_SECONDS));
  const armDownAt=(m.abortedAt??releaseAt)+HAND_RELEASE_SECONDS,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
  return {angle,weight,idleBlend,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt};
 }
@@ -100,12 +102,12 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/.4);
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
   if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
-  if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<HAND_REACH_SECONDS?'reaching':ex.t<HAND_REACH_SECONDS+handSwingSeconds(ex.motion)?'operating':'releasing'};
+  if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<handReachSeconds(ex.motion)?'reaching':ex.t<handReachSeconds(ex.motion)+handSwingSeconds(ex.motion)?'operating':'releasing'};
  },
  cancel(rt,ex){
   // Before contact, return the partly raised arm without applying anything.
   // Once grasped, complete the short safe swing/release before a new walk owns the body.
-  if(ex.t<HAND_REACH_SECONDS&&ex.motion.abortedAt===undefined){ex.motion.abortWeight=handActuatorFrame(ex.motion,ex.t).weight;ex.motion.abortedAt=ex.t;}
+  if(ex.t<handReachSeconds(ex.motion)&&ex.motion.abortedAt===undefined){ex.motion.abortWeight=handActuatorFrame(ex.motion,ex.t).weight;ex.motion.abortedAt=ex.t;}
   return {ok:true,deferred:true};
  },resumable:true,
 };

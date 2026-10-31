@@ -11,6 +11,8 @@ export const CONTACT_REACH = .8;
 export const TUNE_HOLD_SECONDS = .9;
 /** Entry 37: how far in front of a panel of knobs (a radio) the body stands. */
 export const PANEL_STAND = .45;
+/** Entry 37: a reach to a panel's small knob is deliberate: 1 s instead of the 0.65 s switch reach. */
+export const PANEL_REACH_SECONDS = 1;
 export type ContactActuatorIntent = { target:string; action:string; actor:string; owner:string; binding:string; motionV1?:true };
 export const isContactActuator = (def:StoredDef, action:{name:string}) => contactStateKey(def,action.name)!==null;
 const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
@@ -50,7 +52,9 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
      // shuffle between the two knobs. 0.45 m out (take 2: at 0.55 m the reach out of folded arms peaked at 0.087 m/50 ms):
      // elbows bent at a radio, the hands' travel shorter.
      const tuner=shapes?.find(s=>s.tint==='tuner'&&s.at);
-     if(tuner?.at&&valve.at){const mid=placeOf(valve.at.map((v,i)=>(v+tuner.at![i])/2));root=[mid[0]+s*PANEL_STAND,wp.y,mid[2]+c*PANEL_STAND];}
+     // Take 3: out of an idle gesture with the hand at the head, the 0.65 s reach to a knob 0.5 m lower drew the hand at
+     // 0.108 m/50 ms mid-reach; a small knob is reached deliberately, over PANEL_REACH (contact at its end).
+     if(tuner?.at&&valve.at){const mid=placeOf(valve.at.map((v,i)=>(v+tuner.at![i])/2));root=[mid[0]+s*PANEL_STAND,wp.y,mid[2]+c*PANEL_STAND];params.reach=PANEL_REACH_SECONDS;}
      // Entry 33 (take 4): a stand point beside the valve can leave the body ~40° off the valve when it arrives (a wall
      // torch approached along its wall); the Soul turns to face the valve on arrival, before the arm comes up, so the
      // reach is never added to a body turn (the hand actuator's own turn is then ~0).
