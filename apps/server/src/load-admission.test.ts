@@ -3,7 +3,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {Hono} from 'hono';
-import {Admission, admissionMiddleware, classify, type RouteClass, type Ticket} from './load/admission.ts';
+import {Admission, admissionMiddleware, classify, FRAME_BUDGET_MS, frameBudgetMs, type RouteClass, type Ticket} from './load/admission.ts';
 import type {Level} from './load/shared.ts';
 
 const tick = () => new Promise(r => setTimeout(r, 2));
@@ -201,4 +201,30 @@ test('a read that cannot start before its deadline is answered world.busy at onc
   const act = f.ask('Y', route('POST', '/v1/edge/act'));
   assert.equal(act.result, undefined, 'the act queues');
   blocker.done(); f.adm.close();
+});
+
+const LEVELS4: Level[] = ['green', 'amber', 'red', 'black'];
+const r1 = (x: number) => Math.round(10 * x) / 10;
+test('frame budget from the measured quiet tick (srv-admission-calib): production 23/15/8/0, a 35 ms box 9/6/3/0', () => {
+  assert.deepEqual(LEVELS4.map(l => r1(frameBudgetMs(l, 12))), [22.8, 15, 7.6, 0], 'production (tick 12 ms): ≈ today');
+  assert.deepEqual(LEVELS4.map(l => r1(frameBudgetMs(l, 35))), [9, 6, 3, 0], 'a box ticking at 35 ms');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, 0)), [25, 15, 8, 0], 'not measured yet: the caps (today)');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, 5)), [25, 15, 8, 0], 'the laptop: capped at today');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, 60)), [2, 1, 0.5, 0], 'a tick that fills the frame: the floor, so the world still answers');
+  assert.deepEqual(LEVELS4.map(l => frameBudgetMs(l, Number.NaN)), [25, 15, 8, 0]);
+  for (const q of [0, 8, 12, 20, 35, 45, 49, 80]) for (const l of LEVELS4) assert.ok(frameBudgetMs(l, q) <= FRAME_BUDGET_MS[l], `${l}@${q}: never above today`);
+});
+
+test('world-total frame budget follows the quiet tick: at 12 ms and at 35 ms, requests take at most budget/50 of the thread', async () => {
+  for (const quiet of [12, 35]) for (const level of ['green', 'amber', 'red'] as Level[]) {
+    let now = 0, spent = 0; const adm = new Admission({now: () => now, yieldTurn: () => new Promise(() => {}), quietTickMs: () => quiet});
+    adm.setLoadLevel(level);
+    const queueAll = () => { for (let i = 0; i < 100; i++) { const k = `S${i}`; if (adm.outstanding.has(k)) continue; const t = adm.request({key: k, god: false, route: route('POST', '/v1/edge/act')}); if ('turn' in t) void t.turn.then(v => { if (v === 'run') { now += 2; spent += 2; t.done(); } }); } };
+    for (let step = 0; step < 200; step++) { queueAll(); await adm.drain(); now += 10; }
+    const share = spent / now, cap = frameBudgetMs(level, quiet) / 50;
+    assert.equal(adm.frameBudget(), frameBudgetMs(level, quiet));
+    assert.ok(share <= cap + 0.03, `${level}@${quiet}: requests took ${(100 * share).toFixed(1)} % of the thread (cap ${(100 * cap).toFixed(1)} %)`);
+    assert.ok(share >= cap * 0.6, `${level}@${quiet}: the budget is used (${(100 * share).toFixed(1)} %)`);
+    adm.close();
+  }
 });

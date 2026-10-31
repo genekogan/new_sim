@@ -5,7 +5,7 @@
 // whose client went away is dropped. It queues, delays and refuses; it never chooses or retries an act for a Soul.
 import {createHash} from 'node:crypto';
 import type {Context, MiddlewareHandler} from 'hono';
-import type {Level} from './shared.ts';
+import {S, sharedLoad, type Level} from './shared.ts';
 import {crowdedNote} from './waking.ts';
 
 export type Cls = 'C0' | 'C1' | 'C2' | 'C3';
@@ -40,10 +40,24 @@ export function classify(method: string, path: string): RouteClass | null {
   return null;
 }
 
-/** Dial values (LOAD-CONTRACT §1). Frame budget: request ms per 50 ms frame. Refill: per-Soul bucket multiplier. */
+/** Dial values (LOAD-CONTRACT §1, §2b). Frame budget: request ms per 50 ms frame. These are the caps (tuned on the laptop);
+ *  the budget a world gets is calibrated to what its own tick leaves of the frame (frameBudgetMs below). */
 export const FRAME_BUDGET_MS: Record<Level, number> = {green: 25, amber: 15, red: 8, black: 0};
+/** Share of the frame's slack (50 ms − the quiet tick) the requests may take, by level (lane srv-admission-calib). */
+export const FRAME_SLACK_K: Record<Level, number> = {green: 0.6, amber: 0.4, red: 0.2, black: 0};
+/** Floor, so a world whose quiet tick nearly fills the frame still answers (slowly) rather than never. */
+export const FRAME_BUDGET_FLOOR_MS: Record<Level, number> = {green: 2, amber: 1, red: 0.5, black: 0};
+export const FRAME_MS = 50;
+/** The calibrated frame budget: min(cap, max(floor, k × max(0, 50 − quietTickMs))). quietTickMs = the monitor's EWMA of
+ *  the tick's own ms in quiet windows (monitor.ts QuietTick; 0 = not measured yet → the caps). Production (tick 12 ms):
+ *  22.8/15/7.6/0; a box ticking at 35 ms: 9/6/3/0; the laptop (tick ≤ 8 ms): 25/15/8/0. */
+export function frameBudgetMs(level: Level, quietTickMs: number): number {
+  const cap = FRAME_BUDGET_MS[level];
+  if (!(quietTickMs > 0) || !Number.isFinite(quietTickMs)) return cap;
+  return Math.min(cap, Math.max(FRAME_BUDGET_FLOOR_MS[level], FRAME_SLACK_K[level] * Math.max(0, FRAME_MS - quietTickMs)));
+}
 export const REFILL_X: Record<Level, number> = {green: 1, amber: 0.5, red: 0.25, black: 0.25};
-const COOL_MS = 60_000, FRAME_MS = 50, CAPACITY_MS = 2000, GOD_SHARE = 0.25, DEFAULT_EST_MS = 20, ANSWER_MARGIN_MS = 250, ACTIVE_MS = 60_000;
+const COOL_MS = 60_000, CAPACITY_MS = 2000, GOD_SHARE = 0.25, DEFAULT_EST_MS = 20, ANSWER_MARGIN_MS = 250, ACTIVE_MS = 60_000;
 
 type Job = {key: string; god: boolean; route: RouteClass; arrival: number; deadline: number; closed: () => boolean;
   settle: (v: 'run' | 'dropped' | Refusal) => void; finished: Promise<void>; finish: () => void};
@@ -52,6 +66,9 @@ type Bucket = {tokens: number; at: number; seen: number};
  *  ticket as its reply handle). The HTTP middleware below is one front end; a worker's MessagePort can be another. */
 export type Ticket = {refusal: Refusal} | {turn: Promise<'run' | 'dropped' | Refusal>; done: () => void; waitedMs: () => number};
 
+export type AdmissionOpts = {now?: () => number; yieldTurn?: () => Promise<void>;
+  /** The quiet tick ms (default: the monitor's, from the process's shared numbers, S.quietTickMs). */
+  quietTickMs?: () => number};
 export class Admission {
   level: Level = 'green';
   readonly queue: Job[] = [];
@@ -69,10 +86,13 @@ export class Admission {
   private share = {god: 0, souls: 0};   // decaying ms spent, for the god's reserve
   private draining = false; private wake: NodeJS.Timeout | null = null; private soon: NodeJS.Immediate | null = null; private sweeper: NodeJS.Timeout | null = null;
   private now: () => number;
-  private o: {now?: () => number; yieldTurn?: () => Promise<void>};
-  constructor(o: {now?: () => number; yieldTurn?: () => Promise<void>} = {}) { this.o = o; this.now = o.now ?? (() => performance.now()); }
+  private o: AdmissionOpts;
+  private quietTick: () => number;
+  constructor(o: AdmissionOpts = {}) { this.o = o; this.now = o.now ?? (() => performance.now()); this.quietTick = o.quietTickMs ?? (() => sharedLoad[S.quietTickMs]); }
+  /** This level's frame budget (request ms per 50 ms frame), calibrated from the measured quiet tick (frameBudgetMs). */
+  frameBudget(level: Level = this.level) { return frameBudgetMs(level, this.quietTick()); }
 
-  /** Load dial (LOAD-CONTRACT §1): frame budget 25/15/8/0 ms and bucket refill ×1/×0.5/×0.25/×0.25. */
+  /** Load dial (LOAD-CONTRACT §1): frame budget (frameBudgetMs, at most 25/15/8/0 ms) and bucket refill ×1/×0.5/×0.25/×0.25. */
   setLoadLevel(level: Level) { this.level = level; this.kick(); }
   queueStats() { const now = this.now(); let oldest = 0; for (const j of this.queue) oldest = Math.max(oldest, now - j.arrival); return {depth: this.queue.length, oldestMs: Math.round(oldest)}; }
   /** Principals (Souls + god) with a heavy request in the last minute: the `awake` of the refill formula. */
@@ -113,7 +133,7 @@ export class Admission {
     // not after the client has waited for nothing; acts always queue (refused only past their deadline)
     if (read && this.queue.length) {
       let ahead = 0; for (const j of this.queue) ahead += this.estimate(j.route.id);
-      const wait = ahead * FRAME_MS / Math.max(1, FRAME_BUDGET_MS[this.level]);
+      const wait = ahead * FRAME_MS / Math.max(1, this.frameBudget());
       if (now + wait + est + ANSWER_MARGIN_MS >= deadline) { this.shed.reads++; return {refusal: {...busyRefusal(this.level), retryAfterS: Math.max(busyRefusal(this.level).retryAfterS, Math.ceil(wait / 1000))}}; }
     }
     let settle!: Job['settle'], finish!: () => void;
@@ -135,7 +155,7 @@ export class Admission {
     return {turn, waitedMs: () => (ranAt || this.now()) - now, done: () => { if (isDone) return; isDone = true; this.outstanding.delete(r.key); finish(); this.kick(); }};
   }
 
-  private creditNow(now: number) { const budget = FRAME_BUDGET_MS[this.level]; this.credit = Math.min(budget, this.credit + (now - this.creditAt) * budget / FRAME_MS); this.creditAt = now; return this.credit; }
+  private creditNow(now: number) { const budget = this.frameBudget(); this.credit = Math.min(budget, this.credit + (now - this.creditAt) * budget / FRAME_MS); this.creditAt = now; return this.credit; }
   /** Debit a job's measured time: the world credit, the god/Souls shares, the principal's bucket, the route estimate. */
   private charge(key: string, god: boolean, id: string, ms: number, startedAt: number) {
     this.creditNow(startedAt); this.credit -= ms; this.spentMs += ms;
@@ -196,7 +216,7 @@ export class Admission {
       while (this.queue.length) {
         let now = this.now();
         this.sweep(now);
-        const budget = FRAME_BUDGET_MS[this.level];
+        const budget = this.frameBudget();
         if (this.creditNow(now) <= 0) { this.later(budget > 0 ? Math.min(1000, -this.credit * FRAME_MS / budget + 1) : FRAME_MS); return; }
         const i = this.pick(now);
         if (i < 0) { this.later(FRAME_MS); return; }

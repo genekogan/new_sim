@@ -1,7 +1,7 @@
 // srv-load: load levels with hysteresis (LOAD-CONTRACT §1), live.json from the shared numbers (§4).
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {BASELINE_CAP_MS, LevelState, LoadMonitor, QuietBaseline, STEP_DOWN_MS, type Signals} from './load/monitor.ts';
+import {BASELINE_CAP_MS, LevelState, LoadMonitor, QUIET_TICK_ALPHA, QuietBaseline, QuietTick, STEP_DOWN_MS, type Signals} from './load/monitor.ts';
 import {liveOf, newSharedLoad, S} from './load/shared.ts';
 import {attachBootSlots, bootPhase, bootSlots, bootTick} from './load/boot-progress.ts';
 
@@ -154,4 +154,36 @@ test('live.json: phases, boot progress through the absorbed L5 slots, and the tu
     assert.ok(live.loop.lastTurnAgeMs >= 40_000, 'a thread that stopped turning shows its age');
     assert.equal(live.v, 1); assert.equal(live.pid, 42);
   } finally { attachBootSlots(before.view as Float64Array, before.offset); }
+});
+
+test('quiet tick (srv-admission-calib): an EWMA over quiet windows; a provisional seed until the first quiet window', () => {
+  const q = new QuietTick();
+  assert.equal(q.window(30, false, true), 30, 'never quiet yet: a served window seeds it provisionally');
+  assert.equal(q.window(40, false, false), 30, 'an unserved, loaded window teaches nothing');
+  assert.equal(q.window(12, true, true), 12, 'the first quiet window replaces the provisional seed');
+  assert.equal(q.window(50, false, true), 12, 'after that, loaded windows teach nothing');
+  assert.ok(Math.abs(q.window(22, true, true) - (12 + QUIET_TICK_ALPHA * 10)) < 1e-9, 'quiet windows move it by alpha');
+  assert.equal(q.window(Number.NaN, true, true), 13);
+});
+
+test('monitor: the quiet tick is the window\'s own tick average, learned only in quiet windows, and published', () => {
+  let now = 0, reqMs = 0;
+  const host = {engine: {world: {tick: 0}}, tickMs: [] as number[], paused: false, pace: 1, baseRate: 1, running: true, clockAvailable: true};
+  const shared = newSharedLoad(), m = new LoadMonitor({host, now: () => now, shared, requestMs: () => reqMs, windowMs: 5000});
+  m.start(); m.stop();   // opens the first window at now = 0 (no histogram needed: windowDone is driven by hand)
+  const run = (ms: number, n = 100) => { for (let i = 0; i < n; i++) { host.engine.world.tick++; host.tickMs.push(ms); if (host.tickMs.length > 400) host.tickMs.splice(0, 200); } };
+  run(3); now = 5000; m.sample(); m.windowDone(10, now);   // the serving warm-up window: not learned
+  assert.equal(m.quietTick.value, 0);
+  run(12); now = 10_000; m.sample(); m.windowDone(10, now);
+  assert.equal(m.quietTick.value, 12, 'the window\'s own 100 ticks, not the 20 s ring (which still holds the warm-up 3 ms ticks)');
+  assert.equal(shared[S.quietTickMs], 12);
+  reqMs += 2000; run(35); now = 15_000; m.sample(); m.windowDone(10, now);
+  assert.equal(m.quietTick.value, 12, 'a loaded window (requests 40 % of it) teaches nothing');
+  run(14); now = 20_000; m.sample(); m.windowDone(10, now);
+  assert.ok(Math.abs(m.quietTick.value - 12.2) < 1e-9, String(m.quietTick.value));
+  m.sample();
+  assert.equal(m.health().quietTickMs, 12.2); assert.equal(m.health().frameBudgetMs, 22.7, 'green: 0.6 × (50 − 12.2)');
+  const before = bootSlots(); attachBootSlots(shared, S.boot);
+  try { bootPhase('serving', 0); assert.equal(liveOf(shared, 1, now).tick!.quietAvgMs, 12.2, 'live.json carries it for the launcher and the bench'); }
+  finally { attachBootSlots(before.view as Float64Array, before.offset); }
 });
