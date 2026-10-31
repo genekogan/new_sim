@@ -1,6 +1,6 @@
 // Entry 31: framing check before any take (seats paired, no command sent): one still from the proof's fixed camera.
 import {createRequire} from 'node:module';import {mkdirSync,existsSync,copyFileSync} from 'node:fs';import {execFile} from 'node:child_process';import {promisify} from 'node:util';
-const run=promisify(execFile),scene='<team>/soul-actions/day-31/scene',base='http://127.0.0.1:7872/w/soul-door-passage',out=process.argv[2];
+const run=promisify(execFile),scene=process.env.SOUL_DOOR_SCENE??'<team>/soul-actions/day-31/scene',base=`http://127.0.0.1:${process.env.SOUL_DOOR_PORT??7872}/w/soul-door-passage`,out=process.argv[2];
 const cli=async(seat,args)=>JSON.parse((await run(process.execPath,['eden.mjs',...args,'--json'],{cwd:scene+'/'+seat,timeout:120000})).stdout);
 for(const [seat,name] of Object.entries({ada:'Ada',bea:'Bea'})){const dir=scene+'/'+seat;mkdirSync(dir,{recursive:true});if(!existsSync(dir+'/.eden-agent.json')){copyFileSync(new URL('../world-launcher/soul/eden.mjs',import.meta.url).pathname,dir+'/eden.mjs');console.log(JSON.stringify(await cli(seat,['register',base])).slice(0,200));console.log(JSON.stringify(await cli(seat,['create',name])).slice(0,300));}const st=await cli(seat,['status']);console.log(seat,JSON.stringify(st).slice(0,400));}
 const require=createRequire(new URL('../../mars/viewer/package.json',import.meta.url)),{chromium}=require('@playwright/test'),browser=await chromium.launch({channel:'chrome',headless:true}),page=await browser.newPage({viewport:{width:1440,height:1080}});
