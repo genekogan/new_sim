@@ -50,7 +50,7 @@ for (const [label, startX] of [['a bystander on the west shelf point', 74], ['a 
     assert.ok(Math.hypot(w.pos(a)[0] - shelf[0], w.pos(a)[1] - shelf[1]) < 0.5, `A stands on the browse point: ${w.pos(a)} vs ${shelf}`);
     for (const s of by) assert.ok(['idle', 'wait'].includes(w.body(s).human.activity), `${s.name} is idle`);
     // make-way records already there (the four 'go' arrivals in a busy library may nudge one another) are not this read's
-    const before = new Set(w.engine.runtime.records.keys()), tick0 = w.engine.world.tick, earlier = [...before].filter(id => id.includes(':make-way:'));
+    const before = new Set<string>(w.engine.runtime.records.keys() as Iterable<string>), tick0 = w.engine.world.tick, earlier = [...before].filter(id => id.includes(':make-way:'));
     const nudges = new Set<string>(), drift = new Map(by.map(s => [s.soulId, 0])); let browses = 0, prev = '';
     await w.ticks(6000, () => {
       for (const id of w.engine.runtime.records.keys()) if (!before.has(id) && id.includes(':make-way:') && by.some(s => id.startsWith(s.entityId + ':'))) nudges.add(id);
