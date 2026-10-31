@@ -1,3 +1,5 @@
+/** How far an opted-in drawer (kit role `drawer`) slides out, in the def's metres (Soul Actions entry 24). */
+export const DRAWER_TRAVEL=.32;
 /** Opted-in physical actuators. This small shared predicate keeps admission,
  * completion and the viewer's depicted-state clock on the same contract. */
 export function contactStateKey(def:{tags?:readonly string[];components?:{light?:unknown;lights?:unknown;opening?:unknown;container?:unknown}},action?:string):'on'|'open'|null {

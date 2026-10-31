@@ -105,11 +105,12 @@ export class WorldEntityLayer {
    * including reach, swing and release. No wall-clock tween during native operation. */
   drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
     for(const e of Object.values(entities)){
-      const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m?.opening)continue;
+      const m=e.state.handActuator as HandActuatorMotion|undefined;if(!m?.opening&&!m?.slide)continue;
       const d=this.drawn.get(m.target);if(!d)continue;
-      const angle=handActuatorFrame(m,(tick-m.startTick)*dt).angle;
+      const f=handActuatorFrame(m,(tick-m.startTick)*dt),target=this.model?.entities.get(m.target),scale=target?this.model!.worldPose(target).s||1:1;
       if(d.frozen)this.thaw(d);d.opening=undefined;
-      d.obj.traverse(o=>{if(o.userData.role==='door')o.rotation.y=angle;});d.obj.updateMatrixWorld(true);
+      // a hinged leaf turns by the recorded angle; a drawer (entry 24) slides by the recorded travel, in its own units
+      d.obj.traverse(o=>{if(m.opening&&o.userData.role==='door')o.rotation.y=f.angle;if(m.slide&&o.userData.role==='drawer'&&typeof o.userData.restZ==='number')o.position.z=o.userData.restZ+f.pos/scale;});d.obj.updateMatrixWorld(true);
     }
   }
   get entityCount() { return this.model?.entities.size ?? 0; }

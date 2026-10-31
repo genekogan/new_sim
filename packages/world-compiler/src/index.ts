@@ -1,5 +1,5 @@
 export * from './schemas.ts';
-export {contactStateKey} from './contact.ts';
+export {contactStateKey,DRAWER_TRAVEL} from './contact.ts';
 export { WorldModel, definitionRefs, nearHash, obbOverlap, type OBB, type AssetInfo, type AssetLookup } from './model.ts';
 export { plan, applyBatch, checkFields, aimOf, boundsOf, onAbsoluteDeck, type Plan, type PlanOptions, type UsesHook, type Diff } from './compile.ts';
 export { padResettle, RESETTLE_TOL_M } from './pad-resettle.ts';
