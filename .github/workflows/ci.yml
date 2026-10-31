@@ -1,33 +1,81 @@
-# Complete application checks on isolated runners; preserve every acceptance target.
-# Manual only (OPS B5, 2026-10-20): the GitHub account's Actions billing failed, so every push showed a red run that never
-# started. Releases are qualified by the Modal gate (tools/test-harness/release-gate.sh). Restore the push/pull_request
-# triggers once billing is fixed (Gene's), or run this by hand: gh workflow run ci.yml --ref <branch>.
+# Application checks on isolated runners, scoped to what a change touches.
+# The job matrix is the release gate's CPU contract split for GitHub runners; `scope` picks jobs with the same path
+# map as `tools/test-harness/release-gate.mjs --scope auto` (.github/scripts/ci-scope.mjs). Branch protection requires
+# the single `ci-ok` check. The full Modal gate still qualifies releases (release.yml); CI is the per-PR check.
 name: ci
 on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  # Where tools/assets pull keeps its content-addressed download cache (restored by actions/cache below).
+  SIM_ASSETS_CACHE: ${{ github.workspace }}/../.sim-assets-cache
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.scope.outputs.matrix }}
+      any: ${{ steps.scope.outputs.any }}
+      scope: ${{ steps.scope.outputs.scope }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: 22 }
+      - id: scope
+        name: Pick jobs from changed paths
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # A manual run checks everything.
+          if [ "$EVENT" = workflow_dispatch ]; then BASE=; fi
+          node .github/scripts/ci-scope.mjs --base "$BASE" --head "$HEAD_SHA"
+      - name: Scope selector tests
+        run: node --test .github/scripts/ci-scope.test.mjs
+
   qualify:
     name: ${{ matrix.name }}
+    needs: scope
+    if: needs.scope.outputs.any == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { name: types-web, kind: types-web }
-          - { name: packages, kind: packages }
-          - { name: native, kind: native }
-          - { name: latency, kind: latency }
-          - { name: server-0, kind: server, shard: 0 }
-          - { name: server-1, kind: server, shard: 1 }
+      matrix: ${{ fromJSON(needs.scope.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0 }
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      # pnpm's version comes from package.json `packageManager` (pnpm@10.27.0).
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: Run complete assigned checks
+      - name: Restore media cache
+        if: matrix.assets
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SIM_ASSETS_CACHE }}
+          key: sim-assets-${{ hashFiles('tools/assets/**', 'tools/cdn/*.json') }}
+          restore-keys: sim-assets-
+      - name: Pull media
+        if: matrix.assets
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['assets:pull'] ? 0 : 1)"; then
+            pnpm assets:pull
+          else
+            echo "::warning::package.json has no assets:pull script yet; media-dependent checks may fail"
+          fi
+      - name: Run assigned checks
         env:
           CHECK_KIND: ${{ matrix.kind }}
           SERVER_SHARD: ${{ matrix.shard }}
@@ -64,12 +112,20 @@ jobs:
           process.exit(result.status ?? 1);
           NODE
               ;;
-            *) exit 1 ;;
+            *) echo "unknown check kind: $CHECK_KIND"; exit 1 ;;
           esac
-  # Retain a single stable required-check name and fail unless every lane passed.
-  check:
+
+  # The one required check: passes when every selected job passed (or none was needed).
+  ci-ok:
     runs-on: ubuntu-latest
-    needs: qualify
+    needs: [scope, qualify]
     if: always()
     steps:
-      - run: test '${{ needs.qualify.result }}' = success
+      - env:
+          SCOPE: ${{ needs.scope.result }}
+          QUALIFY: ${{ needs.qualify.result }}
+          ANY: ${{ needs.scope.outputs.any }}
+        run: |
+          echo "scope=$SCOPE qualify=$QUALIFY jobs_selected=$ANY"
+          test "$SCOPE" = success
+          if [ "$ANY" = true ]; then test "$QUALIFY" = success; else test "$QUALIFY" = skipped; fi
