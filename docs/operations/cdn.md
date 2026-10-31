@@ -73,9 +73,10 @@ entries, secret-named files, nested symlinks and `node_modules` are never opened
 `$EDEN_CDN_BR_CACHE` (default a temp directory). `--identity` writes an identity-only plan; `--base <manifest>` keeps
 that manifest's world-scoped section.
 
-Uploading needs `CF_ACCOUNT_ID` (the Cloudflare account that owns the R2 bucket) and the R2 credentials file named
-by `EDEN_ASSETS_CREDENTIALS`, both from the environment or the untracked `deploy.env` (template
-[`deploy.env.example`](../../deploy.env.example)); a real `--apply` without the account id stops before any request.
+Uploading needs `CF_ACCOUNT_ID` (the Cloudflare account that owns the R2 bucket), from the environment or the
+untracked `deploy.env` (template [`deploy.env.example`](../../deploy.env.example)), and the R2 credentials file named
+by `EDEN_ASSETS_CREDENTIALS`, which the upload tools read from the environment only. A real `--apply` without the
+account id stops before any request.
 The variable holds the absolute path of a single-link regular file owned by the current user, mode 0600, containing exactly `R2_ACCESS_KEY_ID=...` and `R2_SECRET_ACCESS_KEY=...`.
 Nothing else (environment keys, `~/.aws`, rclone config) is read. In CI, write the secret to a temporary 0600 file
 and point the variable at it. `tools/cdn/install-key.py <path>` creates such a file from hidden

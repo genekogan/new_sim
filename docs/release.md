@@ -47,8 +47,16 @@ a `version` (for the changelog and tag) and optional `label`, `baseline` (defaul
 4. **publish**: compiles `changes/` into [`CHANGELOG.md`](../CHANGELOG.md), tags `v<version>` on the shipped commit
    and creates the GitHub Release.
 
-The production host, SSH user and key, known-hosts entry and the Modal token come from repository and environment
-secrets and variables (the workflow header lists them); none are in the repository.
+Configuration lives in GitHub, never in the repository; preflight names whatever is missing:
+
+| Name | Kind | Purpose |
+|---|---|---|
+| `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET` | repository secrets | the remote gate |
+| `SIM_DEPLOY_HOST`, `SIM_DEPLOY_USER` | variables (or secrets) | SSH target of the production host |
+| `DEPLOY_SSH_KEY`, `SIM_DEPLOY_KNOWN_HOSTS` | `production` environment secrets | SSH key and the host's known-hosts entry |
+| `SIM_PROBE_GOD_JSON` | optional secret | god file of the release-probe world; without it the probe is skipped |
+| `SIM_ORIGIN` | optional variable | public origin, default `https://sim.eden.art` |
+| `MODAL_CLIENT_VERSION` | optional variable | pip pin for the Modal client |
 
 Outside the workflow, the scripts read the same variables from the environment or from an untracked `deploy.env` at
 the repository root (copy [`deploy.env.example`](../deploy.env.example); the environment wins). Loaders:
