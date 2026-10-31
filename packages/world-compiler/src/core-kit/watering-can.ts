@@ -12,16 +12,16 @@ export const CAN_OPENING: [number, number, number] = [0.115, 0.27, 0];
 /** The hook (local): where the can's handle grip rests on its arm when it hangs, clear of the post. */
 export const HOOK_PEG: [number, number, number] = [0, 1.226, 0.22];
 
-const canPalette = { metal: '#9aa3a6', dark: '#4f5659', water: '#5b8fb8' };
+const canPalette = { metal: '#c3cbce', dark: '#6b7376', water: '#5b8fb8' };
 const wateringCan: DefInput = {
   schema: 'def/1', name: 'core-watering-can', version: 2,
   description: `A galvanised garden watering can (${CAN_LITRES} L) with an arched top handle, a long spout and a rose. It is carried by the handle; tilted, it waters the soil through the rose.`,
   tags: ['object', 'tool', 'watering-can', 'garden'], form: 'point',
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.006, shapes: [
     // body: a slightly tapered drum with a domed shoulder
-    { kind: 'lathe', at: [0.06, 0, 0], profile: [[0, 0], [0.122, 0], [0.126, 0.012], [0.12, 0.215], [0.104, 0.248], [0.07, 0.266], [0, 0.27]], segments: 18, tint: 'metal' },
-    { kind: 'cyl', at: [0.06, 0.012, 0], r: 0.127, h: 0.016, segments: 18, tint: 'dark' },
-    { kind: 'cyl', at: [0.06, 0.252, 0], r: 0.106, h: 0.01, segments: 18, tint: 'dark' },
+    { kind: 'lathe', at: [0.06, 0, 0], profile: [[0, 0], [0.11, 0], [0.114, 0.012], [0.109, 0.215], [0.095, 0.248], [0.064, 0.266], [0, 0.27]], segments: 18, tint: 'metal' },
+    { kind: 'cyl', at: [0.06, 0.012, 0], r: 0.115, h: 0.016, segments: 18, tint: 'dark' },
+    
     // filler opening ahead of the handle, with a rolled collar; water shows in it when there is some
     { kind: 'cyl', at: [CAN_OPENING[0], 0.266, 0], r: 0.05, h: 0.022, segments: 14, tint: 'metal' },
     { kind: 'cyl', at: [CAN_OPENING[0], 0.276, 0], r: 0.04, h: 0.004, segments: 14, tint: 'dark' },
@@ -31,7 +31,7 @@ const wateringCan: DefInput = {
     // the rear pouring handle
     { kind: 'sweep', at: [0, 0, 0], path: [[-0.058, 0.2, 0], [-0.11, 0.17, 0], [-0.118, 0.11, 0], [-0.09, 0.06, 0], [-0.06, 0.05, 0]], r: 0.01, segments: 6, tint: 'metal' },
     // the spout from low on the front, up to the rose
-    { kind: 'sweep', at: [0, 0, 0], path: [[0.165, 0.05, 0], [0.26, 0.15, 0], [0.36, 0.255, 0], [0.44, 0.33, 0]], r: 0.014, segments: 7, tint: 'metal' },
+    { kind: 'sweep', at: [0, 0, 0], path: [[0.155, 0.05, 0], [0.26, 0.15, 0], [0.36, 0.255, 0], [0.44, 0.33, 0]], r: 0.014, segments: 7, tint: 'metal' },
     { kind: 'cone', at: [0.452, 0.341, 0], r: 0.036, h: 0.04, segments: 12, tint: 'metal', roll: Math.PI - 0.82 },
     { kind: 'cyl', at: [CAN_ROSE[0], CAN_ROSE[1], 0], r: 0.037, h: 0.006, segments: 12, tint: 'dark', roll: -0.82 }] } } as unknown as DefInput['make'],
   params: { ...Object.fromEntries(Object.entries(canPalette).map(([k, v]) => [k, { type: 'color', default: v, doc: `${k} colour` }])), litres: { type: 'number', min: 1, max: 30, default: CAN_LITRES, doc: 'litres it holds' } } as DefInput['params'], palette: canPalette,
