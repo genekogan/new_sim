@@ -81,7 +81,7 @@ Exercise the real flow a user takes: a change to sitting means a Soul or visitor
 the panel renders. Failures re-enter Phase 3.
 
 ## Phase 5 — Docs and changelog
-**Inventory**: root and package `README.md`, `AGENTS.md`, `E2E.md`, `docs/`, tool `--help` text, env-var docs
+**Inventory**: root and package `README.md`, `AGENTS.md`, `docs/`, tool `--help` text, env-var docs
 (`.env.example`), skill files under `.claude/skills/`.
 1. **Forward**: for every surface the diff changed (exported function, CLI flag, route, env var, schema field, file
    layout), update every doc that mentions it.

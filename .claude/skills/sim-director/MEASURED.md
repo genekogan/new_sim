@@ -62,7 +62,7 @@ Schema (`tools/playtest/director/swarm/cast.mjs`; defaults filled in when omitte
 | field | meaning |
 |---|---|
 | `kind`, `name`, `version`, `seed` | `"cast"`; lowercase name (names the run folder); 1; an integer label |
-| `world` | `{"kind":"dev","genesis":"worlds/templates/<t>.json","slug":"pt-…","port":N,"natives":false}`: a fresh local world from a template (relative to the server root). Pick a port no other run uses and none `E2E.md` reserves. `{"kind":"url","base":"https://…"}` only on the user's word |
+| `world` | `{"kind":"dev","genesis":"worlds/templates/<t>.json","slug":"pt-…","port":N,"natives":false}`: a fresh local world from a template (relative to the server root). Pick a port no other run uses and none `e2e/config.mjs` reserves. `{"kind":"url","base":"https://…"}` only on the user's word |
 | `durationSec` | hard cap; the session also stops when the last talk is done |
 | `brief` | the shared plan in owner language: who they are, where they meet, what each does, in what order |
 | `room` | `{"label":"the library hall","match":["hall"]}`: `match` are lowercase substrings of the Soul's public `placePath`. Find names in a template with `tools/playtest/scenarios/lib/world-names.mjs` (`templateNames`) |

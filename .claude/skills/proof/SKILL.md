@@ -44,8 +44,23 @@ curl -s -X POST -H 'content-type: application/json' -H 'authorization: Bearer de
 ```
 
 Pick the template that contains the changed surface (`worlds/templates/`: hello-hamlet is small and fast; eden-2026,
-mars-two and others are larger). Use a free port; `E2E.md` lists ports reserved for other harnesses. Stop the server
+mars-two and others are larger). Use a free port; `e2e/config.mjs` lists ports reserved for other harnesses. Stop the server
 with `kill <pid>` when done.
+
+## Quick proof the app works: the local smoke
+
+Before recording, or as the whole proof of a T1 change that touches the server or web app, run the local smoke. It
+boots its own isolated launcher (fake minds, dev sign-in, data under the run dir) on a free port, opens the world list
+and one world, checks that a person is drawn with no console errors and no failed requests, and stops what it started:
+
+```bash
+node e2e/local-smoke.mjs --port 9950 --clip      # --build first on a fresh clone; omit --port for any free port
+# → .local/e2e/<timestamp>/summary.json, shots/1-world-list.png 2-world.png 3-person.png, clip.mp4
+node tools/proof/upload.mjs --pr $N .local/e2e/<timestamp>/summary.json .local/e2e/<timestamp>/shots/*.png
+```
+
+`status: "pass"` in `summary.json` is the evidence; its clip is one uncut, real-speed take of the smoke journey. It is
+not a clip of your change: a T2 change still records its own journey below. Details: `docs/testing/e2e.md#local-smoke`.
 
 ## 2. Write the steps
 

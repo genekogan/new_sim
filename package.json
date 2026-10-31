@@ -19,6 +19,7 @@
     "test:mars": "pnpm --filter mars-campus-viewer test:engine",
     "test:mars:release": "pnpm --filter mars-campus-viewer gate",
     "test:client": "node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs",
+    "e2e:smoke": "node e2e/local-smoke.mjs",
     "assets:pull": "node tools/assets/pull.mjs",
     "assets:check": "node tools/assets/pull.mjs --check",
     "prepare": "node .github/scripts/install-hooks.mjs"
