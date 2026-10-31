@@ -17,9 +17,9 @@ type Raw = {bindOneRaw(s: EdgeSoul, id: string): unknown; binds(s: EdgeSoul): {c
 
 /** `here` from its focused menu equals `here` from the whole menu (the frame before item 4), with doHere. */
 function hereSame(L: EdgeLedger, soul: EdgeSoul, what: string) {
-  const proto = Perception.prototype as unknown as {menu(): {caps: EdgeCapability[]}}, focused = proto.menu;
+  const proto = Perception.prototype as unknown as {menu(): {caps: EdgeCapability[]; plans?: unknown}}, focused = proto.menu;
   L.invalidateBodies(); const a = JSON.stringify(hereFrame(L, soul, {doHere: true}));
-  proto.menu = function (this: {L: EdgeLedger; soul: EdgeSoul}) {return {caps: this.L.capabilities(this.soul)};};
+  proto.menu = function (this: {L: EdgeLedger; soul: EdgeSoul}) {const b = (this.L as unknown as Raw).binds(this.soul); return {caps: this.L.capabilities(this.soul), plans: b.plans};};
   try {L.invalidateBodies(); const b = JSON.stringify(hereFrame(L, soul, {doHere: true})); let i = 0; while (i < a.length && a[i] === b[i]) i++; assert.equal(a, b, `${what}: here differs at ${a.slice(Math.max(0, i - 120), i + 120)} | ${b.slice(Math.max(0, i - 120), i + 120)}`);}
   finally {proto.menu = focused;}
 }

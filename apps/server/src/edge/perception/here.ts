@@ -85,8 +85,8 @@ export class Perception {
   /** L3 item 4: the offers this frame reads, built once and only for what is around (EdgeLedger.bindFocus, never the
    *  whole menu): every `…:here` offer, seats, invitations, and offers aimed at the places this Soul is in, the places
    *  its exits lead to, the things within reach and the Souls within 8 m. */
-  private menuMemo: {caps: EdgeCapability[]} | null = null;
-  menu(): {caps: EdgeCapability[]} {
+  private menuMemo: {caps: EdgeCapability[]; plans: ReturnType<EdgeLedger['bindFocus']>['plans']} | null = null;
+  menu(): {caps: EdgeCapability[]; plans: ReturnType<EdgeLedger['bindFocus']>['plans']} {
     if (this.menuMemo) return this.menuMemo;
     const targets = new Set(this.L.placePathOf(this.soul.soulId).map(p => p.id));
     for (const id of exitCandidates(this.L, targets, this.pos)) targets.add(id);
@@ -94,7 +94,7 @@ export class Perception {
     for (const t of this.unseated(OBJECT_RADIUS)) {targets.add(t.id); if (t.kind === 'object') objects = true;}
     for (const o of this.souls(8)) targets.add(o.soulId);
     const f = hereFocus(targets), b = this.L.bindFocus(this.soul, objects ? {...f, verbs: new Set([...f.verbs, 'object'])} : f);
-    return this.menuMemo = {caps: this.L.listed(b.caps)};
+    return this.menuMemo = {caps: this.L.listed(b.caps), plans: b.plans};
   }
   private unseatedMemo = new Map<number, Located[]>();
   private unseated(radius: number): Located[] {
@@ -289,7 +289,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     .filter((x): x is NonNullable<typeof x> => !!x && x.d <= 150).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id)).slice(0, LIMITS.exits)
     .map(x => {const base = {to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id};
       // RT: an exit the body cannot walk from here says so (no eta), instead of an eta for a walk that is refused
-      const problem = ledger.routeProblem(soul, x.c.id);
+      const problem = ledger.routeProblem(soul, x.c.id, P.menu().plans);   // (the exit's plan from this frame's menu)
       return problem ? {...base, reachable: false, why: problem.code} : {...base, eta: '~' + durationWord(walkSeconds(x.d * 1.25))};}) : [];
   const where=whereLine([...ledger.places.byId.values()].filter(p=>ledger.knowledge.knows(soul.soulId,p.id)),ledger.placePathOf(soul.soulId).map(p=>p.id),P.pos);
   const frame = {
