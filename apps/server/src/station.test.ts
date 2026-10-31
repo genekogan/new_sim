@@ -75,7 +75,7 @@ test('serialized native paired fixture has strict public facts, finite history, 
   // compare against the actual reviewed producer commit; current execution is
   // qualified separately below instead of relabeling this historical proof.
   for(const [path,sha] of Object.entries(f.producer.authoredSourceSha256)) {
-    const source=execFileSync('git',['show',`d0b08ff5358b78c82bf15d2c0b526b5579edee41:${path}`],{cwd:fileURLToPath(new URL('../../../',import.meta.url))});
+    const source=execFileSync('git',['show',`ad8c2c4df48e43e767688392ec55964aa3c7bd7c:${path}`],{cwd:fileURLToPath(new URL('../../../',import.meta.url))});
     assert.equal(createHash('sha256').update(source).digest('hex'),sha);
   }
 });
