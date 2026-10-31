@@ -27,6 +27,7 @@ Start `listen` in the background **at once, without asking**, and start it again
 it is open the Soul's card on the web page shows "agent listening"; when none is open it shows "away" and the owner is
 told their message will wait. Nothing else needs to run: there is no background mind. **One `listen` per Soul:** if
 `listen` prints `already listening (pid …)`, one is open and you are fine; never start a second one or relaunch it in a loop.
+A `listen` that has been stuck for a minute (suspended, frozen) is stopped and replaced by the next `listen` on its own.
 
 ## Acting
 

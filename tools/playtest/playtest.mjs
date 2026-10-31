@@ -11,6 +11,7 @@ import { now, setAnchor, sleep, monoMs } from './lib/clock.mjs';
 import { writeJson, readJson, appendJsonl } from './lib/jsonl.mjs';
 import { quota, quotaAllows } from './lib/quota.mjs';
 import { sha256, rng } from './lib/hash.mjs';
+import { tickValidity } from './tick-validity.mjs';
 import { freeMemGb, resolvePlaywright } from './lib/platform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -105,7 +106,7 @@ async function cmdRun(a) {
     ctx.world = await m.provision.startWorld({ serverRoot, slug, port: scenario.world.port, genesis: resolve(serverRoot, scenario.world.genesis), snapshot:scenario.world.snapshot?resolve(serverRoot,scenario.world.snapshot):undefined, dataDir: join(runDir, 'server', 'data'), log: join(runDir, 'server', 'world.log'), fresh: true, natives: scenario.world.natives === true });
     try { ctx.world = { ...ctx.world, ...(await m.provision.describeWorld({ base: ctx.world.base, slug, port: scenario.world.port, pid: ctx.world.pid, build: ctx.world.build, startedAt: new Date().toISOString() })) }; } catch (e) { log('describeWorld failed', e.message); }
     writeJson(join(runDir, 'world.json'), { ...ctx.world, child: undefined, healthz: undefined });
-    try { writeJson(join(runDir, 'server', 'healthz-before.json'), await m.provision.healthz(ctx.world.base)); } catch { /* recorded as missing */ }
+    try { writeJson(join(runDir, 'server', 'healthz-before.json'), { ...(await m.provision.healthz(ctx.world.base)), at: Date.now() }); } catch { /* recorded as missing */ }
     receipt(runDir, 1, 'provision', { ok: true, base: ctx.world.base, build: ctx.world.build });
 
   } else { ctx.world = readJson(join(runDir, 'world.json')); }
@@ -166,6 +167,10 @@ async function cmdRun(a) {
       if (ctx.sampler) { try { await ctx.sampler.stop?.(); } catch { /* ignore */ } }
       if (ctx.browser) { try { await ctx.browser.close(); } catch { /* ignore */ } }
       try { if (m.provision && ctx.world?.base) writeJson(join(runDir, 'server', 'healthz-after.json'), await m.provision.healthz(ctx.world.base)); } catch { /* recorded as missing */ }
+      // H-a: verdicts count only if the world ticked at its nominal rate while the Souls played
+      try { const before = existsSync(join(runDir, 'server', 'healthz-before.json')) ? readJson(join(runDir, 'server', 'healthz-before.json')) : null, after = existsSync(join(runDir, 'server', 'healthz-after.json')) ? { ...readJson(join(runDir, 'server', 'healthz-after.json')), at: Date.now() } : null;
+        const v = tickValidity(before, after); writeJson(join(runDir, 'server', 'tick-validity.json'), v); log('H-a tick service', v.service ?? '-', v.valid === false ? 'INVALID' : v.valid ? 'valid' : 'not judged');
+        if (v.valid === false) appendJsonl(join(runDir, 'infrastructure-invalid.jsonl'), { check: 'H-a', reason: v.reason, service: v.service }); } catch (e) { log('H-a check failed', e.message); }
       writeJson(join(runDir, 'close.json'), { ...now(), ...closed });
       receipt(runDir, 4, 'close', { ok: true });
     }

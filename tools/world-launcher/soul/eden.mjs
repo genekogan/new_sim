@@ -689,9 +689,13 @@ const messagesOf = (d) => {
   return list.filter((m) => m?.id && m.state !== "acknowledged").map((m) => ({ id: m.id, text: m.text, sentAt: m.sentAt }));
 };
 
-// .listen.lock beside .eden-agent.json: {pid, start, soul}. Taken with O_EXCL; a lock whose pid is gone (or is no
-// longer a listen, after pid reuse) is stale and taken over. Released on exit and on SIGINT/SIGTERM/SIGHUP.
+// .listen.lock beside .eden-agent.json: {pid, start, beatAt, soul}. Taken with O_EXCL; a lock whose pid is gone (or is
+// no longer a listen, after pid reuse) is stale and taken over. The holder renews beatAt every 15 s; a live holder that
+// has not renewed it for 60 s (stopped, suspended, its event loop stuck) is stopped (SIGTERM) and its lock taken over, so
+// a replacement listen is never refused by a stuck one. Released on exit and on SIGINT/SIGTERM/SIGHUP.
 export const LISTEN_LOCK = ".listen.lock";
+export const LISTEN_BEAT_MS = 15_000, LISTEN_STALE_MS = 60_000;
+export function lockBeatAgeMs(holder, at = Date.now()) { const t = Date.parse(holder?.beatAt ?? holder?.start ?? ""); return Number.isFinite(t) ? at - t : Infinity; }
 function readLock() { try { return JSON.parse(readFileSync(LISTEN_LOCK, "utf8")); } catch { return null; } }
 export function lockIsLive(holder) {
   if (!Number.isSafeInteger(holder?.pid) || holder.pid <= 0) return false;
@@ -701,18 +705,27 @@ export function lockIsLive(holder) {
 }
 export function listenLockHolder() { const h = readLock(); return h && lockIsLive(h) ? h : null; }
 export function takeListenLock() {
-  const mine = { pid: process.pid, start: now(), soul: load().soul ?? null };
+  const start = now(), mine = { pid: process.pid, start, beatAt: start, soul: load().soul ?? null };
   for (let i = 0; i < 3; i++) {
     try {
       const fd = openSync(LISTEN_LOCK, "wx", 0o600); writeFileSync(fd, JSON.stringify(mine) + "\n"); closeSync(fd);
       const release = () => { try { if (readLock()?.pid === process.pid) unlinkSync(LISTEN_LOCK); } catch { /* gone already */ } };
+      const tmp = `${LISTEN_LOCK}.${process.pid}.tmp`;
+      const beat = setInterval(() => { try { if (readLock()?.pid !== process.pid) return; writeFileSync(tmp, JSON.stringify({ ...mine, beatAt: now() }) + "\n", { mode: 0o600 }); renameSync(tmp, LISTEN_LOCK); } catch { /* next beat */ } }, LISTEN_BEAT_MS);
+      beat.unref();
       process.once("exit", release);
       for (const [sig, n] of [["SIGINT", 130], ["SIGTERM", 143], ["SIGHUP", 129]]) process.once(sig, () => { release(); process.exit(n); });
       return { ok: true };
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
       const holder = readLock();
-      if (holder && lockIsLive(holder)) return { ok: false, holder };
+      if (holder && lockIsLive(holder)) {
+        const age = lockBeatAgeMs(holder);
+        if (age < LISTEN_STALE_MS) return { ok: false, holder };
+        // alive but silent for a minute: stop it (it is this folder's own listen, same user), then take the lock
+        process.stderr.write(`listen: the listener pid ${holder.pid} has not renewed its lock for ${Number.isFinite(age) ? Math.round(age / 1000) + " s" : "ever"}; stopping it and taking over\n`);
+        try { process.kill(holder.pid, "SIGTERM"); } catch { /* gone */ }
+      }
       try { renameSync(LISTEN_LOCK, `${LISTEN_LOCK}.stale-${process.pid}`); unlinkSync(`${LISTEN_LOCK}.stale-${process.pid}`); } catch { /* another listen took it over first */ }
     }
   }
