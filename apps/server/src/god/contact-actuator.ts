@@ -18,7 +18,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
   plan(soul:EdgeSoul,target:string,action:string){
    const m=d.model(),e=m.entities.get(target),def=e&&m.resolvedDef(e.def),body=d.body(soul.entityId);if(!e||!def||!body)return null;
    const wp=m.worldPose(e),me=body.pose.p,at:[number,number,number]=[wp.x,wp.y+1.04*wp.s,wp.z];
-   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number];
+   const params:Omit<HandActuatorParams,'actor'>={target,at};let root:[number,number,number],face:[number,number]|undefined;
    if(def.components.opening){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];tint?:string}[]})?.shapes:undefined;
     const leaf=shapes?.find(s=>s.role==='door'&&s.pivot),knob=shapes?.find(s=>s.role==='door'&&s.tint==='brass');if(!leaf?.pivot)return null;
@@ -40,8 +40,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
      const clear=(p:number[])=>!d.clearance||d.clearance(p[0],p[2],d.levelAt?.(p[0],p[2],wp.y)??0)>=HUMAN_RADIUS+.04;
      const want=Math.atan2(dz,dx),best=Array.from({length:8},(_,i)=>i*Math.PI/4).map(a=>[params.at[0]+Math.cos(a)*.55,wp.y,params.at[2]+Math.sin(a)*.55,Math.abs(((a-want+Math.PI*3)%(Math.PI*2))-Math.PI)]).filter(outside).filter(clear).sort((p,q)=>p[3]-q[3])[0];
      if(best)root=[best[0],best[1],best[2]];
+     // Entry 33 (take 4): a stand point beside the valve can leave the body ~40° off the valve when it arrives (a wall
+     // torch approached along its wall); the Soul turns to face the valve on arrival, before the arm comes up, so the
+     // reach is never added to a body turn (the hand actuator's own turn is then ~0).
+     face=[params.at[0],params.at[2]];
     }}
-   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0};
+   return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:{})};
   },
   /** A few current public facts for compact nearby perception, never the full state. */
   facts(target:string){

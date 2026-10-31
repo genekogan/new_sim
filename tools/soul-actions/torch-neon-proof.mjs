@@ -21,7 +21,7 @@ const sample=()=>page.evaluate((NAMES)=>{const api=window.__simEntity,f=api?.con
  const fx=window.__simFx?.stats(),ids=Object.values(things).map(t=>t.id),fires=(fx?.fire?.burning??[]).filter(b=>ids.includes(b.id)),neon=(fx?.neon?.signs??[]).filter(n=>ids.includes(n.id));
  const cam=api.camera,W=innerWidth,H=innerHeight,proj=p=>{const v=new cam.position.constructor(...p).project(cam);return [Math.round((v.x+1)/2*W),Math.round((1-v.y)/2*H)];};
  return {at:Date.now(),tick:f.tick,dt:f.dt,bodies,things,sound:s?{level:s.level(),heard}:null,fires,neon,cam:[cam.position.x,cam.position.y,cam.position.z],
-  probes:{torchGround:proj([-2.9,0.02,4.5]),torchPole:proj([-2.2,0.9,3.98]),wallTorchWall:proj([-1.6,1.25,7.12]),neonSign:proj([2.7,1.78,6.17]),neonGround:proj([2.7,0.02,5.5])}};},NAMES);
+  probes:{torchGround:proj([-1.6,0.02,4.6]),torchGroundLast:proj([-2.8,0.02,3.6]),torchPole:proj([-2.2,0.9,3.98]),wallTorchWall:proj([-1.6,1.25,7.12]),neonSign:proj([2.7,1.78,6.17]),neonGround:proj([2.7,0.02,5.5])}};},NAMES);
 const act=async(seat,words)=>{const start=Date.now(),r=await promisify(execFile)(process.execPath,['eden.mjs','act',words,'--wait','120','--json'],{cwd:scene+'/'+seat,timeout:180000}),result=JSON.parse(r.stdout);commands.push({seat,words,start,end:Date.now(),result});writeFileSync(out+'/commands.json',JSON.stringify(commands,null,2));assert.equal(result.accepted,true,JSON.stringify(result));assert.equal(result.receipt.phase,'completed',JSON.stringify(result));return result;};
 try{
  await post('/v1/god/env',{timeOfDay:process.env.SOUL_TORCH_TIME??'20:10',timeScale:0,weather:{kind:'clear'}});
