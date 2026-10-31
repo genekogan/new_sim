@@ -13,6 +13,7 @@ const req = (method, headers = {}) => ({ method, headers });
 test('request classes follow LOAD-CONTRACT §2', () => {
   assert.equal(requestClass('/v1/edge/act', 'POST'), 'C1'); assert.equal(requestClass('/v1/edge/here'), 'C2');
   assert.equal(requestClass('/v1/edge/map'), 'C3'); assert.equal(requestClass('/v1/world/snapshot'), 'C3');
+  assert.equal(requestClass('/v1/edge/public/souls/s_fe22d9c553'), 'C3'); // the visitor page's Soul chip needs no token (402.2)
   assert.equal(requestClass('/v1/edge/inbox/listen'), 'listen'); assert.equal(requestClass('/v1/edge/wait'), 'listen');
   assert.equal(requestClass('/v1/edge/receipts/r1'), 'C0'); assert.equal(requestClass('/healthz'), 'C0'); assert.equal(requestClass('/v1/god/act', 'POST'), null);
 });

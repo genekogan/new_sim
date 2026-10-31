@@ -83,7 +83,8 @@ export function requestClass(rest, method = 'GET') {
   const r = rest.slice('/v1/edge/'.length);
   if (/^(inbox\/listen|wait)\/?$/.test(r)) return 'listen';
   if (/^(receipts(\/|$)|inbox(\/|$)|schema\/?$|boot\/static\/?$)/.test(r)) return 'C0';
-  if (read && /^(map|rides|items|platforms)\/?$/.test(r)) return 'C3';
+  // public/souls/:id is the visitor page's Soul chip (apps/web PublicSoulRecord): a public read, served without a token
+  if (read && /^(map|rides|items|platforms)\/?$|^public\//.test(r)) return 'C3';
   return read ? 'C2' : 'C1';
 }
 
