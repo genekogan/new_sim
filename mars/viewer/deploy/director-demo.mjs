@@ -5,7 +5,7 @@
 // self-corrected), fork an alternative future, hit plan
 // staleness, read the ledger and clean up, then pause a run mid-action, fork the
 // pause and resume both branches differently. Prints an annotated transcript
-// with per-call and per-step timings. Reference write-up: docs/engineering/DIRECTOR_DEMO.md.
+// with per-call and per-step timings.
 //
 //   node deploy/director-demo.mjs                  # starts + stops its own `wrangler dev` on :8907
 //   node deploy/director-demo.mjs --base http://127.0.0.1:8907   # use a server you already run
