@@ -61,7 +61,8 @@ export type Soak = {startedAt: number; rounds: number; skipped: Record<string, n
 
 export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {tap: DeltaTap; init: () => unknown; ask: (m: never[]) => void}, dbPath: string, o: {everyMs?: number; log?: (s: string) => void; logEveryMs?: number} = {}) {
   const [{ReplicaWorld}, {ReadOnlyHost, readLedger, MainOnly}, {hereFrame}, {aroundFrame}, {readBridgeSync, readBridgeCost}] = await Promise.all([import('./replica-world.ts'), import('./read-host.ts'), import('../edge/perception/here.ts'), import('../edge/perception/around.ts'), import('./read-bridge.ts')]);
-  const {readFileSync} = await import('node:fs');
+  const {readFileSync, writeFileSync, mkdirSync} = await import('node:fs');
+  const DUMP = process.env.SIM_READ_ORACLE_DUMP || '', dumped: Record<string, number> = {}; if (DUMP) mkdirSync(DUMP, {recursive: true});
   const RW = new ReplicaWorld();
   RW.init(structuredClone(src.init()) as never);
   const H = new ReadOnlyHost(RW, host.worldId, dbPath), RL = readLedger(H, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined);
@@ -101,6 +102,8 @@ export async function installReadOracle(host: WorldHost, L: EdgeLedger, src: {ta
       catch (e) {T.replicaMs += performance.now() - t; if (e instanceof MainOnly) {const k = e.message.replace(/^read worker: | is main-only$/g, ''); T.mainOnly[k] = (T.mainOnly[k] ?? 0) + 1; T.reads++; continue;} b = {error: String(e)};}
       T.replicaMs += performance.now() - t;
       const missed = RW.verdicts.missCount > missBefore, diffs = diffFields(a, b);
+      // SIM_READ_ORACLE_DUMP=<dir>: the first three unequal pairs per read, whole (diagnosis; lane only)
+      if (diffs.length && DUMP && (dumped[name] = (dumped[name] ?? 0) + 1) <= 3) writeFileSync(`${DUMP}/${name}-${dumped[name]}.json`, JSON.stringify({soulId: s.soulId, tick: RW.R.pos.tick, live: a, replica: b}));
       record(T, name, s.soulId, diffs, missed);
     }
     if (RW.verdicts.misses.size) {src.ask([...RW.verdicts.misses.values()] as never[]); RW.verdicts.misses.clear();}
