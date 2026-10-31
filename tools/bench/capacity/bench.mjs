@@ -48,7 +48,7 @@ const CLI_FILE = resolve(opt('cli', join(ROOT, 'tools/world-launcher/soul/eden.m
 if (VIA && CLI_FILE !== resolve(join(ROOT, 'tools/world-launcher/soul/eden.mjs'))) throw new Error('--via-launcher: the launcher serves its own root\'s eden.mjs; drop --cli');
 if (VIA && SLICE) throw new Error('--via-launcher with --slice is not built yet (the slice would wrap the launcher, not the world); use --cpus');
 const LOAD = opt('load', 'v1'), RW_MODES = opt('read-worker', '').split(',').filter(Boolean), RW_N = Number(opt('read-workers', 1)), CLI_SOULS = Number(opt('cli-souls', 3));
-const VIEWERS = Number(opt('viewers', 6)), BUDGET = opt('world-budget-rps', LOAD === 'stageb' ? '200' : ''), ORACLE_RATE = Number(opt('oracle-rate', 0.01)), JOIN_PAR = Number(opt('join-concurrency', LOAD === 'stageb' ? 8 : 1)), CPUS = opt('cpus', '');
+const VIEWERS = Number(opt('viewers', 6)), BUDGET = opt('world-budget-rps', LOAD === 'stageb' ? '200' : ''), ORACLE_RATE = Number(opt('oracle-rate', 0.01)), JOIN_PAR = Number(opt('join-concurrency', LOAD === 'stageb' ? 4 : 1)), CPUS = opt('cpus', '');
 if (!['v1', 'stageb'].includes(LOAD)) throw new Error('--load v1|stageb');
 if ((RW_MODES.length || LOAD === 'stageb' || CPUS) && !VIA) throw new Error('--load stageb, --read-worker and --cpus run through the launcher: add --via-launcher');
 if (RW_MODES.some((m) => m !== 'on' && m !== 'off')) throw new Error('--read-worker off|on|off,on');
@@ -239,8 +239,10 @@ async function join_(run, i) {
   const dir = join(run.dir, 'souls', `s${i}`); mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'eden.mjs'), Buffer.from(await (await fetch(`${BASE}/eden.mjs`)).arrayBuffer()));
   const soul = { i, dir };
-  const a = await runCli(soul, ['register', BASE], 60_000), b = await runCli(soul, ['create', `Bench${i}`], 120_000);
-  if (b.outcome !== 'ok') throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
+  const a = await runCli(soul, ['register', BASE], 60_000);
+  // v2: a create the proxy answered 502/503 (a slow world under N concurrent creates) is tried again, up to 3 times
+  let b; for (let k = 0; k < (LOAD === 'stageb' ? 3 : 1); k++) { b = await runCli(soul, ['create', `Bench${i}`], 120_000); if (b.outcome === 'ok' || existsSync(join(dir, '.eden-agent.json')) && JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) break; run.joinRetries = (run.joinRetries ?? 0) + 1; log(`soul ${i} create try ${k + 1}: ${b.outcome} ${b.err ?? ''}`); await sleep(5000); }
+  if (!JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token) throw new Error(`soul ${i} create: ${b.outcome} ${b.err ?? ''} (${a.outcome})`);
   soul.token = JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8')).token;
   return soul;
 }
@@ -446,8 +448,9 @@ async function oneRun(arm, rep, mode = null) {
   const sampler3 = mode === 'on' ? setInterval(async () => { wstats.push({ at: now(), phase, workers: await workerStats(w) }); }, 2000) : null;
   const souls = [];
   try {
+    const tj = now();
     for (let i = 0; i < N; i += JOIN_PAR) souls.push(...await Promise.all(Array.from({ length: Math.min(JOIN_PAR, N - i) }, (_, k) => join_(run, i + k))));
-    souls.forEach((s) => { s.cli = s.i < cliN; });
+    souls.forEach((s) => { s.cli = s.i < cliN; }); run.joinS = (now() - tj) / 1000;
     log(`${key} r${rep}: ${N} Souls joined (${cliN} CLI, ${N - cliN} raw)`);
     const relaunch = souls.map((s) => s.cli ? holdListen(run, s) : (rawListen(run, s), () => {}));
     if (SB) for (let v = 0; v < VIEWERS; v++) viewer(run, hello); else for (const s of souls) { waitStream(run, s); viewer(run, hello); }
@@ -562,7 +565,7 @@ function stagebSummary({ key, mode, cliN, windows, cmds, proc, wstats, run, w })
   const sum = (k) => [A[k], B[k]].some((x) => x != null) ? (A[k] ?? 0) + (B[k] ?? 0) : null, o = run.oracle;
   const kinds = {}; for (const k of ['here', 'observe', 'caps', 'resolve', 'around', 'act', 'say']) { const v = [A.byKind?.[k]?.p99, B.byKind?.[k]?.p99].filter((x) => x != null); if (v.length) kinds[k] = Math.max(...v); }
   const hereN = (A.byKind?.here?.n ?? 0) + (B.byKind?.here?.n ?? 0), hereW = (A.byKind?.here?.onWorker ?? 0) + (B.byKind?.here?.onWorker ?? 0);
-  return { stageb: { key, mode, cliSouls: cliN, windows: per, pins: w.pins ?? null,
+  return { stageb: { key, mode, cliSouls: cliN, joinS: run.joinS ?? null, joinRetries: run.joinRetries ?? 0, windows: per, pins: w.pins ?? null,
     headline: { rawReadP99Ms: worse('rawReadP99Ms', true), rawActP99Ms: worse('rawActP99Ms', true), cliReadP99Ms: worse('cliReadP99Ms', true), cliActP99Ms: worse('cliActP99Ms', true), readP99ByKind: kinds,
       readsPerS: worse('readsPerS', false), rawReadRefusedShare: worse('rawReadRefusedShare', true), timeouts: sum('timeouts'), errors: sum('errors'),
       routed: sum('routed'), fallbacks: sum('fallbacks'), workerServedShare: worse('workerServedShare', false), hereOnWorkerShare: mode === 'on' && hereN ? +(hereW / hereN).toFixed(3) : null,
