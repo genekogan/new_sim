@@ -209,7 +209,14 @@ export class Runtime {
     this.emit(rec, 'validated');
     const res = def.reservations(this.world, parsed.data);
     const conflict = this.reservationConflict(res, opts.parent);
-    if (conflict) return this.fail(rec, conflict);
+    if (conflict) {
+      // M03 (Soul Actions entry 28): a courtesy step-aside (walk.ts makeWay, id `…:make-way:N`) is a short transient walk,
+      // not a new owner of the body. An action that conflicts only with such nudges waits for them to end and is then
+      // planned again from where the body stands, instead of failing at once (only pose_v1 used to wait this out).
+      const nudges = this.nudgeHolds(res, opts.parent);
+      if (nudges) { this.waiting.set(id, { rec, def, params: parsed.data, parent: opts.parent, holds: nudges }); this.emit(rec, 'requested', undefined, 'make-way'); this.mark('runtime.make-way-wait', { action: id, verb, holds: nudges }); return rec; }
+      return this.fail(rec, conflict);
+    }
     for (const r of res) {
       const list = this.owners.get(r.resource) ?? [];
       list.push({ action: id, mode: r.mode });
@@ -465,6 +472,17 @@ export class Runtime {
     };
   }
 
+  /** The make-way nudges this reservation set conflicts with, when they are its only conflicts (else null). */
+  private nudgeHolds(res: Reservation[], parent?: string): string[] | null {
+    const ancestors = new Set<string>(), out = new Set<string>();
+    for (let p = parent; p; p = this.records.get(p)?.parent) ancestors.add(p);
+    for (const r of res) for (const o of this.owners.get(r.resource) ?? []) {
+      if (ancestors.has(o.action) || (r.mode !== 'exclusive' && o.mode !== 'exclusive')) continue;
+      if (!/:make-way:\d+$/.test(o.action) || !this.live.has(o.action)) return null;
+      out.add(o.action);
+    }
+    return out.size ? [...out] : null;
+  }
   /** Resources held by `parent` (or its ancestors) are delegable to child actions (hierarchical tasks). */
   private reservationConflict(res: Reservation[], parent?: string): Diagnostic | null {
     const ancestors = new Set<string>();
