@@ -70,9 +70,9 @@ export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number
  }
  if(k<.10)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.10)),spread:1};
  if(k<.50)return {x:0,y:lerp(yT,yB,seg(.10,.50)),o:POSTER_ON,spread:1};
- if(k<.62)return {x:0,y:yB,o:POSTER_ON-.012*Math.sin(Math.PI*(k-.50)/.12),spread:1};
- if(k<.86){const f=(k-.62)/.24;return {x:0,y:lerp(yB,yT,smooth(f)),o:POSTER_ON+.03*Math.sin(Math.PI*f),spread:1};}
- return {x:0,y:yT,o:POSTER_ON-.012*Math.sin(Math.PI*(k-.86)/.14),spread:1};
+ if(k<.62)return {x:0,y:yB,o:POSTER_ON-.012*dsin(Math.PI*(k-.50)/.12),spread:1};
+ if(k<.86){const f=(k-.62)/.24;return {x:0,y:lerp(yB,yT,smooth(f)),o:POSTER_ON+.03*dsin(Math.PI*f),spread:1};}
+ return {x:0,y:yT,o:POSTER_ON-.012*dsin(Math.PI*(k-.86)/.14),spread:1};
 }
 export function strokeHands(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):{left:Vec3;right:Vec3}{
  const right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],l=posterLocal(s,u),half=(s.width/2-.04)*l.spread;
