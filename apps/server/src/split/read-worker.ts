@@ -51,7 +51,8 @@ const R2 = wd.mode >= 2 && wd.world ? await (async () => {
 let RW: RWT | null = null, RH: RHT | null = null, RL: EdgeLedger | null = null, ready2 = false;
 /** A static edit moved the scene: connectivity relabels in slices between messages; reads go to main meanwhile. */
 let relabel: {since: number; rebuilds: number} | null = null;
-const c2 = {warmMs: 0, relabels: 0, relabelMs: 0, maxRelabelMs: 0, served: 0, cpuMs: 0, maxCpuMs: 0, fallbacks: {} as Record<string, number>, asks: 0, syncMs: 0};
+const c2 = {warmMs: 0, relabels: 0, relabelMs: 0, maxRelabelMs: 0, served: 0, cpuMs: 0, maxCpuMs: 0, fallbacks: {} as Record<string, number>, asks: 0, syncMs: 0, slow: [] as {ms: number; soul: string; nth: number; tick: number}[]};
+const servedBy = new Map<string, number>();
 const fallback = (why: string) => {c2.fallbacks[why] = (c2.fallbacks[why] ?? 0) + 1;};
 function relabelSlice() {
   if (!relabel || !RW?.spatial) {relabel = null; return;}
@@ -121,6 +122,9 @@ function here2(soulId: string, query: string): {body: object; cpuMs: number} | n
     R2!.readBridgeSync(RH, RL);   // the god layer's reads (split/read-bridge.ts), current to main's last god commit
     const body = {tick: RW.mw.world.tick, here: hereFrame(RL, soul, {doHere: modern}), ...(modern ? {apiContract: 'eden-edge/1.1'} : {})};
     const ms = cpuMs() - c; c2.served++; c2.cpuMs += ms; c2.maxCpuMs = Math.max(c2.maxCpuMs, ms);
+    // the slowest reads (diagnosis): which Soul, its how-many-th read here, the tick
+    const nth = (servedBy.get(soulId) ?? 0) + 1; servedBy.set(soulId, nth);
+    if (c2.slow.length < 5 || ms > c2.slow[c2.slow.length - 1].ms) {c2.slow.push({ms: Math.round(ms), soul: soulId.slice(-6), nth, tick: RW.R.pos.tick}); c2.slow.sort((a, b) => b.ms - a.ms); c2.slow.length = Math.min(5, c2.slow.length);}
     askMisses();
     return {body, cpuMs: ms};
   } catch (e) {
