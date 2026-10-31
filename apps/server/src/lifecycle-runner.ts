@@ -96,7 +96,10 @@ export class LifecycleRunner {
   }
   /** Explicit bounded reconciliation, invoked after boot and on owned ticks by
    * a future opt-in installer. It creates no timers, paid work or default hooks. */
-  pump(){
+  /** `planBirths:false` (the host's onApplied hook): an event applied inside drainInputs plans no birth there, since
+   * the same tick's durable second drain would then run that birth's guard probe too (two probes in one tick, seen in
+   * the profiled join); afterTick, the create's commit and committed promises plan births instead. */
+  pump(planBirths=true){
     const page=this.journal.recover(this.host.worldId,20,this.recoveryAfter),last=page.at(-1);
     // Round-robin keyset scanning prevents twenty deferred requests from
     // starving later work. This is a bounded scan, not a capacity claim.
@@ -106,7 +109,7 @@ export class LifecycleRunner {
       // At most one lifecycle birth in flight, and none planned in a macrotask that already probed: later births stay
       // pending in request order and are planned by a later pump (next tick, request or commit), so no single tick or
       // handler runs more than one detached probe. The create's HTTP wait still answers lifecycle-pending at 2 s.
-      if(op.operation==='create'&&op.state!=='recorded'&&(this.births.size>0||this.probed))continue;
+      if(op.operation==='create'&&op.state!=='recorded'&&(!planBirths||this.births.size>0||this.probed))continue;
       try{this.advance(op);}catch(error){if(!(error instanceof LifecycleDeferred))this.faults.set(op.requestId,error);}
     }
   }
