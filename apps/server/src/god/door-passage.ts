@@ -16,6 +16,10 @@ export type DoorPassageRefusal={refuse:true;code:string;reason:string};
 const FAR=1;
 /** Where the walk stops before the hand takes over: door-local (along the wall to the latch side, out from it), metres. */
 const STAGE=[.7,1.65];
+/** Entry 32: where a second (third) passage on the same side waits instead, about a metre behind the staging spot on the
+ *  latch side, outside the doorway lane and the swing; the last is a hinge-side spare. The engine picks one when the
+ *  staging walk begins (`doorQueueV1`). */
+const QUEUE=[[1.25,2.5],[1.25,3.5],[-1.6,2.5]];
 
 export function createDoorPassage(d:{engine:()=>Engine;model:()=>WorldModel;contact:ContactActuatorService;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null}){
  /** The passage for a plain walk (`steps`) whose destination no walk reaches now; null when no closed door explains it. */
@@ -42,7 +46,8 @@ export function createDoorPassage(d:{engine:()=>Engine;model:()=>WorldModel;cont
    // The walk ends a step short of the door, in front of the latch side (out of the swing and of the way through); the hand
    // step takes the last metre itself once nobody else is at the door (a follower never walks into the leader's swing).
    const u=[Math.cos(wp.yaw),-Math.sin(wp.yaw)],stage=[wp.x+u[0]*STAGE[0]+n[0]*o.side*STAGE[1],0,wp.z+u[1]*STAGE[0]+n[1]*o.side*STAGE[1]];
-   const legs=(first:number[]):Step[]=>[{verb:'stand',params:{}},walk(first),{verb:'mars:hand_actuator_v1',params:{...open.params,passage:{mode:'open',...passage}}},walk(closeAt),{verb:'mars:hand_actuator_v1',params:{...close.params,passage:{mode:'close',...passage}}},...rest];
+   const queue=QUEUE.map(([a,b])=>[+(wp.x+u[0]*a+n[0]*o.side*b).toFixed(3),+(wp.z+u[1]*a+n[1]*o.side*b).toFixed(3)]);
+   const legs=(first:number[]):Step[]=>[{verb:'stand',params:{}},first===stage?{verb:'walk_to',params:{to:[stage[0],stage[2]],standoff:0,doorQueueV1:{door:id,from:o.side,queue}}}:walk(first),{verb:'mars:hand_actuator_v1',params:{...open.params,passage:{mode:'open',...passage}}},walk(closeAt),{verb:'mars:hand_actuator_v1',params:{...close.params,passage:{mode:'close',...passage}}},...rest];
    return {door:id,name,open:intent,note:`Through ${name}: opened it by hand on the way, and closed it behind unless someone was following.`,steps:legs(stage),direct:legs(openAt)};
   }
   if(refusal)return refusal;

@@ -703,7 +703,7 @@ export class MarsEngine implements Engine {
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
         const gaitIssue = this.gaitIssue(me, a); if (gaitIssue) return gaitIssue;
-        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
+        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.doorQueueV1 ? this.doorQueueGoalV1(p, a) : a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
         const movement = this.movementVerb(me,g.x,g.z);
@@ -2052,11 +2052,29 @@ export class MarsEngine implements Engine {
   /** Soul Actions entry 31 (door passage): the programmes walking through `door` (an `open` passage hand step, then the
    * walk through, then the `close` one) and where each is in it. Read by hand-actuator.ts (who is following, who is passing). */
   readonly doorPassersV1=(door:string)=>{
-    const out:{actor:string;phase:'approach'|'opening'|'through'|'closing'}[]=[];
-    for(const p of this.programs.values()){const k=p.steps.findIndex(s=>s.verb==='mars:hand_actuator_v1'&&s.params?.target===door&&(s.params?.passage as {mode?:string}|undefined)?.mode==='open');
-      if(k<0)continue;const i=p.index-k;if(i>=-1&&i<=2)out.push({actor:p.actor,phase:(['approach','opening','through','closing'] as const)[i+1]});}
+    // In programme start order (the Map keeps insertion order): an earlier passage on the same side goes first.
+    // Entry 32: a passage may turn the lock before it opens (`unlock`); `opening` covers both hand steps.
+    const out:{actor:string;phase:'approach'|'opening'|'through'|'closing';from:number}[]=[];
+    for(const p of this.programs.values()){
+      const pass=(s:{verb:string;params?:Record<string,unknown>}|undefined)=>s?.verb==='mars:hand_actuator_v1'&&s.params?.target===door?s.params?.passage as {mode?:string;from?:number}|undefined:undefined;
+      const open=p.steps.findIndex(s=>pass(s)?.mode==='open');if(open<0)continue;
+      const first=p.steps.findIndex(s=>!!pass(s)),close=p.steps.findIndex((s,j)=>j>open&&pass(s)?.mode==='close'),i=p.index;
+      const phase=i===first-1?'approach':i>=first&&i<=open?'opening':i>open&&(close<0||i<close)?'through':i===close?'closing':null;
+      if(phase)out.push({actor:p.actor,phase,from:Number(pass(p.steps[open])!.from)});}
     return out;
   };
+  /** Soul Actions entry 32: the goal of a passage's staging walk, chosen when the walk begins. The first passage on this side
+   * of this door gets the staging spot (`to`); a later one still approaching or opening behind it gets a queue spot about a
+   * metre back (out of the doorway lane and the swing), so two Souls never walk into each other at one waiting spot. */
+  private doorQueueGoalV1(p:Prog,a:Record<string,unknown>):unknown{
+    const q=a.doorQueueV1 as {door:string;from:number;queue:[number,number][]}|undefined;if(!q||!Array.isArray(q.queue))return a.to;
+    let ahead=0;
+    for(const o of this.programs.values()){if(o.id===p.id)break;if(o.actor===p.actor)continue;
+      const passer=this.doorPassersV1(q.door).find(x=>x.actor===o.actor);if(passer&&passer.from===q.from&&(passer.phase==='approach'||passer.phase==='opening'))ahead++;}
+    if(!ahead)return a.to;
+    for(const spot of q.queue.slice(Math.min(ahead-1,q.queue.length-1)))if(!this.plan(this.movementVerb(p.actor,spot[0],spot[1]),{actor:p.actor,x:spot[0],z:spot[1],level:this.ents[p.actor]?.human?.level??0}))return spot;
+    return a.to;
+  }
   /** Soul Actions entry 31 (pure): the closed doors walling this body off from its plan's first walk_to destination. Null
    * when a walk reaches it (or it names nothing). Doors are the walk graph's closed-gap solids (`<door>#door:<opening>`,
    * god engine-bridge) bordering the region the failed route exhausted; nearest to the way there first, at most `max`. */

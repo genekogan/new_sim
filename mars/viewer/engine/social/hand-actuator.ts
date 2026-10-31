@@ -104,8 +104,10 @@ function personBlocking(rt:Runtime,ex:Exec,root:Vec3,angle:number):{id:string;co
 /** Seconds a passage waits on a body in the swing before asking it to step aside, the longest it waits before reaching,
  *  the longest a swing stays paused on a body that stepped into it, and the longest it waits for another Soul to pass. */
 export const PASSAGE_ASK_SECONDS=1,PASSAGE_WAIT_SECONDS=8,PASSAGE_PAUSE_SECONDS=6,PASSAGE_YIELD_SECONDS=15;
+/** Entry 32: the longest a queued Soul waits behind an earlier passage on its side that is still approaching or opening. */
+export const PASSAGE_QUEUE_SECONDS=40;
 /** Other Souls' door passages through `door` (engine-mars installs `doorPassersV1` from its programmes). */
-type Passer={actor:string;phase:'approach'|'opening'|'through'|'closing'};
+type Passer={actor:string;phase:'approach'|'opening'|'through'|'closing';from?:number};
 const passers=(rt:Runtime,door:string):Passer[]=>((rt.services as {doorPassersV1?:(d:string)=>Passer[]}).doorPassersV1?.(door)??[]);
 /** Is the door's closed gap still a solid in the walk graph (god engine-bridge: `<door>#door:<opening>`)? */
 function doorShut(rt:Runtime,target:string){const sp=rt.services.spatial as Spatial|undefined;if(!sp)return false;sp.sync(rt.world);return sp.scene.obstacles.some(o=>o.id.startsWith(target+'#door:'));}
@@ -122,13 +124,20 @@ function following(rt:Runtime,ex:Exec):string|null{
   if(Math.hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<=6&&f.side(e.pose.p[0],e.pose.p[2])===p.passage!.from&&f.side(w.goal.p[0],w.goal.p[1])!==p.passage!.from)return e.id;}
  return null;
 }
-/** Another Soul now opening, walking through or closing this door, or any body in the doorway itself. */
+/** Another Soul now opening, walking through or closing this door, or any body in the doorway itself. A passage queued
+ *  behind this one on the same side (entry 32) waits for this one, never the other way round. */
 function passing(rt:Runtime,ex:Exec):string|null{
  const p=ex.p,[cx,cz]=p.passage!.door;
  const hand=handOnDoor(rt,ex);if(hand)return hand;
- for(const q of passers(rt,p.target))if(q.actor!==p.actor&&q.phase!=='approach')return q.actor;
+ const list=passers(rt,p.target),mine=list.findIndex(q=>q.actor===p.actor);
+ for(const [i,q] of list.entries())if(q.actor!==p.actor&&q.phase!=='approach'&&!(q.from===p.passage!.from&&mine>=0&&i>mine))return q.actor;
  for(const e of Object.values(rt.world.entities))if(e.id!==p.actor&&e.human&&Math.hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<.75)return e.id;
  return null;
+}
+/** Entry 32: an earlier passage on this Soul's side of the door still approaching or opening: this one is queued behind. */
+function queuedBehind(rt:Runtime,ex:Exec):string|null{
+ const list=passers(rt,ex.p.target),mine=list.findIndex(q=>q.actor===ex.p.actor);if(mine<=0)return null;
+ return list.slice(0,mine).find(q=>q.from===ex.p.passage!.from&&(q.phase==='approach'||q.phase==='opening'))?.actor??null;
 }
 /** Another body's hand on this door now (its operation has begun and not yet let go). */
 function handOnDoor(rt:Runtime,ex:Exec):string|null{for(const e of Object.values(rt.world.entities))if(e.id!==ex.p.actor&&e.human?.handActuator?.target===ex.p.target)return e.id;return null;}
@@ -148,6 +157,8 @@ function passageStep(rt:Runtime,ex:Exec,dt:number):StepResult|null{
  const p=ex.p,o=p.opening!,a=rt.world.entities[p.actor],pass=p.passage!;
  if(ex.child){if(rt.isActive(ex.child))return {status:'running',phase:'waiting'};delete ex.child;}
  if(!ex.began){
+  // entry 32: queued behind an earlier passage on this side: wait where the walk stopped (the queue spot) until it is through
+  if(pass.mode!=='close'){const ahead=queuedBehind(rt,ex);if(ahead)return hold(rt,ex,'queue',ahead);}
   if(pass.mode==='open'&&!doorShut(rt,p.target)){const who=passing(rt,ex);if(!who)return skip(rt,ex,'found open');return hold(rt,ex,'passing',who);}
   if(pass.mode==='close'){if(doorShut(rt,p.target))return skip(rt,ex,'already shut');const who=following(rt,ex);if(who)return skip(rt,ex,'held open for '+who);}
   const hand=handOnDoor(rt,ex);if(hand)return hold(rt,ex,'passing',hand);
@@ -174,9 +185,10 @@ function ask(rt:Runtime,who:string,keepClear:Vec2){const h=rt.world.entities[who
 const swingCentre=(o:NonNullable<HandActuatorParams['opening']>):Vec2=>{const a=o.yaw+(o.from+o.to)/2,r=o.radius*.6;return [o.hinge[0]+dcos(a)*r,o.hinge[2]-dsin(a)*r];};
 function skip(rt:Runtime,ex:Exec,why:string):StepResult{ex.skip=why;rt.mark('hand.passage-skip',{action:ex.id,target:ex.p.target,mode:ex.p.passage!.mode,why});return {status:'completed'};}
 /** Wait before reaching: out of the way for a Soul passing; a body in the swing is asked to step aside after a second. */
-function hold(rt:Runtime,ex:Exec,why:'passing'|'swing',who:string):StepResult{
+function hold(rt:Runtime,ex:Exec,why:'passing'|'swing'|'queue',who:string):StepResult{
  const p=ex.p,a=rt.world.entities[p.actor];ex.held??={since:rt.tick,why};if(ex.held.why!==why)ex.held={since:rt.tick,why};
  const waited=(rt.tick-ex.held.since)*DT;
+ if(why==='queue'){if(waited>PASSAGE_QUEUE_SECONDS)return {status:'failed',diagnostic:issue('door-busy','Someone ahead at the door did not get through; this walk stopped before it.',[p.target,who])};if(a.human&&!ex.child)a.human.activity='idle';return {status:'running',phase:'waiting'};}
  if(waited>(why==='passing'?PASSAGE_YIELD_SECONDS:PASSAGE_WAIT_SECONDS))return {status:'failed',diagnostic:why==='passing'?issue('door-busy','Someone else kept passing through the door; this walk stopped before it.',[p.target,who]):issue('swing-blocked','Someone is in the door’s swing and did not move aside; nothing was opened.',[p.target,who])};
  if(why==='passing'&&inTheWay(ex,a.pose.p[0],a.pose.p[2])){const q=waitSpot(rt,ex);if(q&&Math.hypot(q[0]-a.pose.p[0],q[1]-a.pose.p[2])>.3&&stepTo(rt,ex,q))return {status:'running',phase:'waiting'};}
  if(why==='swing'&&waited>=PASSAGE_ASK_SECONDS&&ex.held.asked!==who){ex.held.asked=who;ask(rt,who,swingCentre(p.opening!));}

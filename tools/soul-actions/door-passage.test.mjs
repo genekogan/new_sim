@@ -83,6 +83,15 @@ test('door passage: by hand on the way, close behind, contention, obstruction, r
  await tick(20);assert.deepEqual(W.entities[ana.entityId].pose.p,p1,'refused from inside, not lifted out');report.refusals.lockedFromInside=locked2.error??locked2.reason??locked2;report.checks.push('from inside a closed yard, a locked door at the destination is refused by name; no closest approach');
  // a walk out of the yard to the open field (free-standing doors elsewhere separate nothing) still passes
  const outAgain=await act(ana,'walk:outside-lamp');const [eoa]=await finish([[ana,outAgain]]);assert.equal(eoa.phase,'completed',JSON.stringify(eoa));assert.equal(side(ana),'outside');
+ // ---- 8 (entry 32's carried fix). Same side, the later one nearer (entry 31 take 4's geometry): Ana from the lamp, Bea
+ // from the post 2.5 s later. The first passage gets the staging spot, the later one a queue spot about a metre behind;
+ // they never meet at one waiting spot; Ana holds the door, Bea follows and closes it.
+ const toPost=await act(bea,'walk:outside-post');await finish([[bea,toPost]]);assert.equal(side(bea),'outside');assert.equal(god.model.get('door').state.open,false);
+ const toLamp=await act(ana,'walk:outside-lamp');await finish([[ana,toLamp]]);
+ s0=samples.length;const rq1=await act(ana,'walk:inside-bench');await tick(50);const rq2=await act(bea,'walk:inside-seat');
+ const qs=await finish([[ana,rq1],[bea,rq2]]);assert.deepEqual(qs.map(x=>x.phase),['completed','completed'],JSON.stringify(qs));assert.equal(side(ana),'inside');assert.equal(side(bea),'inside');assert.equal(god.model.get('door').state.open,false,'the last one through closed it');
+ const qss=samples.slice(s0);report.passages.sameSideQueue={...pairChecks(qss,'ana','bea'),handOps:handOps(qss),beaWaitedAt:qss.find(x=>x.bodies.ana.motion&&!x.bodies.bea.motion)?.bodies.bea.p??null};
+ assert.ok(report.passages.sameSideQueue.minBodyDistance>=.52,'never closer than 0.52 m: '+report.passages.sameSideQueue.minBodyDistance);report.checks.push('same side, later one nearer: queued a metre behind the staging spot, never closer than 0.52 m, last one through closed it');
  assert.deepEqual(f.host.engine.runtime.violations,[]);
  report.contextBytes={absent:JSON.stringify(absent).length,distant100:JSON.stringify(far).length,nearby:JSON.stringify(nearby).length,nearbyDoorFacts:nearby.objects?.find(o=>o.id===doorId)?.state??null,afterPassage:JSON.stringify(after).length};
  assert.equal(report.contextBytes.distant100,report.contextBytes.absent,'100 distant doors add +0 bytes');
