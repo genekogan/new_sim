@@ -207,10 +207,10 @@ function vendorGroups() {
 // mars/viewer/dist/client (src/mars-static.ts), among them the people's character set under /modular.
 function devProxy() {
   const http = `http://127.0.0.1:${process.env.PORT ?? 4500}`;
-  const routes = ['/v1', '/__sim', '/skill.md', '/cards.md', '/mcp', '/healthz', '/modular', '/mars-assets', '/engine', '/models', '/history', '/2020', '/browser', '/data/manifest.json'];
-  // Whole path segments only (a key starting with ^ is a RegExp): /history/… goes to the server, a page /history-x does not.
-  const segment = (r: string) => `^${r.replace(/[.]/g, '\\.')}(?:[/?]|$)`;
-  return { '^/w/[^/]+/[^?]+': { target: http, ws: true }, ...Object.fromEntries(routes.map((r) => [segment(r), http])), '^/ws(?:[/?]|$)': { target: http.replace(/^http/, 'ws'), ws: true } };
+  // One RegExp key (a key starting with ^ is one) matching whole path segments: /history/… goes to the server, a page
+  // /history-x stays with Vite.
+  const roots = 'v1|__sim|skill\\.md|cards\\.md|mcp|healthz|modular|mars-assets|engine|models|history|2020|browser|data/manifest\\.json';
+  return { '^/w/[^/]+/[^?]+': { target: http, ws: true }, [`^/(?:${roots})(?:[/?]|$)`]: http, '^/ws(?:[/?]|$)': { target: http.replace(/^http/, 'ws'), ws: true } };
 }
 
 export default defineConfig({
