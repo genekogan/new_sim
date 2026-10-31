@@ -9,7 +9,7 @@ import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
 import { apiPath } from '../../world-path.ts';
 import { artOf, brokenLinkLines, coverWhenReady, imageBroken, imageFailed, imageLoaded, videoTexture, whenImageFails } from '../art-media.ts';
-import { frameMediaKind } from '@sim/world-compiler';
+import { frameMediaKind, pinSlot } from '@sim/world-compiler';
 
 type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean; slot?: number };
 const texCache = new Map<string, THREE.Texture>();
@@ -37,6 +37,40 @@ function textTexture(lines: string[], f: Face): THREE.Texture {
   g.fillStyle = f.ink ?? '#3a2a22'; g.textAlign = 'center'; g.textBaseline = 'middle';
   ls.forEach((l, i) => g.fillText(l, cw / 2, ch / 2 + (i - (ls.length - 1) / 2) * size * 1.1));
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; texCache.set(key, t); return t;
+}
+/** Soul Actions entry 19: a pinboard's notes (one per line, "words — Name") as signed paper cards pinned to cork, each in
+ *  its slot (pinSlot, the place the hand went). Seeded by the words, so every viewer sees the same tilt and paper. */
+export function pinboardTexture(lines: string[], f: Face): THREE.Texture {
+  const key = JSON.stringify(['pinboard', lines, f.w, f.h, f.bg]);
+  const hit = texCache.get(key); if (hit) return hit;
+  const cw = 1024, ch = Math.round(cw * f.h / f.w), px = cw / f.w, c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const g = c.getContext('2d')!; let seed = 7; const rnd = () => ((seed = Math.imul(seed ^ (seed >>> 13), 1103515245) + 12345 | 0) >>> 0) / 4294967296;
+  g.fillStyle = f.bg ?? '#b88a5a'; g.fillRect(0, 0, cw, ch);
+  for (let i = 0; i < 2600; i++) { g.fillStyle = rnd() < 0.5 ? 'rgba(70,40,15,0.22)' : 'rgba(235,200,150,0.18)'; g.fillRect(rnd() * cw, rnd() * ch, 2 + rnd() * 3, 2 + rnd() * 3); }
+  const hash = (t: string) => { let h = 2166136261; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+  const papers = ['#fbf6e4', '#fdf0a6', '#d9ecf7', '#f8dbe0', '#e3f2d6'];
+  lines.slice(0, 6).forEach((line, i) => {
+    if (!line.trim()) return;
+    const cut = line.lastIndexOf(' — '), words = cut >= 0 ? line.slice(0, cut) : line, who = cut >= 0 ? line.slice(cut + 3) : '', r = hash(line);
+    const [sx, sy] = pinSlot(i), x = (sx / f.w + 0.5) * cw, y = (0.5 - sy / f.h) * ch, w = 0.33 * px, h = 0.31 * px;
+    g.save(); g.translate(x, y); g.rotate((r - 0.5) * 0.12);
+    g.fillStyle = 'rgba(30,15,5,0.35)'; g.fillRect(-w / 2 + 6, -h / 2 + 8, w, h);
+    g.fillStyle = papers[Math.floor(r * papers.length)]; g.fillRect(-w / 2, -h / 2, w, h);
+    // the words, wrapped to the card at the largest size that fits four lines; the author's name signs the bottom
+    g.fillStyle = '#26221e'; g.textAlign = 'left'; g.textBaseline = 'top';
+    let size = 34, wrapped: string[] = [];
+    for (; size >= 16; size -= 2) {
+      g.font = `500 ${size}px 'Comic Sans MS', 'Segoe Print', 'Bradley Hand', cursive`; wrapped = [];
+      for (const word of words.split(/\s+/)) { const last = wrapped.at(-1); if (last !== undefined && g.measureText(last + ' ' + word).width <= w - 28) wrapped[wrapped.length - 1] = last + ' ' + word; else wrapped.push(word); }
+      if (wrapped.length * size * 1.15 <= h - 70 && wrapped.every(l => g.measureText(l).width <= w - 28)) break;
+    }
+    wrapped.slice(0, 5).forEach((l, k) => g.fillText(l, -w / 2 + 14, -h / 2 + 26 + k * size * 1.15));
+    if (who) { g.font = `italic 600 24px Georgia, serif`; g.fillStyle = '#5a3d22'; g.textAlign = 'right'; g.fillText('— ' + who, w / 2 - 14, h / 2 - 36); }
+    g.fillStyle = ['#c62f2a', '#2a62c6', '#2f9a4a'][Math.floor(r * 3)]; g.beginPath(); g.arc(0, -h / 2 + 12, 10, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); g.arc(-3, -h / 2 + 9, 3, 0, Math.PI * 2); g.fill();
+    g.restore();
+  });
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; texCache.set(key, t); return t;
 }
 function paintingTexture(seed: number, bg: string): THREE.Texture {
   const key = `painting:${seed}:${bg}`; const hit = texCache.get(key); if (hit) return hit;
@@ -72,6 +106,7 @@ registerMesh({
       else if (f.media && f.slot !== undefined) map = textTexture([''], f);
       else if (f.media && text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
       else if (f.media) map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');
+      else if (ctx.def.tags.includes('pinboard')) map = pinboardTexture(typeof st.text === 'string' ? st.text.split('\n') : [], f);
       else map = textTexture((f.line !== undefined ? [text[f.line] ?? ''] : text).slice(0, 6), f);
       // video and images glow a little so art reads in dim rooms; text keeps the matte board look
       plane.material = art ? new THREE.MeshBasicMaterial({ map, toneMapped: false }) : new THREE.MeshStandardMaterial({ map, roughness: 0.85, metalness: 0 });

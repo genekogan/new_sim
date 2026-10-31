@@ -7,7 +7,7 @@ import {EDEN_PLACE_LORE} from '../content/eden-place-lore.ts';
 import {tx} from '../comms/store.ts';
 import type {PaintingPublished} from '../../art/painting-completion.ts';
 export type HoldingFact={id:string;kind:string;name:string;state:string;holder:string|null;placeId:string|null};
-export type ConfirmedEffects={changed?:EdgeOutcomeV1['changed'];met?:EdgeOutcomeV1['met'];detail?:Record<string,unknown>;summary?:string;untrusted?:boolean};
+export type ConfirmedEffects={changed?:EdgeOutcomeV1['changed'];met?:EdgeOutcomeV1['met'];learned?:EdgeOutcomeV1['learned'];detail?:Record<string,unknown>;summary?:string;untrusted?:boolean};
 export type OutcomeContext={soulId:string;capability:string;params:Record<string,string>;acceptedTick:number;confirmedProduced?:EdgeOutcomeV1['produced'];confirmedChanges?:EdgeOutcomeV1['changed'];holdingBefore?:HoldingFact|null;confirmedEffects?:ConfirmedEffects};
 export type TerminalSection={section:string;rows:Record<string,unknown>[];learned:EdgeOutcomeV1['learned']};
 export type OutcomeSnapshot={worldId:string;tick:number;place:string|null;placePath:string[];pos:readonly number[]|null;walkable:string[];sections:TerminalSection[];materials:{id:string;version:number;title:string;text:string;source:string}[]};
@@ -60,7 +60,7 @@ export class ActionOutcomes{
    }
    if(context.confirmedProduced?.length){out.produced=context.confirmedProduced;out.untrusted=true;}
    if(context.confirmedChanges?.length)out.changed=context.confirmedChanges;
-   for(const e of [context.confirmedEffects,effects])if(e){out.changed.push(...(e.changed??[]));out.met.push(...(e.met??[]));Object.assign(out.detail,e.detail);if(e.summary)out.summary=clip(e.summary,160);out.untrusted||=e.untrusted===true;}
+   for(const e of [context.confirmedEffects,effects])if(e){out.changed.push(...(e.changed??[]));out.met.push(...(e.met??[]));out.learned.push(...(e.learned??[]));Object.assign(out.detail,e.detail);if(e.summary)out.summary=clip(e.summary,160);out.untrusted||=e.untrusted===true;}
    if(!completed)out.detail.completedContent=false;
    const validated=edgeOutcomeV1Schema.parse(out);this.db.prepare('INSERT INTO edge_outcomes_v1(world_id,receipt_id,soul_id,body) VALUES(?,?,?,?)').run(this.worldId,receipt.id,context.soulId,JSON.stringify(validated));return validated;
   });
