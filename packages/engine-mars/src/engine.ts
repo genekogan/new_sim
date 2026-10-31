@@ -143,6 +143,9 @@ const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24
 
 const secs = (v: unknown, d: number) => Math.round(Math.min(3600, Math.max(0.5, typeof v === 'number' ? v : d)) * TPS);
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
+/** free-goal/1: the walk-step marker (`free`, with an optional room polygon `freeWithin`), the gap (m) another body leaves a
+ *  goal free by (as birth-near/1) and the most route plans one step tries. */
+export const FREE_GOAL_V1 = 'goal/1', FREE_GOAL_GAP = 0.8, FREE_GOAL_PLANS = 8;
 const num = { type: 'number' }, str = { type: 'string' };
 const ref = { anyOf: [str, { type: 'array', items: num, minItems: 2, maxItems: 2 }] };
 /** The body language, as the card grammar and agents see it. The actor is always implied. */
@@ -664,12 +667,50 @@ export class MarsEngine implements Engine {
     if ((p.trafficTries = (p.trafficTries ?? 0) + 1) > 6) return this.end(p, 'failed', why);
     p.index--; p.ops = [{ wait: (waiters.length ? 80 : 20) + this.stagger(p.actor) * 10 }];
   }
+  /** free-goal/1 (READ-DISPLACEMENT, continuity C13 2026-10-31): a walk step marked `free:'goal/1'` (a shelf browse before
+   *  or after reading) whose ground goal has another body within FREE_GOAL_GAP when the step begins ends at a free standing
+   *  point within 1.5 m of it instead. Walking onto the body, or brushing past it, would have the native make-way courtesy
+   *  (walk.ts makeWay) move an idle bystander with no decision or event of its own. A candidate is reached straight from the
+   *  goal (never through a wall), lies in the same room (`within`: the room polygon the step names, if any) and the same
+   *  native regions as the goal, and its planned route keeps 2r+0.1 from every body near the goal; nearest the goal, then
+   *  nearest the walker, first; at most FREE_GOAL_PLANS route plans. Null: no such point, and the step is skipped (the browse happens where the walker
+   *  stands). A clear goal, and any upper floor, is unchanged. */
+  private freeGoalV1(me:string,g:{x:number;z:number;level:number},within?:unknown):{x:number;z:number;level:number}|null{
+    if((g.level??0)!==0||!this.ents[me])return g;
+    const people=(listEntities(this.ents) as any[]).filter(o=>o.kind==='human'&&o.id!==me&&(o.human?.level??0)===0).map(o=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
+    const free=(x:number,z:number)=>!people.some(([px,pz])=>hypot(px-x,pz-z)<FREE_GOAL_GAP);
+    if(free(g.x,g.z))return g;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const stand=spatial.clearTester(0,[g.x,g.z],HUMAN_RADIUS+.15),pass=spatial.clearTester(0,[g.x,g.z],HUMAN_RADIUS*.5);if(!stand||!pass)return null;
+    const room=Array.isArray(within)&&within.length>=3&&within.every(v=>Array.isArray(v)&&v.length===2&&v.every(Number.isFinite))?within as [number,number][]:null;
+    const regions=Object.entries(this.rt.world.regions as Record<string,{level?:number;polygon:[number,number][]}>).filter(([,r])=>(r.level??0)===0&&Array.isArray(r.polygon));
+    const regionsAt=(x:number,z:number)=>regions.filter(([,r])=>inPoly(x,z,r.polygon)).map(([id])=>id).sort().join('|'),home=regionsAt(g.x,g.z);
+    const from=this.pos(me)!,near=people.filter(([px,pz])=>hypot(px-g.x,pz-g.z)<=3),keep=2*bodyProfile(this.ents[me]).radius+.1;
+    const cands:{x:number;z:number;ring:number;d:number}[]=[];
+    for(let ring=1;ring<=3;ring++){const n=ring*8;for(let k=0;k<n;k++){
+      const ang=(k/n)*Math.PI*2,x=r3(g.x+dcos(ang)*ring*.5),z=r3(g.z+dsin(ang)*ring*.5);
+      if(!stand([x,z])||!free(x,z)||(room&&!inPoly(x,z,room))||regionsAt(x,z)!==home)continue;
+      let straight=true;for(let t=.1;t<ring*.5-1e-9&&straight;t+=.1)straight=pass([g.x+(x-g.x)*t/(ring*.5),g.z+(z-g.z)*t/(ring*.5)]);
+      if(straight)cands.push({x,z,ring,d:hypot(x-from[0],z-from[1])});}}
+    cands.sort((a,b)=>a.ring-b.ring||a.d-b.d);   // nearest the goal, then the walker's side (stable: angle on a tie)
+    for(const c of cands.slice(0,FREE_GOAL_PLANS)){
+      if(this.movementVerb(me,c.x,c.z)!=='walk_to')continue;
+      const def=this.registry.get('walk_to'),parsed=def?.schema.safeParse({actor:me,x:c.x,z:c.z,level:0});if(!def||!parsed?.success)continue;
+      const r=def.plan(this.rt,parsed.data) as {ok:boolean;program?:{legs:{kind:string;points?:[number,number][]}[]}};
+      if(!r.ok||!r.program||!r.program.legs.every(l=>l.kind==='walk'&&Array.isArray(l.points)))continue;
+      let clear=true;
+      for(const l of r.program.legs)for(let i=1;i<l.points!.length&&clear;i++){const [p0,p1]=[l.points![i-1],l.points![i]],n=Math.max(1,Math.ceil(hypot(p1[0]-p0[0],p1[1]-p0[1])/.1));
+        for(let j=0;j<=n&&clear;j++){const q=[p0[0]+(p1[0]-p0[0])*j/n,p0[1]+(p1[1]-p0[1])*j/n];if(hypot(q[0]-from[0],q[1]-from[1])<.5)continue;clear=!near.some(([px,pz])=>hypot(px-q[0],pz-q[1])<keep);}}
+      if(clear)return {x:c.x,z:c.z,level:0};
+    }
+    return null;
+  }
   private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];if(this.rt.world.groundV1&&(inDeepWater(this.rt,actor)||destinationInDeepWater(this.rt,x,z)))return 'ground_travel';return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
   /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */
   private raw(me: string, step: { verb: string; params: Record<string, unknown> }): { verb: string; params: Record<string, unknown> } | Diag {
-    const verb = step.verb.slice(5), def = this.registry.get(verb), a = step.params ?? {};
+    const verb = step.verb.slice(5), def = this.registry.get(verb), { free: _free, freeWithin: _within, ...rest } = step.params ?? {}, a = verb === 'walk_to' ? rest : step.params ?? {};
     if (!def) return { code: 'action.unknown-verb', message: `no action verb "${verb}"` };
     if(verb==='carrier_ride'){const issue=this.puntBoardingIssue(String(a.carrier??''));if(issue)return issue;}
     const helm=['boat_take_helm','boat_release_helm'].includes(verb);
@@ -703,7 +744,14 @@ export class MarsEngine implements Engine {
 
   /** One body-language step → the Mars actions and waits that depict it, decided when the step begins. */
   private lower(p: Prog, step: { verb: string; params: Record<string, unknown> }): Op[] | Diag {
-    const me = p.actor, a = step.params ?? {};
+    const me = p.actor;
+    if (step.verb === 'mars:walk_to' && step.params?.free === FREE_GOAL_V1) {
+      const lv = step.params.level === undefined ? this.ents[me]?.human?.level ?? 0 : Number(step.params.level);
+      const g = this.freeGoalV1(me, { x: Number(step.params.x), z: Number(step.params.z), level: lv }, step.params.freeWithin);
+      if (!g) return [];
+      step = { verb: step.verb, params: { ...step.params, x: g.x, z: g.z } };
+    }
+    const a = step.params ?? {};
     if (step.verb === 'mars:take_item') { const it=this.ents[String(a.item)]; if (it?.support?.kind === 'in-hand' && it.support.by === me && (!a.hand || it.support.hand === a.hand)) return []; }
     if (step.verb.startsWith('mars:')) { const r = this.raw(me, step); return 'code' in r ? r : [{ ...r, settle: 'held', raw: true }]; }
     switch (step.verb) {
@@ -714,9 +762,10 @@ export class MarsEngine implements Engine {
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
         const gaitIssue = this.gaitIssue(me, a); if (gaitIssue) return gaitIssue;
-        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
+        let g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
+        if (a.free === FREE_GOAL_V1) { const f = this.freeGoalV1(me, g, a.freeWithin); if (!f) return []; g = f; }
         const movement = this.movementVerb(me,g.x,g.z);
         if (a.gait && a.gait !== 'walk' && movement !== 'walk_to') return {code:'gait.dry-ground-required',message:'This shore or water route does not support jogging or running; return to dry ground first.'};
         // LINK BODY: a zombie's shuffle (pace 'shuffle'): half the body's walking speed, dry ground at both ends only
