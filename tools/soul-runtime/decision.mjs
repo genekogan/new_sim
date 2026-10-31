@@ -207,8 +207,12 @@ export async function applyPendingDecision(journal,fence,world,{signal}={}){
  // Consuming an early deadline wake restores the wake the Soul itself asked for.
  if(wakeAt===null&&decision.wakeAt==null&&!cancel&&call.type!=='listen'&&priorLead&&priorWake===priorLead.wakeAt&&Date.parse(priorLead.requestedWakeAt)>pending.retainedAt)wakeAt=priorLead.requestedWakeAt;
  const commitments=ownerCommitmentTimes([latest.value.initialInstruction,...(journal.ownerTaskTexts?.()??[])]);
+ // A kept early wake whose commitment left owner intent (e.g. its task closed)
+ // falls back to the requested wake, so no stale early prompt remains.
+ let lead=priorLead&&wakeAt===priorLead.wakeAt?priorLead:null;
+ if(lead&&!commitments.includes(Date.parse(lead.deadlineAt))){wakeAt=Date.parse(lead.requestedWakeAt)>pending.retainedAt?lead.requestedWakeAt:null;lead=null;}
  const scheduled=deadlineWake(wakeAt,commitments,pending.retainedAt);
- const deadlineWakeV1=scheduled.lead??(priorLead&&wakeAt===priorLead.wakeAt?priorLead:null);
+ const deadlineWakeV1=scheduled.lead??lead;
  wakeAt=scheduled.wakeAt;
  // A real applied decision, including an explicit refusal, is the progress
  // boundary. Retention, inference and uncertain effects never refill this budget.
