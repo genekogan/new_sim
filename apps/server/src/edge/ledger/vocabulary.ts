@@ -206,10 +206,13 @@ const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fis
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
 /** srv-act-words: the plain words an act may resolve on a focused build (`EdgeLedger.wordsFocused`): one walk to a named
- *  place, a sit (on something), standing up, a wave, a dance, a wander. Other shapes read offers beyond their own verbs
+ *  place, standing up, a wave, a wander. (Rotation 2: sits and dances went back to the words menu. Their launch admission
+ *  reads the engine's paged clearance, whose answer near a body depends on the windows the last menu queries opened: after
+ *  a focused build 4 of 15 dances were refused pose.no-room that the whole menu's build admitted, the world identical;
+ *  oracle --gap 20, k=230.) Other shapes read offers beyond their own verbs
  *  (chains, finding, gaits, bikes, rides and steering, "go <doing>", behind / nearest, floors, the refusal table, social
  *  phrasing) and resolve on the whole menu, as before. */
-const WORDS_FOCUS_SHAPE = /^(?:please\s+)?(?:(?:go|walk|head)(?:\s+over|\s+back)?\s+(?:to|into|inside|towards?)\s+[a-z0-9' -]+|sit(?:\s+down)?(?:\s+(?:on|in|at|by|under|near|beside)\s+[a-z0-9' -]+)?|stand(?:\s+up)?|get\s+up|wave|dance|wander)[.!]?$/;
+const WORDS_FOCUS_SHAPE = /^(?:please\s+)?(?:(?:go|walk|head)(?:\s+over|\s+back)?\s+(?:to|into|inside|towards?)\s+[a-z0-9' -]+|stand(?:\s+up)?|get\s+up|wave|wander)[.!]?$/;
 const WORDS_FOCUS_NOT = /\b(?:then|and|jog\w*|run|running|sprint\w*|hurry|cycl\w*|bik\w*|bicycl\w*|board\w*|embark|aboard|row\w*|boat\w*|ride|rides|riding|fly\w*|flight|leave|disembark|alight|start|depart|carousel|merry|ferris|balloon|punt|basket|behind|nearest|closest|nearby|anywhere|somewhere|upstairs|downstairs|floor|storey|story|top|level|find|seek|search|look)\b/;
 /** srv-act-words: the verbs plain words of a focus shape can read while they resolve (resolveWords), or null (the whole
  *  menu): every verb parseCapability tests for these words (leading-word candidates and their VERBS synonyms, the INTENTS
