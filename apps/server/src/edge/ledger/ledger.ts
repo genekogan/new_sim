@@ -335,8 +335,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
     record: (soul, reason, detail) => {const r = this.insert(soul, 'stall:released', 'started', undefined, true, detail); this.update(r.id, {phase: 'completed', code: 'stall.released', reason});},
   });
   readonly spotsRefused: string[];
-  constructor(host: WorldHost, db: Db, placeData?: unknown, options: {ambient?: boolean; spots?: unknown;now?:()=>number} = {}) {
-    this.host = host; this.db = db; this.ambient = options.ambient === true;
+  /** Stage B (split/read-host.ts): a read worker's ledger over a read-only host. The read code runs unchanged; the
+   *  constructor skips what writes or hooks into a live host (the restart re-arm loop, approach/recovery hooks, the
+   *  host listeners) and `replicaSync()` stands in for the per-tick upkeep the read code depends on. */
+  readonly readOnly: boolean;
+  constructor(host: WorldHost, db: Db, placeData?: unknown, options: {ambient?: boolean; spots?: unknown;now?:()=>number; readOnly?: boolean} = {}) {
+    this.host = host; this.db = db; this.ambient = options.ambient === true; this.readOnly = options.readOnly === true;
     this.controlNow=options.now??Date.now;
     const spots = loadSpots(options.spots); this.baseSpots = spots.data; this.spotsRefused = spots.refused;
     db.db.exec(`CREATE TABLE IF NOT EXISTS edge_receipts_v1 (world_id TEXT NOT NULL, receipt_id TEXT NOT NULL, soul_id TEXT NOT NULL, capability TEXT NOT NULL, phase TEXT NOT NULL,
@@ -371,6 +375,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       touch: id => this.comms?.fading.touch?.(id),
       decide: (soul, receipt, capability, label, steps) => this.decide(soul, receipt, capability, label, steps)});
     this.receiptListeners.push(r => {if(!OPEN.includes(r.phase))this.menusChangedBy('receipt-closed', r.soulId, r.capability);});
+    if (this.readOnly) return;
     // D1: the card's doing line names an edge act's approach ("walking to Kitchen chair") from this ledger's plans
     host.approachV1 = m => {const program = host.engine.programOf(m.entityId), r = program ? this.rows("soul_id=? AND phase='started' AND program_id=?", m.soulId, program)[0] : undefined; return r ? this.approachFor(m, r.receipt_id) : null;};
     // Open receipts from a previous process: a started one whose programme the snapshot carries is still followed;
@@ -391,8 +396,16 @@ export class EdgeLedger implements EdgeLedgerHooks {
       afterTick: tick => {this.afterTick(tick);this.stallGuard.afterTick(tick);},
     });
   }
+  /** Read worker (readOnly): after each applied delta, what main's afterTick keeps for the read code: the faded set (from
+   *  the replicated one), the carrier places, the visit memory re-read from the database (main writes it). */
+  replicaSync(faded: Iterable<string>) {
+    if (!this.readOnly) throw new Error('replicaSync: not a read-only ledger');
+    const next = new Set(faded);
+    if (next.size !== this.faded.size || [...next].some(id => !this.faded.has(id))) {this.faded.clear(); for (const id of next) this.faded.add(id);}
+    this.syncCarrierPlaces(); this.knowledge.reload();
+  }
   private loadPlaces(raw: unknown): PlaceData {
-    const world = this.host.engine.world as NativeWorld;
+    const world = this.mw.world as NativeWorld;
     if (raw === undefined) return derivePlaceData(world);
     const errs = validatePlaceData(raw, world);
     if (errs.length) throw new Error('place-data rejected: ' + errs.slice(0, 10).join('; '));

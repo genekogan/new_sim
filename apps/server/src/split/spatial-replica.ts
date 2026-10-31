@@ -17,6 +17,7 @@ import { NavConnectivity, type ConnPoint, type ConnVerdict } from '../../../../m
 import { G_SWIM, swimRootY } from '../../../../mars/viewer/engine/spatial/ground.ts';
 import { dcos, dsin, hypot } from '../../../../mars/viewer/engine/core/math.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
+import { HUMAN_PROFILE } from '../../../../mars/viewer/engine/spatial/types.ts';
 import { LIE_CLEARANCE } from '../../../../mars/viewer/engine/social/pose.ts';
 import type { WorldState } from '../../../../mars/viewer/engine/world/types.ts';
 import { groundField, registerGroundRecipe } from '../../../../packages/engine-mars/src/ground-bridge.ts';
@@ -112,6 +113,18 @@ export class SpatialReplica {
   private sync(): Spatial { const sp = this.spatial; sp.sync(this.world); return sp; }
 
   // ---- the engine's reads (same signatures, same code) ----
+
+  /** B-facade: the synced service, for the engine reads ReplicaWorld answers over its own world view (movementVerb,
+   *  bodyWaterDepthV1: they read a body's pose and the ground field). */
+  service(): Spatial { return this.sync(); }
+  /** engine.reachV1 (B-facade item 2): the planner's route proof between two standing points, over the replica's service. */
+  reachV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: true; length: number; legs: number; levels: number[] } | { ok: false; code: string; message: string } {
+    const r = this.sync().route(this.world, HUMAN_PROFILE, { level: from.level ?? 0, p: from.p }, { level: to.level ?? 0, p: to.p }, { proveUnreachable: true }) as
+      { ok: true; route: { length: number; legs: { kind: string; level?: number; link?: { to: { level: number } } }[] } } | { ok: false; diagnostic: { code: string; message: string } };
+    if (!r.ok) return { ok: false, code: r.diagnostic.code, message: r.diagnostic.message };
+    const levels = [...new Set(r.route.legs.map((l) => l.kind === 'walk' ? l.level! : l.link!.to.level))];
+    return { ok: true, length: Math.round(r.route.length * 100) / 100, legs: r.route.legs.length, levels };
+  }
 
   /** engine.staticEpochV1 */
   staticEpochV1(): number { return this.scene.epoch; }

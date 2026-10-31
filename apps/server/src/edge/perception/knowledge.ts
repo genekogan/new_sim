@@ -76,6 +76,8 @@ export class PlaceKnowledge {
   }
   /** Places change (a god edit re-derives them): drop caches. */
   changed() {this.secretsCache = null; this.version++; this.L.invalidateBodies();}
+  /** Read worker: main writes visits and secrets; forget what was read so the next read sees the database (WAL). */
+  reload() {this.memo.clear(); this.secretsCache = null;}
   secrets(): {id: string; name: string}[] {return [...this.marked()].sort().map(id => ({id, name: this.L.places.byId.get(id)?.name ?? id}));}
 
   // ------------------------------------------------------------ memory of visits

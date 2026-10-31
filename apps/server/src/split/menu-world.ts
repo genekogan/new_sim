@@ -46,7 +46,7 @@ export interface MenuWorld {
   carrierOf?(actor: string): Aboard | null;
   placeLevelV1?(level: number): number;
   bodyUsesV1?(id: string): {body: string; how: 'occupied' | 'held'} | null;
-  seatOccupantsV1?(id: string, kind?: string): {body: string}[];
+  seatOccupantsV1?(id: string, kind?: string): {slot: string; body: string}[];
   // (b) the engine's spatial service (B-spatial mirrors these names in split/spatial-replica.ts)
   withFeasibilityRead?<T>(read: () => T): T;
   readPassV1?<T>(fn: () => T): T;
@@ -65,6 +65,8 @@ export interface MenuWorld {
   standYAtV1?(x: number, z: number, level?: number): number | null;
   nativeSeatLevelsV1?(fixture: string): number[];
   movementVerb?(actor: string, x: number, z: number): string;
+  /** body-state.ts: how deep the water is over the body's root (0 on dry ground, aboard, upstairs) */
+  bodyWaterDepthV1?(actor: string): number;
   // (c)
   readonly feasibility: Feasibility;
 }
@@ -74,7 +76,7 @@ export interface MenuWorld {
 const OPTIONAL = ['programAction', 'commonsNewcomerResourcesV1', 'commonsFoodDeliveriesV1', 'carriers', 'carrierOf', 'placeLevelV1',
   'bodyUsesV1', 'seatOccupantsV1', 'withFeasibilityRead', 'readPassV1', 'staticEpochV1', 'navEpochV1', 'navWarmV1', 'navCheckV1', 'navNearestMainV1',
   'clearanceAtV1', 'clearanceUpToV1', 'nearestStandableV1', 'standableNearV1', 'clearSpotsV1', 'dryGroundAtV1', 'lyingRoomAtV1',
-  'standYAtV1', 'nativeSeatLevelsV1', 'movementVerb'] as const;
+  'standYAtV1', 'nativeSeatLevelsV1', 'movementVerb', 'bodyWaterDepthV1'] as const;
 
 /** `E.withFeasibilityRead(read)` when the world has it, else `read()` (the engine contract's optional batch). */
 export const withRead = <T>(E: MenuWorld, read: () => T): T => E.withFeasibilityRead ? E.withFeasibilityRead(read) : read();
@@ -153,9 +155,13 @@ export function setMenuWorld(host: object, mw: MenuWorld | null) {if (mw) SET.se
 export type ActionRow = {programId: string; actor: string; step: number; action: {id: string; verb: string; status: string; phase?: string} | null; tick: number};
 export type RecordRow = {id: string; verb: string; status: string; phase?: string; live: boolean; params: Record<string, unknown>; requestedTick?: number; runningTick?: number};
 /** The engine's static-per-epoch reads (resent whole when they move). `kernel` = host.kernel (things, vocab, decks). */
-export type MenuStatics = {regions: unknown; navV1: unknown; rulesVersion: string; verbs: VerbInfo[]; anchors: Anchor[]; newcomer?: NewcomerResource[]; deliveries?: {batch: number}[]; kernel?: unknown};
-export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics};
-export type MenuDelta = {actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel'>; kernel?: unknown};
+export type MenuStatics = {regions: unknown; navV1: unknown; rulesVersion: string; verbs: VerbInfo[]; anchors: Anchor[]; newcomer?: NewcomerResource[]; deliveries?: {batch: number}[]; kernel?: unknown; names?: unknown;
+  /** movementVerb / placeLevelV1 inputs: world.groundV1 set, the engine's physical-shore mode, world.upperFloorsV1 */
+  groundV1?: boolean; physical?: boolean; upperFloors?: unknown};
+/** A claimed fixture slot (runtime owners `slot:<fixture>#<slot>`): the slot id and the claiming record's actor. */
+export type ClaimRow = [slot: string, actor: string];
+export type MenuInit = {actions: ActionRow[]; records: RecordRow[]; verdicts: VerdictRow[]; statics: MenuStatics; claims?: ClaimRow[]};
+export type MenuDelta = {actions?: ActionRow[]; actionsGone?: string[]; records?: RecordRow[]; recordsGone?: string[]; verdicts?: VerdictRow[]; statics?: Omit<MenuStatics, 'kernel' | 'names'>; kernel?: unknown; names?: unknown; claims?: ClaimRow[]};
 export type VerdictRow = {soulId: string; actor: string; key: string; verdict: Diag | null; tick: number};
 /** The verdicts main computed for the programs a replica's reads ask about. A miss answers "feasible" (the planner's
  *  refusal then comes at act time, as `deferRouteChecks` offers do today) and is queued for main (`misses`). */
@@ -189,6 +195,9 @@ export type ReplicaSources = {
   carrierOf?(actor: string): Aboard | null;
   placeLevelV1?(level: number): number;
   bodyUsesV1?(id: string): {body: string; how: 'occupied' | 'held'} | null;
+  seatOccupantsV1?(id: string, kind?: string): {slot: string; body: string}[];
+  movementVerb?(actor: string, x: number, z: number): string;
+  bodyWaterDepthV1?(actor: string): number;
   /** B-spatial's SpatialReplica (same method names as the engine). */
   spatial: Partial<Pick<MenuWorld, 'readPassV1' | 'staticEpochV1' | 'navEpochV1' | 'navWarmV1' | 'navCheckV1' | 'navNearestMainV1' | 'clearanceAtV1'
     | 'clearanceUpToV1' | 'nearestStandableV1' | 'standableNearV1' | 'clearSpotsV1' | 'dryGroundAtV1' | 'lyingRoomAtV1' | 'standYAtV1'
@@ -205,6 +214,7 @@ export class ReplicaMenuWorld implements MenuWorld {
     for (const k of Object.keys(sp)) if (typeof sp[k] === 'function') self[k] = (sp[k] as (...a: unknown[]) => unknown).bind(s.spatial);
     if (s.carriers) self.carriers = s.carriers; if (s.carrierOf) self.carrierOf = s.carrierOf;
     if (s.placeLevelV1) self.placeLevelV1 = s.placeLevelV1; if (s.bodyUsesV1) self.bodyUsesV1 = s.bodyUsesV1;
+    if (s.seatOccupantsV1) self.seatOccupantsV1 = s.seatOccupantsV1; if (s.movementVerb) self.movementVerb = s.movementVerb; if (s.bodyWaterDepthV1) self.bodyWaterDepthV1 = s.bodyWaterDepthV1;
     if ('newcomer' in s.statics) self.commonsNewcomerResourcesV1 = () => structuredClone(s.statics.newcomer);
     if ('deliveries' in s.statics) self.commonsFoodDeliveriesV1 = () => structuredClone(s.statics.deliveries);
   }

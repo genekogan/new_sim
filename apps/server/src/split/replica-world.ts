@@ -8,7 +8,11 @@ import type {StaticExportV1} from '../../../../mars/viewer/engine/spatial/servic
 import type {TileRect} from '../../../../mars/viewer/engine/spatial/tiled.ts';
 import {Replica, type Ent, type WorldDelta, type WorldInit} from './read-model.ts';
 import {SpatialReplica, type FixtureRow, type ReplicaBody} from './spatial-replica.ts';
-import {ReplicaMenuWorld, VerdictTable, type ActionRow, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow} from './menu-world.ts';
+import {ReplicaMenuWorld, VerdictTable, type ActionRow, type Aboard, type ClaimRow, type MenuDelta, type MenuInit, type MenuStatics, type RecordRow} from './menu-world.ts';
+import {CATALOG} from '../../../../mars/viewer/engine/world/catalog.ts';
+import {placeLevelOf} from '../../../../packages/engine-mars/src/upper-floors.ts';
+import {inShoreDomain} from '../../../../mars/viewer/engine/locomotion/connected-shore.ts';
+import {inDeepWater, destinationInDeepWater} from '../../../../mars/viewer/engine/locomotion/swim.ts';
 
 type MenuWire = {menu?: MenuInit};
 type MenuDeltaWire = {menu?: MenuDelta};
@@ -16,7 +20,9 @@ const bodyOf = (e: Ent): ReplicaBody => ({id: e.id, x: e.pose.p[0], y: e.pose.p[
 
 export class ReplicaWorld {
   readonly R = new Replica();
-  readonly verdicts = new VerdictTable();
+  readonly verdicts = new VerdictTable((from, to) => this.spatial?.reachV1(from, to));
+  /** claimed fixture slots: slot id (`fixture#slot`) -> the claiming body */
+  private claims = new Map<string, string>();
   spatial: SpatialReplica | null = null;
   readonly mw: ReplicaMenuWorld;
   private ents: Record<string, Ent> = {};
@@ -24,6 +30,8 @@ export class ReplicaWorld {
   private records = new Map<string, RecordRow & {params: Record<string, unknown>; history?: {tick: number; status: string}[]}>();
   private statics: MenuStatics = {regions: {}, navV1: null, rulesVersion: '', verbs: [], anchors: []};
   kernel: unknown = null;
+  /** the host's name facts (profiles, old-name claims): split/read-host.ts */
+  names: unknown = null;
   /** a pump's menu section has been seen (main runs a VerdictPump) */
   private pumped = false;
   private sceneKey = '';
@@ -53,11 +61,53 @@ export class ReplicaWorld {
         get newcomer() {return self.statics.newcomer;}, get deliveries() {return self.statics.deliveries;}},
       carriers: () => this.R.carrierRows().map(c => {const e = this.ents[c.id]; return {...c, pose: {p: [...e.pose.p], yaw: e.pose.yaw}};}),
       spatial: spatial as never, verdicts: this.verdicts,
+      carrierOf: actor => this.carrierOf(actor),
+      placeLevelV1: level => placeLevelOf({upperFloorsV1: this.statics.upperFloors ?? undefined} as never, level),
+      bodyUsesV1: id => this.bodyUsesV1(id),
+      seatOccupantsV1: (id, kind) => this.seatOccupantsV1(id, kind),
+      movementVerb: (actor, x, z) => this.movementVerb(actor, x, z),
+      bodyWaterDepthV1: actor => this.bodyWaterDepthV1(actor),
     });
   }
   private programAction(pid: string): ProgramAction | null {
     for (const a of this.actions.values()) if (a.programId === pid && a.action) return {tick: a.tick, programId: a.programId, actor: a.actor, step: a.step, action: {...a.action} as ProgramAction['action']};
     return null;
+  }
+  // ---- engine reads over the replicated entities (packages/engine-mars/src/engine.ts, same code)
+  private carrierOf(actor: string): Aboard | null {
+    const b = this.ents[actor]?.human?.carrier as {id: string; slot: string; phase: string; outBy?: number} | undefined, e = b ? this.ents[b.id] as Ent & {carrier?: {phase: string}; label?: string} : undefined;
+    if (!b || !e?.carrier) return null;
+    const tick = this.R.pos.tick, out = b.phase === 'leaving' || e.carrier.phase === 'landed' ? Math.max(1, Math.ceil(((b.phase === 'leaving' && b.outBy !== undefined ? b.outBy : tick + 240) - tick) / 20)) : undefined;
+    return {id: e.id, slot: b.slot, riderPhase: b.phase, phase: e.carrier.phase, label: e.label ?? e.id, ...(out !== undefined ? {outInSeconds: out} : {})};
+  }
+  private slotsOf(e: Ent) {return ((CATALOG as Record<string, {slots?: {id: string; kind: string}[]}>)[String(e.def)]?.slots ?? []).map(d => ({id: `${e.id}#${d.id}`, local: d.id, kind: d.kind}));}
+  private bodyUsesV1(id: string): {body: string; how: 'occupied' | 'held'} | null {
+    const e = this.ents[id] as (Ent & {support?: {kind?: string; by?: string | string[]}}) | undefined; if (!e) return null;
+    const s = e.support; if (s?.kind === 'in-hand') return {body: s.by as string, how: 'held'}; if (s?.kind === 'held' && s.by?.[0]) return {body: (s.by as string[])[0], how: 'held'};
+    for (const slot of this.slotsOf(e)) {const actor = this.claims.get(slot.id); if (actor && this.ents[actor]?.human) return {body: actor, how: 'occupied'};}
+    return null;
+  }
+  private seatOccupantsV1(id: string, kind = 'seat'): {slot: string; body: string}[] {
+    const e = this.ents[id]; if (!e) return [];
+    const out: {slot: string; body: string}[] = [];
+    for (const slot of this.slotsOf(e)) {if (slot.kind !== kind) continue; const actor = this.claims.get(slot.id); if (actor && this.ents[actor]?.human) out.push({slot: slot.local, body: actor});}
+    return out;
+  }
+  /** The engine's helpers read `rt.world` and `rt.services.spatial` only. */
+  private rt() {return {world: this.worldView, services: {spatial: this.spatial?.service()}} as never;}
+  private movementVerb(actor: string, x: number, z: number): string {
+    const a = this.ents[actor], w = {navV1: this.statics.navV1} as never;
+    if (this.statics.groundV1 && this.spatial && (inDeepWater(this.rt(), actor) || destinationInDeepWater(this.rt(), x, z))) return 'ground_travel';
+    return this.statics.physical && (inShoreDomain(w, x, z) || !!a && inShoreDomain(w, a.pose.p[0], a.pose.p[2])) ? 'commons_shore_travel' : 'walk_to';
+  }
+  private bodyWaterDepthV1(actor: string): number {
+    const e = this.ents[actor], h = e?.human as {level?: number; carrier?: unknown; riding?: unknown} | undefined;
+    if (!h || (h.level ?? 0) !== 0 || h.carrier || h.riding || !this.statics.groundV1 || !this.spatial) return 0;
+    const g = this.spatial.service().ground as unknown as {base: {waterLevel(x: number, z: number): number | null; height(x: number, z: number): number}; field: {height(x: number, z: number): number}} | undefined;
+    if (!g) return 0;
+    const x = e.pose.p[0], z = e.pose.p[2], lvl = g.base.waterLevel(x, z); if (lvl === null) return 0;
+    if ((g.field as unknown) !== g.base && e.pose.p[1] >= g.field.height(x, z) - 0.5 && g.field.height(x, z) >= lvl) return 0;
+    return Math.max(0, lvl - g.base.height(x, z));
   }
   private fixture = (id: string): FixtureRow | undefined => {const o = this.ents[id] as (Ent & {support?: {kind?: string}; level?: number}) | undefined; return o ? {id, def: String(o.def), kind: String(o.kind), ...(o.support?.kind ? {support: o.support.kind} : {}), ...(typeof o.level === 'number' ? {level: o.level} : {}), y: o.pose.p[1]} : undefined;};
   private humans(): ReplicaBody[] {const out: ReplicaBody[] = []; for (const e of Object.values(this.ents)) if (e.kind === 'human') out.push(bodyOf(e)); return out;}
@@ -80,9 +130,12 @@ export class ReplicaWorld {
     for (const r of m.records ?? []) this.setRecord(r);
     for (const id of (m as MenuDelta).recordsGone ?? []) this.records.delete(id);
     if (m.verdicts?.length) this.verdicts.apply(m.verdicts);
-    if (m.statics) this.statics = {...m.statics};
+    if (m.claims) this.claims = new Map(m.claims as ClaimRow[]);
+    if (m.statics) {const {kernel: _k, names: _n, ...rest} = m.statics as MenuStatics; this.statics = {...this.statics, ...rest};}
     const k = whole ? (m as MenuInit).statics.kernel : (m as MenuDelta).kernel;
     if (k !== undefined) this.kernel = k;
+    const n = whole ? (m as MenuInit).statics.names : (m as MenuDelta).names;
+    if (n !== undefined) this.names = n;
   }
   init(w: WorldInit & MenuWire) {
     this.R.init(w); this.ents = Object.fromEntries(this.R.entities); this.cost.inits++;

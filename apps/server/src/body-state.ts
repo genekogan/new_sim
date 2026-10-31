@@ -4,6 +4,7 @@
 // waist-deep in the pond is "standing in the water", and an approach walk is "walking to Kitchen chair, 18 m left".
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
 import type {WorldHost, Mind} from './world.ts';
+import {menuWorldOf} from './split/menu-world.ts';
 
 export type BodyStateV1 = {
   /** stateOf: seated, lying, sleeping, walking, swimming, riding, rowing, standing, busy, absent… */
@@ -28,7 +29,7 @@ const WATER: Record<string, string> = {swim: 'swimming', tread: 'treading water'
 const GAIT: Record<string, string> = {walk: 'walking', jog: 'jogging', run: 'running', cycle: 'cycling', swim: 'swimming', glide: 'gliding'};
 
 export function stateOf(host: WorldHost, entityId: string): string {
-  const h = (host.engine.world as NativeWorld).entities[entityId]?.human; if (!h) return 'absent';
+  const h = (menuWorldOf(host).world as NativeWorld).entities[entityId]?.human; if (!h) return 'absent';
   if (h.sleepPose) return 'sleeping';
   if (h.carrier) return h.activity === 'row' ? 'rowing' : 'riding';
   const a = String(h.activity ?? 'idle');
@@ -41,25 +42,25 @@ export function stateOf(host: WorldHost, entityId: string): string {
   if (a === 'row') return 'rowing';
   if (a === 'swim' || a === 'tread' || a === 'wade') return 'swimming';
   if (a === 'wait') return 'waiting';
-  if (a === 'idle') return host.engine.programOf(entityId) ? 'busy' : 'standing';
+  if (a === 'idle') return menuWorldOf(host).programOf(entityId) ? 'busy' : 'standing';
   return 'busy';
 }
 
 type Carrier = {label: string; riderPhase: string; phase: string};
 const carrierOf = (host: WorldHost, entityId: string): Carrier | null =>
-  (host.engine as unknown as {carrierOf?: (a: string) => Carrier | null}).carrierOf?.(entityId) ?? null;
+  (menuWorldOf(host).carrierOf?.(entityId) as Carrier | null | undefined) ?? null;
 
 /** The body as the engine has it now. `approach`: where the running program travels to (for `step`). */
 export function bodyState(host: WorldHost, entityId: string, approach?: ApproachV1 | null): BodyStateV1 | null {
-  const world = host.engine.world as NativeWorld, e = world.entities[entityId], h = e?.human; if (!e || !h) return null;
+  const world = menuWorldOf(host).world as NativeWorld, e = world.entities[entityId], h = e?.human; if (!e || !h) return null;
   const activity = String(h.activity ?? 'idle'), posture = stateOf(host, entityId), ride = carrierOf(host, entityId);
   const vehicle = !ride && h.riding ? world.entities[h.riding] : undefined;
   const on = ride ? ride.label : vehicle ? (vehicle.label ?? h.riding!) : null;
-  const depth = on ? 0 : Math.max(h.shore?.submergedHeightMetres ?? 0, (host.engine as {bodyWaterDepthV1?: (a: string) => number}).bodyWaterDepthV1?.(entityId) ?? 0);
+  const depth = on ? 0 : Math.max(h.shore?.submergedHeightMetres ?? 0, menuWorldOf(host).bodyWaterDepthV1?.(entityId) ?? 0);
   const inWater = !on && (activity in WATER || depth > WET_M);
   const gait = GAIT[activity];
   let step: string | undefined;
-  if (approach && gait && !on && host.engine.programOf(entityId)) {
+  if (approach && gait && !on && menuWorldOf(host).programOf(entityId)) {
     const left = approach.to ? Math.round(Math.hypot(approach.to[0] - e.pose.p[0], approach.to[1] - e.pose.p[2])) : null;
     step = `${gait} to ${approach.name}${left !== null ? `, ${left} m left` : ''}`;
   }
@@ -94,7 +95,7 @@ const MOVING_LABEL = /^(?:walk|stroll|wander|go|head|jog|run|cycle|ride a bicycl
 export function cardDoing(host: WorldHost, m: Mind, approach?: ApproachV1 | null): string {
   const b = bodyState(host, m.entityId, approach); if (!b) return m.doing;
   if (b.on) return carrierWords(b, carrierOf(host, m.entityId)?.phase)!;
-  if (host.engine.programOf(m.entityId)) {
+  if (menuWorldOf(host).programOf(m.entityId)) {
     if (approach && GAIT[b.activity] && !MOVING_LABEL.test(m.doing)) return `${GAIT[b.activity]} to ${approach.name}`;
     return m.doing;
   }
