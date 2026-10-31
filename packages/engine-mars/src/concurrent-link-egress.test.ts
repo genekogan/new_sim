@@ -6,6 +6,7 @@ import {bodySpatial} from '../../../mars/viewer/engine/bodies/navigation.ts';
 import {DT} from '../../../mars/viewer/engine/runtime/runtime.ts';
 import {groundFact} from './ground-bridge.ts';
 import {emptyGround} from '../../ground/src/index.ts';
+import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
 
 const factory=await marsFactory(GREEN_FIELD_WORLD);
 const A='h_upper000',C='h_lower000';
@@ -14,6 +15,8 @@ function use(e:MarsEngine,actor:string,goal:{x:number;z:number;level:number}){
  const result=e.perform({actor,label:'concurrent landing egress',steps:[{verb:'mars:walk_to',params:goal}]});assert.equal(result.ok,true,JSON.stringify(result));return result.id;
 }
 function until(e:MarsEngine,done:()=>boolean,limit=900){for(let i=0;i<limit;i++){e.step();if(done())return i+1;}assert.fail('native condition not reached within '+limit+' ticks');}
+// test-only: e.world is the engine-contract view; landing edits and spatial sync read the runtime's native Mars world.
+function nativeWorld(e:MarsEngine):NativeWorld{return (e as any).rt.world;}
 function exOf(e:MarsEngine,actor:string):any{return [...(e as any).rt.services.walkExecs.values()].find((ex:any)=>ex.actor===actor);}
 function physical(e:MarsEngine,before?:Map<string,number[]>,ids:readonly string[]=[A,C]){
  const rt=(e as any).rt;
@@ -59,7 +62,7 @@ function conflictingWalks(e:MarsEngine){
 }
 function resizeLanding(e:MarsEngine,halfX:number){
  const edit:WorldEditV1={contract:'world-edit/1',seq:2,hash:'',levels:[{id:1,y:.381,label:'intermediate landing'}],set:{landing:{surfaces:[{id:'landing-floor',level:1,y:.381,obb:{c:[0,0],half:[halfX,.55],yaw:0}}]}}};
- edit.hash=nextEntityPhysics(e.world.entityPhysicsV1,edit).hash;e.applyWorldEditV1(edit);
+ edit.hash=nextEntityPhysics(nativeWorld(e).entityPhysicsV1,edit).hash;e.applyWorldEditV1(edit);
 }
 
 test('default policy reproduces a climber/person versus landing/passage cycle',()=>{
@@ -203,7 +206,7 @@ test('a real landing edit discards a pending route into removed support',()=>{
  until(e,()=>exOf(e,C)?.detour?.stage==='pending');
  const planned=exOf(e,C).detour.planned,spot=exOf(e,C).detour.spot;
  assert.ok(Math.abs(spot[0])>.7,'courtesy target uses the outer pocket');
- resizeLanding(e,.975);const sp=bodySpatial((e as any).rt,C);sp.sync(e.world);
+ resizeLanding(e,.975);const sp=bodySpatial((e as any).rt,C);sp.sync(nativeWorld(e));
  assert.notEqual(sp.epoch,planned.epoch);
  stepPhysical(e);assert.notEqual(exOf(e,C).route,planned.route,'invalidated cached route was not installed');
  for(let i=0;i<40;i++)stepPhysical(e);
