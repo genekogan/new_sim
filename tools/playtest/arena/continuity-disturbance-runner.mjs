@@ -66,7 +66,7 @@ export function createContinuityDisturbanceRunner({trialDirectory,outputDirector
  for(const d of social){if(d.trigger.deliveryKind==='world'&&(!fixtures.has(senders[d.id])||typeof sendWorld!=='function')||d.trigger.deliveryKind==='owner'&&typeof sendOwner!=='function')throw fault('DISTURBANCE_TRANSPORT_MISSING');}
  mkdirSync(out,{mode:0o700});writeFileSync(join(out,'events.jsonl'),'',{flag:'wx',mode:0o600});
  const createdAt=now(),timelineTail=tail(join(trial,'timeline.jsonl')),captureTail=tail(join(capture,'native-capture.jsonl')),exportDirectory=join(trial,'native-export'),exportTail=tail(join(exportDirectory,'native-snapshots.jsonl'));
- let run=null,runDigest=null,dispatcher=null,failure=null,closed=false,stopping=false,started=false,timer=null,active=null,finishPromise=null,lastPollAt=null,eventLines=0,captureEpoch=null,captureGeneration=0,captureIndex=0,captureHash='',captureScopeHash=null,parsedCaptureIndex=0,parsedCaptureHash='',exportBytes=0,committedExportBytes=0,ownerSourceSeen=false,nativeSourceStatus='unknown';
+ let run=null,runDigest=null,dispatcher=null,failure=null,closed=false,stopping=false,started=false,timer=null,active=null,finishPromise=null,lastPollAt=null,eventLines=0,captureEpoch=null,captureGeneration=0,captureIndex=0,captureHash='',captureScopeHash=null,parsedCaptureIndex=0,parsedCaptureHash='',exportBytes=0,committedExportBytes=0,ownerSourceSeen=false,nativeSourceStatus='unknown',staleHeartbeat=null,captureHeartbeatPending=0;
  const sendAbort=new AbortController();
  const capturePending=[],exportPending=[],bindings=new Map(),sequences=new Map(),receipts=new Map(),deliveryFacts=new Map(),lastBodies=new Map();
  const counts={timeline:0,capture:0,export:0},sourceReadRetries={count:0,last:null};
@@ -113,8 +113,17 @@ export function createContinuityDisturbanceRunner({trialDirectory,outputDirector
   run=value;runDigest=hash(JSON.stringify(value));dispatcher=createContinuityDisturbances({scenario:spec,t0:run.startedAt,cutoffAt:run.cutoffAt,worldId,actors:[...participants].map(([actorId,soulId])=>({actorId,soulId})),evidence:[...evidence,join(trial,'run.json')]},{now,send,onRecord:record});
  }
  function captureStatus(){
-  const status=readJson(join(capture,'capture-status.json'),{optional:!run,maxBytes:65536});if(!status)return null;
-  if(status.schema!=='continuity-native-capture/1'||status.runId!==runId||status.worldId!==worldId||!Array.isArray(status.soulIds)||!same(status.soulIds,souls)||!Number.isSafeInteger(status.index)||status.index<1||!digest(status.lastHash)||typeof status.epoch!=='string'||!Number.isSafeInteger(status.generation)||status.generation<1||status.healthy!==true||status.failure||!Number.isFinite(status.heartbeatAt)||!Number.isSafeInteger(status.limits?.maxHeartbeatGapMs)||status.limits.maxHeartbeatGapMs<1||status.limits.maxHeartbeatGapMs>60000||now()-status.heartbeatAt>status.limits.maxHeartbeatGapMs||status.heartbeatAt>now())throw fault('NATIVE_CAPTURE_SCOPE_OR_HEALTH');
+  // Heartbeat age is judged against the time the read began: a slow read must
+  // not age the file. One over-bound reading stays pending; only a following
+  // poll that still shows no newer heartbeat past maxHeartbeatGapMs+pollMs
+  // faults. The writer's own sticky CAPTURE_HEARTBEAT_GAP (healthy/failure)
+  // remains the authoritative coverage guard.
+  const readAt=now(),status=readJson(join(capture,'capture-status.json'),{optional:!run,maxBytes:65536});if(!status)return null;
+  if(status.schema!=='continuity-native-capture/1'||status.runId!==runId||status.worldId!==worldId||!Array.isArray(status.soulIds)||!same(status.soulIds,souls)||!Number.isSafeInteger(status.index)||status.index<1||!digest(status.lastHash)||typeof status.epoch!=='string'||!Number.isSafeInteger(status.generation)||status.generation<1||status.healthy!==true||status.failure||!Number.isFinite(status.heartbeatAt)||!Number.isSafeInteger(status.limits?.maxHeartbeatGapMs)||status.limits.maxHeartbeatGapMs<1||status.limits.maxHeartbeatGapMs>60000||status.heartbeatAt>now())throw fault('NATIVE_CAPTURE_SCOPE_OR_HEALTH');
+  const age=readAt-status.heartbeatAt,gap=status.limits.maxHeartbeatGapMs;
+  if(age<=gap)staleHeartbeat=null;
+  else if(staleHeartbeat&&status.heartbeatAt<=staleHeartbeat.heartbeatAt){if(age>gap+pollMs)throw fault('NATIVE_CAPTURE_SCOPE_OR_HEALTH');}
+  else{staleHeartbeat={heartbeatAt:status.heartbeatAt,readAt};captureHeartbeatPending++;if(captureHeartbeatPending<=32)record({kind:'capture-heartbeat-pending',heartbeatAt:status.heartbeatAt,readAt,ageMs:age,maxHeartbeatGapMs:gap});}
   if(run&&status.startedAt>run.startedAt)throw fault('NATIVE_CAPTURE_STARTED_AFTER_T0');
   if(!Number.isFinite(status.startedAt)||status.startedAt>now())throw fault('NATIVE_CAPTURE_STARTED_AFTER_T0');
   if(captureEpoch===null){
@@ -192,7 +201,7 @@ export function createContinuityDisturbanceRunner({trialDirectory,outputDirector
   }catch(error){fail(error);}
   try{persist();}catch{fail('DISTURBANCE_RUNNER_EVIDENCE_FAILED');}return snapshot();
  }
- function snapshot(){return {schema:'continuity-disturbance-runner/1',runId,worldId,scenarioId:spec.id,createdAt,started,closed,status:failure?'unknown':!run?'awaiting-trial-manifest':closed?'closed':'observing',failure:clone(failure),pollMs,lastPollAt,sourceCounts:{...counts},sourceReadRetries:clone(sourceReadRetries),capture:{epoch:captureEpoch,index:captureIndex,hash:captureHash},ownerSourceSeen,nativeSourceStatus,dispatchPending:!!active,dispatcher:dispatcher?.snapshot()??null,evidence:{manifest:join(trial,'run.json'),timeline:join(trial,'timeline.jsonl'),capture:join(capture,'native-capture.jsonl'),output:join(out,'events.jsonl')},limits:'Observed native trigger and dispatch evidence only. Original dispatcher invalid/firstMotionContradiction is retained; delivered alone is not a pass. No actor assistance or qualification claim.'};}
+ function snapshot(){return {schema:'continuity-disturbance-runner/1',runId,worldId,scenarioId:spec.id,createdAt,started,closed,status:failure?'unknown':!run?'awaiting-trial-manifest':closed?'closed':'observing',failure:clone(failure),pollMs,lastPollAt,sourceCounts:{...counts},sourceReadRetries:clone(sourceReadRetries),capture:{epoch:captureEpoch,index:captureIndex,hash:captureHash,heartbeatPending:captureHeartbeatPending},ownerSourceSeen,nativeSourceStatus,dispatchPending:!!active,dispatcher:dispatcher?.snapshot()??null,evidence:{manifest:join(trial,'run.json'),timeline:join(trial,'timeline.jsonl'),capture:join(capture,'native-capture.jsonl'),output:join(out,'events.jsonl')},limits:'Observed native trigger and dispatch evidence only. Original dispatcher invalid/firstMotionContradiction is retained; delivered alone is not a pass. No actor assistance or qualification claim.'};}
  const start=()=>{if(started||closed)return snapshot();started=true;const again=()=>{if(closed)return;poll();if(!failure&&(!run||now()<run.cutoffAt))timer=schedule(again,pollMs);};again();return snapshot();};
  const settle=async()=>{if(active)await active;return snapshot();};
  const finish=()=>{if(finishPromise)return finishPromise;stopping=true;sendAbort.abort();finishPromise=(async()=>{cancel(timer);poll({final:true});if(active)await active;try{

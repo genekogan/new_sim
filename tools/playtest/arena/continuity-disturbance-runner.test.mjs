@@ -158,3 +158,21 @@ test('a slow pre-T0 settle gate can be covered by a longer manifest wait; absenc
  const slow=fixture(t,'mars-presentation-four',{manifestWaitMs:180000});slow.setNow(slow.now+170000);slow.statusWrite();slow.runner.poll();assert.equal(slow.runner.snapshot().status,'awaiting-trial-manifest');assert.deepEqual(slow.failures,[]);
  const missing=fixture(t,'mars-presentation-four',{manifestWaitMs:180000});missing.setNow(missing.now+180001);missing.statusWrite();missing.runner.poll();assert.equal(missing.runner.snapshot().status,'unknown');assert.match(JSON.stringify(missing.failures),/TRIAL_MANIFEST_MISSING/);
 });
+
+test('one stale capture heartbeat reading stays pending; a newer heartbeat on the next poll clears it',async t=>{
+ const f=fixture(t);f.launch();await f.poll();
+ f.setNow(T0+5100);f.runner.poll();await f.runner.settle();assert.equal(f.failures.length,0,'a single over-bound reading does not cancel the trial');assert.equal(f.runner.snapshot().capture.heartbeatPending,1);
+ f.setNow(T0+5350);await f.poll();assert.equal(f.failures.length,0);assert.equal(f.runner.snapshot().status,'observing');
+ f.setNow(T0+10450);f.runner.poll();await f.runner.settle();assert.equal(f.failures.length,0,'a later stall gets its own confirmation poll');assert.equal(f.runner.snapshot().capture.heartbeatPending,2);
+ const events=readFileSync(join(f.out,'events.jsonl'),'utf8').trim().split('\n').map(JSON.parse).filter(e=>e.kind==='capture-heartbeat-pending');assert.deepEqual(events.map(e=>[e.heartbeatAt,e.ageMs]),[[T0,5100],[T0+5350,5100]]);
+});
+test('the next poll still showing no newer heartbeat past maxHeartbeatGapMs+pollMs faults',async t=>{
+ const f=fixture(t);f.launch();await f.poll();
+ f.setNow(T0+5100);f.runner.poll();await f.runner.settle();assert.equal(f.failures.length,0);
+ f.setNow(T0+5200);f.runner.poll();await f.runner.settle();assert.equal(f.failures.length,0,'still within the confirmation bound');
+ f.setNow(T0+5251);f.runner.poll();await f.runner.settle();assert.equal(f.failures.length,1);assert.equal(f.failures[0].code,'NATIVE_CAPTURE_SCOPE_OR_HEALTH');
+});
+test('the writer\'s sticky heartbeat failure still faults on the first reading',async t=>{
+ const f=fixture(t);f.launch();await f.poll();
+ f.setNow(T0+1000);Object.assign(f.status,{healthy:false,failure:{code:'CAPTURE_HEARTBEAT_GAP'}});f.statusWrite();f.runner.poll();await f.runner.settle();assert.equal(f.failures.length,1);assert.equal(f.failures[0].code,'NATIVE_CAPTURE_SCOPE_OR_HEALTH');
+});
