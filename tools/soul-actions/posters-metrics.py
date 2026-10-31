@@ -21,7 +21,7 @@ for i, s in enumerate(S):
     for b in s['bodies']:
         m = b.get('motion')
         if m and m.get('stroke'):
-            k = (b['id'], m['startTick']); strokes.setdefault(k, {'id': b['id'], 'start': m['startTick'], 'kind': m['stroke']['kind'], 'seconds': m['stroke']['seconds'], 'target': m['target']})
+            k = (b['id'], m['startTick']); strokes.setdefault(k, {'id': b['id'], 'start': m['startTick'], 'kind': m['stroke']['kind'], 'seconds': m['stroke']['seconds'], 'release': m['stroke'].get('release', RELEASE), 'target': m['target']})
 out = []
 for k, st in sorted(strokes.items(), key=lambda kv: kv[0][1]):
     rows = []
@@ -29,7 +29,7 @@ for k, st in sorted(strokes.items(), key=lambda kv: kv[0][1]):
         b = next((x for x in s['bodies'] if x['id'] == st['id']), None)
         if not b: continue
         el = (s['tick'] - st['start']) * s['dt']
-        if -1.5 <= el <= REACH + st['seconds'] + RELEASE + 1.5: rows.append((el, s['tick'], s['dt'], b))
+        if -1.5 <= el <= REACH + st['seconds'] + st['release'] + 1.5: rows.append((el, s['tick'], s['dt'], b))
     two = st['kind'] in ('poster', 'unposter')
     rel = REACH + st['seconds']
     err_max, err_n, boundary, boundary_walk, op_max, posture_bad, hips = 0.0, 0, [], [], 0.0, 0, []
@@ -41,7 +41,7 @@ for k, st in sorted(strokes.items(), key=lambda kv: kv[0][1]):
             if not a0 or not a1: continue
             p0, p1 = local(b0, a0['palm']), local(b1, a1['palm']); step = math.dist(p0, p1) * scale
             near = lambda e: abs(el0 - e) <= .5 or abs(el1 - e) <= .5
-            if near(0) or near(rel) or near(rel + RELEASE):
+            if near(0) or near(rel) or near(rel + st['release']):
                 w0, w1 = b0['bones'].get('walkW') or 0, b1['bones'].get('walkW') or 0
                 (boundary if w0 == 0 and w1 == 0 else boundary_walk).append({'el': round(el0, 2), 'side': side, 'step': round(step, 4), 'walkW': [w0, w1]})
             if REACH <= el0 and el1 <= rel: op_max = max(op_max, step)

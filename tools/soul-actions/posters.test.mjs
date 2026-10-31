@@ -22,7 +22,7 @@ test('posters and wanted/offered notes', {timeout:400000}, async t=>{
  const comms=mountEdgeRoutes(app,{host:f.host,db:f.db,souls:f.souls,ledger:edge,soul:()=>soul});
  t.after(()=>{comms.close();f.host.stop();f.db.close();});
  const god=new GodMode(f.db,{worldId:f.host.worldId,ownerId:'dev:admin',tick:()=>f.host.engine.world.tick,emit(){}});
- installEngineBridge({host:f.host,god,edge,log(){},worldLore:false,worldClock:false});
+ installEngineBridge({host:f.host,god,edge,log(m){if(process.env.DEBUG_BRIDGE)console.log("BRIDGE",m);},worldLore:false,worldClock:false});
  const tick=async(n=5)=>{for(let i=0;i<n;i++){f.host.tickOnce();await setImmediate();f.host.drainInputs();}};
  await tick();
  const join=async(id,name)=>{await invite(f,id);const row=await accept(f.host,f.souls.create('dev:'+id,{name,description:'Posters test'}));await tick();return {soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};};
@@ -52,7 +52,7 @@ test('posters and wanted/offered notes', {timeout:400000}, async t=>{
     if(!duringHere&&/poster/.test(m.stroke.kind)&&el>HAND_REACH_SECONDS+1)duringHere=JSON.stringify(await here(s===ana?ben:ana));}
    const ph=edge.receipt(s.soulId,receipt.receipt.id)?.phase;if(['completed','failed','cancelled','replaced'].includes(ph))break;await tick(1);}
   return {stroke:stroke&&{kind:stroke.kind,seconds:stroke.seconds,sheet:stroke.sheet},early,hands,phase:edge.receipt(s.soulId,receipt.receipt.id).phase};};
- let makeWayRetries=0;const done=async(s,capability,params)=>{for(let k=0;;k++){const r=await act(s,capability,params);const fr=await finish(s,r),rc=edge.receipt(s.soulId,r.receipt.id);if(fr.phase==='failed'&&rc.code==='reservation.conflict'&&/:make-way:\d+/.test(rc.reason??'')&&k<3){makeWayRetries++;await tick(30);continue;}assert.equal(fr.phase,'completed',capability+' '+JSON.stringify(rc).slice(0,500));return fr;}};
+ let makeWayRetries=0;const done=async(s,capability,params)=>{for(let k=0;;k++){const r=await act(s,capability,params);const fr=await finish(s,r),rc=edge.receipt(s.soulId,r.receipt.id);if(fr.phase==='failed'&&rc.code==='reservation.conflict'&&/:make-way:\d+/.test(rc.reason??'')&&k<3){makeWayRetries++;await tick(30);continue;}if(fr.phase!=='completed'&&rc.code==='engine.fault-recovered'){const ev=f.db.events(f.host.worldId,0).filter(e=>e.kind==='rules'&&e.author==='world:recovery').at(-1);console.log('FAULT',ev?.payload?.recovery?.reason);}assert.equal(fr.phase,'completed',capability+' '+JSON.stringify(rc).slice(0,500));return fr;}};
  const on=(name,s,words,params)=>{watch=name;return done(s,words,params);};
  const read=async(s,name)=>{const r=await act(s,`read:${id(name)}`);await finish(s,r);return edge.receipt(s.soulId,r.receipt.id);};
  const refused=async(s,words,params,re)=>{const b=await act(s,words,params,false);assert.match((b.reason??'')+' '+(b.code??''),re,words+' '+JSON.stringify(b));return b;};

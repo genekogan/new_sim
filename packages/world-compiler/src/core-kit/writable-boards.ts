@@ -124,12 +124,12 @@ const pollBoard: DefInput = {
 // Entry 38: a poster wall and a wanted/offered board (the rest of packet 34). Like the boards above, `text` is what a reader
 // reads and `textBy` is who wrote each part, here as a small JSON list (posters: slot, title, detail, author, world day; notes:
 // column, row, words, author, replies, taker). The hand actuator composes both (apps/server/src/god/actuators.ts).
-/** Posters: one row of 4 at natural height (centres 1.45 m), at most 2 per Soul; out of date after 3 world days. */
+/** Posters: one row of 4 at natural height (centres 1.41 m), at most 2 per Soul; out of date after 3 world days. */
 export const POSTERS_MAX = 4, POSTERS_PER_SOUL = 2, POSTER_TITLE_MAX = 40, POSTER_DETAIL_MAX = 80, POSTER_STALE_DAYS = 3;
 /** A poster's size on the wall (metres): a little under A2. */
 export const POSTER_W = 0.42, POSTER_H = 0.56;
 /** Where poster slot i's centre sits on the wall's face (face-local metres, x right, y up). */
-export const posterSlot = (i: number): [number, number] => [(i - 1.5) * 0.6, 0.1];
+export const posterSlot = (i: number): [number, number] => [(i - 1.5) * 0.6, 0.05];   // centres 1.41 m: top corners 1.69, bottom 1.13
 /** A poster's paper (index into the viewer's papers), chosen by its title and author so every viewer agrees. */
 export const posterPaper = (title: string, name: string) => { let h = 2166136261; for (const ch of title + '|' + name) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) % 5; };
 export type PosterRec = { s: number; t: string; d: string; by: string; n: string; day: number };
@@ -139,7 +139,7 @@ export function posterList(state: Record<string, unknown>): PosterRec[] {
 /** Wanted/offered: two columns of 3 notes, 2 notes per Soul, replies of up to 40 characters (2 per note), one taker. */
 export const WANTED_ROWS = 3, WANTED_TEXT_MAX = 60, WANTED_PER_SOUL = 2, WANTED_REPLY_MAX = 40, WANTED_REPLIES = 2;
 /** Where a note sits on the wanted/offered face: column 0 (wanted, left) or 1 (offered, right), rows top to bottom. */
-export const wantedSlot = (col: number, row: number): [number, number] => [col ? 0.37 : -0.37, 0.24 - row * 0.28];
+export const wantedSlot = (col: number, row: number): [number, number] => [col ? 0.37 : -0.37, 0.22 - row * 0.25];   // rows at 1.60, 1.35, 1.10 m
 export type WantedRec = { c: 'w' | 'o'; r: number; t: string; by: string; n: string; re: { t: string; by: string; n: string }[]; tk?: { by: string; n: string } };
 export function wantedList(state: Record<string, unknown>): WantedRec[] {
   try { const v = typeof state.textBy === 'string' && state.textBy.startsWith('[') ? JSON.parse(state.textBy) : []; return Array.isArray(v) ? v.filter(n => n && (n.c === 'w' || n.c === 'o') && typeof n.t === 'string').map(n => ({ ...n, re: Array.isArray(n.re) ? n.re : [] })) : []; } catch { return []; }
@@ -152,11 +152,11 @@ const posterWall: DefInput = {
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.008, shapes: [
     { kind: 'box', at: [-1.3, 1.1, -0.02], size: [0.1, 2.2, 0.1], round: 0.01, tint: 'post' },
     { kind: 'box', at: [1.3, 1.1, -0.02], size: [0.1, 2.2, 0.1], round: 0.01, tint: 'post' },
-    { kind: 'box', at: [-1.3, 0.03, -0.02], size: [0.16, 0.06, 0.42], round: 0.01, tint: 'post' },
-    { kind: 'box', at: [1.3, 0.03, -0.02], size: [0.16, 0.06, 0.42], round: 0.01, tint: 'post' },
+    { kind: 'box', at: [-1.3, 0.03, -0.04], size: [0.16, 0.06, 0.34], round: 0.01, tint: 'post' },
+    { kind: 'box', at: [1.3, 0.03, -0.04], size: [0.16, 0.06, 0.34], round: 0.01, tint: 'post' },
     { kind: 'box', at: [0, 1.36, -0.005], size: [2.5, 1.56, 0.035], round: 0, tint: 'board' },
     { kind: 'box', at: [0, 0.56, 0.0], size: [2.56, 0.07, 0.06], round: 0.006, tint: 'post' },
-    { kind: 'box', at: [0, 2.17, 0.03], size: [2.78, 0.06, 0.26], round: 0.006, tint: 'roof', pitch: 0.18 }],
+    { kind: 'box', at: [0, 2.17, 0.0], size: [2.78, 0.06, 0.18], round: 0.006, tint: 'roof', pitch: 0.18 }],
     faces: [{ at: [0, 1.36, 0.0135], w: 2.46, h: 1.52, bg: '#4c6a58', ink: '#1f2622' }] } } as unknown as DefInput['make'],
   params: { post: { type: 'color', default: '#4a3b2c', doc: 'post colour' }, board: { type: 'color', default: '#4c6a58', doc: 'board colour' }, roof: { type: 'color', default: '#3b3530', doc: 'cap colour' } },
   palette: { post: '#4a3b2c', board: '#4c6a58', roof: '#3b3530' },
@@ -175,9 +175,9 @@ const wantedBoard: DefInput = {
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
     { kind: 'extrude', at: [-0.82, 0.012, 0], polygon: [[-0.04, -0.04], [0.04, -0.04], [0.04, 0.04], [-0.04, 0.04]], h: 2.02, tint: 'post' },
     { kind: 'extrude', at: [0.82, 0.012, 0], polygon: [[-0.04, -0.04], [0.04, -0.04], [0.04, 0.04], [-0.04, 0.04]], h: 2.02, tint: 'post' },
-    { kind: 'box', at: [0, 1.45, 0.02], size: [1.6, 1.08, 0.04], round: 0.01, tint: 'frame' },
-    { kind: 'box', at: [0, 2.08, 0.03], size: [1.84, 0.06, 0.42], round: 0, tint: 'roof', pitch: 0.25 }],
-    faces: [{ at: [0, 1.45, 0.042], w: 1.5, h: 1.0, bg: '#b88a5a', ink: '#2a2622' }] } } as unknown as DefInput['make'],
+    { kind: 'box', at: [0, 1.38, 0.02], size: [1.6, 1.08, 0.04], round: 0.01, tint: 'frame' },
+    { kind: 'box', at: [0, 2.0, 0.0], size: [1.84, 0.06, 0.24], round: 0, tint: 'roof', pitch: 0.25 }],
+    faces: [{ at: [0, 1.38, 0.042], w: 1.5, h: 1.0, bg: '#b88a5a', ink: '#2a2622' }] } } as unknown as DefInput['make'],
   params: { post: { type: 'color', default: '#5e4630', doc: 'post colour' }, frame: { type: 'color', default: '#8b6a48', doc: 'frame colour' }, roof: { type: 'color', default: '#5a4a3a', doc: 'roof colour' } },
   palette: { post: '#5e4630', frame: '#8b6a48', roof: '#5a4a3a' },
   state: { text: { type: 'string', max: 1600, default: '' }, textBy: { type: 'string', max: 2000, default: '' } } as DefInput['state'],

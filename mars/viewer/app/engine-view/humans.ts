@@ -1440,14 +1440,14 @@ function heldSheet(v: View, h: THREE.Object3D, tSec: number) {
   // how much of the sheet lies flat on the wall: [from, to] in v (0 = bottom edge, 1 = top edge)
   let from = 1, to = 1, rolled = 1;
   if (s.kind === 'poster') {
-    if (u >= .5) { from = 0; rolled = 0; } else if (u > .1) { from = Math.max(0, Math.min(1, (yH - .006 + H / 2) / H)); rolled = from; } else { from = 1; rolled = 1; }
+    if (u >= .45) { from = 0; rolled = 0; } else if (u > .09) { from = Math.max(0, Math.min(1, (yH - .006 + H / 2) / H)); rolled = from; } else { from = 1; rolled = 1; }
   } else {
     if (u < .15) { from = 0; to = 1; rolled = 0; } else if (u < .55) { from = 0; to = Math.max(0, Math.min(1, (yH + .006 + H / 2) / H)); rolled = 1 - to; } else { from = 0; to = 0; rolled = 1; }
   }
   const flatOn = to - from > .002;
   sh.flat.visible = flatOn; if (flatOn) sheetGeometryRange(sh.flat.geometry as THREE.BufferGeometry, W, H, from, to, age);
-  // tape: putting up, bottom corners at u .56, top at .93; taking down, top comes off at .12, bottom at .55
-  const tapeOn = (i: number) => s.kind === 'poster' ? (i >= 2 ? u >= .56 : u >= .93) : (i >= 2 ? u < .55 : u < .12);
+  // tape: putting up, bottom corners at u .50, top at .83 (the presses in posterLocal); taking down, top comes off at .12, bottom at .55
+  const tapeOn = (i: number) => s.kind === 'poster' ? (i >= 2 ? u >= .5 : u >= .83) : (i >= 2 ? u < .55 : u < .12);
   sh.tapes.forEach((t, i) => { t.visible = tapeOn(i) && !(i === 3 && age >= 1.8); });
   // the roll: between the drawn palms, a paper tube as long as the sheet is wide; its radius follows how much is rolled
   const L = palmSide(v, 'left'), R = palmSide(v, 'right');
@@ -1455,7 +1455,7 @@ function heldSheet(v: View, h: THREE.Object3D, tSec: number) {
   if (!showRoll) { sh.roll.visible = false; return; }
   const f = handActuatorFrame(m, el), releaseAt = HAND_REACH_SECONDS + s.seconds;
   // appearing in the hands as they rise (putting up) and put away as they lower (taking down)
-  const grow = s.kind === 'poster' ? smooth(clamp01(el / .35)) : 1 - smooth(clamp01((el - releaseAt - HAND_RELEASE_SECONDS * .35) / (HAND_RELEASE_SECONDS * .65)));
+  const grow = s.kind === 'poster' ? smooth(clamp01(el / .35)) : 1 - smooth(clamp01((el - releaseAt - (s.release ?? HAND_RELEASE_SECONDS) * .35) / ((s.release ?? HAND_RELEASE_SECONDS) * .65)));
   if (grow <= .01 || (s.kind === 'poster' && f.weight <= 1e-3 && el > HAND_REACH_SECONDS)) { sh.roll.visible = false; return; }
   const r = (.006 + .022 * Math.sqrt(rolled)) * grow, len = W * grow;
   const mid = V().addVectors(L!, R!).multiplyScalar(.5);

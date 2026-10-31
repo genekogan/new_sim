@@ -15,7 +15,7 @@ const opening=z.object({hinge:vec,yaw:z.number().finite(),radius:z.number().min(
 // Soul Actions entry 38: a poster is put up (or taken down) with both hands: `width`/`height` are the sheet's, `at` its centre on
 // the wall's surface, and `sheet` what is printed on it (so every viewer draws the same paper in the hands as on the wall).
 const sheet=z.object({title:z.string().max(40),detail:z.string().max(80),name:z.string().max(40).optional(),paper:z.number().int().min(0).max(15),age:z.number().min(0).max(99).optional()}).strict();
-const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),sheet:sheet.optional()}).strict();
+const stroke=z.object({kind:z.union([z.literal('write'),z.literal('wipe'),z.literal('poster'),z.literal('unposter')]),yaw:z.number().finite(),stand:z.number().min(.3).max(.7).optional(),width:z.number().min(.1).max(1.2),height:z.number().min(.05).max(.8),lines:z.number().int().min(1).max(3),seconds:z.number().min(.8).max(6),release:z.number().min(.7).max(1.6).optional(),sheet:sheet.optional()}).strict();
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional()}).strict();
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
 export type HandActuatorMotion=Omit<HandActuatorParams,'actor'> & {startTick:number;actionId?:string;abortedAt?:number;abortWeight?:number};
@@ -31,9 +31,11 @@ export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const commitAt=m.opening?.to===0||m.stroke?releaseAt:HAND_REACH_SECONDS;
  const k=smooth(((m.abortedAt??seconds)-HAND_REACH_SECONDS)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0;
- const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/HAND_RELEASE_SECONDS))
-   :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/HAND_RELEASE_SECONDS));
- const armDownAt=(m.abortedAt??releaseAt)+HAND_RELEASE_SECONDS,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
+ // Entry 38: a stroke may lower the arm more slowly (a hand coming down from above the shoulder; default 0.7 s)
+ const rel=m.stroke?.release??HAND_RELEASE_SECONDS;
+ const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/rel))
+   :smooth(seconds/HAND_REACH_SECONDS)*(1-smooth((seconds-releaseAt)/rel));
+ const armDownAt=(m.abortedAt??releaseAt)+rel,idleBlend=smooth((seconds-armDownAt)/HAND_IDLE_HANDOFF_SECONDS);
  return {angle,weight,idleBlend,armDown:seconds>=armDownAt,commitAt,done:seconds>=armDownAt+HAND_IDLE_HANDOFF_SECONDS,contact:m.abortedAt===undefined&&seconds>=commitAt};
 }
 /** Three's local-Y rotation convention, converted to the native world frame. */
@@ -60,19 +62,22 @@ export const twoHanded=(s?:HandActuatorParams['stroke'])=>s?.kind==='poster'||s?
  *  wall]: press the rolled top edge to the wall, unroll it downward with both palms sliding down the sides, press (tape) the
  *  bottom corners, smooth back up the sides and press (tape) the top corners. Taking down: hands to the top corners, peel, roll
  *  the sheet up from the top as the hands go down, then lift the roll away toward the chest. Continuous at u=0 and u=1. */
-export const POSTER_ON=.035,POSTER_OFF=.10;
+export const POSTER_ON=.035,POSTER_OFF=.07;
 export function posterLocal(s:NonNullable<HandActuatorParams['stroke']>,u:number):{x:number;y:number;o:number;spread:number}{
- const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.035,yB=-s.height/2+.04,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
+ const k=Math.max(0,Math.min(1,u)),yT=s.height/2-.06,yB=-s.height/2+.045,seg=(a:number,b:number)=>smooth((k-a)/(b-a)),lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
  if(s.kind==='unposter'){
   if(k<.15)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.15)),spread:1};
   if(k<.55){const f=seg(.15,.55);return {x:0,y:lerp(yT,yB,f),o:lerp(POSTER_ON,.06,f),spread:1};}
-  const f=seg(.55,1);return {x:0,y:lerp(yB,-.1,f),o:lerp(.06,.22,f),spread:lerp(1,.8,f)};
+  const f=seg(.55,1);return {x:0,y:lerp(yB,-.2,f),o:lerp(.06,.15,f),spread:lerp(1,.85,f)};   // the roll held low in front, not at the chin
  }
- if(k<.10)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.10)),spread:1};
- if(k<.50)return {x:0,y:lerp(yT,yB,seg(.10,.50)),o:POSTER_ON,spread:1};
- if(k<.62)return {x:0,y:yB,o:POSTER_ON-.012*dsin(Math.PI*(k-.50)/.12),spread:1};
- if(k<.86){const f=(k-.62)/.24;return {x:0,y:lerp(yB,yT,smooth(f)),o:POSTER_ON+.03*dsin(Math.PI*f),spread:1};}
- return {x:0,y:yT,o:POSTER_ON-.012*dsin(Math.PI*(k-.86)/.14),spread:1};
+ if(k<.09)return {x:0,y:yT,o:lerp(POSTER_OFF,POSTER_ON,seg(0,.09)),spread:1};
+ if(k<.45)return {x:0,y:lerp(yT,yB,seg(.09,.45)),o:POSTER_ON,spread:1};
+ if(k<.56)return {x:0,y:yB,o:POSTER_ON-.012*dsin(Math.PI*(k-.45)/.11),spread:1};
+ if(k<.78){const f=(k-.56)/.22;return {x:0,y:lerp(yB,yT,smooth(f)),o:POSTER_ON+.03*dsin(Math.PI*f),spread:1};}
+ if(k<.88)return {x:0,y:yT,o:POSTER_ON-.012*dsin(Math.PI*(k-.78)/.10),spread:1};
+ // last, the palms slide off the top corners down the sheet's sides to chest height and come away, so the arms are lowered
+ // from there and not from above the shoulders
+ const f=seg(.88,1);return {x:0,y:lerp(yT,-.06,f),o:lerp(POSTER_ON,.11,f),spread:lerp(1,.86,f)};
 }
 export function strokeHands(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,u:number):{left:Vec3;right:Vec3}{
  const right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)],l=posterLocal(s,u),half=(s.width/2-.04)*l.spread;

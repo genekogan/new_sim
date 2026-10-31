@@ -169,7 +169,7 @@ export function wantedTexture(notes: WantedRec[], f: Face): THREE.Texture {
   }
   const papers = ['#fbf6e4', '#fdf0a6', '#d9ecf7', '#f8dbe0', '#e3f2d6'], hash = (t: string) => { let h = 2166136261; for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
   for (const n of notes) {
-    const [sx, sy] = wantedSlot(n.c === 'o' ? 1 : 0, n.r), x = (sx / f.w + 0.5) * cw, y = (0.5 - sy / f.h) * ch, w = 0.62 * px, h = 0.25 * px, r = hash(n.t + n.n);
+    const [sx, sy] = wantedSlot(n.c === 'o' ? 1 : 0, n.r), x = (sx / f.w + 0.5) * cw, y = (0.5 - sy / f.h) * ch, w = 0.62 * px, h = 0.23 * px, r = hash(n.t + n.n);
     g.save(); g.translate(x, y); g.rotate((r - 0.5) * 0.06);
     g.fillStyle = 'rgba(30,15,5,0.35)'; g.fillRect(-w / 2 + 6, -h / 2 + 8, w, h); g.fillStyle = papers[Math.floor(r * papers.length)]; g.fillRect(-w / 2, -h / 2, w, h);
     const words = n.t.replace(/^(?:wanted|offered)\s*[:\-–—]?\s*/i, '');
