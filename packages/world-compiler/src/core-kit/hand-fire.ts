@@ -117,13 +117,13 @@ const wallTorch: DefInput = {
 } as DefInput;
 
 // A neon sign (entry 33): glass tube lettering (state `text`, chosen by its owner, at most 32 characters on 1–2 lines)
-// and a tube border on a dark backboard between two posts, switched on and off by hand at the switch box on the left
-// post (1.2 m; the lamps' contact). The viewer draws the tubes (tag `neon`, gen-mesh/kits/neon.mesh.ts): pale glass
+// and a tube border on a dark backboard between two posts, switched on and off by hand at the switch box on the outer
+// side of the right-hand post (1.2 m; the lamps' contact). The viewer draws the tubes (tag `neon`, gen-mesh/kits/neon.mesh.ts): pale glass
 // while off, a stutter as each tube strikes, then a steady glow with a hot core, bloom and spill; the coloured pools
 // on the ground are its two lights; a quiet transformer hum while lit.
 const neonSign: DefInput = {
   schema: 'def/1', name: 'core-neon-sign', version: 1,
-  description: 'A neon sign: glass tube lettering (state text, its owner\'s words, up to 32 characters on one or two lines) and a tube border on a dark board between two posts (top 2.15 m). A Soul switches it on and off by hand at the switch box on the left post; lit, it glows and hums quietly.',
+  description: 'A neon sign: glass tube lettering (state text, its owner\'s words, up to 32 characters on one or two lines) and a tube border on a dark board between two posts (top 2.15 m). A Soul switches it on and off by hand at the switch box on the side of the right-hand post; lit, it glows and hums quietly.',
   tags: ['lighting', 'sign', 'neon', 'hand-operated', 'local-fixture'], form: 'point',
   make: { kind: 'gen', gen: 'kit/2', args: { round: 0.008, shapes: [
     ...[-0.8, 0.8].flatMap((x) => [
@@ -133,9 +133,10 @@ const neonSign: DefInput = {
     { kind: 'box', at: [0, 2.165, -0.005], size: [1.74, 0.03, 0.06], tint: 'frame' },
     { kind: 'box', at: [0, 1.395, -0.005], size: [1.74, 0.03, 0.06], tint: 'frame' },
     { kind: 'box', at: [0.35, 1.62, -0.07], size: [0.26, 0.13, 0.08], tint: 'frame' },
-    { kind: 'box', at: [-0.8, 1.2, 0.055], size: [0.08, 0.12, 0.06], tint: 'valve' },
-    { kind: 'box', at: [-0.8, 1.215, 0.092], size: [0.014, 0.034, 0.016], tint: 'lever' },
-    { kind: 'cyl', at: [-0.8, 1.32, 0.04], r: 0.009, h: 0.12, segments: 6, tint: 'frame' }],
+    // the switch box on the outer side of the right-hand post (seen from the front), its lever facing out
+    { kind: 'box', at: [0.855, 1.2, 0], size: [0.06, 0.12, 0.08], tint: 'valve' },
+    { kind: 'box', at: [0.892, 1.215, 0], size: [0.016, 0.034, 0.014], tint: 'lever' },
+    { kind: 'cyl', at: [0.84, 1.33, 0], r: 0.009, h: 0.14, segments: 6, tint: 'frame' }],
     faces: [{ neon: true, at: [0, 1.78, 0.022], w: 1.56, h: 0.62 }] } } as unknown as DefInput['make'],
   params: { frame: { type: 'color', default: '#1c1d21', doc: 'posts and frame colour' }, board: { type: 'color', default: '#121318', doc: 'backboard colour' },
     valve: { type: 'color', default: '#4a4f57', doc: 'switch box colour (the hand goes here)' }, lever: { type: 'color', default: '#c9ccd2', doc: 'switch lever colour' },
@@ -145,7 +146,7 @@ const neonSign: DefInput = {
   // the coloured spill on the ground in front of the board (the viewer draws the glow on the board itself)
   components: { lights: [{ color: '#ff3d8e', range: 5, on: true, at: [-0.45, 1.78, 0.7] }, { color: '#ff3d8e', range: 5, on: true, at: [0.45, 1.78, 0.7] }],
     sound: { kind: 'hum', radius: 7, volume: 0.16, when: 'on', mode: 'loop', variant: 2 } } as DefInput['components'],
-  size: { box: [1.76, 2.18, 0.34] },
+  size: { box: [1.86, 2.18, 0.34] },
   actions: switches('Switch on the neon sign', 'Switch off the neon sign') as DefInput['actions'],
 } as DefInput;
 

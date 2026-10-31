@@ -91,12 +91,13 @@ const kindOf = (c: FlameCluster): FireKind => (c.r < 0.05 ? 'candle' : c.r < 0.2
 export const flameStats = { mounted: 0, near: 0, enabled: true };
 let phone: boolean | null = null;
 
-type Mounted = { fire: Fire; standIns: THREE.Object3D[]; kind: FireKind; level: 0 | 1 | 2 | -1 };
+type Mounted = { fire: Fire; standIns: THREE.Object3D[]; kind: FireKind; level: 0 | 1 | 2 | -1; id: string; strength: number };
 const live = new Set<Mounted>();
 function show(f: Mounted, level: 0 | 1 | 2) { f.fire.setDetail(level); for (const s of f.standIns) s.visible = level === 0; }
 registerFx('fire', {
   set(on) { flameStats.enabled = on; for (const f of live) show(f, on && f.level > 0 ? f.level as 1 | 2 : 0); },
-  stats() { return { ...flameStats }; },
+  /** `burning`: the fires drawn near the camera now, with their catch strength (entry 33 proofs). */
+  stats() { return { ...flameStats, burning: [...live].filter((f) => f.level > 0).map((f) => ({ id: f.id, kind: f.kind, strength: +f.strength.toFixed(3) })) }; },
 });
 /** Mount a fire on every flame cluster under `obj`; returns false when there is none. `catchUp`: a fire a Soul just lit
  *  by hand (a hand-operated def is rebuilt at the contact) catches and grows to full over IGNITE seconds. */
@@ -112,7 +113,7 @@ export function mountFlames(obj: THREE.Object3D, id: string, catchUp = false, wi
       fire.group.position.set(c.p[0], c.p[1], c.p[2]);
       fire.group.children[0].onBeforeRender = noteCamera;
       pivot.add(fire.group);
-      const f: Mounted = { fire, standIns, kind, level: -1 }; fires.push(f); live.add(f);
+      const f: Mounted = { fire, standIns, kind, level: -1, id, strength: catchUp ? 0.12 : 1 }; fires.push(f); live.add(f);
     });
   });
   if (!fires.length) return false;
@@ -136,6 +137,7 @@ export function mountFlames(obj: THREE.Object3D, id: string, catchUp = false, wi
         f.level = level; show(f, level);
       }
       if (level > 0) f.fire.update(time, strength);
+      f.strength = strength;
     }
   };
   obj.addEventListener('removed', function gone() {
