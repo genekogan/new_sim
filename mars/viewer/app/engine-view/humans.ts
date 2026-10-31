@@ -304,6 +304,35 @@ const IDLE_VARIETY_ONSET = 1.2;
 export const GESTURE_FADE = 1.4;
 /** Track names (three-sanitised bone names) of the arms and hands: shoulders to fingertips. */
 const ARM_TRACK = /^(Shoulder|UpperArm|LowerArm|Wrist|Thumb|Index|Middle|Ring|Pinky)/;
+/** An idle gesture (Idle_Neutral, fold arms, look around) is drawn on the arms, neck and head only; the body, hips and
+ *  legs keep the Idle clip. The gesture clips stand in their own stance (fold arms / look around: feet 0.41 m apart, the
+ *  other foot forward from Idle's 0.34 m stagger; Idle_Neutral: feet together), so every gesture fade in or out slid
+ *  both feet 0.2–0.4 m across the ground and crossed them (entry 39, take 3: at the tap she reached while her feet slid
+ *  from one split stance to the other). Their torso turn belongs to that stance too (25° off the legs without it). */
+const GESTURE_TRACK = /^(Neck|Head|Shoulder|UpperArm|LowerArm|Wrist|Thumb|Index|Middle|Ring|Pinky)/;
+/** Per rig, the upper-body (GESTURE_TRACK) copy of an idle gesture clip. */
+function gestureAction(rig: Rig, name: string): THREE.AnimationAction | null {
+  const key = name + '#gesture';
+  let a = rig.lib.get(key);
+  if (a === undefined) {
+    const c = THREE.AnimationClip.findByName(rig.template.gltf.animations, name), tracks = c?.tracks.filter((t) => GESTURE_TRACK.test(t.name)) ?? [];
+    a = c && tracks.length ? rig.mixer.clipAction(new THREE.AnimationClip(key, c.duration, tracks)) : null;
+    rig.lib.set(key, a);
+  }
+  return a;
+}
+/** Per rig, the Idle clip without the gesture tracks: it carries the gesture's share of the body and legs, so their
+ *  weights still sum to one (the mixer fills a bone's missing share with its bind pose). */
+function idleBodyAction(rig: Rig): THREE.AnimationAction {
+  const key = '#idle-body';
+  let a = rig.lib.get(key);
+  if (!a) {
+    const c = rig.idle.getClip();
+    a = rig.mixer.clipAction(new THREE.AnimationClip(key, c.duration, c.tracks.filter((t) => !GESTURE_TRACK.test(t.name))));
+    rig.lib.set(key, a);
+  }
+  return a;
+}
 /** Per rig, an arms-only copy of a template clip (the gesture fades on the arms while the legs stride). */
 function armsAction(rig: Rig, name: string): THREE.AnimationAction | null {
   const key = name + '#arms';
@@ -834,7 +863,9 @@ export class HumanViews {
     };
     if (lib.cur) libAt(lib.cur.act, curW, lib.cur.time);
     if (lib.prev) libAt(lib.prev.act, prevW, lib.prev.time);
-    if (variantA) libAt(variantA, variantW, tSec + (hashId(h.name) % 7));
+    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, tSec + (hashId(h.name) % 7));
+    if (neutralW > 0) libAt(gestureAction(v.rig, 'Idle_Neutral'), neutralW, tSec);
+    if (neutralW + variantW > 1e-4) libAt(idleBodyAction(v.rig), neutralW + variantW, b.idleT);
     if (armsN > 0) libAt(armsAction(v.rig, 'Idle_Neutral'), armsN, tSec);
     if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, tSec + (hashId(h.name) % 7));
     if (jog) { const sp = jog.getClip().name === 'Sprint_Loop' ? v.rig.template.sprintSpeed : v.rig.template.jogSpeed; libAt(jog, runW, sp ? v.dist / sp : tSec); }
@@ -849,7 +880,7 @@ export class HumanViews {
     clipAt('run', jog ? 0 : runW, v.dist/(v.rig.template.runSpeed ?? 2.5));
     clipAt('wave', waveW, tSec);
     clipAt('interact', interactW, tSec);
-    clipAt('idleNeutral', neutralW, tSec);
+    clipAt('idleNeutral', 0, tSec); // drawn as a gesture (arms, neck, head) above
     walk.setEffectiveWeight(w - runW);
     idle.setEffectiveWeight(Math.max(0, 1 - w - waveW - interactW - neutralW - variantW - curW - prevW));
     // The mixer only writes a bone when its clip value changed since the last apply, so undo last
