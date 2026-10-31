@@ -174,12 +174,12 @@ export function wantedTexture(notes: WantedRec[], f: Face): THREE.Texture {
     g.fillStyle = 'rgba(30,15,5,0.35)'; g.fillRect(-w / 2 + 6, -h / 2 + 8, w, h); g.fillStyle = papers[Math.floor(r * papers.length)]; g.fillRect(-w / 2, -h / 2, w, h);
     const words = n.t.replace(/^(?:wanted|offered)\s*[:\-–—]?\s*/i, '');
     g.fillStyle = '#26221e'; g.textAlign = 'left'; g.textBaseline = 'top';
-    let size = 44, wrapped: string[] = [];
-    for (; size >= 24; size -= 2) { g.font = `600 ${size}px 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive`; wrapped = []; for (const word of words.split(/\s+/)) { const last = wrapped.at(-1); if (last !== undefined && g.measureText(last + ' ' + word).width <= w - 40) wrapped[wrapped.length - 1] = last + ' ' + word; else wrapped.push(word); } if (wrapped.length <= 2) break; }
-    wrapped.slice(0, 2).forEach((l, k) => g.fillText(l, -w / 2 + 20, -h / 2 + 14 + k * size * 1.1));
-    g.font = `italic 600 26px Georgia, serif`; g.fillStyle = '#5a3d22'; g.textAlign = 'right'; g.fillText('— ' + n.n, w / 2 - 18, -h / 2 + 18 + Math.min(2, wrapped.length) * size * 1.1);
+    let size = 58, wrapped: string[] = [];
+    for (; size >= 28; size -= 2) { g.font = `700 ${size}px 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive`; wrapped = []; for (const word of words.split(/\s+/)) { const last = wrapped.at(-1); if (last !== undefined && g.measureText(last + ' ' + word).width <= w - 40) wrapped[wrapped.length - 1] = last + ' ' + word; else wrapped.push(word); } if (wrapped.length <= 2) break; }
+    wrapped.slice(0, 2).forEach((l, k) => g.fillText(l, -w / 2 + 20, -h / 2 + 12 + k * size * 1.08));
+    g.font = `italic 700 32px Georgia, serif`; g.fillStyle = '#5a3d22'; g.textAlign = 'right'; g.fillText('— ' + n.n, w / 2 - 18, -h / 2 + 16 + Math.min(2, wrapped.length) * size * 1.08);
     // replies, each in the replier's own blue ink, signed
-    n.re.slice(0, 2).forEach((re, k) => { g.textAlign = 'left'; g.fillStyle = '#1d3f8f'; g.font = `500 27px 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive`; g.fillText(`↳ ${re.t} — ${re.n}`, -w / 2 + 34, h / 2 - 72 + k * 33, w - 60); });
+    n.re.slice(0, 2).forEach((re, k) => { g.textAlign = 'left'; g.fillStyle = '#1d3f8f'; g.font = `700 36px 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive`; g.fillText(`↳ ${re.t} — ${re.n}`, -w / 2 + 30, h / 2 - 84 + k * 40, w - 50); });
     g.fillStyle = ['#c62f2a', '#2a62c6', '#2f9a4a'][Math.floor(r * 3)]; g.beginPath(); g.arc(0, -h / 2 + 10, 11, 0, Math.PI * 2); g.fill();
     g.fillStyle = 'rgba(255,255,255,0.6)'; g.beginPath(); g.arc(-3, -h / 2 + 7, 3.5, 0, Math.PI * 2); g.fill();
     if (n.tk) { g.save(); g.translate(w * 0.17, -h * 0.02); g.rotate(-0.16); g.strokeStyle = 'rgba(178,34,34,0.85)'; g.lineWidth = 6; g.strokeRect(-w * 0.22, -32, w * 0.44, 64); g.fillStyle = 'rgba(178,34,34,0.88)'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `800 34px 'Courier New', monospace`; g.fillText(`TAKEN · ${n.tk.n}`.toUpperCase(), 0, 2, w * 0.42); g.restore(); }
