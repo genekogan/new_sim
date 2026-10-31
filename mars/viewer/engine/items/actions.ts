@@ -266,7 +266,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         else { ex.child = ch; ex.phase = 'approach'; }
       }
       a.human!.task = id;
-      if(rt.world.entities[p.item].tags?.includes('entity-world-item-pose')){a.human!.itemTransferV1={item:p.item,hand:ex.hand,action:id,startTick:rt.tick};ex.reachTicks=ticks(ITEM_REACH_SECONDS);}
+      if(rt.world.entities[p.item].tags?.includes('entity-world-item-pose')){a.human!.itemTransferV1={item:p.item,hand:ex.hand,action:id,mode,startTick:rt.tick};ex.reachTicks=ticks(ITEM_REACH_SECONDS);}
       return ex;
     },
     step(rt, ex): StepResult {
@@ -388,7 +388,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       // light items: stop at once; an item already grasped stays in hand (hold_items keeps it there)
       if (a?.human) {
         if(a.human.itemTransferV1?.action===ex.id&&['reach','withdraw','cancel-withdraw','recover'].includes(ex.phase)){
-          if(ex.phase!=='recover'&&ex.phase!=='cancel-withdraw'){ex.from=handNow(a,ex.hand,bodyFrame(a));ex.to=inHand(rt.world,ex.actor,ex.hand)?carryHand(bodyFrame(a),ex.hand):restHand(bodyFrame(a),ex.hand);ex.phase='cancel-withdraw';ex.t=0;}
+          if(ex.phase!=='recover'&&ex.phase!=='cancel-withdraw'){a.human.itemTransferV1.cancelTick=rt.tick;ex.from=handNow(a,ex.hand,bodyFrame(a));ex.to=inHand(rt.world,ex.actor,ex.hand)?carryHand(bodyFrame(a),ex.hand):restHand(bodyFrame(a),ex.hand);ex.phase='cancel-withdraw';ex.t=0;}
           return{ok:true,deferred:true};
         }
         if(a.human.itemTransferV1?.action===ex.id)delete a.human.itemTransferV1;

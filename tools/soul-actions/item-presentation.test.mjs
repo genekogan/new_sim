@@ -10,3 +10,19 @@ test('item posture hump: zero at reach start and withdraw end, full at the grasp
  assert.equal(itemPresentation(p,undefined,10,dt).posture,undefined,'no bend before the reach moves');
  assert.equal(itemPresentation({...p,target:undefined},undefined,10+R,dt).posture,undefined,'older records keep no item posture');
 });
+test('pick-up presentation (entry 29 on M04): one reach clock for the drawn hand, a gesture fade through the grasp, an interrupted reach returns smoothly',async()=>{
+ const{ITEM_GESTURE_FADE_SECONDS,ITEM_ARM_LEAD_SECONDS}=await import('../../mars/viewer/engine/items/presentation.ts');
+ const dt=.05,R=Math.round(ITEM_REACH_SECONDS/dt),sm=n=>{const k=Math.max(0,Math.min(1,n));return k*k*(3-2*k)},take={item:'bowl',hand:'right',action:'a1',mode:'take',startTick:0,reachTick:10,target:[1,.75,2]};
+ const at=(t,rec=take)=>itemPresentation(rec,t>=10+R&&!rec.cancelTick?{right:'bowl'}:undefined,t,dt);
+ // the drawn palm's share of the way (goal k × arm weight) is exactly the reach clock: a single smoothstep
+ for(let t=11;t<10+R;t++){const p=at(t);assert.ok(p.goal,'empty-handed reach draws a goal');assert.ok(Math.abs(p.goal.k*p.weight-sm((t-10)*dt/ITEM_REACH_SECONDS))<1e-9,'palm share at '+t);assert.ok(p.goal.k<=1)}
+ assert.equal(at(10+R).goal,undefined,'holding: the engine hand again');assert.equal(at(10+R).weight,1);
+ assert.ok(Math.abs(at(10+R-1).weight-1)<1e-9||ITEM_ARM_LEAD_SECONDS>ITEM_REACH_SECONDS,'full arm weight before the grasp');
+ // the idle gesture fades out from the reach start on through the grasp and the withdraw, never cut
+ let prev=1;for(let t=10;t<10+2*R;t++){const g=at(t).idleBlend;assert.ok(g<=prev+1e-12&&prev-g<=1.5*dt/ITEM_GESTURE_FADE_SECONDS+1e-9,'gesture fade at '+t+': '+prev+' → '+g);prev=g}
+ // a put starts holding: no gesture at any point until the release
+ const put={...take,mode:'put',action:'a2'};for(let t=0;t<10+R;t++)assert.equal(itemPresentation(put,{right:'bowl'},t,dt).idleBlend,0);
+ // interrupted halfway: the goal stops, the arm weight eases back to 0 over the engine's withdraw and stays 0 in recovery
+ const c={...take,cancelTick:10+R/2};let w=at(10+R/2,c).weight;for(let t=10+R/2+1;t<=10+R/2+R;t++){const q=at(t,c);assert.ok(Math.abs(q.weight-w)<=1.5/R+1e-9,'cancel withdraw at '+t);assert.equal(q.goal.k,at(10+R/2,c).goal.k);w=q.weight}
+ assert.ok(w<1e-9,'drawn arm back on the clip');assert.equal(itemPresentation({...c,releaseTick:10+R/2+R},undefined,10+R/2+R+3,dt).weight,0,'recovery keeps the clip');
+});

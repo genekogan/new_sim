@@ -829,10 +829,10 @@ export class HumanViews {
     // Over GESTURE_FADE, not the 0.65 s reach: folded arms opening in 0.65 s still swung the free hand 0.13 m per 50 ms (0.084 over 1.2 s).
     const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE) : 0;
     // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
-    // An opted-in item transfer (lantern, bowl) keeps its own clock: idle variety may play through its reach until the
-    // item's arm weight is full, and its idleBlend is the handoff (0 while an item is held).
+    // An opted-in item transfer (lantern, bowl) keeps its own clock (presentation.ts): idle variety plays on through its
+    // turn and fades out over a pick-up from the reach start, as a hand actuator's does; 0 while an item is held.
     const itemReach = !!v.itemPose && v.activity === 'reach';
-    const idleFree = (v.activity === 'idle' || itemReach || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.weight ?? 1) < 1) && freeBody && !lib.cur;
+    const idleFree = (v.activity === 'idle' || itemReach || GAIT_ACTS.has(v.activity) || (v.activity === 'operate' && reachFade > 0)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.idleBlend ?? 0) > 0) && freeBody && !lib.cur;
     const idleHandoff = v.itemPose?.idleBlend ?? (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, reachFade)) : 1);
     // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
     // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
@@ -1015,6 +1015,9 @@ export class HumanViews {
       v.arms.forEach((arm, i) => {
         const q = armSide(v, i) === 'left' ? hands.left : hands.right;
         if (q) targets[i] = new THREE.Vector3(q[0], q[1], q[2]);
+        // an empty-handed item pick-up: from the drawn palm to the fixed grasp point on the reach clock (presentation.ts `goal`)
+        const g = v.itemPose?.goal;
+        if (g && q && armSide(v, i) === g.hand) { h.updateMatrixWorld(true); const from = palm(arm, V()); targets[i]!.set(g.p[0], g.p[1], g.p[2]).sub(from).multiplyScalar(g.k).add(from); }
       });
       // A hand on the engine's mouth landmark (items/body.ts: 0.15 m ahead of the body axis at 1.58 m,
       // −0.45 seated) would cover the rig's face (its lips are ~7 cm further back and 3 cm lower): the
@@ -1052,9 +1055,10 @@ export class HumanViews {
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0 && !seatClip) handOnThigh(v, i, sitW);
       });
-      // an opted-in item reach bends up to ~60° in 0.8 s: let the free arm hang from the first degree of bend,
-      // not swing down between 30° and 63° in a fifth of a second
-      if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k, v.itemPose?.posture ? 0 : DANGLE_FROM);
+      // an opted-in item reach bends up to ~60° in 1 s: let the free arm hang from the first degree of bend,
+      // not swing down between 30° and 63° in a fifth of a second; an idle gesture still fading out (folded arms at a
+      // pick-up) keeps the free arm until it has gone: hung at the bend's rate, it dropped 0.11 m per 50 ms
+      if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k, v.itemPose?.posture ? 0 : DANGLE_FROM, v.itemPose?.posture ? 1 - clamp01(v.variety ?? 0) : 1);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
       for(const b of armBase){b.o.quaternion.slerp(b.q,1-weight);b.o.position.lerp(b.p,1-weight);}if(armBase.length)h.updateMatrixWorld(true);
       closeHands(v, k.map((c, i) => weight*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
@@ -2083,8 +2087,8 @@ function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, 
  * point backwards on a torso pitched 80°. Only arms with no contact at all, from ~30° of bend.
  */
 const DANGLE_FROM = 0.5, DANGLE_FULL = 1.1;
-function dangle(v: View, bend: number, contacts: number[], from = DANGLE_FROM) {
-  const b = smooth((bend - from) / (DANGLE_FULL - from)); // from ~30° of bend, fully by ~63°
+function dangle(v: View, bend: number, contacts: number[], from = DANGLE_FROM, keep = 1) {
+  const b = smooth((bend - from) / (DANGLE_FULL - from)) * keep; // from ~30° of bend, fully by ~63°
   if (b <= 0) return;
   v.arms.forEach((arm, i) => {
     if ((contacts[i] ?? 0) > 0) return; // touching (even partly): the reach IK owns the arm
