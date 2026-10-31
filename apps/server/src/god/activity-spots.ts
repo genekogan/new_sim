@@ -79,9 +79,15 @@ export class GodActivitySpots {
    * occupancy filtering. Seated, social and roaming activities are not stations. */
   serviceStandingPoints(): readonly ActivityServicePoint[] {
     const data = this.data();
-    if (this.services?.from !== data) this.services = {from: data, points: data.spots
-      .filter(s => s.base === 'idle' && SERVICE_ACTIVITIES.has(s.activity))
-      .map(s => ({id: s.id, at: [...s.at] as V2, level: s.level ?? 0}))};
+    if (this.services?.from !== data) {
+      const points = data.spots
+        .filter(s => s.base === 'idle' && SERVICE_ACTIVITIES.has(s.activity))
+        .map(s => ({id: s.id, at: [...s.at] as V2, level: s.level ?? 0}));
+      // A re-derive that moved no station (a sign rewritten) keeps the array identity, so GodNav does not drop its
+      // per-epoch room goals for it (busy-costs S2: no room re-routed)
+      const same = !!this.services && JSON.stringify(this.services.points) === JSON.stringify(points);
+      this.services = {from: data, points: same ? this.services!.points : points};
+    }
     return this.services.points;
   }
   data(): SpotsData { this.wanted = true; return this.get(); }
