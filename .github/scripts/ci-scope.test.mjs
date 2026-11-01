@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { JOBS, changedFiles, jobsFor, smokeFor } from './ci-scope.mjs';
+import { SCOPE_RULES, scopeFor } from '../../tools/test-harness/release-gate.mjs';
 
 const names = files => jobsFor(files).include.map(j => j.name);
 
@@ -9,8 +12,27 @@ test('docs and plain tools changes run no job', () => {
   assert.equal(jobsFor(['docs/a.md']).scope, 'none');
 });
 
-test('web changes run types-web and packages only', () => {
-  assert.deepEqual(names(['apps/web/src/main.ts']), ['types-web', 'packages']);
+test('web changes run the typecheck/build and the web unit suite', () => {
+  assert.deepEqual(names(['apps/web/src/main.ts']), ['types-web', 'web']);
+});
+
+test('launcher and client-cli changes run their own unit tests', () => {
+  const launcher = names(['tools/world-launcher/launcher.mjs']);
+  assert.ok(launcher.includes('launcher'), launcher.join());
+  assert.ok(!launcher.includes('web') && !launcher.includes('client-cli'));
+  for (const f of ['tools/edge-skill/soul.mjs', 'tools/client-eval/eval.mjs']) assert.deepEqual(names([f]), ['client-cli'], f);
+});
+
+test('every step the scope map can select is run by some job', () => {
+  const selectable = new Set(SCOPE_RULES.flatMap(([prefix]) => scopeFor([`${prefix}x.ts`]).steps));
+  const owned = step => JOBS.some(job => job.steps.some(s => s.endsWith('-') ? step.startsWith(s) : step === s));
+  for (const step of selectable) assert.ok(owned(step), `${step} is selectable by --scope auto but no CI job runs it`);
+  for (const step of ['V4-web', 'V3-launcher-unit', 'V3-client-cli']) assert.ok(selectable.has(step) && owned(step), step);
+});
+
+test('each job kind has a branch in ci.yml', () => {
+  const workflow = readFileSync(fileURLToPath(new URL('../workflows/ci.yml', import.meta.url)), 'utf8');
+  for (const job of JOBS) assert.match(workflow, new RegExp(`^\\s+${job.kind}\\)$`, 'm'), job.kind);
 });
 
 test('server changes run server shards and latency, not native', () => {
