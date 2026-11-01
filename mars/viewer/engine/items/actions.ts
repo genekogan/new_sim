@@ -8,6 +8,7 @@
 // its own activity this tick, because they are submitted later) and publish `human.baseActivity` =
 // the activity they are layered on ('sit' = seated).
 import { z } from 'zod';
+import {ITEM_REACH_SECONDS,ITEM_RECOVERY_SECONDS} from './presentation.ts';
 import { angleDelta, clamp, heading, q6, rot2, wrapAngle, type Vec3 } from '../core/math.ts';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
@@ -25,12 +26,13 @@ const BUILT_IN_ITEMS: ReadonlySet<string> = new Set(ITEM_ASSETS.map((d) => d.id)
 import { checkStations, childrenState, walkCrew, type Children } from '../construction/children.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
 import { SIT_TRANSITION } from '../social/actions.ts';
+import { watering } from './watering.ts';
 import {
   bodyFrame, bowlHand, carryHand, dipHand, HANDS, lerp3, mouthPoint, otherHand, restHand, rimHand, SEAT_DROP, smooth,
   type BodyFrame, type Hand,
 } from './body.ts';
 import {
-  BODY_REACH, followHand, graspPoint, heldBy, inHand, isItem, placeOnGround, placeOnSlot, putInHand,
+  BODY_REACH, carryPoint, followHand, graspPoint, heldBy, inHand, isItem, itemReachSeconds, placeOnGround, placeOnSlot, putInHand,
   reachOf, reachStation, slotOccupant, surfaceSlot, whereIs, type Station, type SurfaceSlot,
 } from './model.ts';
 
@@ -120,12 +122,17 @@ export const holdItems: ActionDef<{ actor: string }, null, HoldExec> = {
     else if (want < ex.k) ex.k = Math.max(0, ex.k - dt / SIT_TRANSITION);
     const b = bodyFrame(a, smooth(ex.k) * SEAT_DROP);
     const held = heldBy(rt.world, ex.actor);
+    // Reuse the custody lookup already required by the holder. No new world scan,
+    // and old definitions/takes retain their original state bytes.
+    const presented = held.filter(x => x.item.tags?.includes('entity-world-item-pose'));
+    if (presented.length) a.human.heldItemsV1 = Object.fromEntries(presented.map(x => [x.hand, x.item.id]));
+    else delete a.human.heldItemsV1;
     // a construction grip (carry / lift / hand_up) owns human.hands while it lasts: leave them alone
     for (const h of a.human.grip ? [] : HANDS) {
       if (driven(rt, ex.actor, h)) continue;
       const it = held.find((x) => x.hand === h);
       if (it) {
-        const q = carryHand(b, h);
+        const q = carryPoint(it.item, b, h);
         setHand(a, h, q);
         followHand(it.item, q, a.pose.yaw);
       } else setHand(a, h, undefined);
@@ -143,7 +150,9 @@ type Dest = { slot: SurfaceSlot; ownerPose: Entity['pose']; ownerDef: string } |
 type TransferProgram = { hand: Hand; station?: Station; target: Vec3; dest?: Dest };
 type TransferExec = {
   id: string; mode: 'take' | 'put'; actor: string; item: string; hand: Hand; station?: Station; target: Vec3; dest?: Dest;
-  phase: 'approach' | 'turn' | 'reach' | 'withdraw'; child?: Children; error?: Diagnostic; t: number; from?: Vec3; to?: Vec3;
+  phase: 'approach' | 'turn' | 'reach' | 'withdraw' | 'cancel-withdraw' | 'recover'; child?: Children; error?: Diagnostic; t: number; from?: Vec3; to?: Vec3;
+  /** Reach / withdraw length (ticks): REACH_TIME, or ITEM_REACH_SECONDS for an opted-in presented item (its body bends on the same clock). */
+  reachTicks?: number;
   /** Item support at plan time (take): the item must still be there when the hand arrives. */
   source?: string;
 };
@@ -151,6 +160,11 @@ type TransferExec = {
 const supportKey = (e: Entity) => JSON.stringify(e.support ?? null);
 
 /** Already within HERE_REACH of the target (e.g. the next item along the table): no walk, just turn to it. */
+/** Opted-in presented items (drawn reach and bend, presentation.ts): stand at the side of a table nearest the item.
+ *  0.3 m in from the edge + the 0.35 m approach gap is a 0.65 m reach, a standing ~50° bend for a 1.71 m body; at
+ *  0.44 m in (0.79 m) a shorter rig could only reach it kneeling. Other items keep the shared station order. */
+const PRESENTED_COMFORT_DEPTH = 0.3;
+const presentedDepth = (it: Entity) => (it.tags?.includes('entity-world-item-pose') ? PRESENTED_COMFORT_DEPTH : undefined);
 function fromHere(a: Entity, target: Vec3): Station | null {
   if (reachOf(a, target) > HERE_REACH || !STILL_ACTIVITIES.has(a.human!.activity) || a.human!.activity === 'sit') return null;
   return { p: [a.pose.p[0], a.pose.p[2]], yaw: heading([target[0] - a.pose.p[0], target[2] - a.pose.p[2]]) };
@@ -177,7 +191,7 @@ function planTake(rt: Runtime, p: TransferParams) {
     if (!owner || !s.slot) return fail('item.unsupported-source', `${it.id} rests on ${s.on}, which is not a surface an item can be taken from`, [it.id, s.on]);
   } else if (s?.kind !== 'ground') return fail('item.unsupported-source', `${it.id} is ${whereIs(rt.world, it)}; only items on a surface or the ground can be taken`, [it.id]);
   const target = graspPoint(it);
-  const st = fromHere(a, target) ?? reachStation(rt, a, target, owner, `${it.id} (${whereIs(rt.world, it)})`);
+  const st = fromHere(a, target) ?? reachStation(rt, a, target, owner, `${it.id} (${whereIs(rt.world, it)})`, presentedDepth(it));
   if ('code' in st) return { ok: false as const, diagnostic: { ...st, subjects: [...new Set([...(st.subjects ?? []), it.id])] } };
   const here = Math.abs(st.p[0] - a.pose.p[0]) < 0.05 && Math.abs(st.p[1] - a.pose.p[2]) < 0.05;
   if (!here) {
@@ -224,7 +238,7 @@ function planPut(rt: Runtime, p: TransferParams) {
   const g = CATALOG[it.def].handling!.grips[1][0].local;
   const q = rot2([g[0], g[2]], owner.pose.yaw);
   const target: Vec3 = [slot.p[0] + q[0], slot.p[1] + g[1], slot.p[2] + q[1]];
-  const st = fromHere(a, slot.p) ?? reachStation(rt, a, slot.p, owner, `surface slot ${slot.id}`);
+  const st = fromHere(a, slot.p) ?? reachStation(rt, a, slot.p, owner, `surface slot ${slot.id}`, presentedDepth(it));
   if ('code' in st) return { ok: false as const, diagnostic: st };
   const here = Math.abs(st.p[0] - a.pose.p[0]) < 0.05 && Math.abs(st.p[1] - a.pose.p[2]) < 0.05;
   if (!here) {
@@ -246,7 +260,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
       { resource: `entity:${p.item}`, mode: 'exclusive' },
       ...(mode === 'put' && p.surfaceSlot !== 'ground' ? [{ resource: `surface-slot:${p.surfaceSlot}`, mode: 'exclusive' as const }] : []),
     ],
-    drivesReservedHands: (record) => record.phase === 'reach' || record.phase === 'withdraw',
+    // an opted-in item's own withdraw-on-cancel and recovery keep the hand until the arm has eased back to the clip
+    drivesReservedHands: (record) => record.phase === 'reach' || record.phase === 'withdraw' || record.phase === 'cancel-withdraw' || record.phase === 'recover',
     plan: (rt, p) => (mode === 'take' ? planTake(rt, p) : planPut(rt, p)),
     start(rt, p, prog, id) {
       const a = rt.world.entities[p.actor];
@@ -257,12 +272,27 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         else { ex.child = ch; ex.phase = 'approach'; }
       }
       a.human!.task = id;
+      if(rt.world.entities[p.item].tags?.includes('entity-world-item-pose')){a.human!.itemTransferV1={item:p.item,hand:ex.hand,action:id,mode,startTick:rt.tick};ex.reachTicks=ticks(ITEM_REACH_SECONDS);}
       return ex;
     },
     step(rt, ex): StepResult {
+      const advance=():StepResult=>{
       if (ex.error) return { status: 'failed', diagnostic: ex.error };
       const a = rt.world.entities[ex.actor];
       const it = rt.world.entities[ex.item];
+      if(ex.phase==='recover'){
+        a.human!.activity='idle';ex.t++;
+        if(ex.t<ticks(ITEM_RECOVERY_SECONDS))return{status:'running',phase:'recover'};
+        // the released hand stayed at its rest point while the drawn arm eased back to the idle clip
+        if(!inHand(rt.world,ex.actor,ex.hand))setHand(a,ex.hand,undefined);
+        return{status:'completed',outputs:{item:ex.item,hand:ex.hand,support:it.support}};
+      }
+      if(ex.phase==='cancel-withdraw'){
+        const R=ex.reachTicks??ticks(REACH_TIME);ex.t++;const q=lerp3(ex.from!,ex.to!,smooth(ex.t/R));setHand(a,ex.hand,q);a.human!.activity='reach';
+        if(inHand(rt.world,ex.actor,ex.hand))followHand(it,q,a.pose.yaw);
+        if(ex.t<R)return{status:'running',phase:'cancel-withdraw'};
+        ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};
+      }
       if (ex.phase === 'approach') {
         const st = childrenState(ex.child!);
         if (st === 'running') return { status: 'running', phase: 'approach' };
@@ -287,18 +317,26 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
           if (occ) return { status: 'failed', diagnostic: { code: 'item.slot-occupied', message: `${ex.dest.slot.id} was taken by ${occ.id} before ${ex.actor} got there`, subjects: [ex.dest.slot.id, occ.id] } };
         }
         ex.phase = 'reach';
+        // This step also advances t to one tick of reach, so the phase origin is
+        // the preceding interval boundary (full weight at the actual grasp).
+        // The fixed grasp / placement point lets the renderer solve one posture for the whole reach.
+        if(a.human!.itemTransferV1?.action===ex.id){a.human!.itemTransferV1.reachTick=rt.tick-1;a.human!.itemTransferV1.target=ex.target.map(x=>Math.round(x*1000)/1000) as [number,number,number];}
         ex.t = 0;
         ex.from = handNow(a, ex.hand, bodyFrame(a));
         ex.to = ex.target;
       }
       a.human!.activity = 'reach';
+      // Soul Actions 34: a handle-held item's reach and release are recorded, so the drawn arm blends on their timeline
+      const opted = itemReachSeconds(it);
+      if (opted !== undefined && ex.phase === 'reach' && ex.t === 0) a.human!.handTransferV1 = { mode: ex.mode, hand: ex.hand, startTick: rt.tick, reach: opted };
       ex.t++;
-      const k = smooth(ex.t / ticks(REACH_TIME));
+      const reachTicks = ex.reachTicks ?? ticks(itemReachSeconds(it) ?? REACH_TIME);
+      const k = smooth(ex.t / reachTicks);
       const q = lerp3(ex.from!, ex.to!, k);
       setHand(a, ex.hand, q);
       const holding = (ex.mode === 'take') === (ex.phase === 'withdraw');
       if (holding) followHand(it, q, a.pose.yaw);
-      if (ex.t < ticks(REACH_TIME)) return { status: 'running', phase: ex.phase };
+      if (ex.t < reachTicks) return { status: 'running', phase: ex.phase };
       if (ex.phase === 'reach') {
         const b = bodyFrame(a);
         if (ex.mode === 'take') {
@@ -306,7 +344,7 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
           followHand(it, q, a.pose.yaw);
           const d = ensureHolder(rt, ex.actor);
           if (d) return { status: 'failed', diagnostic: d };
-          ex.to = carryHand(b, ex.hand);
+          ex.to = carryPoint(it, b, ex.hand);
         } else {
           if ('slot' in ex.dest!) {
             const dest = ex.dest, owner = rt.world.entities[dest.slot.owner];
@@ -328,7 +366,8 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
               message: `${ex.actor} cannot release ${ex.item}: ${dest.slot.id} is now occupied by ${occupied.id}`,
               subjects: [ex.actor, ex.item, dest.slot.id, occupied.id],
             } };
-            placeOnSlot(it, dest.slot, owner.pose.yaw);
+            // a hook (Soul Actions 34): what hangs keeps the yaw it was hung with (no turn at the release)
+            placeOnSlot(it, dest.slot, dest.slot.hang ? it.pose.yaw : owner.pose.yaw);
           }
           else placeOnGround(it, ex.dest!.ground, a.pose.yaw);
           ex.to = restHand(b, ex.hand);
@@ -338,15 +377,35 @@ function transfer(mode: 'take' | 'put', verb: string, description: string, schem
         ex.from = q;
         return { status: 'running', phase: 'withdraw' };
       }
-      if (ex.mode === 'put') setHand(a, ex.hand, undefined);
+      const presented = a.human!.itemTransferV1?.action === ex.id;
+      if (ex.mode === 'put' && !presented) setHand(a, ex.hand, undefined);
+      // the record stays, ended: the drawn idle (and its gestures) eases back in from here (overwritten by the next one)
+      if (a.human!.handTransferV1) a.human!.handTransferV1 = { ...a.human!.handTransferV1, endTick: rt.tick };
       if (a.human!.task === ex.id) { a.human!.task = undefined; a.human!.activity = 'idle'; }
+      if(presented){ex.phase='recover';ex.t=0;a.human!.itemTransferV1!.releaseTick=rt.tick;return{status:'running',phase:'recover'};}
       return { status: 'completed', outputs: { item: ex.item, hand: ex.hand, support: rt.world.entities[ex.item].support } };
+      };
+      const result=advance();
+      if(result.status!=='running'){
+        const h=rt.world.entities[ex.actor]?.human;
+        if(h?.itemTransferV1?.action===ex.id){
+          delete h.itemTransferV1;
+          if(h.task===ex.id){delete h.task;h.activity='idle';}
+        }
+      }
+      return result;
     },
     cancel(rt, ex) {
       const a = rt.world.entities[ex.actor];
       // light items: stop at once; an item already grasped stays in hand (hold_items keeps it there)
       if (a?.human) {
+        if(a.human.itemTransferV1?.action===ex.id&&['reach','withdraw','cancel-withdraw','recover'].includes(ex.phase)){
+          if(ex.phase!=='recover'&&ex.phase!=='cancel-withdraw'){a.human.itemTransferV1.cancelTick=rt.tick;ex.from=handNow(a,ex.hand,bodyFrame(a));ex.to=inHand(rt.world,ex.actor,ex.hand)?carryHand(bodyFrame(a),ex.hand):restHand(bodyFrame(a),ex.hand);ex.phase='cancel-withdraw';ex.t=0;}
+          return{ok:true,deferred:true};
+        }
+        if(a.human.itemTransferV1?.action===ex.id)delete a.human.itemTransferV1;
         if (!inHand(rt.world, ex.actor, ex.hand)) setHand(a, ex.hand, undefined);
+        delete a.human.handTransferV1;
         if (a.human.task === ex.id) { a.human.task = undefined; a.human.activity = 'idle'; }
       }
       return { ok: true };
@@ -629,4 +688,4 @@ export const eat: ActionDef<EatParams, { bowlHand: Hand }, EatExec> = {
   resumable: true,
 };
 
-export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems];
+export const ITEM_ACTIONS: ActionDef[] = [takeItem, putItem, serve, eat, holdItems, watering as unknown as ActionDef];

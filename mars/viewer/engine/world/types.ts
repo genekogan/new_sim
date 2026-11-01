@@ -61,6 +61,11 @@ export type HumanState = {
     mode: 'bed' | 'buoyant'; bedY: number; datumY: number;
     depthMetres: number; submergedHeightMetres: number; normal: Vec3;
   };
+  handActuator?: import('../social/hand-actuator.ts').HandActuatorMotion;
+  /** Soul Actions 34: one recorded watering-can stage (fill at a tap, pour on a planter); never controller context. */
+  wateringV1?: import('../items/watering.ts').WateringMotion;
+  /** Soul Actions 34: a handle-held item being taken or put by hand (the arm blends in and out on this timeline). */
+  handTransferV1?: import('../items/watering.ts').HandTransfer;
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };
@@ -74,6 +79,9 @@ export type HumanState = {
    * at rest. Absent when neither hand is published. ITEMS.md "Hand points".
    */
   hands?: { left?: Vec3; right?: Vec3 };
+  /** Only opted-in world items; bounded to the two actual occupied hands. */
+  heldItemsV1?: { left?: string; right?: string };
+  itemTransferV1?: import('../items/presentation.ts').ItemTransferV1;
   /** While an overlay activity (`eat`) runs: the activity it is layered on ('sit' = seated, 'talk', 'idle'…). */
   baseActivity?: string;
   /**
@@ -115,6 +123,10 @@ export type HumanState = {
   instrument?: string;
   /** CN5 (social/pose.ts): a choreographed game's public turn state (who throws to whom and when). */
   game?: import('../social/pose.ts').GameState;
+  /** entry 35 (social/hand-hold.ts): holding hands with another body (offered, joined, letting go). */
+  handHold?: import('../social/hand-hold.ts').HandHoldState;
+  /** entry 35 (social/rps.ts): a rock-paper-scissors count's shared start and shoot ticks; the shape from the shoot only. */
+  rps?: import('../social/rps.ts').RpsState;
 };
 
 /** Persistent committed quantities for one bounded cold preparation batch. */
@@ -175,6 +187,8 @@ export type Entity = {
   /** Partial preparation survives interruption; incomplete contents cannot be served. */
   foodPreparation?: FoodPreparation;
   gardenCare?: import('../objects/garden.ts').GardenState;
+  /** Soul Actions 34: a handle-held can rides this much lower in the hand when it is full (m). */
+  carryDropV1?: number;
   planting?: import('../objects/planting.ts').PlantingState;
   /** Placed electrical equipment (construction/solar.ts place_equipment, spec §19): kind + configuration. */
   equipment?: { kind: string; config: Record<string, number | string | boolean> };

@@ -1,0 +1,11 @@
+// Retain the open -> enter -> close journey; remove only model-thinking gaps.
+import {readFileSync,writeFileSync} from 'node:fs';import {execFileSync} from 'node:child_process';
+const out=process.argv[2],folder=out+'/viewer',turn=JSON.parse(readFileSync(out+'/door-journey.json')),samples=JSON.parse(readFileSync(folder+'/samples.json')),video=folder+'/continuous-playtest.webm';
+const duration=Number(execFileSync('ffprobe',['-v','error','-show_entries','format=duration','-of','default=nw=1:nk=1',video],{encoding:'utf8'})),epoch=samples.at(-1).at-duration*1000,starts=new Map(),segments=[];
+for(const event of turn.stream){const content=event.message?.content??event.content??[];if(!Array.isArray(content))continue;for(const c of content){if(c.type==='tool_use'&&c.name==='Bash'&&/node eden\.mjs act (?:"open the courtyard-door"|walk:courtyard\b|"close the courtyard-door")/.test(c.input?.command??''))starts.set(c.id,{at:event._rx,command:c.input.command});if(c.type==='tool_result'&&starts.has(c.tool_use_id)){const a=starts.get(c.tool_use_id);segments.push({start:Math.max(0,(a.at-epoch)/1000-.7),end:Math.min(duration,(event._rx-epoch)/1000+2.6),command:a.command});}}}
+if(segments.length!==3)throw Error('Expected open, enter, close intervals, got '+segments.length);
+const merged=[];for(const s of segments){const p=merged.at(-1);if(p&&s.start<=p.end)p.end=Math.max(p.end,s.end);else merged.push({...s});}
+const filter=merged.map((s,i)=>`[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS,scale=1120:-2[v${i}]`).join(';')+';'+merged.map((_,i)=>`[v${i}]`).join('')+`concat=n=${merged.length}:v=1:a=0[out]`;
+execFileSync('ffmpeg',['-v','error','-y','-i',video,'-filter_complex',filter,'-map','[out]','-c:v','libx264','-preset','veryfast','-crf','24','-an','-movflags','+faststart',folder+'/playtest.mp4']);
+writeFileSync(folder+'/edit-receipt.json',JSON.stringify({method:'CLI wall-clock intervals aligned from recording endpoint; initial loading and model pauses removed. Approach, contact, swing, crossing and closing kept at normal speed. Renderer playback buffer/tween retained.',duration:merged.reduce((n,s)=>n+s.end-s.start,0),segments,merged},null,2));
+console.log(JSON.stringify({seconds:merged.reduce((n,s)=>n+s.end-s.start,0),segments:merged}));

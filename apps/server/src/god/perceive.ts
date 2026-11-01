@@ -12,7 +12,7 @@
 // The object id is the entity id. Objects follow the entity world: re-derived on each god edit, removed with the thing.
 // No edge file changes: the kind registers on the ledger's comms objects when they exist; the read capability goes in
 // through the ledger's world-profile hook (as nav.ts's `walk:<path>`).
-import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
+import { gameStatus, type Entity, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { paintingLine } from '../art/art.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -24,12 +24,16 @@ import { heldGodThing } from './held.ts';
 import { waterRole, wordOf } from './water.ts';
 import { economyOn } from './layers.ts';
 import { supportY } from './nav.ts';
+import { posterStale } from './poster-boards.ts';
+import { posterList, wantedList } from '@sim/world-compiler';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
 type Want = { name: string; kind: string; description: string; params: BuiltState & { paintingWhat?: true } };
-type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string };
+/** Entry 27: a game board's read offer names only its state, never the grid or the players. */
+function gameLabel(state: Record<string, unknown>): string { const st = gameStatus(String(state.text ?? '')); return st.moves === 0 ? 'a game of noughts and crosses, not started' : st.winner ? `a game of noughts and crosses, won by ${st.winner}` : st.draw ? 'a game of noughts and crosses, a draw' : `a game of noughts and crosses, ${st.turn} to play`; }
+type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string; writable?: boolean; pinboard?: boolean; list?: 'signup' | 'poll' | 'posters' | 'wanted'; votes?: number; game?: string; state?: Record<string, unknown> };
 /** x0, z0, x1, z1 */
 type Box = [number, number, number, number];
 type Run = { queue: string[]; i: number; changed: string[]; made: number; root: string; layersOn: boolean; full: boolean; ms: number };
@@ -99,6 +103,8 @@ export type PerceiveHost = {
   /** VOCAB-MECH: commit a Soul's actuator action on a god thing (engine edit). Without it, things offer no actions. */
   commit?(ops: unknown[], note: string): { accepted: boolean };
   log(m: string): void;
+  /** Entry 34 (watering.ts): "water <plant>" with a watering can from its hook. */
+  watering?: { plan(soul: { entityId: string }, plant: string): { steps: { verb: string; params: Record<string, unknown> }[]; summary: string } | { code: string; reason: string } | null; expect(body: string): void };
   /** LAYERS (layers.ts): owner/price/hours in what Souls see; private things refuse other Souls' actuators. */
   layers?: { active(): boolean; tag(e: Entity): string; refusal(id: string, soul: { soulId: string; name: string }): { code: string; reason: string } | null; ownerWord(id: string, soul?: { soulId: string; name: string }): string | null; hoursOf(s: Entity['schedule']): string };
 };
@@ -122,6 +128,7 @@ export class GodPerceive {
     if (!o.kindOf(BUILT_KIND)) { o.register(builtKindFor((key) => this.desired.get(key))); this.kinds.add(BUILT_KIND); }
     this.objs = o;
     this.wrapVisible(o as never);
+    this.wrapCapabilities(o as never);
     if (this.h.commit) wrapAct(o as never, (id) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? { def, state: actuatedState(e, def), name: e.name ? this.h.model.pathOf(e.id) : shortDef(def) } : null; }, this.actHost(), this.h.log);
     return o;
   }
@@ -133,13 +140,29 @@ export class GodPerceive {
    *  a single kind would show only the two nearest god things. A name the framework already uses gets `built-`. */
   private kindFor(short: string, def?: StoredDef): string {
     const o = this.objs!; let k = short.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40) || BUILT_KIND;
+    // Different published revisions may expose different actions. Never give a frozen v1
+    // object v2 actions (or hide v2 actions) because another revision registered first.
+    if (def && def.version > 1) k = `${k}-v${def.version}`.slice(0, 48);
     if (!this.kinds.has(k) && o.kindOf(k)) k = `built-${k}`.slice(0, 48);
     // VOCAB-MECH: a def with actions (actuators) gives its kind those actions (one kind per kind of thing)
-    if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k, def && actionsOf(def).length && this.h.commit ? kindActions(def, this.actHost(), (st) => { const id = (st as BuiltState).key; const e = id ? this.h.model.entities.get(id) : undefined; return e?.name ? this.h.model.pathOf(e.id) : short; }) : {})); this.kinds.add(k); }
+    if (!this.kinds.has(k)) this.registerBuiltKind(k, def, short);
     return k;
+  }
+  private registerBuiltKind(k: string, def?: StoredDef, short = k) {
+    if (!this.objs!.kindOf(k)) this.objs!.register(builtKindFor(key => this.desired.get(key), k,
+      def && actionsOf(def).length && this.h.commit ? kindActions(def, this.actHost(), st => {
+        const id = (st as BuiltState).key, e = id ? this.h.model.entities.get(id) : undefined;
+        return e?.name ? this.h.model.pathOf(e.id) : short;
+      }) : {}));
+    this.kinds.add(k);
   }
   private actHost() {
     return {
+      deferContacts: !!this.h.edge?.contactActuator,
+      watering: (soul: EdgeSoul, id: string) => this.h.watering?.plan(soul, id) ?? null,
+      wateringBegun: (soul: EdgeSoul) => this.h.watering?.expect(soul.entityId),
+      contactPlan:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>this.h.edge?.contactActuator?.plan(soul,id,action,params)??null,
+      policy:(id:string,soul:EdgeSoul,action:string)=>this.h.edge?.contactActuator?.policy(soul,id,action)??null,
       bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },
       commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),
       stateOf: (id: string) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? actuatedState(e, def) : null; },
@@ -161,7 +184,7 @@ export class GodPerceive {
       },
       // SOULFIX: where to stand to operate it: a clear spot within reach (1.5 m) on its level that the body can walk to,
       // nearest its front first, else nearest the thing (bars across a cell work from either side); deterministic order
-      approach: (id: string, soul: EdgeSoul, front: Vec2 | null) => {
+      approach: (id: string, soul: EdgeSoul, front: Vec2 | null, radius = 1.5) => {
         const E = this.h.engine as unknown as { clearanceAtV1?: (x: number, z: number, level?: number) => number; reachV1?: (a: { p: Vec2; level?: number }, b: { p: Vec2; level?: number }) => { ok: boolean } };
         const e = this.h.model.entities.get(id), b = this.h.engine.world.entities[soul.entityId];
         if (!e || !b?.pose?.p || !E.clearanceAtV1 || !E.reachV1) return null;
@@ -170,7 +193,7 @@ export class GodPerceive {
         const cands: { p: Vec2; d: number }[] = [];
         for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) {
           const p: Vec2 = [Math.round((at[0] + i * 0.25) * 100) / 100, Math.round((at[1] + j * 0.25) * 100) / 100], r = Math.hypot(p[0] - at[0], p[1] - at[1]);
-          if (r < 0.3 || r > 1.5 || E.clearanceAtV1(p[0], p[1], level) < 0.4) continue;
+          if (r < 0.3 || r > radius || E.clearanceAtV1(p[0], p[1], level) < 0.4) continue;
           cands.push({ p, d: front ? Math.hypot(p[0] - front[0], p[1] - front[1]) : r });
         }
         cands.sort((x, y) => x.d - y.d || x.p[0] - y.p[0] || x.p[1] - y.p[1]);
@@ -215,10 +238,12 @@ export class GodPerceive {
     // Unpainted input is unchanged; only painted initialization opts into the 230-character bound.
     const what = painting ? painting + clip(prefix + suffix, 120).slice(prefix.length) : prefix + suffix;
     const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
-    const w: Want = { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, ...(painting ? { paintingWhat: true as const } : {}), text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
+    // a board Souls write on keeps its own kind: kinds carry actions, and two writable v1 boards (a sign-up sheet, a poll, a game board)
+    // under one `sign` kind would share whichever registered first (entries 25, 27)
+    const w: Want = { name, kind: this.kindFor(text !== null && !def.tags.includes('hand-writable') ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, ...(painting ? { paintingWhat: true as const } : {}), text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
     if (text === null) return { w };
     // read from in front of its face (entity frame: the front is +z, turned by the yaw)
-    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text } };
+    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text, ...(def.tags.includes('hand-writable') ? { writable: true } : {}), ...(def.tags.includes('pinboard') ? { pinboard: true } : {}), ...(def.tags.includes('posters') ? { list: 'posters' as const, state: e.state ?? {} } : def.tags.includes('wanted') ? { list: 'wanted' as const, state: e.state ?? {} } : def.tags.includes('signup') ? { list: 'signup' as const } : def.tags.includes('poll') ? { list: 'poll' as const, votes: typeof e.state?.textBy === 'string' && e.state.textBy ? e.state.textBy.split(',').length : 0 } : {}), ...(def.tags.includes('tictactoe') ? { game: gameLabel(e.state ?? {}) } : {}) } };
   }
   private at(e: Entity, def: StoredDef): Vec2 | null {
     const sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
@@ -293,7 +318,7 @@ export class GodPerceive {
   private begin(): Run | null {
     const objs = this.objects(); if (!objs) return null;
     const root = this.rootPlace(); if (!root) return null;
-    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, stateDigest(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
+    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, stateDigest(o.state)); if (!this.kinds.has(o.kind)) { const e = this.h.model.entities.get(o.id), def = e && this.h.model.resolvedDef(e.def); this.registerBuiltKind(o.kind, def ?? undefined); } }
     const layersOn = !!this.h.layers?.active();
     // L4 item 5: the layers switching on or off changes only what wantOne's `lay` reads: things with a layer field
     if (layersOn !== this.layersOn) { this.layersOn = layersOn; for (const e of this.h.model.entities.values()) if (layered(e)) this.retag.add(e.id); }
@@ -412,6 +437,15 @@ export class GodPerceive {
     };
   }
 
+  /** Unreachable built-object actuators do not belong in discovery. Keep direct admission's
+   * honest refusal and nearby state/permission refusals; do not affect other object kinds. */
+  private wrapCapabilities(o: { capabilities(soul: EdgeSoul): EdgeCapability[]; __godCaps?: boolean }) {
+    if (o.__godCaps) return; o.__godCaps = true;
+    const original = o.capabilities.bind(o);
+    o.capabilities = soul => original(soul).filter(cap =>
+      !(cap.object && this.desired.has(cap.object) && cap.blocked?.code === 'object.out-of-reach'));
+  }
+
   /** `read:<sign>` for signs near this Soul: walk up to it and face it; the label carries its words. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans) {
     this.ensure();
@@ -422,7 +456,15 @@ export class GodPerceive {
       const d = Math.hypot(s.at[0] - here[0], s.at[1] - here[1]); if (d > SIGN_READ_RADIUS) continue;
       const id = `read:${s.id}`; if (caps.some((c) => c.id === id)) continue;
       const words = s.text.replace(/\s*\n\s*/g, ' / ');
-      const label = `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
+      // A Soul-written board offers a read only when written on, and never carries its words: they come with the read.
+      if (s.writable && !words && s.list !== 'poll' && !s.game) continue;
+      const pinned = s.pinboard ? s.text.split('\n').length : 0;
+      const names = s.list === 'signup' ? s.text.split('\n').filter(Boolean).length : 0;
+      // entry 25: counts only, never the names or the question (they come with the read)
+      // entry 38: counts only (posters, out-of-date ones, wanted / offered / taken notes), never a title, a note or a name
+      const listLabel = s.list === 'posters' ? (() => { const ps = posterList(s.state ?? {}), old = ps.filter(p => posterStale(p)).length; return `Read ${s.name} (a poster wall, ${ps.length} poster${ps.length === 1 ? '' : 's'}${old ? `, ${old} out of date` : ''}, ${Math.round(d)} m)`; })()
+        : s.list === 'wanted' ? (() => { const ns = wantedList(s.state ?? {}), w = ns.filter(n => n.c === 'w').length, tk = ns.filter(n => n.tk).length; return `Read ${s.name} (a wanted/offered board, ${w} wanted, ${ns.length - w} offered${tk ? `, ${tk} taken` : ''}, ${Math.round(d)} m)`; })() : null;
+      const label = listLabel ?? (s.game ? `Read ${s.name} (${s.game}, ${Math.round(d)} m)` : s.list === 'poll' ? `Read ${s.name} (a poll, ${s.votes ?? 0} vote${s.votes === 1 ? '' : 's'}, ${Math.round(d)} m)` : names ? `Read ${s.name} (a sign-up sheet, ${names} name${names > 1 ? 's' : ''}, ${Math.round(d)} m)` : pinned ? `Read ${s.name} (${pinned} pinned note${pinned > 1 ? 's' : ''}, ${Math.round(d)} m)` : s.writable ? `Read ${s.name} (a board with writing on it, ${Math.round(d)} m)` : `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`);
       caps.push({ id, verb: 'read', label, target: { id: s.id, kind: 'object' }, available: true });
       plans.set(id, { label: `Read ${s.name}`, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), ...(Math.hypot(s.front[0] - here[0], s.front[1] - here[1]) > 0.8 ? [{ verb: 'walk_to', params: { to: s.front, standoff: 0 } }] : []), { verb: 'wave', params: { at: s.id, seconds: 1 } }] });
     }

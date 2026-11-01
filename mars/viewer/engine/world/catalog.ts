@@ -48,6 +48,9 @@ export type Handling = {
   hands?: 1 | 2;
   /** A small hand-held item (bowl, spoon, cup…): taken / put / eaten with by engine/items. */
   small?: true;
+  /** Soul Actions 34: an item held by a handle (a watering can) hangs from the hand: carried with the arm down at the
+   *  side at this hand point (body frame, m) instead of the small-item carry point, and reached for in `reachSeconds`. */
+  hangCarry?: { fwd: number; side: number; up: number; reachSeconds: number };
   /**
    * Small enough (≤ SMALL_LOAD_KG) to carry in one hand while climbing a frame or walking a beam
    * (construction/frame.ts). Absent = not small.
@@ -94,6 +97,8 @@ export type AssetDef = {
   equipment?: { kind: EquipmentKind; defaults: Record<string, number | string> };
   /** Usable activity affordances, independent of mesh appearance and per-entity state. */
   capabilities?: {
+    /** Opt-in small world items whose poses share the recorded hand clock. */
+    recordedItemPoseV1?: true;
     /** Upright ground fixture transport; handling geometry is defined only here. */
     /** Chess token semantics are independent of its appearance. */
     gameToken?: { game: 'chess'; color: Color; kind: Kind };

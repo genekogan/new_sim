@@ -14,7 +14,7 @@ import { CONTAINERS, isHandItem } from '../world/catalog-items.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 import { APPROACH_CLEARANCE, APPROACH_GAPS, blockerNear } from '../social/slots.ts';
-import { HANDS, type Hand } from './body.ts';
+import { HANDS, at, carryHand, sideOf, type BodyFrame, type Hand } from './body.ts';
 import { BODY_MODEL } from '../body/model.ts';
 
 /** Farthest an item may be from the table edge in front of the person (m). */
@@ -30,6 +30,14 @@ const fmt = (q: Vec2 | Vec3) => (q.length === 3 ? `(${q[0].toFixed(2)}, ${q[2].t
 
 export const itemDef = (e: Entity): AssetDef | undefined => CATALOG[e.def];
 export const isItem = (e: Entity | undefined): boolean => !!e && isHandItem(itemDef(e));
+/** Soul Actions 34: where a hand carries this item. A handle-held item (a watering can) hangs at the side with the arm
+ *  down, a little lower when it is full (`carryDropV1`, set by the watering verb); everything else at the carry point. */
+export function carryPoint(item: Entity | undefined, b: BodyFrame, h: Hand): Vec3 {
+  const hc = item && itemDef(item)?.handling?.hangCarry;
+  return hc ? at(b, hc.fwd, sideOf(h) * hc.side, hc.up - (item.carryDropV1 ?? 0)) : carryHand(b, h);
+}
+/** Reach time for an item (s): handle-held items are reached for slowly and deliberately; undefined = the verb's own. */
+export const itemReachSeconds = (item: Entity | undefined): number | undefined => (item ? itemDef(item)?.handling?.hangCarry?.reachSeconds : undefined);
 
 export function itemEntity(id: string, defId: string, p: Vec3, yaw = 0, opts: { provenance?: Provenance; contents?: { food: string; fraction: number }; label?: string } = {}): Entity {
   if (!isHandItem(CATALOG[defId])) throw new Error(`${defId} is not a small hand-held item`);
@@ -75,7 +83,7 @@ export function whereIs(w: WorldState, e: Entity): string {
 
 // ---- surfaces ----
 
-export type SurfaceSlot = { id: string; owner: string; slot: string; p: Vec3 };
+export type SurfaceSlot = { id: string; owner: string; slot: string; p: Vec3; hang?: true };
 
 export function surfaceSlotsOf(w: WorldState, owner: string): SurfaceSlot[] {
   const t = w.entities[owner];
@@ -83,7 +91,7 @@ export function surfaceSlotsOf(w: WorldState, owner: string): SurfaceSlot[] {
   if (!t || !d?.surfaceSlots) return [];
   return d.surfaceSlots.map((s) => {
     const q = rot2([s.local[0], s.local[2]], t.pose.yaw);
-    return { id: `${owner}#${s.id}`, owner, slot: s.id, p: [t.pose.p[0] + q[0], t.pose.p[1] + s.local[1], t.pose.p[2] + q[1]] as Vec3 };
+    return { id: `${owner}#${s.id}`, owner, slot: s.id, p: [t.pose.p[0] + q[0], t.pose.p[1] + s.local[1], t.pose.p[2] + q[1]] as Vec3, ...(s.hang ? { hang: true as const } : {}) };
   });
 }
 
@@ -147,8 +155,11 @@ export type Station = { p: Vec2; yaw: number };
  * that edge straight opposite the target (clamped to the edge), first with ≥ APPROACH_CLEARANCE;
  * sides ordered by distance from the actor. On the ground: 8 points GROUND_STANDOFF around it, the
  * one facing the actor first. `item.unreachable` names what blocks every candidate.
+ * `comfortDepth` (m, opted-in presented items only): a side whose edge is farther than this from the target ranks after
+ * every shallower side, so the body stands where the reach is short (a bowl 0.44 m in from the end the actor walked up
+ * to is 0.23 m in from the side); sides within it keep the actor-distance order.
  */
-export function reachStation(rt: Runtime, actor: Entity, target: Vec3, owner: Entity | undefined, what: string): Station | Diagnostic {
+export function reachStation(rt: Runtime, actor: Entity, target: Vec3, owner: Entity | undefined, what: string, comfortDepth?: number): Station | Diagnostic {
   const sp = rt.services.spatial as Spatial | undefined;
   sp?.sync(rt.world);
   const g = sp?.level(actor.human!.level);
@@ -175,7 +186,8 @@ export function reachStation(rt: Runtime, actor: Entity, target: Vec3, owner: En
       const probe = add2(c, rot2([edge[0] + s.n[0] * APPROACH_GAPS[0], edge[1] + s.n[1] * APPROACH_GAPS[0]], owner.pose.yaw));
       rows.push({ ...s, edge, depth, order: hyp(probe[0] - me[0], probe[1] - me[1]) });
     }
-    rows.sort((a, b) => a.order - b.order || sides.indexOf(a) - sides.indexOf(b));
+    const deep = (r: { depth: number }) => (comfortDepth === undefined ? 0 : Math.max(r.depth, comfortDepth));
+    rows.sort((a, b) => deep(a) - deep(b) || a.order - b.order || sides.indexOf(a) - sides.indexOf(b));
     for (const s of rows)
       for (const gap of APPROACH_GAPS) {
         const p = add2(c, rot2([s.edge[0] + s.n[0] * gap, s.edge[1] + s.n[1] * gap], owner.pose.yaw));

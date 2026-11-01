@@ -36,9 +36,12 @@ const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite
 
 /** FNV-1a: a stable small hash for variant choice and grid scatter. */
 export function hash(s: string): number { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; }
+/** Voicings only a def can ask for by number (never hashed onto other things): hum 2 is a neon sign's transformer buzz
+ *  (Soul Actions entry 33); water 3 is a can's rose on soil (entry 34). */
+export const PINNED_ONLY: Partial<Record<SoundKind, number>> = { hum: 1, water: 1 };
 export const variantOf = (kind: SoundKind, key: string, pinned?: unknown) => {
-  const n = VARIANTS[kind];
-  return typeof pinned === 'number' && Number.isInteger(pinned) ? ((pinned % n) + n) % n : hash(key) % n;
+  const n = VARIANTS[kind], all = n + (PINNED_ONLY[kind] ?? 0);
+  return typeof pinned === 'number' && Number.isInteger(pinned) ? ((pinned % all) + all) % all : hash(key) % n;
 };
 
 /** The condition `when` against an entity's state (with the def's state defaults): 'on', '!open'. `day` and `night`
@@ -255,7 +258,7 @@ export function ambienceAt(L: Listener): Emitter[] {
 // ---------------------------------------------------------------- residents and the visitor
 
 /** `speaking`: the resident is saying something right now (a speech line shown in the last few seconds). */
-export type Resident = { id: string; p: readonly [number, number, number]; speaking?: boolean };
+export type Resident = { id: string; p: readonly [number, number, number]; speaking?: boolean; body?: string; activity?: string; instrument?: string };
 type Track = { p: readonly [number, number, number]; t: number; speed: number };
 
 /** Footsteps where residents walk, a resident's murmur while they speak, and chatter where two or more stand within 4 m of each other; the visitor's own

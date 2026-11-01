@@ -15,7 +15,7 @@ import { FT } from '../core/math.ts';
 import type { AssetDef, Handling } from './catalog.ts';
 
 /** A place on a fixture's top where one item can rest; local x/z in the fixture frame, y = top height. */
-export type SurfaceSlotDef = { id: string; local: [x: number, y: number, z: number] };
+export type SurfaceSlotDef = { id: string; local: [x: number, y: number, z: number]; /** a hook: what hangs keeps the yaw it was hung with */ hang?: true };
 
 export const TABLE_TOP = 0.75; // m, 6 ft folding table top height
 export const TABLE_SLOT_PITCH = 0.3; // m between surface slots

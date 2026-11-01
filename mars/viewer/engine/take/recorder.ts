@@ -60,7 +60,12 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['equipment', (e) => e.equipment], // construction/solar.ts place_equipment (kind + config)
   ['paint', (e) => e.paint], // work/paint.ts: colour / texture, coverage (0.01 steps), per band
   // mars-take/2 (BODY_MODEL.md "take fields"): what a replay needs to pose people exactly as the engine did
+  ['handActuator', e=>e.human?.handActuator], // one finite native contact timeline; never controller context
+  ['wateringV1', e=>e.human?.wateringV1],
+  ['handTransferV1', e=>e.human?.handTransferV1], // Soul Actions 34: a handle-held item's reach / release timeline // Soul Actions 34: one finite watering-can stage; never controller context
   ['hands', takeHands], // human.hands, integer mm (hand-up, items, eating, paint)
+  ['heldItemsV1', e => e.human?.heldItemsV1],
+  ['itemTransferV1', e => e.human?.itemTransferV1],
   ['baseActivity', (e) => e.human?.baseActivity], // the activity an overlay (eat) is layered on: 'sit' = seated
   ['prop', (e) => e.human?.prop], // activities/1: the small object in the hands (book, cup, flower…; ACTIVITIES-v1)
   ['seatHeight', (e) => e.human?.seatHeight], // activities/1: seat top (m) at a scenery seat with no native fixture
@@ -68,6 +73,8 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['together', (e) => e.human?.together], // together/1: a grouped pose's shared group and end tick (animate cyclic poses in step)
   ['instrument', (e) => e.human?.instrument], // CN5: the instrument a play-music body plays (drums, guitar, violin…)
   ['game', (e) => e.human?.game], // CN5: a choreographed game's turn (who throws to whom, when; petanque jack and boules)
+  ['handHold', (e) => e.human?.handHold], // entry 35: holding hands (partner, hand, offered/since/release ticks); never controller context
+  ['rps', (e) => e.human?.rps], // entry 35: rock-paper-scissors shared start and shoot ticks; the shape only from the shoot
   ['gaze', (e) => e.human?.gaze], // attention/1: a Soul's own look/turn (head target and why); `attention` is the point
   ['on', (e) => e.human?.on], // the rack link (beam:… / climb:…) someone stands on
   ['speed', (e) => (e.human?.speed === undefined ? undefined : q(e.human.speed, SPEED_Q))], // integer cm/s (walk_to)
@@ -209,6 +216,8 @@ export class TakeRecorder implements RuntimeObserver {
     this.sample();
   }
 
+  private readonly itemTracks = new Set<string>(); // finite recording chunk, never an accumulating world history
+
   private sample() {
     const t = this.rt.tick - this.startTick;
     const ents = this.rt.world.entities;
@@ -218,7 +227,16 @@ export class TakeRecorder implements RuntimeObserver {
     // S1 r2: found again from the last scan while the table holds the same objects under the same keys (stableIndices:
     // an entity's tags never change), so an idle world does not read ~4,500 entities' tags every tick (shared: read-only)
     const list = entityList(this.rt.world), keys = entityKeys(this.rt.world);
-    const dynamic = stableIndices(ents, 'take sample', list, keys, (e) => !e.tags?.includes('entity-world'), (idx) => idx.map((i) => keys[i]).sort()).derived;
+    const base = stableIndices(ents, 'take sample', list, keys, (e) => !e.tags?.includes('entity-world'), (idx) => idx.map((i) => keys[i]).sort()).derived;
+    const eligible = stableIndices(ents, 'take presented items', list, keys, e => !!e.tags?.includes('entity-world-item-pose'), idx => new Set(idx.map(i => keys[i]))).derived;
+    if (eligible.size) for (const id of base) {
+      for (const item of Object.values(ents[id].human?.heldItemsV1 ?? {})) if (eligible.has(item)) this.itemTracks.add(item);
+      // State-only projection starts before grasp; the recorder does not inspect
+      // the scheduler and a live reparent cannot move the mesh early.
+      const item=ents[id].human?.itemTransferV1?.item;
+      if(item&&eligible.has(item))this.itemTracks.add(item);
+    }
+    const dynamic = this.itemTracks.size ? [...base, ...[...this.itemTracks].filter(id => !!ents[id])].sort() : base;
     for (const id of dynamic) {
       const e = ents[id];
       const s = quantize(e, t);
@@ -231,7 +249,7 @@ export class TakeRecorder implements RuntimeObserver {
         this.last.set(id, prev);
         this.changes.push([t, id, 'present', true]);
         const { provenance: _p, label: _l, tags: _t, ...e0 } = e;
-        this.first.set(id, structuredClone(e0));
+        this.first.set(id, structuredClone({...e0,...(e.tags?.includes('entity-world-item-pose')?{tags:['entity-world','entity-world-item-pose']}: {})}));
       }
       for (const [f, get] of FIELDS) {
         const v = get(e);
