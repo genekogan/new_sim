@@ -11,7 +11,7 @@
 export const PWA_MANIFEST = 'manifest.webmanifest';
 export const PWA_COLOR = '#101110';   // the dark page colour (styles.css --bg, dark scheme)
 
-export type PwaIcons = { icon180: string; icon192: string; icon512: string };
+export type PwaIcons = { icon32: string; icon180: string; icon192: string; icon512: string };
 
 export function pwaManifest(base: string, icons: PwaIcons) {
   const at = (f: string) => `${base}assets/${f}`;
@@ -36,6 +36,7 @@ export function pwaManifest(base: string, icons: PwaIcons) {
 export function pwaHeadTags(base: string, icons: PwaIcons): string {
   return [
     `<link rel="manifest" href="${PWA_MANIFEST}" />`,
+    `<link rel="icon" type="image/png" sizes="32x32" href="${base}assets/${icons.icon32}" />`,
     `<link rel="apple-touch-icon" href="${base}assets/${icons.icon180}" />`,
   ].join('\n    ');
 }

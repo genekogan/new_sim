@@ -1,7 +1,7 @@
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { PWA_MANIFEST, pwaHeadTags, pwaManifest } from './pwa-manifest.ts';
 
-const icons = { icon180: 'sim-icon-180-a.png', icon192: 'sim-icon-192-b.png', icon512: 'sim-icon-512-c.png' };
+const icons = { icon32: 'sim-icon-32-z.png', icon180: 'sim-icon-180-a.png', icon192: 'sim-icon-192-b.png', icon512: 'sim-icon-512-c.png' };
 // what a browser does with the manifest a world page links (URL resolution against the manifest's own URL)
 const installed = (pageUrl: string, base: string) => {
   const manifestUrl = new URL(PWA_MANIFEST, pageUrl), m = pwaManifest(base, icons);
@@ -25,5 +25,5 @@ test('standalone, both icon purposes, and head tags', () => {
   const m = pwaManifest('/worlds/', icons);
   assert.equal(m.display, 'standalone');
   assert.deepEqual(m.icons.map((i) => `${i.sizes}/${i.purpose}`), ['192x192/any', '512x512/any', '512x512/maskable']);
-  assert.equal(pwaHeadTags('/worlds/', icons), '<link rel="manifest" href="manifest.webmanifest" />\n    <link rel="apple-touch-icon" href="/worlds/assets/sim-icon-180-a.png" />');
+  assert.equal(pwaHeadTags('/worlds/', icons), '<link rel="manifest" href="manifest.webmanifest" />\n    <link rel="icon" type="image/png" sizes="32x32" href="/worlds/assets/sim-icon-32-z.png" />\n    <link rel="apple-touch-icon" href="/worlds/assets/sim-icon-180-a.png" />');
 });
