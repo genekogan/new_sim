@@ -9,7 +9,7 @@ import {bodyProfile} from '../bodies/navigation.ts';
 export const FRISBEE_CLEAR_WINDUP=1.2;
 // The depicted disc's hand points may be .43m off the body line, radius .13m.
 // Another .15m catches walking entry before the following native tick.
-const FLIGHT_MARGIN=.43+.13+.15;
+export const FLIGHT_MARGIN=.43+.13+.15;
 const memo=new WeakMap<Runtime,{tick:number;groups:Map<string,Diagnostic|null>}>();
 function segmentBox(a:number[],b:number[],half:number[],pad:number){let lo=0,hi=1;for(let k=0;k<2;k++){const d=b[k]-a[k],h=half[k]+pad;if(Math.abs(d)<1e-9){if(Math.abs(a[k])>h)return false;continue}let x=(-h-a[k])/d,y=(h-a[k])/d;if(x>y)[x,y]=[y,x];lo=Math.max(lo,x);hi=Math.min(hi,y);if(lo>hi)return false}return true}
 export function frisbeeLaneIssue(rt:Runtime,group:string,actor:string):Diagnostic|null{

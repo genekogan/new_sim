@@ -5,6 +5,7 @@ import type {Program} from '@sim/engine-contract';
 import type {EdgeCapability} from '../contract.ts';
 import type {Interior, Platform, Ring, Solid} from './nav.ts';
 import {POSE_INSTRUMENTS} from '../../../../../mars/viewer/engine/social/pose.ts';
+import {FLIGHT_MARGIN} from '../../../../../mars/viewer/engine/social/frisbee-clearance.ts';
 import {validInteriorShellBounds} from './nav.ts';
 import {paintingParam} from '../../art/painting.ts';
 
@@ -326,9 +327,16 @@ export type GameSlot = {id: string; spot: Spot; at: V2; faceTo?: V2; label: stri
   side: number};
 export type GameCourt = {activity: string; group: string; game: {kind: 'frisbee' | 'petanque' | 'volleyball'; flightPolicy?:'clear-v1'; jack?: V2; net?: [number, number, number, number]}; slots: GameSlot[];maxPlayers?:number};
 const r2 = (n: number) => Math.round(n * 100) / 100;
+/** Soul Actions entry 7: a frisbee place (an end or the triangle corner) stands clear of every solid by the flight margin the
+ *  clear-v1 lane check pads upright obstacles with, plus slack for the clearance raster, so a court this builds can play:
+ *  World's north park end sits inside the pond's rim and moves out past it. The capped clearance read tops out at 1 m. */
+const FRISBEE_SLOT_CLEAR = r2(FLIGHT_MARGIN + 0.2);
 /** CN5: game courts from World's game spots (one court per game and place): the shared group, the jack (pétanque: 7 m out
  *  along the players' facing) or net (volleyball: between the two sides), and up to six places — the spots, then extra places
- *  beside or behind them on clear ground at least a metre from every other place. Deterministic. */
+ *  beside or behind them on clear ground at least a metre from every other place. Deterministic.
+ *  Soul Actions entry 7: a frisbee court with two authored ends plays under `clear-v1` (no flight through a body or an upright
+ *  solid) and gets one broad triangle corner instead of the padded places: pair + corner = 3 places, `maxPlayers` 3 (or 2 when
+ *  neither corner is clear). Its places stand clear by `FRISBEE_SLOT_CLEAR`. Other courts keep the six places. */
 export function gameCourts(spots: Spot[], w: Pick<ActivityWorld, 'clearance'>): GameCourt[] {
   const by = new Map<string, Spot[]>();
   for (const s of spots) if (s.activity in GAME_ACTIVITIES) {const k = s.activity + '|' + (s.place ?? ''); by.set(k, [...(by.get(k) ?? []), s]);}
@@ -347,12 +355,13 @@ export function gameCourts(spots: Spot[], w: Pick<ActivityWorld, 'clearance'>): 
     }
     const sideOf = (s: Spot) => {if (kind === 'petanque') return 0; const d = dir(s); return d[0] + d[1] * 1e-3 > 0 ? 0 : 1;};
     // a spot not on clear ground (World's north frisbee end lies inside the pond's rim) moves forward along its facing to the
-    // first clear point within 6 m; one with none is left out
-    const clearAt = (s: Spot): V2 | null => {const d = dir(s); for (let t = 0; t <= 6; t += 0.25) {const p: V2 = [r2(s.at[0] + d[0] * t), r2(s.at[1] + d[1] * t)]; if (w.clearance(p[0], p[1]) >= 0.35) return p;} return null;};
+    // first clear point within 6 m; one with none is left out. A frisbee end needs the flight margin (entry 7), not just room to stand.
+    const minClear = kind === 'frisbee' ? FRISBEE_SLOT_CLEAR : 0.35;
+    const clearAt = (s: Spot): V2 | null => {const d = dir(s); for (let t = 0; t <= 6; t += 0.25) {const p: V2 = [r2(s.at[0] + d[0] * t), r2(s.at[1] + d[1] * t)]; if (w.clearance(p[0], p[1]) >= minClear) return p;} return null;};
     const slots: GameSlot[] = sp.flatMap(s => {const at = clearAt(s); return at ? [{id: s.id, spot: s, at, ...(s.faceTo ? {faceTo: s.faceTo} : {}), label: s.label ?? s.id, side: sideOf(s)}] : [];});
     if(kind==='frisbee'&&slots.length===2){
       const [a,b]=slots,dx=b.at[0]-a.at[0],dz=b.at[1]-a.at[1],d=Math.hypot(dx,dz),centre:V2=[(a.at[0]+b.at[0])/2,(a.at[1]+b.at[1])/2];
-      if(d>=3)for(const sign of [1,-1]){const at:V2=[r2(centre[0]-dz*Math.sqrt(3)/2*sign),r2(centre[1]+dx*Math.sqrt(3)/2*sign)];if(w.clearance(at[0],at[1])<.35)continue;slots.push({id:a.id+'.triangle',spot:a.spot,at,faceTo:centre,label:'triangle corner',side:2});break;}
+      if(d>=3)for(const sign of [1,-1]){const at:V2=[r2(centre[0]-dz*Math.sqrt(3)/2*sign),r2(centre[1]+dx*Math.sqrt(3)/2*sign)];if(w.clearance(at[0],at[1])<FRISBEE_SLOT_CLEAR)continue;slots.push({id:a.id+'.triangle',spot:a.spot,at,faceTo:centre,label:'triangle corner',side:2});break;}
       out.push({activity,group:`game-${kind}-${sp[0].id}`.replace(/[^A-Za-z0-9_-]/g,'-').slice(0,80),game,slots,maxPlayers:slots.length});continue;
     }
     for (let k = 0; slots.length < GAME_MAX_PLAYERS && k < 40; k++) {
