@@ -6,15 +6,16 @@ import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiPath } from './world-path.ts';
 import { signOutAndReturn } from './clerk-sign-out.ts';
+import { clerkSatelliteOptions, startClerkSignIn, type ClerkSatellite } from './clerk-satellite.ts';
 import type { AuthCtx } from './Shell.tsx';
 
-export type ClerkBridgeProps = { publishableKey: string; issuer: string | undefined; onAuth(auth: AuthCtx): void; takePendingLogin(): boolean };
+export type ClerkBridgeProps = { publishableKey: string; satellite?: ClerkSatellite; issuer: string | undefined; onAuth(auth: AuthCtx): void; takePendingLogin(): boolean };
 
 export default function ClerkBridge(props: ClerkBridgeProps) {
-  return <ClerkProvider publishableKey={props.publishableKey}><Bridge {...props} /></ClerkProvider>;
+  return <ClerkProvider publishableKey={props.publishableKey} {...clerkSatelliteOptions(props.satellite, location.origin)}><Bridge {...props} /></ClerkProvider>;
 }
 
-function Bridge({ issuer, onAuth, takePendingLogin }: ClerkBridgeProps) {
+function Bridge({ satellite, issuer, onAuth, takePendingLogin }: ClerkBridgeProps) {
   const session = useAuth(), clerk = useClerk(), profile = useUser();
   const [binding, setBinding] = useState<{ accountId: string; issuer: string; subject: string } | null>(null);
   const subject = session.userId, sessionId = session.sessionId;
@@ -37,10 +38,10 @@ function Bridge({ issuer, onAuth, takePendingLogin }: ClerkBridgeProps) {
   const ready = session.isLoaded, signedIn = !!session.isSignedIn, authed = ready && signedIn && !!accountId;
   const label = currentProfile?.primaryEmailAddress?.emailAddress ?? currentProfile?.firstName ?? null, avatarUrl = currentProfile?.imageUrl ?? null;
   const auth = useMemo<AuthCtx>(() => ({ mode: 'clerk', ready, authed, label, avatarUrl,
-    login: () => { if (signingOut.current) return; const { session: s, clerk: c } = live.current; if (s.isSignedIn) setResolveAttempt(n => n + 1); else c.openSignIn({ afterSignInUrl: location.href, afterSignUpUrl: location.href }); },
+    login: () => { if (signingOut.current) return; const { session: s, clerk: c } = live.current; if (s.isSignedIn) setResolveAttempt(n => n + 1); else startClerkSignIn(c, satellite, location.href, url => location.assign(url)); },
     logout: async (returnUrl) => { if (signingOut.current) return; signingOut.current = true; try { await signOutAndReturn(live.current.clerk, returnUrl); } catch (error) { signingOut.current = false; throw error; } },
     getToken: async () => { const s = live.current.session; return s.isLoaded && s.isSignedIn ? s.getToken() : null; },
-    debug: { privyUserId: null, accountIdentity: accountId, wallet: null, linked: [] } }), [ready, authed, label, avatarUrl, accountId]);
+    debug: { privyUserId: null, accountIdentity: accountId, wallet: null, linked: [] } }), [ready, authed, label, avatarUrl, accountId, satellite]);
   // Published once Clerk has loaded: the placeholder before it (signed-out controls, or "Signing in…") stays until then.
   useEffect(() => { if (auth.ready) onAuth(auth); }, [auth, onAuth]);
   // A sign-in asked for before Clerk had loaded (the Shell's placeholder login) opens once it has.

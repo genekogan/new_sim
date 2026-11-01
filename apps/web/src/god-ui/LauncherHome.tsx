@@ -1,6 +1,7 @@
 // The homepage when the page is served by the world launcher
 // (tools/world-launcher): the worlds on this computer, and a New world dialog
 // that names a world, picks its template, starts it and opens it.
+import type { ClerkSatellite } from '../clerk-satellite.ts';
 import { BASE } from '../base-path.ts';
 import { useEffect, useRef, useState } from 'react';
 import './launcher-home.css';
@@ -9,7 +10,7 @@ import { useSession, userAuthHeaders } from '../auth-session.ts';
 export type LauncherTemplate = { id: string; name: string; description: string; batches: number; ops?: number };
 export type LauncherWorldCard = { slug: string; name: string; basePath: string; url: string; template: string; templateName: string; createdAt: number; god: boolean; godName?: string | null; nameTag?: string | null; claimable?: boolean; souls?: number | null; entities: number | null; seq: number | null; status: string; restarts: number };
 /** How people sign in on this launcher's worlds (the public Clerk settings; never a secret). */
-export type LauncherAuth = { provider: 'clerk' | 'dev'; clerkPublishableKey?: string; clerkIssuer?: string; authenticationOrigin?: string };
+export type LauncherAuth = { provider: 'clerk' | 'dev'; clerkSatellite?: ClerkSatellite; clerkPublishableKey?: string; clerkIssuer?: string; authenticationOrigin?: string };
 export type LauncherList = { contract: 'local-worlds/1'; launcher: string; worlds: LauncherWorldCard[]; templates: LauncherTemplate[]; auth?: LauncherAuth };
 
 const ago = (t: number) => { const s = Math.max(0, (Date.now() - t) / 1000); if (s < 90) return 'just now'; if (s < 3600) return `${Math.round(s / 60)} minutes ago`; if (s < 86400 * 2) { const h = Math.round(s / 3600); return `${h} hour${h === 1 ? '' : 's'} ago`; } return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
