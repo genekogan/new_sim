@@ -1773,6 +1773,20 @@ export class EngineBridge {
     return moved;
   }
 
+  /** Continuity (warm after listen, EdgeLedger.warmForServing): what this Soul's first listing would build on this side
+   *  of the edge, in steps of about `sliceMs`: the god's places (derived and published to the ledger, as the boot's own
+   *  sliced catch-up does), the named things, the first perception catch-up (the
+   *  slices the tick runs, perceiveStep; a listing otherwise runs it whole, perceive.ensure), the activity spots, then
+   *  the walk goals one thing at a time (GodNav.servingWarmGen). The caches the listing fills; no world state changes. */
+  *servingWarmGen(soul: EdgeSoul, sliceMs: number): Generator<void, void, void> {
+    while (!this.places.syncStep(sliceMs)) yield;   // as the tick's own catch-up (layersStep) and a listing publish them
+    yield;
+    yield* this.nav.thingsGen(); yield;
+    if (!this.perceive.stats.runs) { try { while (!this.perceive.step(sliceMs)) yield; } catch (e) { this.log(`perceive: ${(e as Error).message}`); } yield; }
+    yield* this.activitySpots.servingWarmGen(sliceMs); yield;
+    try { return yield* this.nav.servingWarmGen(soul); } finally { releaseBigScratch(); }
+  }
+
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
     // L1: the walk listing only reads the world; the engine's planner syncs once for all of it (readPassV1). S2: so does
