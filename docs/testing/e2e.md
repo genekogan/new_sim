@@ -82,4 +82,4 @@ sequence/state within 3000ms of the ACK: the documented hot C3 cache TTL is 2000
 The first same-URL response, cache headers and monotonic timestamps remain in the report, including stale hits.
 Rejected ACKs, missing/stale sequences, replacement identities, late convergence and page errors fail. This observes
 the existing cache policy; it changes neither production caching nor Undo/Redo admission. Earlier release receipts
-retain their original verdicts. Focused regression: `node --test tools/god-skill/e2e/edit-observation.test.mjs`.
+retain their original verdicts. Focused regression: `node --test tools/world-launcher/edit-observation.test.mjs`.

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MicroCache } from '../../world-launcher/flood.mjs';
-import { SnapshotCache } from '../../../apps/server/src/god/snapshot-cache.ts';
-import { observeEdit, EDIT_OBSERVATION_BOUND_MS } from './edit-observation.mjs';
+import { MicroCache } from './flood.mjs';
+import { SnapshotCache } from '../../apps/server/src/god/snapshot-cache.ts';
+import { observeEdit, EDIT_OBSERVATION_BOUND_MS } from '../god-skill/e2e/edit-observation.mjs';
 
 const url = 'http://fixture.test/v1/world/snapshot', entity = { id: 'original-bench', name: 'e2e-bench' };
 function fixture({ ttl = 1000, broken = null } = {}) {
