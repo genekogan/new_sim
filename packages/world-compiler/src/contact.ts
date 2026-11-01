@@ -2,7 +2,9 @@
 export const DRAWER_TRAVEL=.32;
 /** Opted-in physical actuators. This small shared predicate keeps admission,
  * completion and the viewer's depicted-state clock on the same contract. */
-export function contactStateKey(def:{tags?:readonly string[];components?:{light?:unknown;lights?:unknown;opening?:unknown;sign?:unknown;container?:unknown;display?:{controlAt?:readonly number[]}};state?:Record<string,unknown>},action?:string):'on'|'open'|'text'|'locked'|null {
+export function contactStateKey(def:{tags?:readonly string[];components?:{light?:unknown;lights?:unknown;opening?:unknown;sign?:unknown;container?:unknown;display?:{controlAt?:readonly number[]};bell?:unknown};state?:Record<string,unknown>},action?:string):'on'|'open'|'text'|'locked'|'rings'|null {
+  // Entry 10: an opted-in bell pull rings (a counter, not a toggle).
+  if(def.components?.bell&&def.tags?.includes('hand-rung')&&(!action||action==='ring'))return 'rings';
   // Entry 9: an opted-in display's power control is the same on/off contact as a light switch.
   if((def.components?.light||def.components?.lights||(def.tags?.includes('hand-powered-display')&&def.components?.display?.controlAt))&&(!action||['switch-on','switch-off'].includes(action)))return 'on';
   if((def.components?.opening||def.components?.container)&&def.tags?.includes('hand-operated')&&(!action||['open','close'].includes(action)))return 'open';

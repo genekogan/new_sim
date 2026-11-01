@@ -110,15 +110,19 @@ export class WorldEntityLayer {
   readonly cover = new GroundCover(() => (this.active ? this.model : null), coverSetting(), () => this.seq);
   /** Recorded contact drives the leaf on the same depicted tick as the body,
    * including reach, swing and release. No wall-clock tween during native operation. */
+  private tugged=new Set<THREE.Object3D>();
   drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
     // M01: no per-frame array; leaf parts found once per drawn object; an unchanged angle (the release and
     // idle hand-off) leaves the leaf and its matrices alone. The angle is still the depicted tick's.
     const peeled=new Set<THREE.Object3D>();
+    for(const rope of this.tugged)rope.rotation.x=0;this.tugged.clear();
     for(const id in entities){
       const m=entities[id].state.handActuator as HandActuatorMotion|undefined;
       // Soul Actions entry 38: a poster being taken down is drawn in the hands (humans.ts) from the moment the peel starts;
       // the wall's own copy of it is hidden until the wall redraws without it at the depicted commit
       if(m?.stroke?.kind==='unposter'&&m.abortedAt===undefined&&(tick-m.startTick)*dt>=HAND_REACH_SECONDS){const d=this.drawn.get(m.target);if(d){let best:THREE.Object3D|null=null,bd=.12;d.obj.traverse(o=>{if(!o.name.startsWith('poster-slot-'))return;const p=o.getWorldPosition(new THREE.Vector3()),dd=Math.hypot(p.x-m.at[0],p.y-m.at[1],p.z-m.at[2]);if(dd<bd){bd=dd;best=o;}});if(best){(best as THREE.Object3D).visible=false;peeled.add(best);}}continue;}
+      // Entry 10: a bell pull's rope swings with the hand's tug, on the depicted tick
+      if(m?.tug){const rope=this.drawn.get(m.target)?.obj.getObjectByName('role:rope');if(rope){rope.rotation.x=-handActuatorFrame(m,(tick-m.startTick)*dt).tug*m.tug.angle;this.tugged.add(rope);}continue;}
       if(!m?.opening&&!m?.slide)continue;
       const d=this.drawn.get(m.target);if(!d)continue;
       const sec=(tick-m.startTick)*dt,f=handActuatorFrame(m,sec);
@@ -765,7 +769,7 @@ export class WorldEntityLayer {
     for (const m of this.sectors.values()) { m.geometry.dispose(); }
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);
-    this.drawn.clear();
+    this.drawn.clear();this.tugged.clear();
     this.recordedItems.clear();this.missingItemAt.clear();this.lightMoves.clear();
     for (const m of this.materials.values()) m.dispose();
     this.materials.clear();

@@ -1,6 +1,6 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,opPoint,slidePoint,strokePoint,strokeRoot,twoHanded,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,tugPoint,opPoint,slidePoint,strokePoint,strokeRoot,twoHanded,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { isDry, stageWord } from './garden.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
@@ -87,6 +87,10 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     params.opening={bodyPolicy:'door-natural-v2',...(def.tags.includes('wall-window')?{floorY:me[1]}:{}),hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening?.width??leaf.size?.[0]??.8)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening?.height??leaf.size?.[1]??1.8)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:(opts?.open??actuatedState(e,def).open===true)?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:def.tags.some(t=>['wall-window','hand-cabinet'].includes(t))?1:localZ<0?-1:1};
     if(def.tags.includes('wall-window')&&(wp.y+params.opening.handleY-me[1]>1.65||wp.y+params.opening.handleY-me[1]<.35))return null;
     root=actuatorPoint(params.opening,params.opening.from).root;
+   }else if(def.components.bell&&def.tags.includes('hand-rung')){
+    const [x,y,z]=def.components.bell.gripAt,stretch=(key:string)=>Number(e.params?.[key]??def.params[key]?.default??1),sx=wp.s*stretch('sx'),sy=wp.s*stretch('sy'),sz=wp.s*stretch('sz'),c=Math.cos(wp.yaw),s=Math.sin(wp.yaw);
+    at[0]=wp.x+x*sx*c+z*sz*s;at[1]=wp.y+y*sy;at[2]=wp.z-x*sx*s+z*sz*c;params.tug={length:.45*sy,angle:def.components.bell.pullAngle,yaw:wp.yaw,seconds:.6};
+    root=[at[0]+s*.55,m.terrain.sample(at[0]+s*.55,at[2]+c*.55),at[2]+c*.55];
    }else if(def.tags.includes('hand-powered-display')&&def.components.display?.controlAt){
     const [x,y,z]=def.components.display.controlAt,c=Math.cos(wp.yaw),s=Math.sin(wp.yaw);
     at[0]=wp.x+(x*c+z*s)*wp.s;at[1]=wp.y+y*wp.s;at[2]=wp.z+(-x*s+z*c)*wp.s;
@@ -194,7 +198,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
    const hand=twoHanded(motion?.stroke)?b?.human?.hands?.right:b?.human?.hands?.left??b?.human?.hands?.right;
-   const expected=motion?.opening&&motion.op?opPoint(motion.opening,motion.op,0):motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.slide?slidePoint(motion.slide,intent.action==='close'?motion.slide.to:motion.slide.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.at;
+   const expected=motion?.opening&&motion.op?opPoint(motion.opening,motion.op,0):motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.slide?slidePoint(motion.slide,intent.action==='close'?motion.slide.to:motion.slide.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.tug?tugPoint(motion.at,motion.tug,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def);
    // entry 32: a walk's thumb-turn on a door somebody unlocked meanwhile has nothing left to do

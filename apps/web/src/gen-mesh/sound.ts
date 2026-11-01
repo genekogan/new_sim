@@ -513,6 +513,9 @@ function step(host: Host) {
     // state is read live (one map lookup; the entity's specs share this state object).
     if (e.source === 'object' && e.spec.when && d < e.spec.radius) { const live = model.entities.get(e.id.split('#')[0])?.state; if (live) Object.assign(e.state, live); }
     if (e.spec.mode === 'change') {
+      // Native diffs advance the layer's depicted state without model.editSeq.
+      // Read only already cached change emitters; do not rescan the world.
+      if(e.source==='object'){const live=model.entities.get(e.id.replace(/#\d+$/, ''));if(!live)continue;e.state={...e.state,...live.state};}
       const k = (e.spec.when ?? '').replace(/^!/, ''), v = e.state[k], prev = lastValue.get(e.id);
       lastValue.set(e.id, v);
       if (prev !== undefined && prev !== v && condition(e.spec.when, e.state, night) && ctx) { const g = falloff(d, e.spec.radius, e.spec.volume); if (g > 0.001) oneShot(ctx, e.spec.kind, g); }

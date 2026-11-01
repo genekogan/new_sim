@@ -47,6 +47,7 @@ export const componentsSchema = z.object({
   light: lightSchema.optional(),
   /** A list replaces the singular light when supplied. */
   lights: z.array(lightSchema).min(1).max(8).optional(),
+  bell: z.object({ gripAt: z.tuple([num, num, num]), pullAngle: num.positive().max(0.6) }).optional(),
   display: z.object({ w: num.positive(), h: num.positive(), controlAt: z.tuple([num, num, num]).optional(), slots: z.number().int().min(1).max(8).optional() }).optional(),
   paint: z.object({ faces: z.array(z.enum(['front', 'back', 'all'])).default(['all']) }).optional(),
   plant: z.object({ stages: z.number().int().min(1).max(8).default(3), daysPerStage: num.positive().default(1) }).optional(),
@@ -103,6 +104,7 @@ export const actionSchema = z.object({
     z.object({ op: z.literal('toggle'), field: z.string() }),
     /** Soul Actions entry 37: step a field to the next of `values` (wrapping), e.g. a radio's station. */
     z.object({ op: z.literal('cycle'), field: z.string(), values: z.array(z.string().max(80)).min(2).max(16) }),
+    z.object({ op: z.literal('increment'), field: z.string(), by: z.number().int().min(1).max(10).default(1) }),
     z.object({ op: z.literal('attach'), what: z.enum(['actor', 'held']), slot: z.string() }),
     z.object({ op: z.literal('detach'), what: z.enum(['actor', 'held']) }),
   ])).min(1).max(8),
