@@ -1,10 +1,10 @@
 // Contact effects commit at the recorded hand contact, with release still owned by the native action.
 // Durable receipt intent, no per-tick object scan and no effect from an interrupted walk.
-import {actuatorPoint,tugPoint,opPoint,slidePoint,strokePoint,strokeRoot,twoHanded,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
+import {actuatorPoint,actuatorHand,tugPoint,opPoint,slidePoint,strokePoint,strokeRoot,twoHanded,STROKE_STAND,HAND_OPEN_ANGLE,type HandActuatorParams} from '../../../../mars/viewer/engine/social/hand-actuator.ts';
 import { createHash } from 'node:crypto';
 import { isDry, stageWord } from './garden.ts';
 import { HUMAN_RADIUS } from '../../../../mars/viewer/engine/world/catalog.ts';
-import { opSchema, contactStateKey, DRAWER_TRAVEL, pinSlot, signupSlot, pollSlot, gameSquare, gameSquareOf, gameStatus, posterSlot, posterList, posterPaper, wantedSlot, wantedList, POSTER_W, POSTER_H, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
+import { opSchema, contactStateKey, DRAWER_TRAVEL, containerInside, pinSlot, signupSlot, pollSlot, gameSquare, gameSquareOf, gameStatus, posterSlot, posterList, posterPaper, wantedSlot, wantedList, POSTER_W, POSTER_H, type WorldModel, type Op, type StoredDef } from '@sim/world-compiler';
 import { posterName, posterFreeSlot, posterTarget, posterAge, posterStale, wantedColumn, wantedFreeRow, wantedTarget } from './poster-boards.ts';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { actionPatch, actionsOf, actuatedState, boardTextProblem, gamePatch, gameProblem, isGameAction, isListAction, listProblem, pinNotes, pollChoice, pollLines, whenRefusal } from './actuators.ts';
@@ -78,6 +78,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const c=Math.cos(wp.yaw),s=Math.sin(wp.yaw),[kx,ky,kz]=knob.at.map(v=>v*wp.s),travel=DRAWER_TRAVEL*wp.s;
     params.slide={at:[wp.x+kx*c+kz*s,wp.y+ky,wp.z-kx*s+kz*c],dir:[s,c],travel,from:actuatedState(e,def).open===true?travel:0,to:action==='open'?travel:0,floorY:wp.y};
     root=slidePoint(params.slide,params.slide.from).root;
+    // entry 42 (take 2): arriving from the side (from a table, carrying a bowl) left the body 56° off the chest, and the
+    // pull's own turn ran during the reach (0.105 m per 50 ms): turn to the knob on arrival first, as M04 does for valves
+    face=[params.slide.at[0],params.slide.at[2]];
+    // a storage drawer's knob is reached deliberately (0.9 s): the 0.65 s reach peaked at 0.087 m per 50 ms (take 3)
+    // and the arm comes back down over 1 s (0.7 s lowered it at 0.082 m per 50 ms while the other hand carried, take 5)
+    if(containerInside(def)){params.reach=.9;params.release=1;}
    }else if(def.components.opening||def.tags.includes('hand-cabinet')){
     const shapes=def.make.kind==='gen'?(def.make.args as {shapes?:{role?:string;pivot?:number[];at?:number[];size?:number[];tint?:string}[]})?.shapes:undefined;
     const leaf=shapes?.find(s=>s.role==='door'&&s.pivot),knob=shapes?.find(s=>s.role==='door'&&['brass','chrome'].includes(s.tint??''));if(!leaf?.pivot)return null;
@@ -131,6 +137,9 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
      face=[params.at[0],params.at[2]];
     }}
    // entry 32: after knocking, step back beside the door (latch side, out of its swing and of the way through) to wait
+   // entry 42: a body carrying something in the hand this would use operates with the other, free hand
+   const busy=body.human?.hands,usual=actuatorHand(params.opening),other=usual==='left'?'right':'left';
+   if(busy&&(busy.left||busy.right)&&!body.human?.handActuator&&!(busy[usual]&&busy[other]))params.hand=busy[usual]?other:usual;
    const o=params.opening,after:[number,number]|undefined=params.op==='knock'&&o?[+(wp.x+Math.cos(wp.yaw)*1.35+Math.sin(wp.yaw)*o.side*1.3).toFixed(3),+(wp.z-Math.sin(wp.yaw)*1.35+Math.cos(wp.yaw)*o.side*1.3).toFixed(3)]:undefined;
    return {params,root,level:d.levelAt?.(root[0],root[2],root[1])??0,...(face?{face}:faceTo?{face:faceTo}:{}),...(after?{after}:{})};
   },
@@ -171,11 +180,14 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     const stage=st.growth?.type==='number'?stageWord(e.state?.growth??st.growth.default):null;
     return stage?{stage,...(dry?{dry:true}:{})}:dry?{dry:true}:null;}
    if(e&&def&&!key)return d.moreFacts?.(target)??null;
-   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean|string>={};
+   if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean|string|string[]>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;
    // Entry 37: a radio that is on says which station it plays ("radio: on, quiet piano"); off, only that it is off.
    if(state.on===true&&typeof state.station==='string')facts.station=state.station;
+   // entry 42: what is inside an open container (names only, at most its few places); nothing while it is shut
+   const ins=state.open===true?containerInside(def):null;
+   if(ins){const slots=new Set(ins.slots.map(s=>s.id)),holds:string[]=[];for(const c of m.children.get(target)??[]){const x=m.entities.get(c);if(x&&slots.has(x.in.slot??''))holds.push(x.name??(m.resolvedDef(x.def)?.name.replace(/^core-/,'')??'something'));}if(holds.length)facts.holds=holds.sort();}
    return facts;
   },
   /** Entry 33: a neon sign's words for a Soul near it (the same nearby rule as `facts`): its owner's text, at most 32
@@ -199,7 +211,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
    if(!e||!def||!a||binding(intent.target)!==intent.binding)return fail('contact.target-changed','The target changed during the approach; no action was applied.');
    const denied=d.access(intent.target,soul);if(denied)return fail(denied.code,denied.reason);
    const b=d.body(soul.entityId),p=m.worldPose(e),motion=b?.human?.handActuator;
-   const hand=twoHanded(motion?.stroke)?b?.human?.hands?.right:b?.human?.hands?.left??b?.human?.hands?.right;
+   const hand=motion?.hand?b?.human?.hands?.[motion.hand]:twoHanded(motion?.stroke)?b?.human?.hands?.right:b?.human?.hands?.left??b?.human?.hands?.right;
    const expected=motion?.opening&&motion.op?opPoint(motion.opening,motion.op,0):motion?.opening?actuatorPoint(motion.opening,intent.action==='close'?motion.opening.to:motion.opening.from).hand:motion?.slide?slidePoint(motion.slide,intent.action==='close'?motion.slide.to:motion.slide.from).hand:motion?.stroke?strokePoint(motion.at,motion.stroke,1):motion?.tug?tugPoint(motion.at,motion.tug,1):motion?.at;
    const reached=intent.motionV1?!!motion&&motion.target===intent.target&&!!hand&&!!expected&&Math.hypot(...hand.map((v,i)=>v-expected[i]))<.1&&Math.hypot(b!.pose.p[0]-hand[0],b!.pose.p[2]-hand[2])<.9&&Math.abs(b!.pose.p[1]-p.y)<1.2:!!b&&Math.hypot(b.pose.p[0]-p.x,b.pose.p[2]-p.z)<=CONTACT_REACH&&Math.abs(b.pose.p[1]-p.y)<=1.2;if(!b?.human||!reached)return fail('contact.not-reached','Your hand did not reach the target; no action was applied.');
    const state=actuatedState(e,def);

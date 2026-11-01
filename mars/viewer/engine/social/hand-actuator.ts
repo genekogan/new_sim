@@ -3,6 +3,7 @@
 import {z} from 'zod';
 import type {ActionDef,Diagnostic,StepResult} from '../actions/types.ts';
 import {DT,type Runtime} from '../runtime/runtime.ts';
+import type {Entity} from '../world/types.ts';
 import type {Spatial} from '../spatial/service.ts';
 import {dcos,dsin,heading,type Vec2,type Vec3} from '../core/math.ts';
 import {HUMAN_RADIUS} from '../world/catalog.ts';
@@ -31,6 +32,7 @@ const op=z.enum(['lock','unlock','knock']);
 // Entry 37: `hold` keeps the hand on a switch for a while after contact (a radio's tuning knob turns while the dial sweeps);
 // `reach` is a slower, deliberate reach to a small knob (default HAND_REACH_SECONDS), contact at its end.
 export const handActuatorParams=z.object({actor:z.string(),target:z.string(),at:vec,opening:opening.optional(),stroke:stroke.optional(),slide:slide.optional(),passage:passage.optional(),op:op.optional(),hold:z.number().min(0).max(2).optional(),reach:z.number().min(.3).max(2).optional(),
+ /** entry 42: `hand` names the free hand when the other one carries something; `release` a slower arm lowering (s) */ hand:z.enum(['left','right']).optional(),release:z.number().min(.3).max(2).optional(),
  /** entry 10: a bell pull: the hand tugs the rope down `length` m along `yaw`, the rope swinging by `angle` */ tug:z.object({length:z.number().positive().max(3),angle:z.number().positive().max(.6),yaw:z.number().finite(),seconds:z.number().min(.4).max(1.5)}).strict().optional()}).strict();
 
 export type HandActuatorParams=z.infer<typeof handActuatorParams>;
@@ -41,6 +43,9 @@ export const handReachSeconds=(m:Pick<HandActuatorMotion,'reach'>)=>m.reach??HAN
 export const LOCK_TURN_SECONDS=.9,UNLOCK_SLIDE_SECONDS=.4,KNOCK_RAPS=3,KNOCK_PERIOD=.3,KNOCK_LEAD=.1,KNOCK_IN=.35,KNOCK_SECONDS=KNOCK_LEAD+KNOCK_RAPS*KNOCK_PERIOD+.1;
 /** Depicted contact times of the raps (seconds from the motion's start). */
 export const knockContacts=()=>Array.from({length:KNOCK_RAPS},(_,i)=>HAND_REACH_SECONDS+KNOCK_LEAD+(i+KNOCK_IN)*KNOCK_PERIOD);
+/** `release`: the arm's way back down (s; default HAND_RELEASE_SECONDS). Entry 42's storage drawer, carrying in the other hand,
+ *  lowered its arm at 0.082 m per 50 ms in 0.7 s (take 5); it takes 1 s. */
+export const handReleaseSeconds=(m:Pick<HandActuatorMotion,'release'>)=>m.release??HAND_RELEASE_SECONDS;
 export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'|'slide'|'op'|'hold'|'tug'>){
  if(m.op)return m.op==='knock'?KNOCK_SECONDS:LOCK_TURN_SECONDS;
  if(m.slide)return Math.max(1,Math.abs(m.slide.to-m.slide.from)*3.2);   // a drawer: about a second, an ordinary pull
@@ -56,7 +61,8 @@ export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const k=smooth(((m.abortedAt??seconds)-R)/(swing||1));
  const angle=m.opening?m.opening.from+(m.opening.to-m.opening.from)*k:0,pos=m.slide?m.slide.from+(m.slide.to-m.slide.from)*k:0;
  // Entry 38: a stroke may lower the arm more slowly (a hand coming down from above the shoulder; default 0.7 s)
- const rel=m.stroke?.release??HAND_RELEASE_SECONDS;
+ // Entry 42: or the motion's own `release` (a storage drawer, carrying in the other hand)
+ const rel=m.stroke?.release??handReleaseSeconds(m);
  const weight=m.abortedAt!==undefined?(m.abortWeight??0)*(1-smooth((seconds-m.abortedAt)/rel))
    :smooth(seconds/R)*(1-smooth((seconds-releaseAt)/rel));
  // entry 32: a walk's thumb-turn / key keeps the hand up and slides it to the handle (`slide`), then hands over to the opening
@@ -168,7 +174,7 @@ export function opPoint(o:NonNullable<HandActuatorParams['opening']>,op:'lock'|'
  const off=op==='knock'?.075+KNOCK_LIFT*rap:.085;
  return [o.hinge[0]+c*along+s*off*o.side,y,o.hinge[2]-s*along+c*off*o.side];
 }
-export const actuatorHand=(o?:HandActuatorParams['opening']):'left'|'right'=>o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right');
+export const actuatorHand=(o?:HandActuatorParams['opening'],hand?:'left'|'right'):'left'|'right'=>hand??(o?.bodyPolicy==='door-natural-v2'?'left':(o?.side===-1?'left':'right'));
 export function tugPoint(at:Vec3,tug:NonNullable<HandActuatorParams['tug']>,amount:number):Vec3 {
  const a=tug.angle*amount,side=tug.length*dsin(a);
  return [at[0]+dsin(tug.yaw)*side,at[1]+tug.length*(1-dcos(a)),at[2]+dcos(tug.yaw)*side];
@@ -323,13 +329,18 @@ type Exec={p:HandActuatorParams;motion:HandActuatorMotion;t:number;root:Vec3;yaw
  /** passage: ticks the swing has been paused on a body in it */ paused?:number;
  /** passage: a courtesy walk of this Soul's own in progress */ child?:string;
  /** passage: the operation reached the door (motion begun) */ began?:true};
-function clear(rt:Runtime,ex:Exec){const h=rt.world.entities[ex.p.actor]?.human;if(!h)return;delete h.handActuator;delete h.hands;delete h.speed;h.activity='idle';}
+function clear(rt:Runtime,ex:Exec){const h=rt.world.entities[ex.p.actor]?.human;if(!h)return;delete h.handActuator;freeHand(h,ex.p);delete h.speed;h.activity='idle';}
+/** Lower the operating hand: the other hand keeps what it carries (entry 42); without `hand`, all hands as before. */
+function freeHand(h:NonNullable<Entity['human']>,p:HandActuatorParams){if(!p.hand||!h.hands){delete h.hands;return;}delete h.hands[p.hand];if(!h.hands.left&&!h.hands.right)delete h.hands;}
+/** Entry 42: the hands of `actor` that hold an item (hold_items keeps them at their carry points). */
+const holdingHands=(rt:Runtime,actor:string)=>{const out=new Set<string>();for(const e of Object.values(rt.world.entities))if(e.support?.kind==='in-hand'&&e.support.by===actor)out.add(e.support.hand);return out;};
 export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
  verb:'hand_actuator_v1',description:'Reach, operate a switch or hinged opening with continuous hand contact, and lower the arm before releasing the body.',schema:handActuatorParams,
  // A passage step shares the door with other passages and decides who goes first itself (passageStep: one hand on the
  // door at a time); against an explicit open/close it is exclusive as before, and waits for it (runtime nudgeHolds).
- reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening)),mode:'exclusive'},...(twoHanded(p.stroke)?[{resource:'hand:'+p.actor+':left',mode:'exclusive' as const}]:[]),{resource:'entity:'+p.target,mode:p.passage?'shared':'exclusive'}],
- plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};if(p.tug&&actor&&(p.at[1]-actor.pose.p[1]>1.65||p.at[1]-actor.pose.p[1]<.9))return {ok:false,diagnostic:issue('rope-out-of-reach','This rope cannot be pulled from a comfortable standing reach.',[p.actor,p.target])};if(!h||h.grip||(h.hands&&!(h.handActuator?.passage?.mode==='unlock'&&h.handActuator.target===p.target))||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
+ reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'hand:'+p.actor+(':'+actuatorHand(p.opening,p.hand)),mode:'exclusive'},...(twoHanded(p.stroke)?[{resource:'hand:'+p.actor+':left',mode:'exclusive' as const}]:[]),{resource:'entity:'+p.target,mode:p.passage?'shared':'exclusive'}],
+ plan(rt,p){const actor=rt.world.entities[p.actor],h=actor?.human;if(actor?.body?.family==='floater')return {ok:false,diagnostic:issue('no-arms','This body has no humanoid hand actuator.',[p.actor])};const carried=p.hand&&h?.hands?holdingHands(rt,p.actor):null,carrying=!!carried&&Object.keys(h!.hands!).every(k=>carried.has(k))&&!carried.has(p.hand!);
+  if(p.tug&&actor&&(p.at[1]-actor.pose.p[1]>1.65||p.at[1]-actor.pose.p[1]<.9))return {ok:false,diagnostic:issue('rope-out-of-reach','This rope cannot be pulled from a comfortable standing reach.',[p.actor,p.target])};if(!h||h.grip||(h.hands&&!(h.handActuator?.passage?.mode==='unlock'&&h.handActuator.target===p.target)&&!carrying)||h.on||h.carrier||h.riding||h.shore||h.holding||h.activity==='sit')return {ok:false,diagnostic:issue('body-busy','Stand with a free hand on stable ground first.',[p.actor])};return {ok:true,program:true};},
  start(rt,p,_plan,_id){const a=rt.world.entities[p.actor];return {p:structuredClone(p),motion:{...structuredClone(p),startTick:rt.tick,actionId:_id},t:0,root:[...a.pose.p],yaw:a.pose.yaw,id:_id};},
  step(rt,ex,dt){
   const a=rt.world.entities[ex.p.actor],h=a?.human;if(!h)return {status:'failed',diagnostic:issue('body-gone','The original body is gone.',[ex.p.actor])};
@@ -340,7 +351,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   if(ex.p.slide&&Math.hypot(ex.root[0]-slidePoint(ex.p.slide,ex.p.slide.from).root[0],ex.root[2]-slidePoint(ex.p.slide,ex.p.slide.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
   if(ex.p.stroke){const goal=strokeRoot(ex.p.at,ex.p.stroke,ex.root[1]);if(Math.hypot(goal[0]-ex.root[0],goal[2]-ex.root[2])>.5){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-board','Walk up to the board before writing on it.',[ex.p.target])};}
    const k=smooth(Math.min(1,ex.t/HAND_REACH_SECONDS));point.root=[ex.root[0]+(goal[0]-ex.root[0])*k,ex.root[1],ex.root[2]+(goal[2]-ex.root[2])*k];}
-  if((ex.p.opening||ex.p.slide)&&ex.t<HAND_REACH_SECONDS){const k=smooth(ex.t/HAND_REACH_SECONDS);point.root=[ex.root[0]+(point.root[0]-ex.root[0])*k,ex.root[1]+(point.root[1]-ex.root[1])*k,ex.root[2]+(point.root[2]-ex.root[2])*k];}
+  if((ex.p.opening||ex.p.slide)&&ex.t<handReachSeconds(ex.p)){const k=smooth(ex.t/handReachSeconds(ex.p));point.root=[ex.root[0]+(point.root[0]-ex.root[0])*k,ex.root[1]+(point.root[1]-ex.root[1])*k,ex.root[2]+(point.root[2]-ex.root[2])*k];}
   const bad=blocked(rt,ex,point.root,f.angle);if(bad){clear(rt,ex);return {status:'failed',diagnostic:bad};}
   const before=[...a.pose.p];a.pose.p=[...point.root];
   const face=ex.p.slide?heading([-ex.p.slide.dir[0],-ex.p.slide.dir[1]]):ex.p.opening?heading([-dsin(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side,-dcos(ex.p.opening.yaw+(ex.p.opening.bodyPolicy==='door-natural-v2'?(ex.p.opening.side===-1?f.angle*.34:0):f.angle))*ex.p.opening.side]):ex.p.stroke?heading([-dsin(ex.p.stroke.yaw),-dcos(ex.p.stroke.yaw)]):heading([point.hand[0]-a.pose.p[0],point.hand[2]-a.pose.p[2]]),turn=((face-ex.yaw+Math.PI*3)%(Math.PI*2))-Math.PI;
@@ -348,7 +359,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   // keeps its 0.4 s), so the reaching hand and the turning torso do not add up to a fast sweep
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/(ex.p.opening||ex.p.slide||ex.p.stroke?.4:handReachSeconds(ex.motion)));
   const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
-  if(f.armDown){delete h.hands;h.activity='idle';delete h.speed;}else if(twoHanded(ex.p.stroke)){const two=strokeHands(ex.p.at,ex.p.stroke!,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke!.seconds);h.hands={left:two.left,right:two.right};}else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
+  if(f.armDown){freeHand(h,ex.p);h.activity='idle';delete h.speed;}else if(twoHanded(ex.p.stroke)){const two=strokeHands(ex.p.at,ex.p.stroke!,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke!.seconds);h.hands={left:two.left,right:two.right};}else if(ex.p.hand)h.hands={...(h.hands??{}),[ex.p.hand]:[...point.hand]};else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
   // entry 32: a walk's thumb-turn ends with the hand already on the handle: the opening that follows takes it from there
   if(f.done&&ex.p.passage?.mode==='unlock'&&ex.motion.abortedAt===undefined){h.activity='operate';return {status:'completed'};}
   if(f.done){clear(rt,ex);return {status:'completed'};}return {status:'running',phase:ex.t<handReachSeconds(ex.motion)?'reaching':ex.t<handReachSeconds(ex.motion)+handSwingSeconds(ex.motion)?'operating':'releasing'};

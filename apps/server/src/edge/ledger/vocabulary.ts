@@ -298,6 +298,24 @@ function steerWords(input: string, ctx: VocabContext): VocabResult | null {
   }
   return null;
 }
+// Soul Actions entry 42: "put the bowl in the drawer" is put-in:<container>; "take the bowl out of the chest" is that
+// bowl's take from inside it. A shut container's contents are never offered: its words name its open offer instead.
+const STOW = /^(?:please\s+)?(?:put|place|stow|store|keep|leave|set|pop|tuck|slip)\s+(?:away\s+)?(.+?)\s+(?:in|into|inside|in\s+to|away\s+in)\s+(.+?)[.!]?$/;
+const UNSTOW = /^(?:please\s+)?(?:take|get|fetch|remove|grab|lift|pull|pick\s+up|pick)\s+(.+?)\s+(?:out\s+of|out\s+from|from\s+inside|from\s+in|from)\s+(.+?)[.!]?$/;
+function storeWords(input: string, text: string, ctx: VocabContext): VocabResult | null {
+  const put = STOW.exec(text), take = put ? null : UNSTOW.exec(text), m = put ?? take; if (!m) return null;
+  const verb = put ? 'put-in' : 'pick-up', pool = ctx.caps.filter(c => c.verb === verb); if (!pool.length && put) return null;
+  const words = (x: string) => tokens(x).filter(w => !['the', 'a', 'an', 'my', 'your', 'it', 'its', 'of', 'top'].includes(w));
+  const thing = words(m[1]), box = words(m[2]), hits = (c: EdgeCapability, ws: string[]) => {const t = ctx.target(c), all = tokens([c.id, c.label, ...t.names].join(' ')); return ws.every(w => tokenHit(w, all) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, all)));};
+  // a take from inside names its container (the label says "out of chest (drawer)"); a put names the container it goes in
+  const named = pool.filter(c => hits(c, box) && (put || hits(c, thing))).sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id));
+  if (named[0] && (put || / out of /.test(named[0].label))) return {kind: 'alias', cap: named[0], note: `${input} is ${named[0].id} (${named[0].label}).`};
+  if (put) return null;
+  // nothing offered to take from there: a shut container named by these words says so (what is inside stays unseen)
+  const shut = ctx.caps.filter(c => c.verb === 'object' && c.action === 'open' && c.available && /^e_/.test(c.object ?? '') && hits(c, box));
+  if (shut[0]) return {kind: 'unknown', code: 'container.closed', reason: `${shut[0].label.replace(/^Open /, '').replace(/^the /i, 'The ')} is shut, so nothing inside it can be seen or taken; open it first (${shut[0].id}).`, didYouMean: [{id: shut[0].id, label: shut[0].label}]};
+  return null;
+}
 function resolveWords(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
   const steered = steerWords(input, ctx); if (steered) return steered;
@@ -316,6 +334,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     return {kind: 'alias', cap: first.cap, note: `${'note' in first ? first.note : `${clauses[0]} is ${first.cap.id}.`} Doing the first part now; act again for "${clauses.slice(1).join(', then ')}" when its receipt completes.`};
   }
   const text = input.toLowerCase(), colon = text.indexOf(':'), head = colon >= 0 ? text.slice(0, colon) : '';
+  const stow = colon < 0 ? storeWords(input, text, ctx) : null; if (stow) return stow;
   // RESOLVE (SOULSIM-E "find a boat": no "find" capability): find / look for / search for X is a walk to the nearest X you
   // can reach, unless the words name an activity offered here ("find somewhere quiet to read", "find a seat" keep theirs)
   const find = colon < 0 ? FIND.exec(text.trim()) : null;

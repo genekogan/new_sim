@@ -10,7 +10,7 @@ import { godFeature, isFlagDef } from './god-ui/features.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
-import { WorldModel, CAN_OPENING, CAN_ROSE, CUP_RIM, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, SPOUT_SPEED, cupSteam, spoutSpeed, isKettleDef, isTeaCupDef, kettleHeat, spoutRun, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { WorldModel, CAN_OPENING, CAN_ROSE, CUP_RIM, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, SPOUT_SPEED, cupSteam, spoutSpeed, isKettleDef, isTeaCupDef, kettleHeat, spoutRun, containerInside, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
@@ -116,6 +116,7 @@ export class WorldEntityLayer {
     // M01: no per-frame array; leaf parts found once per drawn object; an unchanged angle (the release and
     // idle hand-off) leaves the leaf and its matrices alone. The angle is still the depicted tick's.
     const peeled=new Set<THREE.Object3D>();
+    this.movingBoxes.clear();this.movingAt=this.now;
     for(const rope of this.tugged)rope.rotation.x=0;this.tugged.clear();
     for(const id in entities){
       const m=entities[id].state.handActuator as HandActuatorMotion|undefined;
@@ -125,8 +126,18 @@ export class WorldEntityLayer {
       // Entry 10: a bell pull's rope swings with the hand's tug, on the depicted tick
       if(m?.tug){const rope=this.drawn.get(m.target)?.obj.getObjectByName('role:rope');if(rope){rope.rotation.x=-handActuatorFrame(m,(tick-m.startTick)*dt).tug*m.tug.angle;this.tugged.add(rope);}continue;}
       if(!m?.opening&&!m?.slide)continue;
+      this.movingBoxes.add(m.target);
       const d=this.drawn.get(m.target);if(!d)continue;
       const sec=(tick-m.startTick)*dt,f=handActuatorFrame(m,sec);
+      // entry 42: what is kept in a drawer rides with it (its places are where the drawer is pulled out to), and it is
+      // seen while the drawer or door moves; at rest a shut container hides it (interiorVisible).
+      // Before M01's early `continue`s (a drawer's slide, an unchanged leaf angle), so every moving container is covered.
+      for(const [id,box] of this.keptIn){
+        if(box!==m.target)continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
+        if(k.frozen)this.thaw(k);
+        if(m.slide){const off=f.pos-m.slide.travel;k.obj.position.set(k.to.p.x+m.slide.dir[0]*off,k.to.p.y,k.to.p.z+m.slide.dir[1]*off);k.settled=false;}
+        this.showKept(id,k,true);
+      }
       if(m.slide){
         // a drawer (entry 24) slides by the recorded travel, in its own units
         const target=this.model?.entities.get(m.target),scale=target?this.model!.worldPose(target).s||1:1;
@@ -143,6 +154,15 @@ export class WorldEntityLayer {
       if(d.frozen)this.thaw(d);d.opening=undefined;leaf.angle=angle;
       for(const o of leaf.parts)o.rotation.y=angle;d.obj.updateMatrixWorld(true);
       this.stats.leafWrites++;
+    }
+    // entry 42: this runs after update(), which saw last frame's moving containers: a drawer whose hand just let go shows
+    // what is in it where it is now (shut: hidden; open: at its place), never one frame back at the open place
+    for(const [id,box] of this.keptIn){
+      // a recorded item (take track) is drawn where its native twin is: a hand is taking it out or has just put it in
+      if(this.movingBoxes.has(box)||this.overrides.has(id))continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
+      const open=this.model?.entities.get(box)?.state?.open===true;
+      if(!open){if(k.inst?k.shown!==false:k.obj.visible)this.showKept(id,k,false);}
+      else if(k.obj.position.distanceToSquared(k.to.p)>1e-8&&k.settled){k.obj.position.copy(k.to.p);this.showKept(id,k,true);}
     }
     for(const o of this.peeled)if(!peeled.has(o))o.visible=true;
     this.peeled=peeled;
@@ -186,6 +206,18 @@ export class WorldEntityLayer {
   private lit(id:string){const e=this.model?.entities.get(id),def=e&&this.model!.resolvedDef(e.def);return !!def&&(defLights(def.components).length>0||!!def.tags?.includes('lighthouse'));}
   /** M01: bumped only by a diff that can change a lamp pool (world-env's immediate repaint); other diffs keep its 2 Hz gate. */
   lightSeq = 0;
+  /** Entry 42: show or hide a stored thing where its drawn object is now (instanced or not). */
+  private showKept(id:string,k:Drawn,shown:boolean){
+    if(k.inst){this.instancer.set(k.inst,id,k.obj.position,k.obj.rotation.y,shown?k.obj.scale.x:0,[k.obj.rotation.x,k.obj.rotation.z]);k.shown=shown;}
+    else{k.obj.visible=shown;k.obj.updateMatrixWorld(true);}
+  }
+  /** Entry 42: things kept inside a container (item id → container id), and the containers whose drawer or door a hand
+   *  is moving this frame. Only stored things, never a scan of the world. */
+  private keptIn=new Map<string,string>();
+  private movingBoxes=new Set<string>();
+  private movingAt=-Infinity;
+  /** Entry 42, for proofs: whether a stored thing is drawn now and where. */
+  keptView(id:string){const d=this.drawn.get(id);return d?{box:this.keptIn.get(id)??null,visible:d.inst?(d.shown??true):d.obj.visible,inst:!!d.inst,p:d.obj.position.toArray()}:null;}
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
@@ -780,6 +812,8 @@ export class WorldEntityLayer {
   /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
   private interiorVisible(id: string, d: Drawn): boolean {
     if (!this.model) return true;
+    // entry 42: a thing kept in a shut drawer or locker is not seen, unless a hand is opening or closing it right now
+    const box = this.keptIn.get(id); if (box && !(this.movingBoxes.has(box) && this.now - this.movingAt < 200) && this.model.entities.get(box)?.state?.open !== true) return false;
     // P1: which building (if any) holds a thing, and on which slot, is found once per world revision (seq + drawn count),
     // not by walking the parent chain of all ~4,800 things every frame; kept on the thing itself (no lookup per frame)
     const key = this.seq * 1_048_576 + this.drawn.size;
@@ -865,7 +899,7 @@ export class WorldEntityLayer {
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);
     this.drawn.clear();this.tugged.clear();
-    this.recordedItems.clear();this.missingItemAt.clear();this.lightMoves.clear();
+    this.recordedItems.clear();this.missingItemAt.clear();this.lightMoves.clear();this.keptIn.clear();this.movingBoxes.clear();
     for (const m of this.materials.values()) m.dispose();
     this.materials.clear();
     this.waterGroup.clear(); this.terrainGroup.clear(); this.thingsGroup.clear();
@@ -1030,6 +1064,7 @@ export class WorldEntityLayer {
     if (def.tags.includes('horizon')) this.horizonBy.add(e.id); else this.horizonBy.delete(e.id);
     const parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     if (parent && m.resolvedDef(parent.def)?.components.body) this.held.set(e.id, parent.id); else this.held.delete(e.id);
+    if (parent && containerInside(m.resolvedDef(parent.def))?.slots.some((s) => s.id === e.in.slot)) this.keptIn.set(e.id, parent.id); else this.keptIn.delete(e.id);
     const existing = this.drawn.get(e.id);
     const defHash = def.hash + ':' + JSON.stringify(e.params ?? {}) + ':' + JSON.stringify(e.state ?? {}) + ':' + JSON.stringify(e.shape ?? null) + ':' + JSON.stringify(e.r ?? 0);
     const builder = meshFor(def);
@@ -1090,12 +1125,14 @@ export class WorldEntityLayer {
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
     const mdef = rideMotionDef(def);  // BALLOON-BODY: a ride balloon does not hover; Core's vehicle owns its motion
     this.drawn.set(e.id, { ...(opening ? {opening} : {}), ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(mdef) ? { motion: { entity: e, def: mdef, yaw: wp.yaw, glowOnly: glowOnly(mdef) } } : {}) });
+    // entry 42: a thing kept in a shut container is hidden from its first frame (a resync can draw before the next update)
+    if (this.keptIn.has(e.id)) { const k = this.drawn.get(e.id)!, v = this.interiorVisible(e.id, k); if (k.inst) k.shown = v; else k.obj.visible = v; }
   }
   private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id);
     this.tapJets.delete(id); this.growing.delete(id); this.plantShown.delete(id); this.plantTweens.delete(id);
     { const pour = this.pours.get(id); if (pour) { pour.removeFromParent(); (pour.material as THREE.Material).dispose(); this.pours.delete(id); } }
-    { const st = this.steamers.get(id); if (st) { st.pts.removeFromParent(); (st.pts.material as THREE.Material).dispose(); st.lamp?.removeFromParent(); this.steamers.delete(id); } }
+    { const st = this.steamers.get(id); if (st) { st.pts.removeFromParent(); (st.pts.material as THREE.Material).dispose(); st.lamp?.removeFromParent(); this.steamers.delete(id); } } this.keptIn.delete(id);
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now + delaySeconds * 1000; d.dur = EASE_OUT_S;
   }

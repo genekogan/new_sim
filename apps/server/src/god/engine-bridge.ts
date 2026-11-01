@@ -11,7 +11,7 @@ import { menuWorldOf, type MenuWorld } from '../split/menu-world.ts';
 import {CATALOG} from '../../../../mars/viewer/engine/world/catalog.ts';
 import {MAX_KG_PER_CARRIER} from '../../../../mars/viewer/engine/carry/formation.ts';
 import { deckRaised, railGaps, rasterOf } from '@sim/generators';
-import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
+import { applyBatch, containerInside, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, buildWorldEditPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import { createHash } from 'node:crypto';
 import type { WorldHost } from '../world.ts';
@@ -31,6 +31,7 @@ import { createTea, type Tea } from './tea.ts';
 import { createContactActuatorService } from './contact-actuator.ts';
 import { createDoorPassage } from './door-passage.ts';
 import { setWorldDaySource } from './poster-boards.ts';
+import { actuatedState } from './actuators.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
 import { GodLayers } from './layers.ts';
@@ -123,6 +124,7 @@ export class FloorCells {
 }
 const NEAR = 60;               // capabilities: god things within this many metres
 const FAR_SEAT = 250, FAR_SEATS = 6; // F2: and the nearest FAR_SEATS seats out to FAR_SEAT m (sit only)
+const STORE_NEAR = 8;          // entry 42: put-in is offered for containers within this many metres of a Soul holding something
 const BODY_DEF = 'core/humanoid@1';
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
@@ -1812,7 +1814,7 @@ export class EngineBridge {
       // floors (2026-10-26): a seat the body cannot use names the nearest one it can (or the ground)
       const unusable: number[] = [], usable: { id: string; label: string; d: number }[] = [];
       for (const x of near) {
-        const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
+        const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string; inside?: unknown }[]; category?: string };
         const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
         if (asset.slots?.some((s) => s.kind === 'seat')) {
           const u = this.mw.bodyUsesV1!(x.id), mine = u?.body === soul.entityId;
@@ -1872,21 +1874,41 @@ export class EngineBridge {
             if(!block)plans.set(id,{label,steps:[...stand,{verb:'mars:move_fixture',params:{fixture:x.id,to:{x:here[0],z:here[1],yaw:x.pose.yaw??0}}}]});
           }
         }
-        if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
-          const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-          caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
+        // entry 42: a thing kept inside a container is seen, offered and named only while the container is open
+        const kept = asset.category === 'item' && x.support?.kind === 'resting-on' ? this.keptIn(x) : null;
+        if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held && (!kept || (kept.open && d <= STORE_NEAR))) {
+          const id = `pick-up:${x.id}`, label = kept ? `Take ${name(x.id)} out of ${kept.label} (${d} m)` : `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+          const block = kept ? this.storageRefusal(kept, soul) : null;
+          caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: !block, ...(block ? { blocked: block } : {}) });
           const precise=(this.physics?.assets[x.def] as {capabilities?:{recordedItemPoseV1?:boolean}})?.capabilities?.recordedItemPoseV1&&levelOf(x)===(me.human.level??0);
           // entry 43: an opted-in pick-up lets an idle gesture go before the hand reaches (entry 41's M04 finding)
-          plans.set(id, { label, steps: [...stand, ...(precise?[{ verb: 'mars:let_go_v1', params: {} }]:approach(x)), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
+          plans.set(id, { label, steps: [...stand, ...(precise?[{ verb: 'mars:let_go_v1', params: {} }]:kept?[]:approach(x)), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
         }
-        if (held && asset.surfaceSlots?.length) {
+        const inner = (asset.surfaceSlots as { id: string; inside?: { fit: number[] } }[] | undefined)?.filter((sl) => sl.inside) ?? [];
+        if (held && inner.length && d <= STORE_NEAR) {
+          const box = this.storage(x.id);
+          if (box) {
+            const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
+            const free = inner.find((sl) => !taken.has(sl.id)), size = (this.physics?.assets[held.def] as { size?: number[] } | undefined)?.size;
+            const hd = this.model.entities.get(held.id), hdef = hd && this.model.resolvedDef(hd.def), lit = !!hdef && !!(hdef.components.light || hdef.components.lights) && actuatedState(hd!, hdef).on !== false;
+            const fit = inner[0].inside!.fit, m2 = (v: number) => v.toFixed(2), fits = !size || (size[1] <= fit[1] + 1e-6 && ((size[0] <= fit[0] + 1e-6 && size[2] <= fit[2] + 1e-6) || (size[2] <= fit[0] + 1e-6 && size[0] <= fit[2] + 1e-6)));
+            const block = this.storageRefusal(box, soul)
+              ?? (!fits ? { code: 'item.does-not-fit', reason: `${name(held.id)} (${size!.map(m2).join(' × ')} m) does not fit in ${box.label} (up to ${fit.map(m2).join(' × ')} m).` } : null)
+              ?? (lit ? { code: 'item.lit', reason: `${name(held.id)} is lit; switch it off before putting it away.` } : null)
+              ?? (!free ? { code: 'container.full', reason: `${box.label} is full (${inner.length} ${inner.length === 1 ? 'thing' : 'things'}).` } : null);
+            const id = `put-in:${x.id}`, label = `Put ${name(held.id)} in ${box.label} (${d} m)`;
+            caps.push({ id, verb: 'put-in', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}) });
+            if (free) plans.set(id, { label, steps: [...stand, { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
+          }
+        }
+        if (held && asset.surfaceSlots?.some((sl: { inside?: unknown }) => !sl.inside)) {
           const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
           // MARSLIVED: the free place nearest the Soul (the first free one was often on a table's far side, against a
           // counter: "put the cup on the prep table" failed as unreachable while the near end was free)
           // MARSLAND: engine poses carry the negated three.js yaw (fixtureSpec registers yaw: −wp.yaw); turn the slot's local
           // offset with the entity's own (three.js) yaw, or a turned table's places are mirrored and the far one is chosen
           const yw = -(x.pose.yaw ?? 0), at = (sl: { local?: number[] }) => { const l = sl.local ?? [0, 0, 0]; return [x.pose.p[0] + l[0] * Math.cos(yw) + l[2] * Math.sin(yw), x.pose.p[2] - l[0] * Math.sin(yw) + l[2] * Math.cos(yw)]; };
-          const free = (asset.surfaceSlots as { id: string; local?: number[] }[]).filter((s) => !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
+          const free = (asset.surfaceSlots as { id: string; local?: number[]; inside?: unknown }[]).filter((s) => !s.inside && !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
           const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
           caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
           // The native item action already plans a slot-specific station. A generic
@@ -1905,6 +1927,25 @@ export class EngineBridge {
     if (wants(focus, 'sit:here')) this.sitHere(caps, plans, here, soul.entityId);
     this.fireLit(caps);
     try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
+  }
+  /** Entry 42: a god container a Soul keeps things in (def containerInside), whether it is open, and its words. */
+  storage(id: string) {
+    const e = this.model.entities.get(id), def = e && this.model.resolvedDef(e.def), ins = containerInside(def);
+    if (!e || !def || !ins) return null;
+    const n = this.model.pathOf(id), word = ins.word;
+    return { id, ins, open: actuatedState(e, def).open === true, label: n.toLowerCase().split(/[^a-z0-9]+/).includes(word) ? n : `${n} (${word})`, word, name: n };
+  }
+  /** Entry 42: the container an engine item rests inside, or null (a table top, the ground). */
+  keptIn(x: { support?: { kind: string; on?: string; slot?: string } }) {
+    const on = x.support?.on, a = on ? this.physics?.assets[this.engine.world.entities[on]?.def] as { surfaceSlots?: { id: string; inside?: unknown }[] } | undefined : undefined;
+    return on && a?.surfaceSlots?.some((sl) => sl.id === x.support!.slot && sl.inside) ? this.storage(on) : null;
+  }
+  /** Entry 42: why a Soul cannot put into or take out of a container now (whose it is, closed, being opened or shut). */
+  private storageRefusal(box: NonNullable<ReturnType<EngineBridge['storage']>>, soul: EdgeSoul): { code: string; reason: string } | null {
+    const denied = this.layers.refusal(box.id, soul); if (denied) return denied;
+    if (!box.open) return { code: 'container.closed', reason: `${box.label} is closed; open it first (object:${box.id}:open).` };
+    for (const b of Object.values(this.engine.world.entities) as any[]) if (b.human?.handActuator?.target === box.id) return { code: 'container.moving', reason: `${box.label} is being opened or closed; wait a moment.` };
+    return null;
   }
   /** B6: a god-built campfire that has been put out warms nobody: warm-by-fire there is refused until someone lights it. */
   private fireLit(caps: EdgeCapability[]) {

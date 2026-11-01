@@ -83,7 +83,7 @@ export function whereIs(w: WorldState, e: Entity): string {
 
 // ---- surfaces ----
 
-export type SurfaceSlot = { id: string; owner: string; slot: string; p: Vec3; hang?: true };
+export type SurfaceSlot = { id: string; owner: string; slot: string; p: Vec3; hang?: true; inside?: NonNullable<import('../world/catalog-items.ts').SurfaceSlotDef['inside']>; local?: Vec3 };
 
 export function surfaceSlotsOf(w: WorldState, owner: string): SurfaceSlot[] {
   const t = w.entities[owner];
@@ -91,7 +91,7 @@ export function surfaceSlotsOf(w: WorldState, owner: string): SurfaceSlot[] {
   if (!t || !d?.surfaceSlots) return [];
   return d.surfaceSlots.map((s) => {
     const q = rot2([s.local[0], s.local[2]], t.pose.yaw);
-    return { id: `${owner}#${s.id}`, owner, slot: s.id, p: [t.pose.p[0] + q[0], t.pose.p[1] + s.local[1], t.pose.p[2] + q[1]] as Vec3, ...(s.hang ? { hang: true as const } : {}) };
+    return { id: `${owner}#${s.id}`, owner, slot: s.id, p: [t.pose.p[0] + q[0], t.pose.p[1] + s.local[1], t.pose.p[2] + q[1]] as Vec3, ...(s.hang ? { hang: true as const } : {}), ...(s.inside ? { inside: s.inside, local: [...s.local] as Vec3 } : {}) };
   });
 }
 
@@ -231,3 +231,27 @@ export function reachStation(rt: Runtime, actor: Entity, target: Vec3, owner: En
 
 /** Horizontal distance from a person's body axis to a world point. */
 export const reachOf = (actor: Entity, p: Vec3) => hyp(p[0] - actor.pose.p[0], p[2] - actor.pose.p[2]);
+
+// ---- inside a container (Soul Actions entry 42) ----
+
+/** A fixture-frame point (x, y, z) in the world. */
+export function fixturePoint(t: Entity, l: Vec3): Vec3 {
+  const q = rot2([l[0], l[2]], t.pose.yaw);
+  return [t.pose.p[0] + q[0], t.pose.p[1] + l[1], t.pose.p[2] + q[1]];
+}
+/** A world point in the fixture frame. */
+export function fixtureLocal(t: Entity, p: Vec3): Vec3 {
+  const q = rot2([p[0] - t.pose.p[0], p[2] - t.pose.p[2]], -t.pose.yaw);
+  return [q[0], p[1] - t.pose.p[1], q[1]];
+}
+/** The place inside a container an item rests in, or null (a table top, the ground, a hand). */
+export function storedIn(w: WorldState, item: Entity): SurfaceSlot | null {
+  const s = item.support;
+  if (s?.kind !== 'resting-on' || !s.slot) return null;
+  return surfaceSlotsOf(w, s.on).find((x) => x.slot === s.slot && x.inside) ?? null;
+}
+/** Whether an item of catalog size (w, h, d) fits a place inside (either way round on the floor). */
+export function fitsInside(size: readonly number[], fit: readonly number[]): boolean {
+  const [w, h, d] = size, e = 1e-6;
+  return h <= fit[1] + e && ((w <= fit[0] + e && d <= fit[2] + e) || (d <= fit[0] + e && w <= fit[2] + e));
+}

@@ -12,14 +12,14 @@
 // The object id is the entity id. Objects follow the entity world: re-derived on each god edit, removed with the thing.
 // No edge file changes: the kind registers on the ledger's comms objects when they exist; the read capability goes in
 // through the ledger's world-profile hook (as nav.ts's `walk:<path>`).
-import { gameStatus, type Entity, type StoredDef, type WorldModel } from '@sim/world-compiler';
+import { containerInside, gameStatus, type Entity, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { paintingLine } from '../art/art.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { readOnlyObjectAdvance, refreshOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
 import type { NearFilter } from '../edge/comms/objects/framework.ts';
 import { canonicalJson, stateDigest } from '../edge/comms/objects/table.ts';
-import { actionsOf, actuatedState, kindActions, wrapAct, type Thing } from './actuators.ts';
+import { actionsOf, actuatedState, keptShut, kindActions, wrapAct, type Thing } from './actuators.ts';
 import { heldGodThing } from './held.ts';
 import { waterRole, wordOf } from './water.ts';
 import { economyOn } from './layers.ts';
@@ -158,8 +158,19 @@ export class GodPerceive {
       }) : {}));
     this.kinds.add(k);
   }
+  /** Entry 42: a thing inside a container that is shut (a lantern in a closed locker). */
+  private keptShut(id: string): boolean { const e = this.h.model.entities.get(id); return !!e && keptShut(this.h.model, e); }
   private actHost() {
     return {
+      // entry 42: a container is not shut on a hand that is putting something in or taking something out
+      busy: (id: string, action: string) => {
+        if (action !== 'close') return null;
+        const m = this.h.model, e = m.entities.get(id), ins = e ? containerInside(m.resolvedDef(e.def)) : null; if (!e || !ins) return null;
+        const rt = (this.h.engine as unknown as { rt?: { holder(r: string): string[] } }).rt; if (!rt) return null;
+        const slots = new Set(ins.slots.map((s) => s.id));
+        const busy = ins.slots.some((s) => rt.holder(`surface-slot:${id}#${s.id}`).length) || [...(m.children.get(id) ?? [])].some((c) => slots.has(m.entities.get(c)?.in.slot ?? '') && rt.holder(`entity:${c}`).length);
+        return busy ? { code: 'container.in-use', reason: `Someone's hand is in ${e.name ? m.pathOf(id) : 'it'}; wait until they are done.` } : null;
+      },
       deferContacts: !!this.h.edge?.contactActuator,
       watering: (soul: EdgeSoul, id: string) => this.h.watering?.plan(soul, id) ?? null,
       wateringBegun: (soul: EdgeSoul) => this.h.watering?.expect(soul.entityId),
@@ -223,6 +234,7 @@ export class GodPerceive {
     const m = this.h.model, def = m.resolvedDef(e.def); if (!def) return null;
     const c = def.components as Record<string, unknown>;
     if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) return null;
+    if (keptShut(m, e)) return null;   // entry 42: kept in a shut drawer or locker: not a thing anyone sees until it is opened
     const text = signText(e, def), acts = this.h.commit ? actionsOf(def).length > 0 : false;
     // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
     const lay = layersOn && layered(e) ? this.h.layers!.tag(e) : '';
@@ -428,6 +440,7 @@ export class GodPerceive {
         if (!this.kinds.has(v.kind)) { rest.push(v); continue; }
         const at = v.public?.at as Vec2 | null | undefined; if (!Array.isArray(at)) continue;
         const d = Math.hypot(at[0] - pos[0], at[1] - pos[1]); if (d > SIGHT) continue;
+        if (this.keptShut(v.id)) continue;   // entry 42: a thing kept in a shut drawer or locker is not seen
         const pl = this.placeOf(v.id, at), lvl = pl.level;
         if (L.enclosureAtPoint(at[0], at[1], lvl) !== myEnc) continue;
         const placeId = pl.place ?? v.placeId;
