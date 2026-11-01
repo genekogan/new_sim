@@ -38,6 +38,16 @@ Every file that owns a cost has a **dial** and exposes `setLoadLevel(level: Leve
 
 Admission (L2, `apps/server/src/load/admission.ts`): one outstanding heavy (C1/C2) request per Soul; per-Soul CPU-ms token bucket (refill `min(200, 20 × frameBudget / awake)` ms/s, so the Souls' buckets together refill at the frame budget's own throughput; capacity 2,000 ms, charged measured handler time; was `min(200, 500/awake) × {1, ½, ¼}` until srv-admission-calib); the god holds a reserved 25 % of the request budget (its bucket unchanged: 125 ms/s × {1, ½, ¼, ¼}); heavy handlers run from a dispatcher after `tickOnce` within a frame budget (at most 25 ms of each 50 ms at green, less above, calibrated to the tick: §1), round-robin across Souls, writes before reads; a job whose deadline passed is answered `world.busy` without running; a job whose socket closed is dropped. Shedding order: duplicate concurrent → C3 to launcher cache → C2 over budget → C2 past deadline (oldest first) → C1 past deadline only.
 
+### Serving warm after listen
+
+The world opens its HTTP port before warming Soul capability caches. The ledger warms those caches in roughly
+40 ms slices, yielding between slices so lightweight requests can continue. Rich `here` (excluding `view=body`),
+`observe`, `capabilities`, `around`, `resolve`, `act` and `converse` wait for an active warm before admission, for
+at most 15 seconds. This waiting time is neither a request in flight nor charged to the Soul's handler budget.
+A warm failure falls back to building menus on demand; shutdown stops the warm, and a later activity warm queues
+behind an existing one. The final capability listing is still synchronous, so the slice duration is not a bound
+on every event-loop pause during startup.
+
 ## 2b. Ceilings for untrusted clients (Gene, 2026-10-31 04:40Z: agents that run Souls are untrusted users; the world must be immune to being taken down by them, accidentally or adversarially)
 
 Enforced server-side whether or not the client honours §3. Two layers, so a world that is already behind is protected by the launcher in front of it:

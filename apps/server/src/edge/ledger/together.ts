@@ -157,6 +157,8 @@ export type TogetherPort = {
 const pose = (activity: string, seconds: number, extra: Record<string, unknown> = {}) => ({verb: 'mars:pose_v1', params: {activity, seconds, ...extra}});
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
+/** A deterministic item source (sources()): a shelf, a writing desk or a walkable place by kind. */
+type ItemSource = {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null};
 export class Together {
   private p: TogetherPort;
   private follows = new Map<string, Follow>();          // receipt id → follow
@@ -273,13 +275,29 @@ export class Together {
   awaiting(soulId: string) {return this.invitesFor(soulId).length > 0;}
 
   // ---------------------------------------------------------------- item sources
-  private sourceCache: {key: string; list: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[]} | null = null;
+  private sourceCache: {key: string; list: ItemSource[]} | null = null;
   /** Deterministic item sources: shelves (books), writing desks (letters) and walkable places by kind (gardens → flowers…). */
   sources() {
-    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = (this.p.staticVersion?.() ?? '') + '|' + Object.keys(this.w.regions).length + ':' + this.p.places.version + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
+    const key = this.sourceKey();
     if (this.sourceCache?.key === key) {menuStats.src.hit++; return this.sourceCache.list;}
-    menuStats.src.miss++; const c0 = cpuNow();
-    const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];
+    menuStats.src.miss++;
+    const it = this.sourcesGen(key); for (;;) {const r = it.next(); if (r.done) return r.value;}
+  }
+  /** Continuity (warm after listen): derive the item sources now (unless current), one place per step, so a sliced caller
+   *  (EdgeLedger.warmForServing) builds them between requests instead of inside a Soul's first listing (~0.2 s). */
+  *sourcesWarmGen(): Generator<void, void, void> {
+    const key = this.sourceKey(); if (this.sourceCache?.key === key) return;
+    yield* this.sourcesGen(key, true);
+  }
+  private sourceKey() {
+    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1;
+    return (this.p.staticVersion?.() ?? '') + '|' + Object.keys(this.w.regions).length + ':' + this.p.places.version + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
+  }
+  /** The derive behind sources() (`sliced`: a step after each place's standing point; the result is the same). A key that
+   *  moves between steps (a god edit landed) is not cached: the next read derives again. */
+  private *sourcesGen(key: string, sliced = false): Generator<void, ItemSource[], void> {
+    let c = cpuNow();
+    const out: ItemSource[] = [];
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
     for (const s of this.p.spots().shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
@@ -291,10 +309,13 @@ export class Together {
       if (!place.polygon?.length || place.kind === 'water' || place.carrier) continue;
       const text = (place.id + ' ' + place.name).toLowerCase(), kinds = SOURCE_WORDS.filter(([, re]) => re.test(text)).map(([k]) => k);
       if (!kinds.length) continue;
+      if (sliced) {menuStats.src.cpuUs += cpuNow() - c; yield; c = cpuNow();}
       const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24, false) ?? null; if (!at) continue;
       for (const kind of [...new Set(kinds)]) out.push({id: 'place:' + place.id, kind, label: place.name, at, place: place.id});
     }
-    this.sourceCache = {key, list: out}; menuStats.src.cpuUs += cpuNow() - c0; return out;
+    menuStats.src.cpuUs += cpuNow() - c;
+    if (!sliced || this.sourceKey() === key) this.sourceCache = {key, list: out};
+    return out;
   }
 
   /** GEST-LIVE: the other sources of an item kind within reach, nearest first (the nearest one may have no walkable route). */
