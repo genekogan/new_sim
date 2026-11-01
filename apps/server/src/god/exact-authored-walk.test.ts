@@ -208,3 +208,15 @@ test('exact walk asks the object provider for no unrelated objects (no object ta
   assert.ok(!projected.caps.some((c:any)=>c.verb==='object'),`${capability}: no object offers built`);
  }
 });
+test('god object capability wrapper preserves a selected object and its place output',async t=>{
+ const {comms,soul}=await setup(t),objects=comms.objects as any;
+ let tableReads=0;
+ const fresh=objects.fresh.bind(objects);objects.fresh=(...args:any[])=>{tableReads++;return fresh(...args);};
+ const places=new Map<string,string>();
+ const caps=objects.capabilities(soul,new Set(['projection-object']),places);
+ assert.ok(caps.length>0,'the selected object still offers its actions');
+ assert.ok(caps.every((c:any)=>c.object==='projection-object'),'no unrelated object offers');
+ assert.deepEqual([...places.keys()],['projection-object'],'the caller receives the selected object place');
+ assert.equal(typeof places.get('projection-object'),'string');
+ assert.equal(tableReads,0,'selected-object lookup never reads the whole object table');
+});
