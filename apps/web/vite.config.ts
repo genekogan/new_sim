@@ -66,7 +66,7 @@ function phasedEntry(): Plugin {
 }
 
 // Lane P4: the installable-app manifest and icons (src/pwa-manifest.ts). Build only, index.html only (the workbench page is
-// not an app). Icons (pwa/icon.svg rendered to pwa/icon-<size>.png) are hashed files in assets/; the manifest is
+// not an app). Icons (pwa/icon.svg, the souls.game orb, rendered to pwa/icon-<size>.png; 32 is the tab favicon) are hashed files in assets/; the manifest is
 // dist/manifest.webmanifest, linked relative to the page and served beside every page (world servers and the launcher).
 function pwa(): Plugin {
   let base = '/';
@@ -79,7 +79,7 @@ function pwa(): Plugin {
     configResolved(c) {
       base = c.base;
       const png = (n: number) => hashed(`sim-icon-${n}`, readFileSync(fileURLToPath(new URL(`./pwa/icon-${n}.png`, import.meta.url))));
-      names = { icon180: png(180), icon192: png(192), icon512: png(512) };
+      names = { icon32: png(32), icon180: png(180), icon192: png(192), icon512: png(512) };
     },
     generateBundle() {
       for (const [file, source] of icons) this.emitFile({ type: 'asset', fileName: `assets/${file}`, source });
