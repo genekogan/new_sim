@@ -29,7 +29,7 @@ export function readCgroup(dir) {
   return { workingBytes: num('memory.current') - field(stat, 'inactive_file'), maxBytes: num('memory.max'), oomKills: field(events, 'oom_kill') };
 }
 
-export function evaluate({ diskTotalBytes, diskFreeBytes, memMb, units = {}, prevUnits = {}, backups = {} }, t = {}) {
+export function evaluate({ diskTotalBytes, diskFreeBytes, memMb, units = {}, prevUnits = {}, backups = {}, worldProblems = [] }, t = {}) {
   const minPct = t.minFreePct ?? 15, minGb = t.minFreeGb ?? 20, minMem = t.minMemMb ?? 1536, capPct = t.capPct ?? 90;
   const diskFreeGb = +(diskFreeBytes / 1e9).toFixed(1), diskFreePct = +(100 * diskFreeBytes / diskTotalBytes).toFixed(1);
   const problems = [], codes = new Set();
@@ -49,6 +49,8 @@ export function evaluate({ diskTotalBytes, diskFreeBytes, memMb, units = {}, pre
   for (const [stage, b] of Object.entries(backups)) {
     if (b.enabled && b.result && b.result !== 'success') flag(`backup:${stage}`, `sim-worlds-backup@${stage} last run: ${b.result}`);
   }
+  // lane L1: the launcher's guard (children.mjs problems(), via <data>/world-problems.json): wedged, held, crashloop, bootSlow
+  for (const w of worldProblems) if (w?.code && w.text) flag(w.code, w.text);
   return { ok: problems.length === 0, diskFreeGb, diskFreePct, memAvailableMb: memMb, problems, codes: [...codes], units: unitStatus, backups,
     thresholds: { minFreePct: minPct, minFreeGb: minGb, minMemMb: minMem, capPct } };
 }
@@ -81,6 +83,12 @@ function readBackups(stages) {
   return backups;
 }
 
+/** The launcher's guard findings (written every 10 s); none when the file is older than 2 min (the launcher is down:
+ *  its own unit and the healthz probe report that). */
+export function readWorldProblems(dataDir, now = Date.now()) {
+  try { const j = JSON.parse(readFileSync(join(dataDir, 'world-problems.json'), 'utf8')); return now - Date.parse(j.at) < 120_000 && Array.isArray(j.problems) ? j.problems : []; } catch { return []; }
+}
+
 function main(argv) {
   const dataDir = argv[0];
   if (!dataDir) { console.error('usage: host-health.mjs <dataDir> [--disk-path /] [--min-free-pct N] [--min-free-gb N] [--min-mem-mb N]'); return; }
@@ -93,7 +101,7 @@ function main(argv) {
     const s = statfsSync(diskPath);
     const units = readUnits();
     status = evaluate({ diskTotalBytes: s.blocks * s.bsize, diskFreeBytes: s.bavail * s.bsize, memMb: memAvailableMb(readFileSync('/proc/meminfo', 'utf8')),
-      units, prevUnits: prev?.units ?? {}, backups: readBackups(Object.keys(units)) },
+      units, prevUnits: prev?.units ?? {}, backups: readBackups(Object.keys(units)), worldProblems: readWorldProblems(dataDir) },
       { minFreePct: Number(opt('min-free-pct', 15)), minFreeGb: Number(opt('min-free-gb', 20)), minMemMb: Number(opt('min-mem-mb', 1536)), capPct: Number(opt('cap-pct', 90)) });
   } catch (e) { status = { ok: false, problems: [`check failed: ${e.message}`], codes: ['check'] }; }
   status = { ...status, at: new Date().toISOString(), diskPath };

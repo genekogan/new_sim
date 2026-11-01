@@ -731,6 +731,14 @@ export function* finishGraphSteps(handle: GraphCapture, maxWork = 256): Generato
   return result;
 }
 
+const KEY_LISTS = new Map<string, string[]>();
+function sharedKeys(keys: string[]): string[] {
+  const id = JSON.stringify(keys), hit = KEY_LISTS.get(id);
+  if (hit) return hit;
+  if (KEY_LISTS.size < 4096) KEY_LISTS.set(id, keys);
+  return keys;
+}
+
 /** Explicit ownership boundary for static snapshot facts (currently entity
  * physics construction/restore only). Validate the whole enumerable graph before
  * freezing any source node. Object.freeze cannot make Map/Set entries immutable,
@@ -754,8 +762,11 @@ export function prepareImmutableSnapshotData(root: unknown, rootPath = '$'): boo
   for (const [source, node] of captured) {
     if (immutableShapes.has(source)) continue;
     Object.freeze(source);
-    if (node.kind === 'array') immutableShapes.set(source, { kind: 'array', values: node.values });
-    else if (node.kind === 'object') immutableShapes.set(source, { kind: 'object', keys: node.keys, values: node.values, tilde: node.tilde });
+    // L4 #7: an admitted array is its own value list (frozen, dense, data properties only: exactly what capture read),
+    // and objects of one key list share it (an obb's c/half/yaw, a surface's id/level/obb/y): these shadows were a second
+    // copy of every node of the entity physics (~34 MB on Eden 2026). Both are only ever read.
+    if (node.kind === 'array') immutableShapes.set(source, { kind: 'array', values: source as unknown[] });
+    else if (node.kind === 'object') immutableShapes.set(source, { kind: 'object', keys: sharedKeys(node.keys), values: node.values, tilde: node.tilde });
   }
   // Admission itself still accepts codec-valid cycles/nonfinite values. Only the
   // proven finite acyclic closures receive the optional hashability shortcut.

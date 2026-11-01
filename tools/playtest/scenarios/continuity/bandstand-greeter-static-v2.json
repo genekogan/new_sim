@@ -1,0 +1,43 @@
+{
+  "schema": "continuity-bandstand-greeter-proposal/1",
+  "id": "bandstand-static-greeter-v2",
+  "status": "prospective-native-verification-only",
+  "baseScenario": "eden-bandstand-five",
+  "greeter": {
+    "role": "greeter",
+    "publicName": "FixtureBandGreeter",
+    "authoredRef": "street-bench-6",
+    "walkCapability": "walk:street-bench-6",
+    "seatCapability": "discover-current-offer-targeting-fresh-bench-entity",
+    "seatSeconds": 1,
+    "setupBeforeT0": true,
+    "follow": false
+  },
+  "greeting": {
+    "disturbanceId": "unrelated-waiting-conversation",
+    "text": "BandGuest2, hello! How has your day been?",
+    "recipient": "guest-2",
+    "deliveryKind": "world",
+    "offsetSec": 150,
+    "maximumDelaySec": 2,
+    "attempts": 1
+  },
+  "mechanicalWitnessesOnly": {
+    "audienceTargets": {
+      "guest-1": [34.5, -30],
+      "guest-2": [38.5, -31],
+      "guest-3": [42.5, -30],
+      "guest-4": [43.5, -26]
+    },
+    "minimumPerformanceSec": 30,
+    "minimumAudienceOverlapSec": 15,
+    "bodyCount": 6
+  },
+  "limits": [
+    "This supplement is not consumed by the frozen fixture, runner or oracle and is not fixture acceptance.",
+    "Synthetic native physical witnesses only; no model instructions, model release timing or held-out model behavior is exercised.",
+    "Actual current native route, held bench slot and linked intended-recipient speech evidence are required; static distances do not certify hearing.",
+    "No guarantee for arbitrary permitted audience positions, enclosures or absent/travelling participants. An actual greeting miss stays fixture failure.",
+    "No authored geometry, fake reservation, participant target, channel, task, oracle, timing or threshold change; no follow/chase/retry/relocation/coaching."
+  ]
+}

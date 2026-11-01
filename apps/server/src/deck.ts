@@ -1,6 +1,7 @@
 // From a Soul's deck to the options its mind chooses among, and from a card's
 // depiction program to concrete engine steps. This is the boundary where
 // meaning (kernel things) meets the engine (bodies, fixtures, points).
+import {menuWorldOf,withRead} from './split/menu-world.ts';
 import type { ActivityOption } from '@sim/engine-contract';
 import { SPEECH_LINKS, bind, enablers, linked, linksFrom, linksTo, playable, samePlace, whyNot, type KState, type MintedCard, type Thing } from '@sim/kernel';
 import type { Mind, WorldHost } from './world.ts';
@@ -13,7 +14,7 @@ export function engineRef(host: WorldHost, id: string): string | [number, number
   for (let t: Thing | undefined = k.things[id], n = 0; t && n < 6; t = t.at ? k.things[t.at] : undefined, n++) {
     if (typeof t.traits.body === 'string') return t.traits.body;
     if (typeof t.traits.entity === 'string') return t.traits.entity;
-    if(host.engine.world.regions[t.id])return t.id;
+    if(menuWorldOf(host).world.regions[t.id])return t.id;
     if (Array.isArray(t.traits.point)) return t.traits.point as [number, number];
   }
   return null;
@@ -22,12 +23,12 @@ export function engineRef(host: WorldHost, id: string): string | [number, number
 export function positionOf(host: WorldHost, id: string): [number, number] | null {
   const r = engineRef(host, id); if (r === null) return null;
   if (Array.isArray(r)) return r;
-  const e = host.engine.world.entities[r]; if (e) return [e.pose.p[0], e.pose.p[2]];
+  const e = menuWorldOf(host).world.entities[r]; if (e) return [e.pose.p[0], e.pose.p[2]];
   // Keep the region ID for native traversal, but use the adapter's current
   // physical anchor for distance and coordinate bindings. A symbolic `at`
   // relationship does not establish arrival at this point.
-  if (!host.engine.world.regions[r]) return null;
-  const p = host.engine.anchors().find((a) => a.id === r)?.point;
+  if (!menuWorldOf(host).world.regions[r]) return null;
+  const p = menuWorldOf(host).anchors().find((a) => a.id === r)?.point;
   return p?.length === 2 && p.every(Number.isFinite) ? [p[0], p[1]] : null;
 }
 export function distance(host: WorldHost, a: string, b: string): number {
@@ -98,16 +99,16 @@ export const serves = (host: WorldHost, m: Mind, card: string, target: string | 
 
 /** The options the mind chooses among: playable cards, physically feasible, ranked and capped. */
 export function optionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards=new Set<string>()): CardOption[] {
-  const read=()=>readOptionsFor(host,m,cap,ordinaryRetainedCards);return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
+  const read=()=>readOptionsFor(host,m,cap,ordinaryRetainedCards);return withRead(menuWorldOf(host),read);
 }
 /** Registry read keeps supported blocked offers; minds still receive only feasible choices. */
 export function registeredOptionsFor(host:WorldHost,m:Mind,cap=128):CardOption[]{
  const read=()=>readOptionsFor(host,m,cap,new Set(),true);
- return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
+ return withRead(menuWorldOf(host),read);
 }
 function readOptionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards=new Set<string>(),includeBlocked=false): CardOption[] {
   if (m.life && cap === 12) cap = 24;
-  const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
+  const k = host.kernel, me = m.soulId; k.tick = menuWorldOf(host).world.tick;
   const fr = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;
   const servesNow = (card: string, target: string | null) => matchesStep(host, fr, card, target);
   const faults = (host.extra.cardFaults ?? {}) as Record<string,number>;
@@ -158,7 +159,7 @@ function readOptionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards
     const b = bind(k, p.card, me, p.target); if (!b) continue;
     const steps = [...p.card.approach, ...p.card.during].map((s) => ({ verb: s.verb, params: resolveParams(host, s.params, b) as Record<string, unknown> }));
     // physical feasibility of the first step, asked of the engine (Mars: verb.plan)
-    const issue=steps.length?host.engine.canPerform({actor:m.entityId,label:p.card.name,steps}):null;
+    const issue=steps.length?menuWorldOf(host).feasibility.canPerform({actor:m.entityId,label:p.card.name,steps}):null;
     if(issue&&!includeBlocked)continue;
     perCard.set(p.card.name, n + 1);
     const label = `${p.card.name}${t ? `: ${describeTarget(host, me, t)}` : ''}`;
@@ -177,13 +178,13 @@ function readOptionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards
 
 /** Who this Soul has asked something and not yet heard back from (they are here, and the question still hangs in the air). */
 export function awaiting(host: WorldHost, me: string): string[] {
-  const k = host.kernel; k.tick = host.engine.world.tick;
+  const k = host.kernel; k.tick = menuWorldOf(host).world.tick;
   return linksFrom(k, me, 'asked').map((l) => l.to).filter((to) => samePlace(k, me, to));
 }
 
 /** The Soul's social situation in words, for its mind (and for agents through `perceive`). */
 export function situationOf(host: WorldHost, m: Mind): { situation: string[]; heard: { who: string; act: string; about?: string; from: string }[] } {
-  const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
+  const k = host.kernel, me = m.soulId; k.tick = menuWorldOf(host).world.tick;
   const self = k.things[me]; if (!self) return { situation: [], heard: [] };
   const out: string[] = [];
   const name = (id: string) => k.things[id]?.name ?? id;
@@ -210,7 +211,7 @@ export function situationOf(host: WorldHost, m: Mind): { situation: string[]; he
 
 /** For the owner's dashboard: every card in the deck, and whether it can be played now (and on what, or why not). */
 export function deckView(host: WorldHost, m: Mind) {
-  const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
+  const k = host.kernel, me = m.soulId; k.tick = menuWorldOf(host).world.tick;
   const deck = k.decks[me] ?? { cards: [], manners: [] };
   const cands = candidatesFor(host, me);
   const cards = deck.cards.map((n) => k.vocab.cards[n]).filter((c): c is MintedCard => !!c).map((c) => {

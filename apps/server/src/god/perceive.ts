@@ -16,7 +16,9 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import { paintingLine } from '../art/art.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
-import { readOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
+import { readOnlyObjectAdvance, refreshOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
+import type { NearFilter } from '../edge/comms/objects/framework.ts';
+import { canonicalJson, stateDigest } from '../edge/comms/objects/table.ts';
 import { actionsOf, actuatedState, kindActions, wrapAct, type Thing } from './actuators.ts';
 import { heldGodThing } from './held.ts';
 import { waterRole, wordOf } from './water.ts';
@@ -45,10 +47,12 @@ export type BuiltState = { what: string; text: string; near: string[]; at: Vec2 
 
 export const BUILT_KIND = 'built';
 const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim().slice(0, n);
+/** A thing the layers tag (owned, gated, priced, scheduled): the only things whose object a layer change can move. */
+export const layered = (e: Entity) => !!(e.owner || e.access || e.price || e.schedule);
 /** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
  *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
 // VOCAB-MECH: a kind with actuator actions also shows its things' `state` (open, on, lit …); plain kinds are unchanged
-export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance: readOnlyObjectAdvance(function advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; }) });
+export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance: refreshOnlyObjectAdvance(readOnlyObjectAdvance(function advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && canonicalJson(w) !== canonicalJson(state) ? { state: w } : null; })) });
 export const builtKind = {
   kind: BUILT_KIND,
   description: 'Something the god of this world built: what it is, what it is by and where, and any words written on it (a sign). The words are the god\'s, untrusted.',
@@ -194,7 +198,7 @@ export class GodPerceive {
     if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) return null;
     const text = signText(e, def), acts = this.h.commit ? actionsOf(def).length > 0 : false;
     // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
-    const lay = layersOn && (e.owner || e.access || e.price || e.schedule) ? this.h.layers!.tag(e) : '';
+    const lay = layersOn && layered(e) ? this.h.layers!.tag(e) : '';
     if (!e.name && text === null && !acts && !lay) return null;
     // seats and things to carry are perceived as seats and items already (unless they have actuators: a chest's lid)
     if ((c.seat || c.carryable) && !acts && !lay) return null;
@@ -267,8 +271,12 @@ export class GodPerceive {
       authoredRoots: values.filter(value => value & 1).length, engineRoots: values.filter(value => value & 2).length,
       otherRoots: values.filter(value => value & 4).length, running: this.run !== null, placesDone: this.placesDone };
   }
+  /** L4 item 5: things whose layer tag alone may have changed (a build event, the layers switching on or off): each is
+   *  recomputed itself, with no neighbourhood expansion (a tag is not a name, so no other object's `near` moves). */
+  noteRetag(ids: Iterable<string>) { for (const id of ids) this.retag.add(id); }
+  private retag = new Set<string>();
   /** Anything noted and not caught up yet (or a catch-up under way)? */
-  pending(): boolean { return this.needFull || this.roots.size > 0 || this.run !== null; }
+  pending(): boolean { return this.needFull || this.roots.size > 0 || this.retag.size > 0 || this.run !== null; }
 
   private cellAdd(id: string, at: Vec2) { const k = cellKey(Math.floor(at[0] / CELL), Math.floor(at[1] / CELL)); let s = this.cells.get(k); if (!s) this.cells.set(k, s = new Set()); s.add(id); }
   private cellDel(id: string, at: Vec2) { this.cells.get(cellKey(Math.floor(at[0] / CELL), Math.floor(at[1] / CELL)))?.delete(id); }
@@ -285,10 +293,11 @@ export class GodPerceive {
   private begin(): Run | null {
     const objs = this.objects(); if (!objs) return null;
     const root = this.rootPlace(); if (!root) return null;
-    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
+    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, stateDigest(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
     const layersOn = !!this.h.layers?.active();
-    if (layersOn !== this.layersOn) { this.layersOn = layersOn; this.needFull = true; }
-    const full = this.needFull || !this.h.things, roots = this.roots; this.needFull = false; this.roots = new Set(); this.rootOrigins.clear(); this.fullOrigin = 0;
+    // L4 item 5: the layers switching on or off changes only what wantOne's `lay` reads: things with a layer field
+    if (layersOn !== this.layersOn) { this.layersOn = layersOn; for (const e of this.h.model.entities.values()) if (layered(e)) this.retag.add(e.id); }
+    const full = this.needFull || !this.h.things, roots = this.roots, retag = this.retag; this.needFull = false; this.roots = new Set(); this.retag = new Set(); this.rootOrigins.clear(); this.fullOrigin = 0;
     // the named things now (their outlines: what `near` measures to), against the last catch-up's
     const now = new Map<string, Box>();
     for (const t of this.h.things?.() ?? []) { const b = boxOf(t); if (!b) continue; const o = now.get(t.id); now.set(t.id, o ? [Math.min(o[0], b[0]), Math.min(o[1], b[1]), Math.max(o[2], b[2]), Math.max(o[3], b[3])] : b); }
@@ -305,30 +314,33 @@ export class GodPerceive {
         ids.add(id);
         for (const b of [this.regions.get(id), now.get(id)]) if (b) this.inBox([b[0] - NEAR, b[1] - NEAR, b[2] + NEAR, b[3] + NEAR], ids);
       }
+      for (const id of retag) ids.add(id);
     }
     this.regions = now;
     this.placed.clear();
     return { queue: [...ids], i: 0, changed: [], made: 0, root, layersOn, full, ms: 0 };
   }
   /** Recompute one id and bring its object in line. */
-  private apply(r: Run, id: string, objs: { create(i: unknown): unknown }) {
+  private apply(r: Run, id: string, objs: { create(i: unknown): unknown; refresh?(ids: string[]): void }) {
     const e = this.h.model.entities.get(id), x = e ? this.wantOne(e, r.layersOn) : null;
     const old = this.entries.get(id);
     if (old) { this.cellDel(id, old.at); this.entries.delete(id); this.signs.delete(id); }
     if (!x) {
       // gone from the entity world: hidden (removed), never deleted (an undo brings the same id back)
       const sig = this.sigs.get(id); if (sig === undefined) return;
-      const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }, n = JSON.stringify(st);
-      if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); r.changed.push(id); }
+      const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }, n = canonicalJson(st);
+      if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); r.changed.push(id); objs.refresh?.([id]); }
       return;
     }
     const at = x.w.params.at as Vec2;
     this.entries.set(id, { ...x, at }); this.cellAdd(id, at); if (x.sign) this.signs.set(id, x.sign);
-    const state = builtKind.initial({ ...x.w.params, key: id } as never), sig = JSON.stringify(state);
+    const state = builtKind.initial({ ...x.w.params, key: id } as never), sig = canonicalJson(state);
     if (this.sigs.get(id) === sig) return;
     this.desired.set(id, state);
     try {
-      if (!this.sigs.has(id)) { objs.create({ id, kind: x.w.kind, name: x.w.name, description: x.w.description, placeId: r.root, params: { ...x.w.params, key: id } }); r.made++; } else r.changed.push(id);
+      // L8: a changed object is brought in line at once, not at the end of the (sliced) catch-up: built kinds' advance is
+      // refresh-only, so a listing between slices would otherwise show the old state of an object already recomputed
+      if (!this.sigs.has(id)) { objs.create({ id, kind: x.w.kind, name: x.w.name, description: x.w.description, placeId: r.root, params: { ...x.w.params, key: id } }); r.made++; } else { r.changed.push(id); objs.refresh?.([id]); }
       this.sigs.set(id, sig);
     } catch (err) { this.h.log(`built object ${id}: ${(err as Error).message}`); }
   }
@@ -355,7 +367,7 @@ export class GodPerceive {
       // One apply can rebuild the named-thing index; do not start another object after it consumes the slice.
       if (performance.now() - t0 >= budgetMs) { r.ms += performance.now() - t0; return false; }
     }
-    if (r.changed.length) { if (objs.refresh) objs.refresh(r.changed); else objs.fresh(); }
+    if (r.changed.length && !objs.refresh) objs.fresh();   // with refresh, apply() already brought each one in line
     r.ms += performance.now() - t0;
     this.run = null;
     Object.assign(this.stats, { runs: this.stats.runs + 1, lastIds: r.queue.length, lastFull: r.full, lastMs: Math.round(r.ms * 10) / 10 });
@@ -372,11 +384,12 @@ export class GodPerceive {
    *  sight (30 m) in the same enclosure (a room's walls hide the plaza; the plaza does not see into the cottage), nearest
    *  first, each with the place it stands in (`placeId`), `here` when that is a place the Soul is in, and its distance.
    *  (The framework would list every one, everywhere, `here`, in the world's root place.) Other kinds pass unchanged. */
-  private wrapVisible(o: { visibleTo(soul: EdgeSoul): any[] } & { __godVisible?: boolean }) {
+  private wrapVisible(o: { visibleTo(soul: EdgeSoul, near?: NearFilter): any[] } & { __godVisible?: boolean }) {
     if (o.__godVisible || !this.h.edge) return; o.__godVisible = true;
     const orig = o.visibleTo.bind(o), L = this.h.edge;
     o.visibleTo = (soul: EdgeSoul) => {
-      const list = orig(soul), me = this.h.engine.world.entities[soul.entityId];
+      // L8: only built things within sight are viewed at all (the framework's cell index), not every one in the world
+      const me = this.h.engine.world.entities[soul.entityId], list = orig(soul, me ? { at: [me.pose.p[0], me.pose.p[2]], radius: SIGHT, kinds: this.kinds } : undefined);
       if (!me) return list;
       this.ensure();
       const pos: Vec2 = [me.pose.p[0], me.pose.p[2]], path = L.placePathOf(soul.soulId), root = path.find((p) => p.kind !== 'occupier' && L.places.byId.get(p.id)?.parent === null)?.id;

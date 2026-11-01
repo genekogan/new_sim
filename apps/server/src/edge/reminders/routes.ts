@@ -16,6 +16,7 @@ export function mountPersonalReminders(app:Hono,deps:EdgeDeps,comms:CommsRuntime
   return service.create(deps.soul(c).soulId,input);
  }));
  app.get('/v1/edge/reminders',wrap(c=>service.list(soul(c,'list',120).soulId,c.req.query('state'),c.req.query('after'))));
+ app.get('/v1/edge/reminders/by-client-ref/:key',wrap(c=>service.byClientRef(soul(c,'lookup',120).soulId,c.req.param('key')??'')));
  app.delete('/v1/edge/reminders/:id',wrap(c=>service.cancel(soul(c,'cancel',60).soulId,c.req.param('id')??'')));
  // Separate owned wall timer; real reminders continue while the world is
  // paused. World targets compare only the unchanged authoritative world clock.

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "status": "intent-frozen; exact physical fixtures pending verification before baseline",
+  "date": "2026-10-29",
+  "proposalArtifacts": {"fixtures":"fixtures.json","oracles":"oracles.json","scorer":"oracle.mjs","status":"not baseline-ready; physical verification and numeric seal pending"},
+  "policy": {
+    "independentAgents": true,
+    "privateCrossAgentMessages": false,
+    "centralSocialCoordinator": false,
+    "arms": ["existing-headless-seat", "managed-continuity-runtime"],
+    "trialsPerArm": 2,
+    "sameModelAndEffort": true,
+    "clock": "explicit UTC real deadlines plus authoritative world clock when required",
+    "holdoutRule": "Do not use holdout transcripts to tune behavior; a failure remains a reported failure. A general fix requires a new declared evaluation.",
+    "soak": {"minimumSeconds": 7200, "count": 1, "afterShortScenariosPass": true}
+  },
+  "scenarios": [
+    {
+      "id": "eden-reading-duo", "role": "development", "world": "eden-2026", "souls": 2,
+      "venue": "Eden Library reading room",
+      "instructions": [
+        "Meet your partner at Eden Library at {meetingUTC}. Read briefly together in available seats, exchange one observation about what you read, and return to your original errand. If interrupted, answer briefly without losing the appointment.",
+        "Meet your partner at Eden Library at {meetingUTC}. Find your own available seat, read briefly, discuss one observation, then leave to continue your errand. Your partner may arrive late; coordinate through the world."
+      ],
+      "disturbances": ["one frozen reading seat occupied before arrival", "one addressed greeting during travel", "one controller restart during strategic waiting"],
+      "required": ["both arrive by the declared tolerance", "distinct usable seats", "actual supported reading activity", "relevant reciprocal exchange", "bounded response to greeting", "original errands resumed after interaction", "no duplicate public effects after restart"]
+    },
+    {
+      "id": "mars-presentation-four", "role": "development", "world": "mars-two", "souls": 4,
+      "venue": "Chiba auditorium podium and audience seating",
+      "instructions": [
+        "At {meetingUTC}, give a short presentation at Chiba auditorium about what you observed in this world. Take the appropriate presenter place, welcome arrivals, present, invite questions, answer at least two, close, then resume your errand.",
+        "Attend the Chiba presentation at {meetingUTC}. Choose an audience place, listen, and ask a relevant question when appropriate. Coordinate only through what you perceive in the world; then resume your errand."
+      ],
+      "disturbances": ["one audience seat occupied", "one participant has a predeclared late start", "one addressed interruption shortly before the scheduled start"],
+      "required": ["presenter and three audience members reach appropriate places", "observed presentation start and closure", "two relevant questions answered", "no harness-synchronized speaking turns", "interruption does not erase event intent", "participants resume their previous errands"]
+    },
+    {
+      "id": "eden-walk-three", "role": "holdout", "world": "eden-2026", "souls": 3,
+      "venue": "Commons Field through a garden to a verified second landmark",
+      "instructions": [
+        "Meet the other two walkers at Commons Field at {meetingUTC}. Agree together on a garden walk and a second landmark to finish at. Stay aware of one another, regroup if separated, and finish together before returning to your own errand."
+      ],
+      "disturbances": ["one walker starts late", "one participant receives an independent short errand that causes separation", "one participant proposes changing the final meeting point through in-world speech"],
+      "required": ["three-way meeting established", "destination agreement visible in world conversation", "separated participant rejoins using observed information", "all reach the agreed revised endpoint", "no hard-coded path or hidden leader commands", "original errands resumed"]
+    },
+    {
+      "id": "eden-bandstand-five", "role": "holdout", "world": "eden-2026", "souls": 5,
+      "venue": "verified Eden bandstand or existing supported performance venue",
+      "instructions": [
+        "Give an informal short performance at the bandstand at {meetingUTC} using an activity the world actually supports. Welcome your four guests, perform, respond to a relevant question, close naturally, and return to your errand.",
+        "Attend the informal bandstand performance at {meetingUTC}. Find an appropriate audience position, pay attention to what occurs, interact briefly when appropriate, and continue your errand afterward."
+      ],
+      "disturbances": ["staggered participant starts", "one guest has an unrelated short conversation during waiting", "one audience question during the gathering"],
+      "required": ["performer and four guests converge without central coordination", "supported activity observed", "relevant question and reply", "late arrival accommodated", "interrupted participant retains gathering intent", "voluntary dispersal and errand resumption"]
+    }
+  ],
+  "acceptanceMeasurements": ["physical receipt and position evidence", "notification ingest-to-host and ingest-to-first-relevant-action latency", "deadline adherence", "goal and suspended-step retention", "duplicate effects", "input/output/cached tokens and inference call count", "per-scenario outcomes with failures retained"],
+  "notYetFrozen": ["exact physical fixture refs and starting poses", "explicit numeric deadlines and latency thresholds copied from accepted audit", "deterministic oracles and declared semantic-review rubric"]
+}

@@ -84,3 +84,43 @@ test('GODLIST: activity spots derived in a tick after a caught-up god edit equal
   assert.equal(S.stats.derives, n + 1, 'unread since: not derived again');
   S.data(); assert.equal(S.stats.derives, n + 2, 'the reader derives it');
 });
+
+test('L4 item 6: a served world derives the spots in tick slices; reads meanwhile keep the old spots; the result equals a fresh derive', { timeout: 600000 }, async (t) => {
+  const f = fixture(':memory:', factory, { durableClockV1: true });
+  const god = new GodMode(f.db, { worldId: f.host.worldId, ownerId: 'dev:admin', tick: () => f.host.engine.world.tick, emit: () => {} });
+  const edge = new EdgeLedger(f.host, f.db);
+  const bridge = installEngineBridge({ host: f.host, god, edge, log: () => {}, worldLore: true });
+  const { Hono } = await import('hono');
+  const { mountEdgeRoutes, edgeSoulResolver } = await import('../edge/routes.ts');
+  const comms = mountEdgeRoutes(new Hono(), { host: f.host, db: f.db, souls: f.souls, soul: edgeSoulResolver(f.host, f.souls, () => undefined), ledger: edge } as never);
+  t.after(() => comms.close());
+  const settle = async (n = 4) => { for (let i = 0; i < n; i++) { f.host.tickOnce(); await setImmediate(); f.host.drainInputs(); } };
+  f.brain.quiesce();
+  t.after(() => { f.brain.quiesce(); f.host.stop(); f.db.close(); });
+  await settle(2);
+  const act = (ops: unknown[]) => { const r = god.act({ ops } as never) as any; assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600)); return r; };
+  const ops: unknown[] = [];
+  for (let i = 0; i < 12; i++) ops.push({ op: 'place', def: coreRef('bookcase'), name: `books-${i}`, p: [i * 6, 0] }, { op: 'place', def: coreRef('armchair'), name: `chair-${i}`, p: [i * 6, 2.5], r: Math.PI }, { op: 'place', def: coreRef('bench'), name: `bench-${i}`, p: [i * 6, -5] });
+  act(ops);
+  const P = bridge.perceive as any, S = bridge.activitySpots as any;
+  const caughtUp = async () => { for (let i = 0; i < 200 && (P.pending() || (bridge as any).perceiveRunning); i++) await settle(1); assert.equal(P.pending(), false, 'caught up'); };
+  await caughtUp();
+  // served-world behaviour, with the smallest slice (one step of the derive per tick)
+  S.h.sliced = () => true; (bridge as any).perceiveDial = { sliceMs: 0, settle: 20 };
+  let slices = 0; const warm = S.warm.bind(S); S.warm = (ms: number) => { if (S.deriving() || !S.cache) slices++; return warm(ms); };
+  for (let i = 0; i < 400 && (!S.cache || S.deriving()); i++) await settle(1);
+  assert.ok(S.cache && !S.deriving(), 'the boot spots are warmed unasked');
+  assert.ok(slices > 2, `in slices (${slices})`);
+  const fresh = (label: string) => { const ref = new GodActivitySpots({ ...S.h, sliced: () => false }); (bridge as any).places.sync(true); assert.equal(JSON.stringify(S.data()), JSON.stringify(ref.data()), `${label}: equals a fresh derive`); };
+  fresh('boot');
+  const before = S.data(), n = S.stats.derives;
+  act([{ op: 'place', def: coreRef('bench'), name: 'late-bench', p: [3, 8] }]);
+  await caughtUp();
+  assert.equal(S.data(), before, 'a read before the sliced derive ends keeps the spots it has');
+  slices = 0;
+  for (let i = 0; i < 400 && (S.stats.derives === n || S.deriving()); i++) await settle(1);
+  assert.equal(S.stats.derives, n + 1, 'derived once');
+  assert.ok(slices > 2, `in slices (${slices})`);
+  assert.notEqual(S.data(), before);
+  fresh('after an edit');
+});

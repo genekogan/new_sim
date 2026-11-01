@@ -36,6 +36,7 @@ export const EVENT_KINDS: Record<string, {salience: 0 | 1 | 2 | 3; what: string}
   'world.leave': {salience: 1, what: 'known Soul faded from world'},
   'receipt.waiting': {salience: 0, what: 'act accepted; safe body stop pending'},
   'receipt.started': {salience: 1, what: 'act started'},
+  'activity.observed': {salience: 2, what: 'own actual current native activity; nonterminal, no content/hold completion'},
   'receipt.terminal': {salience: 3, what: 'act completed/failed; own newer act replacement:1; plan-driven:1 (plan reports)'},
   'blocked': {salience: 3, what: 'act failed: blocked route, occupied seat, full region'},
   'plan.step.started': {salience: 1, what: 'my plan step started; chosen act included'},
@@ -198,6 +199,7 @@ export function toEnvelope(e: StreamEvent, me: Viewer): Envelope {
     case 'arrive': text = `You arrived at ${d.placePath?.[0] ?? d.endedAt?.placePath?.[0] ?? where?.place ?? d.placeId ?? 'your destination'}.`; break;
     case 'arrival': text = `${who} arrived${where?.place ? ' at ' + where.place : ''}`; break;
     case 'departure': text = `${about?.name ?? 'Someone'} left${where?.place ? ' ' + where.place : ''}`; break;
+    case 'activity.observed': text = `Your body is ${oneLine(d.body?.posture,40)} (${oneLine(d.body?.activity,60)}); receipt remains open. No completion or content outcome implied.${d.body?.occupiedSeats?.length ? ' Occupied '+d.body.occupiedSeats.map((s:unknown)=>oneLine(s,100)).join(', ') : ''}`; break;
     case 'mail.delivered':text=`A private letter is in your postbox (${d.letter?.id??'letter'}).`;break;
     case 'receipt': {
       const r = d.receipt ?? {}, end = r.endedAt ?? d.endedAt;

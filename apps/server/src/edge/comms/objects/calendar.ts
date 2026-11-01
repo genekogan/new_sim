@@ -1,6 +1,7 @@
 // Calendar items the steward posts (often proposed by Souls): an open gathering at a place and time.
 // Anyone may mark interest from anywhere; interested Souls get a reminder when it starts.
-import type {ObjectKind, SoulRef} from './types.ts';
+import type {ObjectEvent, ObjectKind, SoulRef, TimeCtx} from './types.ts';
+import {readOnlyObjectAdvance} from './framework.ts';
 
 export type CalendarState = {title: string; description: string; placeId: string; placeName: string; startsAtTick: number; endsAtTick: number;
   proposedBy: string; interested: SoulRef[]; phase: 'upcoming' | 'happening' | 'over'; reminded: boolean};
@@ -29,10 +30,12 @@ export const calendarKind: ObjectKind<CalendarState> = {
     'not-coming': {label: 'Withdraw my interest', roles: ['interested'], reach: 'anywhere', params: {},
       validate: () => null, apply: (s, _p, c) => ({state: {...s, interested: s.interested.filter(x => x.soulId !== c.soul.soulId)}})},
   },
-  advance(s, ctx) {
+  // L3 (server reliability): returns new state, never mutates or keeps its input, so fresh() skips the defensive
+  // structuredClone (the live Eden 2026 keeps 8,273 calendar items: ~45 ms of clones per object listing)
+  advance: readOnlyObjectAdvance(function advance(s: CalendarState, ctx: TimeCtx): {state: CalendarState; events?: ObjectEvent[]} | null {
     if (s.phase === 'upcoming' && ctx.tick >= s.startsAtTick) return {state: {...s, phase: 'happening', reminded: true},
       events: [{to: s.interested.map(x => x.soulId), kind: 'schedule', text: `"${s.title}" is starting now at ${s.placeName || s.placeId}.`, data: {placeId: s.placeId, startsAtTick: s.startsAtTick}, untrusted: true}]};
     if (s.phase === 'happening' && ctx.tick >= s.endsAtTick) return {state: {...s, phase: 'over'}};
     return null;
-  },
+  }),
 };

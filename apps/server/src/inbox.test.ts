@@ -404,6 +404,18 @@ test('god queue: commands typed while away wait in order; tickets move pending -
   assert.equal(inbox.view(g).latest!.text, 'cmd 0'); assert.equal(inbox.view(g).queued, 50); assert.equal(inbox.ownerView(g).log!.length, 50);
 });
 
+test('god presence: a command handed over reads working even when the clock moves between the seen stamp and the delivery', t => {
+  // R5 gate (run-3910d6152): the agent middleware stamps last_seen_at, then delivers; a millisecond boundary between the two
+  // left last_seen_at < delivered_at, so the owner saw 'listening' (and 'away' after the 75 s lease) for a held command.
+  const db = new Db(':memory:'); t.after(() => db.close());
+  let now = 1000; const inbox = new AgentInbox(db, 'w1', () => now++), g = {scope: 'god', owner: 'alice'};
+  inbox.send(g, 'Build a pier'); inbox.send(g, 'Paint the barn red');
+  inbox.listening(g)();                     // a poll start (lease) that has ended, as after a timeoutMs=0 listen
+  inbox.touch(g); const v = inbox.deliver(g);  // the middleware's order: seen, then delivered
+  assert.equal(v.latest!.state, 'delivered'); assert.equal(v.presence, 'working');
+  now += GOD_LISTEN_LEASE_MS + 1; assert.equal(inbox.view(g).presence, 'working', 'a held command outlives the listen lease');
+});
+
 test('god queue: a message waiting in the old one-message box moves into the queue at boot', t => {
   const db = new Db(':memory:'); t.after(() => db.close());
   db.db.exec(`CREATE TABLE agent_inbox_v1 (world_id TEXT NOT NULL, scope TEXT NOT NULL, owner TEXT NOT NULL, id TEXT, text TEXT, sent_at INTEGER, delivered_at INTEGER, acknowledged_at INTEGER, reply TEXT, last_seen_at INTEGER, PRIMARY KEY(world_id,scope,owner)) WITHOUT ROWID`);

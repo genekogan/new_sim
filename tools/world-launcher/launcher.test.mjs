@@ -56,7 +56,7 @@ test('templates: empty first, hello hamlet next, broken files skipped', () => {
   const t = listTemplates(templatesDir).map((x) => x.id);
   assert.deepEqual(t, ['empty', 'hello-hamlet', 'island']);
   assert.deepEqual(listTemplates(templatesDir, { all: true }).map((x) => x.id), ['empty', 'hello-hamlet', 'island', 'retired'], 'a hidden template is still found for worlds made from it');
-  assert.equal(backoffMs(0), 500); assert.equal(backoffMs(3), 4000); assert.equal(backoffMs(20), 30000);
+  assert.equal(backoffMs(0, () => 0.5), 500); assert.equal(backoffMs(3, () => 0.5), 4000); assert.equal(backoffMs(20, () => 0.5), 150_000);   // full jitter (lane L1): uniform under min(5 min, 1 s * 2^n)
 });
 test('homepage and assets come from the web build', async () => {
   const r = await api('/'); assert.equal(r.status, 200); assert.match(await r.text(), /<title>Sim/);
@@ -277,7 +277,9 @@ test('production launcher under --base /worlds: one prefix for page, assets, API
     const a = await make('Mars'); assert.equal(a.status, 201); const ab = await a.json();
     assert.equal(ab.slug, 'my-mars'); assert.equal(ab.url, `${B}/w/my-mars/?dev=1&new=1`);
     const env = await (await fetch(`${base}${B}/w/my-mars/env`)).json();
-    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: `http://sim-worlds.localhost:${at(4)}`, ANTHROPIC_API_KEY: '', NODE_OPTIONS: '--max-old-space-size=512', FAKE_FROM_FILE: null, WORLD_PATH: `${B}/w/my-mars` });
+    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: `http://sim-worlds.localhost:${at(4)}`, ANTHROPIC_API_KEY: '', NODE_OPTIONS: null, FAKE_FROM_FILE: null, WORLD_PATH: `${B}/w/my-mars` });
+    // lane L1: the heap is the child's own node flag (--world-heap-mb is the default only), never NODE_OPTIONS
+    const argv = await (await fetch(`${base}${B}/w/my-mars/argv`)).json(); assert.deepEqual([argv.execArgv, argv.heapMb], [['--max-old-space-size=512'], '512']);
     // behind the reverse proxy the visitor's x-forwarded-for reaches the world unchanged
     assert.equal((await fetch(`${base}${B}/w/my-mars/echo`, { method: 'POST', body: 'x', headers: { 'x-forwarded-for': '203.0.113.7' } })).headers.get('x-xff'), '203.0.113.7');
     const ws = await new Promise((yes, no) => { const s = connect(P, '127.0.0.1', () => s.write(`GET ${B}/w/my-mars/ws HTTP/1.1\r\nHost: x\r\nUpgrade: test\r\nConnection: Upgrade\r\n\r\n`)); s.once('data', (d) => { s.destroy(); yes(String(d)); }); s.on('error', no); });

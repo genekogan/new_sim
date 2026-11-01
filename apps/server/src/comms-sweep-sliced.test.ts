@@ -89,6 +89,7 @@ test('sliced sweep holds only ordered ids and reads edited, deleted and replaced
   g.next(); assert.deepEqual(f.visits, ['a']); assert.equal(f.db.db.isTransaction, false);
   const b = row(f, 'b'); b.state.target = 4;
   f.db.db.prepare('UPDATE edge_comms_objects SET body=? WHERE world_id=? AND id=?').run(JSON.stringify(b), f.host.worldId, 'b');
+  f.runtime.objects.reload();   // L8: SQL that bypasses the framework must tell the in-memory table
   f.runtime.objects.remove('c'); f.runtime.objects.remove('d'); f.add('d', 7); f.add('e', 9);
   f.host.engine.world.tick = 250;
   while (!g.next().done) assert.equal(f.db.db.isTransaction, false);

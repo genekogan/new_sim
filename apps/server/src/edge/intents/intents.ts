@@ -62,7 +62,7 @@ export class Intents {
    *  receipt gains `alternatives` (a fresh dry run of the same intent) for Core-B's derived `blocked`. */
   private onTerminal(r: EdgeReceipt) {
     if (r.phase !== 'completed' && r.phase !== 'failed') return;
-    const verb = r.capability.split(':')[0], deliver = (kind: string, body: Record<string, unknown>) => (this.L.comms as unknown as {streams?: {deliver?(s: string, k: string, t: number, b: object): void}} | undefined)?.streams?.deliver?.(r.soulId, kind, this.L.host.engine.world.tick, body);
+    const verb = r.capability.split(':')[0], deliver = (kind: string, body: Record<string, unknown>) => (this.L.comms as unknown as {streams?: {deliver?(s: string, k: string, t: number, b: object): void}} | undefined)?.streams?.deliver?.(r.soulId, kind, this.L.mw.world.tick, body);
     if (!['walk', 'stroll', 'hang-out', 'approach', 'go-near', 'sit', 'swim', 'gather', 'warm-by-fire'].includes(verb) || (r.channel && r.channel !== 'body')) return;
     const end = r.endedAt as {place?: string | null; placePath?: string[]} | undefined;
     if (r.phase === 'completed' && ['walk', 'stroll', 'hang-out', 'approach', 'go-near'].includes(verb)) {deliver('arrive', {receipt: {id: r.id, capability: r.capability, phase: r.phase}, placeId: end?.place ?? null, placePath: end?.placePath ?? [], ...(r.chosen ? {chosen: r.chosen} : {}), endedAt: r.endedAt ?? null}); return;}
@@ -105,10 +105,10 @@ export class Intents {
     }
   }
   private eta(P: Perception, at: V2): {distance: number; eta: string; route: 'planned' | 'estimate'} {
-    const engine = this.L.host.engine as unknown as {routeEstimateV1?: (a: string, to: V2) => {ok: true; metres: number} | {ok: false}};
+    const engine = this.L.mw as unknown as {routeEstimateV1?: (a: string, to: V2) => {ok: true; metres: number} | {ok: false}};
     let r = engine.routeEstimateV1?.(P.soul.entityId, at);
     // a seat or a pond is not standing ground: plan to the nearest standing spot beside it instead
-    if (r && !r.ok) {const near = (this.L.host.engine as unknown as {nearestStandableV1?: (p: V2, except?: string) => V2 | null}).nearestStandableV1?.(at, P.soul.entityId); if (near) r = engine.routeEstimateV1?.(P.soul.entityId, near);}
+    if (r && !r.ok) {const near = this.L.mw.nearestStandableV1?.(at, P.soul.entityId); if (near) r = engine.routeEstimateV1?.(P.soul.entityId, near);}
     if (r && r.ok) return {distance: round1(r.metres), eta: durationWord(walkSeconds(r.metres)), route: 'planned'};
     const d = dist2(P.pos!, at) * 1.25; return {distance: round1(d), eta: '~' + durationWord(walkSeconds(d)), route: 'estimate'};
   }
@@ -248,11 +248,11 @@ export class Intents {
 
   /** turn {heading} | {face: soul} | {target: thing/soul/place}: the body turns when it is free and standing, else the head. */
   private turn(P: Perception, s: Record<string, unknown>): Resolution {
-    const until = this.L.host.engine.world.tick + FACE_SECONDS * 20;
+    const until = this.L.mw.world.tick + FACE_SECONDS * 20;
     if (s.heading !== undefined) {
       const h = Number(s.heading); if (!Number.isFinite(h)) return no('capability.params', 'heading must be compass degrees (0 = north, 90 = east).');
       const deg = ((Math.round(h) % 360) + 360) % 360, yaw = yawOfHeading(deg), ahead: V2 = [P.pos![0] + 6 * Math.sin(deg * Math.PI / 180), P.pos![1] - 6 * Math.cos(deg * Math.PI / 180)];
-      return {ok: true, kind: 'attention', capability: `turn:${deg}`, yaw, gaze: {at: ahead, until: this.L.host.engine.world.tick + LOOK_SECONDS * 20, kind: 'turn'}, chosen: {heading: deg}};
+      return {ok: true, kind: 'attention', capability: `turn:${deg}`, yaw, gaze: {at: ahead, until: this.L.mw.world.tick + LOOK_SECONDS * 20, kind: 'turn'}, chosen: {heading: deg}};
     }
     const asked = str(s.face) ?? str(s.target); if (!asked) return no('capability.params', 'turn needs a heading (degrees), face (a Soul) or target (a thing, Soul or place).');
     if (/^(?:around|back|behind)$/.test(asked.toLowerCase())) return this.turn(P, {heading: (P.heading + 180) % 360});
@@ -265,7 +265,7 @@ export class Intents {
   private look(P: Perception, s: Record<string, unknown>): Resolution {
     const sec = s.seconds === undefined ? LOOK_SECONDS : Number(s.seconds);
     if (!Number.isInteger(sec) || sec < 1 || sec > LOOK_SECONDS_MAX) return no('capability.params', `seconds must be an integer 1..${LOOK_SECONDS_MAX}.`);
-    const until = this.L.host.engine.world.tick + sec * 20, asked = (str(s.direction) ?? str(s.target) ?? '').toLowerCase();
+    const until = this.L.mw.world.tick + sec * 20, asked = (str(s.direction) ?? str(s.target) ?? '').toLowerCase();
     if (!asked) return no('capability.params', 'look needs a target (a thing, Soul or place) or a direction (left, right, behind, ahead).');
     const dirs: Record<string, number> = {ahead: 0, forward: 0, right: 90, behind: 180, back: 180, around: 180, left: 270};
     if (asked in dirs) {
@@ -310,10 +310,10 @@ export class Intents {
   }
   /** The attention channel: one logged edge-attention event, then a completed receipt (channel attention). */
   async attend(soul: EdgeSoul, capability: string, gaze: Gaze, yaw: number | undefined, chosen: Chosen, clientRef?: string) {
-    const tick = this.L.host.engine.world.tick;
+    const tick = this.L.mw.world.tick;
     if (gaze?.until) this.explicitUntil.set(soul.soulId, gaze.until); else this.explicitUntil.delete(soul.soulId);
     await this.L.host.enqueue('edge-attention' as never, `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, gaze, ...(yaw !== undefined ? {yaw} : {})});
-    const b = (this.L.host.engine.world as {entities: Record<string, {pose: {yaw: number}}>}).entities[soul.entityId];
+    const b = (this.L.mw.world as {entities: Record<string, {pose: {yaw: number}}>}).entities[soul.entityId];
     const turned = yaw !== undefined && b && Math.abs(((b.pose.yaw - yaw + 3 * Math.PI) % (2 * Math.PI)) - Math.PI) < 0.01 ? 'body' : gaze ? 'head' : 'none';
     const done = {...chosen, turned, ...(gaze?.until ? {holdsFor: durationWord((gaze.until - tick) / 20)} : {})};
     this.L.comms?.fading.touch?.(soul.soulId);
@@ -326,10 +326,10 @@ export class Intents {
    *  centre, the speaker included, so a talking group stands facing each other (a pair faces each other). */
   onTurn(conversation: string, speaker: string, members: string[]) {
     type Ents = {entities: Record<string, {pose: {p: number[]}}>};
-    const ents = (this.L.host.engine.world as Ents).entities, bodyOf = (id: string) => {const m = this.L.host.minds.get(id); return m ? {m, b: ents[m.entityId]} : null;};
+    const ents = (this.L.mw.world as Ents).entities, bodyOf = (id: string) => {const m = this.L.host.minds.get(id); return m ? {m, b: ents[m.entityId]} : null;};
     const sm = this.L.host.minds.get(speaker); if (!sm) return;
     const sb = ents[sm.entityId]; if (!sb) return;
-    const tick = this.L.host.engine.world.tick;
+    const tick = this.L.mw.world.tick;
     const auto = (id: string) => !(this.autoFace.get(`${id}|${conversation}`) === false || (this.autoFace.get(`${id}|${conversation}`) === undefined && this.autoFace.get(`${id}|*`) === false)) && (this.explicitUntil.get(id) ?? -1) <= tick;
     const group = [...new Set([speaker, ...members])].flatMap(id => {const x = bodyOf(id); return x?.b && !this.L.faded.has(id) && Math.hypot(x.b.pose.p[0] - sb.pose.p[0], x.b.pose.p[2] - sb.pose.p[2]) <= 12 ? [{id, ...x, b: x.b}] : [];});
     const centre: V2 | null = group.length >= 2 ? [group.reduce((a, g) => a + g.b.pose.p[0], 0) / group.length, group.reduce((a, g) => a + g.b.pose.p[2], 0) / group.length] : null;
@@ -342,14 +342,37 @@ export class Intents {
     }
   }
 
+  /** A dry run's answer for one resolved capability (the full path below and the exact-walk fast path share it). */
+  private capabilityWould(soul: EdgeSoul, cap: EdgeCapability, asked: string, params: Record<string, unknown>, note: string, extra?: Record<string, unknown>): Record<string, unknown> {
+    const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, cap);
+    return {ok: true, would: {capability: cap.id, label: cap.label, available: cap.available, ...(cap.blocked ? {blocked: cap.blocked} : {}), ...(Object.keys(params).length ? {params} : {}), channel: cap.verb === 'face' ? 'attention' : 'body',
+      ...resolvedParts(this.L,soul,cap,asked), ...(note ? {resolved: note + (extra?.with ? `. Act it with these params (act ${cap.id} '${JSON.stringify(extra)}'), or act the same words; an act without "with" is solo.` : '')} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
+  }
+  /** Latency only (continuity r3, 2026-10-30: two concurrent `resolve walk:<ref>` each built the whole-world menu and
+   *  stalled Eden 2026 ~1.9 s). A listed exact walk act would take its fast path for resolves over act's narrow bindings
+   *  (exactWalkBindings, then explicitPlaceCapability over them), never the whole menu. For such an offer the full path
+   *  below has a fixed course (no place, attention, class, strict or social rewrite: the listing holds the exact id) and
+   *  ends in capabilityWould with the same capability, so the answer is identical. Null means: take the full path. */
+  private exactWalkDryRun(soul: EdgeSoul, capability: string, params: unknown): Record<string, unknown> | null {
+    if (this.L.bodyVerbProblem(soul, capability.split(/[:\s]/)[0]!)) return null;   // as act: body refusals first
+    const exact = this.L.coreA.exactListedWalk(soul, {capability, params}); if (!exact) return null;
+    const asked = capability.trim();
+    if (explicitPlaceCapability(this.L, soul, asked, exact.caps)) return null;
+    const v = this.L.resolveOnDemand(soul, asked, exact.caps, exact.plans).v;
+    if (v.kind !== 'exact' || v.cap.id !== asked) return null;
+    return this.capabilityWould(soul, v.cap, asked, {}, '');
+  }
+
   /** POST /v1/edge/resolve: what act would do, without doing anything. */
   dryRun(soul: EdgeSoul, input: IntentInput & {capability?: unknown}): Record<string, unknown> {
     if (typeof input.capability === 'string' && input.verb === undefined) {
       const walk=walkWithDestinationWords(input.capability,[...this.L.host.minds.values()].map(m=>m.name));if(walk){const out=this.dryRun(soul,{...walk,...(input.params?{params:input.params}:{})});if(out.ok!==false)return out;
         // quality case 27: an ambiguous destination name ("the library") falls back to the walk the plain words resolve to, still inviting the companions
         const alt=walkWithFallback(this.L,soul,walk);return alt?{ok:true,would:{capability:alt.cap.id,label:alt.cap.label,available:alt.cap.available,params:{with:walk.with},channel:'body',resolved:`${input.capability} is ${alt.cap.id} with ${(walk.with as string[]).join(', ')} invited ({"with": ${JSON.stringify(walk.with)}}); they join if they accept.`}}:out;}
+      const exact = this.exactWalkDryRun(soul, input.capability, input.params); if (exact) return exact;
       // Social approaches may add an on-demand plan. Keep the dry run's additions local, just as act does.
-      const bound = this.L.coreA.binds(soul), caps = [...bound.caps], plans = new Map(bound.plans), asked = input.capability.trim();
+      // L3 (b): words resolve on the words menu; resolveText / exactWords rebuild the chosen offer exactly
+      const bound = this.L.coreA.wordsMenu(soul), caps = [...bound.caps], plans = new Map(bound.plans), asked = input.capability.trim();
       // SOULSIM-E: a far place's id the listing leaves out resolves on demand below, as act walks it (resolveText)
       const place=explicitPlaceCapability(this.L,soul,asked),onDemand=!!place&&!place.ok&&place.code==='place.unwalkable'&&this.L.onDemandId(soul,asked);if(place&&!onDemand){if(!place.ok)return place;return {ok:true,would:{capability:place.chosen.capability,channel:'body',chosen:place.chosen,...resolvedParts(this.L,soul,place.chosen.capability,asked)}};}
       const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
@@ -361,31 +384,29 @@ export class Intents {
       const social = caps.some(c => c.id === asked) ? null : this.L.together.resolve(soul, asked, caps, plans);
       if (social && 'code' in social) return {ok: false, code: social.code, reason: social.reason, did_you_mean: social.did_you_mean};
       const text = social ? social.capability || social.rest || asked : asked, extra = social?.params;
-      const r = text === asked ? this.L.coreA.resolveText(soul, asked, caps) : caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : this.L.coreA.resolveText(soul, text, caps);
+      const r = text === asked ? this.L.coreA.resolveText(soul, asked, caps) : caps.some(c => c.id === text) ? this.L.coreA.exactWords(soul, bound, text, {kind: 'exact' as const, cap: caps.find(c => c.id === text)!}) : this.L.coreA.resolveText(soul, text, caps);
       if (r.kind === 'unknown') return {ok: false, code: (r as {code?: string}).code ?? 'capability.unknown', reason: r.reason, did_you_mean: r.didYouMean,...(r.discovery?{discovery:r.discovery}:{})};
       const params = {...(r.kind === 'alias' && r.params ? r.params : {}), ...(extra ?? {})};
-      const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, r.cap), note = [social?.note, r.kind === 'alias' ? r.note : null].filter(Boolean).join('; ');
-      return {ok: true, would: {capability: r.cap.id, label: r.cap.label, available: r.cap.available, ...(r.cap.blocked ? {blocked: r.cap.blocked} : {}), ...(Object.keys(params).length ? {params} : {}), channel: r.cap.verb === 'face' ? 'attention' : 'body',
-        ...resolvedParts(this.L,soul,r.cap,asked), ...(note ? {resolved: note + (extra?.with ? `. Act it with these params (act ${r.cap.id} '${JSON.stringify(extra)}'), or act the same words; an act without "with" is solo.` : '')} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
+      return this.capabilityWould(soul, r.cap, asked, params, [social?.note, r.kind === 'alias' ? r.note : null].filter(Boolean).join('; '), extra);
     }
     const r = this.resolve(soul, input);
     if (!r.ok) return {...r};
     if (r.kind === 'capability') {
       // the concrete capability must itself be offered (or resolve) right now
-      const {caps} = this.L.coreA.binds(soul), strict = strictCheck(this.L, soul, r.capability, caps); if (strict && !this.L.onDemandId(soul, r.capability, caps)) return {ok: false, ...strict};
+      const {caps} = this.L.coreA.wordsMenu(soul), strict = strictCheck(this.L, soul, r.capability, caps); if (strict && !this.L.onDemandId(soul, r.capability, caps)) return {ok: false, ...strict};
       const v = this.L.coreA.resolveText(soul, r.capability, caps);
       if (v.kind === 'unknown') return {ok: false, code: (v as {code?: string}).code ?? 'capability.unknown', reason: v.reason, did_you_mean: v.didYouMean,...(v.discovery?{discovery:v.discovery}:{})};
       if (!v.cap.available && v.cap.blocked) return {ok: false, code: v.cap.blocked.code, reason: v.cap.blocked.reason};
       return {ok: true, would: {capability: v.cap.id, ...(r.params ? {params: r.params} : {}), channel: 'body', chosen: r.chosen,...resolvedParts(this.L,soul,v.cap)}};
     }
     if (r.kind === 'plan') {
-      const issue = this.L.host.engine.canPerform({actor: soul.entityId, label: r.label, steps: r.steps});
+      const issue = this.L.mw.feasibility.canPerform({actor: soul.entityId, label: r.label, steps: r.steps});
       if (issue && !['program.safe-stop-required', 'program.safe-stop-pending'].includes(issue.code)) return {ok: false, code: issue.code, reason: issue.message};
       return {ok: true, would: {capability: r.capability, channel: 'body', chosen: r.chosen, ...(issue ? {waitsFor: 'a safe stop of what the body is doing'} : {})}};
     }
     if (r.kind === 'setting') return {ok: true, would: {capability: r.capability, channel: 'none', chosen: r.chosen}};
-    const h = (this.L.host.engine.world as {entities: Record<string, {human?: {activity?: string; baseActivity?: string}}>}).entities[soul.entityId]?.human;
-    const free = !this.L.host.engine.programOf(soul.entityId) && (h?.activity === 'idle' || h?.activity === 'wait');
+    const h = (this.L.mw.world as {entities: Record<string, {human?: {activity?: string; baseActivity?: string}}>}).entities[soul.entityId]?.human;
+    const free = !this.L.mw.programOf(soul.entityId) && (h?.activity === 'idle' || h?.activity === 'wait');
     return {ok: true, would: {capability: r.capability, channel: 'attention', chosen: {...r.chosen, turns: r.yaw !== undefined && free ? 'body' : r.gaze ? 'head' : 'none'}}};
   }
 }
@@ -408,7 +429,7 @@ export function attentionWords(text: string): IntentInput | null {
 /** "walk with X to <place>" whose place name is ambiguous for strict place resolution: the walk its plain words resolve to. */
 export function walkWithFallback(L:EdgeLedger,soul:EdgeSoul,walk:IntentInput):{cap:EdgeCapability}|null{
  const place=(walk.target as {place?:unknown}|undefined)?.place;const companions=walk.with as string[]|undefined;if(typeof place!=='string'||!companions?.length)return null;
- const {caps}=L.coreA.binds(soul),r=L.coreA.resolveText(soul,'walk to '+place,caps);return r.kind!=='unknown'&&r.cap.verb==='walk'?{cap:r.cap}:null;
+ const {caps}=L.coreA.wordsMenu(soul),r=L.coreA.resolveText(soul,'walk to '+place,caps);return r.kind!=='unknown'&&r.cap.verb==='walk'?{cap:r.cap}:null;
 }
 export function walkWithDestinationWords(text:string,knownNames:readonly string[]=[]):IntentInput|null {
  if(text.includes(':'))return null;
