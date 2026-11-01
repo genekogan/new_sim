@@ -22,6 +22,7 @@ BUILD="$(cat "$REL/BUILD")"
 ARGS="$(sed -n 's/^SIM_WORLDS_ARGS=//p' "$CONF")"
 port="$(echo "$ARGS" | sed -n 's/.*--port \([0-9]*\).*/\1/p')"; data="$(echo "$ARGS" | sed -n 's/.*--data \([^ ]*\).*/\1/p')"
 base="$(echo "$ARGS" | sed -n 's/.*--base \([^ ]*\).*/\1/p')"
+while [[ "$base" == */ ]]; do base="${base%/}"; done
 [ -n "$port" ] && [ -n "$data" ] || { echo "no --port/--data in $CONF"; exit 1; }
 # one field of <data>/keeper.json (empty when absent)
 kj() { node -e 'try{let v=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));for(const k of process.argv[2].split("."))v=v?.[k];process.stdout.write(v==null?"":String(v))}catch{}' "$data/keeper.json" "$1"; }
