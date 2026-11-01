@@ -33,11 +33,11 @@ function origin(routes) {
 function rig(routes = {}, r2 = {}) {
   const env = { ASSETS: new FakeR2(r2) }, o = origin(routes), cache = new FakeCache(), waits = [];
   const ctx = { waitUntil: (p) => waits.push(p) };
-  const call = (path, init = {}) => handle(new Request(url(path), init), env, ctx, { fetch: o.fetch, caches: cache });
+  const call = (path, init = {}) => handle(new Request(url(path), { ...init, headers: { origin: 'https://sim.eden.art', ...init.headers } }), env, ctx, { fetch: o.fetch, caches: cache });
   const settle = () => Promise.all(waits.splice(0));
   return { env, o, cache, call, settle };
 }
-const SRC = `https://sim.eden.art/worlds/w/bench-hamlet/assets/${SHA}.glb`;
+const SRC = `https://souls.game/w/bench-hamlet/assets/${SHA}.glb`;
 const body = async (r) => new Uint8Array(await r.arrayBuffer());
 
 test('parsePath: only /w/<slug>/assets/<sha>.<ext>, strict shapes', () => {
@@ -103,7 +103,8 @@ test('hit on an object stored precompressed: Content-Encoding br, the stored byt
   const { env, call } = rig({});
   const br = new Uint8Array([1, 2, 3, 4]);
   env.ASSETS.objects.set(`w/bench-hamlet/assets/${SHA}.glb`, { bytes: br, httpMetadata: { contentType: 'model/gltf-binary', contentEncoding: 'br' }, customMetadata: { sha256: SHA } });
-  const r = await call(PATH);
+  const r = await call(PATH, { headers: { origin: 'https://souls.game' } });
+  assert.equal(r.headers.get('access-control-allow-origin'), 'https://souls.game');
   assert.equal(r.status, 200); assert.equal(r.headers.get('content-encoding'), 'br'); assert.equal(r.headers.get('content-length'), null);
 });
 
@@ -179,6 +180,7 @@ test('no binding: 500, never an origin pull', async () => {
   const o = origin({ [SRC]: { body: GLB } });
   const r = await handle(new Request(url(PATH)), {}, {}, { fetch: o.fetch, caches: null });
   assert.equal(r.status, 500); assert.equal(o.calls.length, 0);
+  assert.equal(r.headers.get('access-control-allow-origin'), null);
 });
 
 test('HEAD right after the miss answers 200 hit: the write landed before the miss answered (the live 2026-10-20 race)', async () => {
@@ -221,4 +223,41 @@ test('the R2 fake is as strict as the R2 Workers API: unknown options, two hashe
   await assert.rejects(r2.put('k', b, { sha256: sha(new Uint8Array([9])) }), /sha256 mismatch/);
   assert.equal(r2.objects.size, 0);
   assert.equal((await r2.put('k', b, { sha256: h, httpMetadata: { contentType: 'x/y', cacheControl: IMMUTABLE }, customMetadata: { sha256: h } })).size, 3);
+});
+
+
+test('CORS is per request across miss, R2, cached old responses, HEAD, OPTIONS, 304 and refusals', async () => {
+  const { call, cache, settle } = rig({ [SRC]: { body: GLB } });
+  await call(PATH); await settle();
+  // Include a cached entry from the previously deployed worker, which carried one fixed origin.
+  const cached = cache.map.get(url(PATH));
+  cached.headers.set('access-control-allow-origin', 'https://sim.eden.art');
+  cached.headers.set('timing-allow-origin', 'https://sim.eden.art');
+  for (const origin of ['https://souls.game', 'https://sim.eden.art', 'https://souls.game.evil.example', 'null', '']) {
+    for (const init of [{}, { method: 'HEAD' }, { method: 'OPTIONS' }, { headers: { 'if-none-match': `"${SHA}"` } }]) {
+      const r = await call(PATH, { ...init, headers: { ...init.headers, origin } });
+      const allowed = ['https://souls.game', 'https://sim.eden.art'].includes(origin) ? origin : null;
+      assert.equal(r.headers.get('access-control-allow-origin'), allowed);
+      assert.equal(r.headers.get('timing-allow-origin'), allowed);
+      assert.match(r.headers.get('vary'), /Origin/);
+    }
+    const refused = await call('/w/bad', { headers: { origin } });
+    assert.equal(refused.status, 400);
+    assert.equal(refused.headers.get('access-control-allow-origin'), ['https://souls.game', 'https://sim.eden.art'].includes(origin) ? origin : null);
+  }
+  cache.map.clear();
+  assert.equal((await call(PATH, { headers: { origin: 'https://souls.game' } })).headers.get('access-control-allow-origin'), 'https://souls.game');
+});
+
+test('old slug cache keys remain unchanged and misses use root launcher aliases', async () => {
+  for (const slug of ['eden-2026', 'my-mars-college-2026-3', 'mars-2027', 'eden', 'mars-college-2026', 'mars-college-2027']) {
+    const path = `/w/${slug}/assets/${SHA}.glb`;
+    const { call, env, o } = rig({ [`https://souls.game${path}`]: { body: GLB } });
+    const r = await call(path, { headers: { origin: 'https://souls.game' } });
+    assert.equal(r.status, 200);
+    assert.deepEqual(await body(r), GLB);
+    assert.equal(r.headers.get('access-control-allow-origin'), 'https://souls.game');
+    assert.equal(o.calls[0].url, `https://souls.game${path}`);
+    assert.equal(env.ASSETS.puts[0].key, path.slice(1));
+  }
 });

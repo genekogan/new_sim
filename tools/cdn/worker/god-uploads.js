@@ -7,10 +7,9 @@
 // and nothing else under /w/ (400). The R2 key mirrors the path, `w/<slug>/assets/<sha256>.<ext>`, a top-level prefix no
 // publisher uses (CDN1-3 keys all start with `assets/`), so it cannot overwrite or shadow any published object.
 //
-//   R2 hit  -> the stored object: immutable cache, Content-Type by extension, CORS for https://sim.eden.art, ETag "<sha>",
+//   R2 hit  -> the stored object: immutable cache, Content-Type by extension, CORS for the requesting allowed site, ETag "<sha>",
 //              Content-Encoding br when the object was stored precompressed; also kept in the edge cache (Cache API).
-//   R2 miss -> GET https://sim.eden.art/worlds/w/<slug>/assets/<sha>.<ext> (the god world's own immutable route; the legacy
-//              root worlds /w/<slug> serve no uploads: their /assets/ path answers the SPA page). The body is read as a
+//   R2 miss -> GET https://souls.game/w/<slug>/assets/<sha>.<ext> (old slugs resolve through launcher aliases). The body is read as a
 //              stream, counted against MAX_BYTES and hashed; only bytes whose SHA-256 equals the sha in the path are
 //              returned (200) and stored, so the bucket cannot be poisoned. Mismatch -> 502, origin 404 -> 404, any other
 //              origin status or a redirect -> 502, too large -> 502; none of these is stored or cached (no-store). The R2 write is
@@ -20,11 +19,12 @@
 // Content-Encoding br with ETag W/"<sha>"). That is left on: it is transport only, browsers and fetch decode it, and the
 // client's checks (byte count and SHA-256 of the decoded body, cdn-assets.ts) run on what the loaders get.
 //
-// The Worker holds no secrets: R2 is an object binding (env.ASSETS, bucket eden-assets). Deployment: DEPLOY.md here.
+// The Worker holds no secrets: R2 is an object binding (env.ASSETS, bucket eden-assets). Deployment: README.md here.
 // Tests: god-uploads.test.mjs (fake R2, fake origin, fake edge cache). Post-deploy proof: verify-worker.mjs.
 
 export const APP_ORIGIN = 'https://sim.eden.art';
-export const ORIGIN = 'https://sim.eden.art';
+export const APP_ORIGINS = [APP_ORIGIN, 'https://souls.game'];
+export const ORIGIN = 'https://souls.game';
 /** God uploads are budgeted at 3 MB by default (creation limits); a world can raise its budget. 32 MiB bounds memory. */
 export const MAX_BYTES = 32 * 1024 * 1024;
 export const IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -37,12 +37,12 @@ export function parsePath(pathname) {
   return m ? { slug: m[1], sha: m[2], ext: m[3], key: `w/${m[1]}/assets/${m[2]}.${m[3]}` } : null;
 }
 
-const cors = { 'access-control-allow-origin': APP_ORIGIN, 'timing-allow-origin': APP_ORIGIN, 'access-control-expose-headers': 'x-eden-cdn, etag' };
+// Cached bytes are shared; caller-specific CORS is applied after every response, including old edge entries.
 function refuse(status, reason, method) {
-  return new Response(method === 'HEAD' ? null : JSON.stringify({ error: reason }) + '\n', { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-eden-cdn': `refused:${reason}`, ...cors } });
+  return new Response(method === 'HEAD' ? null : JSON.stringify({ error: reason }) + '\n', { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-eden-cdn': `refused:${reason}` } });
 }
 function objectHeaders(p, obj, state) {
-  const h = new Headers({ 'content-type': obj?.httpMetadata?.contentType || TYPES[p.ext], 'cache-control': IMMUTABLE, etag: `"${p.sha}"`, 'x-eden-cdn': state, ...cors });
+  const h = new Headers({ 'content-type': obj?.httpMetadata?.contentType || TYPES[p.ext], 'cache-control': IMMUTABLE, etag: `"${p.sha}"`, 'x-eden-cdn': state });
   const enc = obj?.httpMetadata?.contentEncoding;
   if (enc) h.set('content-encoding', enc); else if (obj && Number.isSafeInteger(obj.size)) h.set('content-length', String(obj.size));
   return h;
@@ -69,21 +69,21 @@ async function readCapped(body, max) {
 
 /**
  * The handler. `deps` exists for the local tests: `fetch` (the origin), `caches` (the edge cache; absent = none),
- * `subtle` (Web Crypto), `origin` (a loopback stand-in for sim.eden.art). In Cloudflare these are the runtime's own.
+ * `subtle` (Web Crypto), `origin` (a loopback stand-in for souls.game). In Cloudflare these are the runtime's own.
  */
-export async function handle(request, env, ctx, deps = {}) {
+async function respond(request, env, ctx, deps = {}) {
   const originFetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
   const edge = 'caches' in deps ? deps.caches : globalThis.caches?.default;
   const subtle = deps.subtle ?? globalThis.crypto.subtle;
   const origin = deps.origin ?? ORIGIN;   // tests and the local stand-in only
   const method = request.method.toUpperCase();
-  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET, HEAD', 'access-control-allow-headers': '*', 'access-control-max-age': '86400' } });
+  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'access-control-allow-methods': 'GET, HEAD', 'access-control-allow-headers': '*', 'access-control-max-age': '86400' } });
   if (method !== 'GET' && method !== 'HEAD') return refuse(405, 'method', method);
   const url = new URL(request.url);
   const p = url.search ? null : parsePath(url.pathname);
   if (!p) return refuse(400, 'path', method);
   if (!env?.ASSETS) return refuse(500, 'binding', method);
-  if (notModified(request, p)) return new Response(null, { status: 304, headers: { etag: `"${p.sha}"`, 'cache-control': IMMUTABLE, ...cors } });
+  if (notModified(request, p)) return new Response(null, { status: 304, headers: { etag: `"${p.sha}"`, 'cache-control': IMMUTABLE } });
 
   const cacheKey = new Request(`https://assets.eden.art/${p.key}`, { method: 'GET' });
   if (method === 'GET' && edge) {
@@ -107,7 +107,7 @@ export async function handle(request, env, ctx, deps = {}) {
   if (obj) await obj.arrayBuffer().catch(() => {});   // a stray object without our metadata is never served; re-pulled below
 
   // Miss: pull from the god world's own route, verify, store.
-  const source = `${origin}/worlds/w/${p.slug}/assets/${p.sha}.${p.ext}`;
+  const source = `${origin}/w/${p.slug}/assets/${p.sha}.${p.ext}`;
   let res;
   try { res = await originFetch(source, { method: 'GET', redirect: 'manual', headers: { accept: '*/*', 'user-agent': 'eden-assets-pull/1 (god-uploads worker)' } }); }
   catch { return refuse(502, 'origin-unreachable', method); }
@@ -131,6 +131,21 @@ export async function handle(request, env, ctx, deps = {}) {
   const headers = objectHeaders(p, { httpMetadata: meta, size: bytes.byteLength }, state);
   if (edge) ctx?.waitUntil?.(edge.put(cacheKey, new Response(bytes, { headers: { ...Object.fromEntries(headers), 'x-eden-cdn': 'hit' } })).catch((e) => logError('edge cache put', p, e)));
   return new Response(bytes, { status: 200, headers });
+}
+
+export async function handle(request, env, ctx, deps = {}) {
+  const response = await respond(request, env, ctx, deps);
+  // Mutate our response rather than reconstruct it: precompressed R2 responses retain encodeBody: manual.
+  for (const name of ['access-control-allow-origin', 'timing-allow-origin', 'access-control-expose-headers']) response.headers.delete(name);
+  const origin = request.headers.get('origin');
+  if (APP_ORIGINS.includes(origin)) {
+    response.headers.set('access-control-allow-origin', origin);
+    response.headers.set('timing-allow-origin', origin);
+    response.headers.set('access-control-expose-headers', 'x-eden-cdn, etag');
+  }
+  const vary = response.headers.get('vary');
+  if (!vary?.split(',').some((part) => part.trim().toLowerCase() === 'origin')) response.headers.set('vary', vary ? `${vary}, Origin` : 'Origin');
+  return response;
 }
 
 export default { fetch: (request, env, ctx) => handle(request, env, ctx) };
