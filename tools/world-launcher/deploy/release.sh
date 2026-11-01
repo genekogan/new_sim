@@ -18,7 +18,9 @@
 set -euo pipefail
 # The box: [SIM_DEPLOY_USER@]SIM_DEPLOY_HOST from the environment or deploy.env (deploy.env.example); only needed to upload.
 . "$(dirname "$0")/deploy-env.sh"
-STAGE=staging; ACTIVATE=1; LOCAL=""; RESTART=""; HOW=""; BASE="${SIM_WORLDS_BASE:-/worlds}"
+STAGE=staging; ACTIVATE=1; LOCAL=""; RESTART=""; HOW=""; BASE="${SIM_WORLDS_BASE-/worlds}"
+while [[ "$BASE" == */ ]]; do BASE="${BASE%/}"; done
+[[ -z "$BASE" || "$BASE" =~ ^/[a-z][a-z0-9-]{0,31}$ ]] || { echo "SIM_WORLDS_BASE must be / or one path segment"; exit 2; }
 while [ $# -gt 0 ]; do case "$1" in staging|production|legacy) STAGE="$1";; --no-activate) ACTIVATE=0;; --restart) RESTART=1; HOW=--restart;; --reload) HOW=--reload;; --local) LOCAL="$2"; shift;; *) echo "usage: $0 [staging|production|legacy] [--no-activate] [--restart|--reload] | --local <dir>"; exit 2;; esac; shift; done
 # CDN1: the asset CDN switch (default on; SIM_ASSETS_CDN_ENABLED=0 turns it off for one release), see the web build below.
 CDN="${SIM_ASSETS_CDN_ENABLED-1}"

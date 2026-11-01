@@ -121,7 +121,7 @@ export function decorateCommand({ cmd, args, env }, s) {
   Object.assign(out, { MIND_DRIVER: 'edge', BRAIN_MODE: 'fake', ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '' });
   if (s.devAuth) out.DEV_AUTH = '1'; else out.DEV_AUTH = '0';
   out.PUBLIC_URL = s.publicOrigin;
-  if (out.WORLD_KEY) out.WORLD_PATH = `${s.base ?? ''}/w/${out.WORLD_KEY}`;
+  if (out.WORLD_KEY) out.WORLD_PATH = `${s.base ?? ''}/w/${out.WORLD_SLUG ?? out.WORLD_KEY}`;
   // this release's identity, not a BUILD_ID that a shared settings file may carry for another release
   if (s.build && s.build !== 'dev') out.BUILD_ID = s.build;
   if (s.worldHeapMb) out.NODE_OPTIONS = `--max-old-space-size=${s.worldHeapMb}`;

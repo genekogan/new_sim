@@ -25,3 +25,13 @@ test('bootstrap config carries the world title, never the slug', async t => {
   assert.equal((await cfgOf(app(f, 'littlemartians'))).worldName, 'Little Martians', 'shared old world keeps its title');
   assert.equal((await cfgOf(app(f, 'mars'))).worldName, 'Mars');
 });
+
+
+test('renamed world publishes canonical routing and engine kind without changing its world identity', async t => {
+  const f = fixture(':memory:'); f.brain.quiesce(); t.after(() => { f.host.stop(); f.db.close(); });
+  const cfg = { ...config, worldKey: 'eden-2026', worldSlug: 'eden', worldEngine: true, worldPath: '/w/eden', publicUrl: 'http://localhost/w/eden', accountAuthRequired: false };
+  const a = buildApp({ cfg, db: f.db, host: f.host, auth: f.auth, brain: f.brain, souls: f.souls, hub: { clients: new Map(), refreshMe() {} } as never });
+  const body = await (await a.request('/v1/config')).json() as Record<string, unknown>;
+  assert.equal(body.worldKey, 'eden'); assert.equal(body.worldPath, '/w/eden'); assert.equal(body.worldId, f.host.worldId); assert.equal(body.worldEngine, true);
+  assert.equal(cfg.worldKey, 'eden-2026');
+});
