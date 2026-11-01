@@ -104,7 +104,8 @@ export function itemPresentation(transfer:ItemTransferV1|undefined,held:{left?:s
  // After release the engine keeps the hand at its rest point through recovery: the drawn arm eases from it to the clip.
  // A pick-up's recovery ends holding the item: no gesture comes back (it would be cut when the record clears), only
  // the reach-start fade runs out.
- if(transfer.releaseTick!==undefined&&transfer.mode==='put'&&!holding){const u=(tick-transfer.releaseTick)*dt;return{weight:1-smooth(u/ITEM_PUT_ARM_BACK),idleBlend:smooth((u-ITEM_PUT_GESTURE_DELAY)/(ITEM_PUT_RECOVERY_SECONDS-ITEM_PUT_GESTURE_DELAY)),...posture};}
+ // (not a hand-over's giver, `hold`: entry 41 returns its arm to the standing clip first, below)
+ if(transfer.releaseTick!==undefined&&transfer.mode==='put'&&!holding&&!transfer.hold){const u=(tick-transfer.releaseTick)*dt;return{weight:1-smooth(u/ITEM_PUT_ARM_BACK),idleBlend:smooth((u-ITEM_PUT_GESTURE_DELAY)/(ITEM_PUT_RECOVERY_SECONDS-ITEM_PUT_GESTURE_DELAY)),...posture};}
  if(transfer.releaseTick!==undefined){const r=smooth((tick-transfer.releaseTick)*dt/ITEM_RECOVERY_SECONDS);
   // a giver after a hand-over: the arm goes back to the plain standing clip first, and only then does an idle gesture
   // come in, slowly (take 3: folded arms blending in over the arm's own recovery swung both hands out in front first)
