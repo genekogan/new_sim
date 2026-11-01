@@ -12,11 +12,16 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REQUIRED_STEPS, scopeFor } from '../../tools/test-harness/release-gate.mjs';
 
-// The qualify matrix (unchanged from the manual workflow). `steps` are the gate steps that make a job relevant;
-// `assets` says whether the job pulls media first. Keep this list and the case block in ci.yml in step.
+// The qualify matrix. `steps` are the gate steps that make a job relevant, and the job runs the same command as that
+// step in tools/test-harness/one-validation.sh (web: V4-web, launcher: V3-launcher-unit, client-cli: V3-client-cli);
+// `assets` says whether the job pulls media first. Keep this list and the case block in ci.yml in step;
+// ci-scope.test.mjs checks that every step the scope map can select has a job.
 export const JOBS = [
   { name: 'types-web', kind: 'types-web', assets: true, steps: ['V1-types', 'V2-build-root', 'V2-build-worlds', 'V3-bundle'] },
-  { name: 'packages', kind: 'packages', assets: true, steps: ['V3-packages', 'V4-web', 'V3-walk'] },
+  { name: 'packages', kind: 'packages', assets: true, steps: ['V3-packages', 'V3-walk'] },
+  { name: 'web', kind: 'web', assets: true, steps: ['V4-web'] },
+  { name: 'launcher', kind: 'launcher', assets: true, steps: ['V3-launcher-unit'] },
+  { name: 'client-cli', kind: 'client-cli', assets: true, steps: ['V3-client-cli'] },
   { name: 'native', kind: 'native', assets: true, steps: ['V3-mars-engine'] },
   { name: 'latency', kind: 'latency', assets: false, steps: ['V5-server-full'] },
   { name: 'server-0', kind: 'server', shard: 0, assets: true, steps: ['V5-server-full', 'V6-'] },
