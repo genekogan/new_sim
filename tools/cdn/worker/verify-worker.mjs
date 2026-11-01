@@ -8,7 +8,7 @@
 // scratch god world with the folder's own god session (the session file is read by path and never printed), then:
 //   1. origin   GET <world>/assets/<sha>.glb is 200 and hashes to <sha>;
 //   2. absent   HEAD https://assets.eden.art/w/<slug>/assets/<sha>.glb is 404 (HEAD never pulls);
-//   3. miss     GET  same URL: 200, x-eden-cdn miss, immutable, model/gltf-binary, CORS sim.eden.art, ETag "<sha>" (or
+//   3. miss     GET  same URL: 200, x-eden-cdn miss, immutable, model/gltf-binary, CORS matching the allowed app origin, ETag "<sha>" (or
 //               W/"<sha>" when Cloudflare compressed it on the way out: Content-Encoding br/gzip/zstd is transport only),
 //               the DECODED body hashes to <sha> with the upload's byte count;
 //   4. stored   HEAD at once: 200 hit (the Worker awaits its R2 write before the miss answers, so no wait is allowed);
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../../..');
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const sha = (b) => createHash('sha256').update(b).digest('hex');
-const APP = 'https://sim.eden.art';
+const APPS = ['https://sim.eden.art', 'https://souls.game'];
 
 /** A minimal valid GLB: one triangle, random vertices (a fresh sha every run), about 1 m tall. */
 export function triangleGlb() {
@@ -64,10 +64,10 @@ function coreKey() {
   return Object.values(m.assets).find((a) => /^assets\/[0-9a-f]{2}\//.test(a.key) && a.bytes < 200_000)?.key ?? null;
 }
 
-export async function verify({ cdn, world, token, slug, fetch: f = fetch }) {
+export async function verify({ cdn, world, token, slug, app = new URL(world).origin, fetch: f = fetch }) {
   const checks = [], note = (name, ok, detail = {}) => { checks.push({ name, ok: !!ok, ...detail }); return !!ok; };
   const get = async (url, init = {}) => {
-    const r = await f(url, { ...init, headers: { origin: APP, ...(init.headers ?? {}) } });
+    const r = await f(url, { ...init, headers: { origin: app, ...(init.headers ?? {}) } });
     const body = init.method === 'HEAD' ? Buffer.alloc(0) : Buffer.from(await r.arrayBuffer());
     const h = Object.fromEntries(['x-eden-cdn', 'cache-control', 'content-type', 'access-control-allow-origin', 'content-encoding', 'etag', 'cf-cache-status'].map((k) => [k, r.headers.get(k)]));
     return { status: r.status, h, bytes: body.length, sha: body.length ? sha(body) : null };
@@ -89,15 +89,19 @@ export async function verify({ cdn, world, token, slug, fetch: f = fetch }) {
   const etagOk = (e) => e === `"${s}"` || e === `W/"${s}"`, encodingOk = (e) => e === null || ['br', 'gzip', 'zstd'].includes(e);
   const m = await get(url, { headers: { 'accept-encoding': 'br' } });
   note('miss: pulled, verified, returned', m.status === 200 && m.h['x-eden-cdn'] === 'miss' && m.sha === s && m.bytes === asset.bytes &&
-    m.h['cache-control'] === 'public, max-age=31536000, immutable' && m.h['content-type'] === 'model/gltf-binary' && m.h['access-control-allow-origin'] === APP &&
+    m.h['cache-control'] === 'public, max-age=31536000, immutable' && m.h['content-type'] === 'model/gltf-binary' && m.h['access-control-allow-origin'] === app &&
     etagOk(m.h.etag) && encodingOk(m.h['content-encoding']), { status: m.status, ...m.h, bytes: m.bytes });
   // 4. stored: the miss answered only after its R2 write, so HEAD (never the edge cache) sees it at once; then a GET
   const h1 = await get(url, { method: 'HEAD' });
   note('HEAD right after the miss: 200 hit (stored in R2)', h1.status === 200 && h1.h['x-eden-cdn'] === 'hit', { status: h1.status, worker: h1.h['x-eden-cdn'] });
   const hit = await get(url, { headers: { 'accept-encoding': 'br' } });
-  note('second GET: from R2 or the edge cache, same bytes', hit.status === 200 && ['hit', 'edge'].includes(hit.h['x-eden-cdn']) && hit.sha === s && hit.bytes === asset.bytes && hit.h['access-control-allow-origin'] === APP && etagOk(hit.h.etag), { status: hit.status, ...hit.h });
+  note('second GET: from R2 or the edge cache, same bytes', hit.status === 200 && ['hit', 'edge'].includes(hit.h['x-eden-cdn']) && hit.sha === s && hit.bytes === asset.bytes && hit.h['access-control-allow-origin'] === app && etagOk(hit.h.etag), { status: hit.status, ...hit.h });
   const plain = await get(url, { headers: { 'accept-encoding': 'identity' } });
   note('identity client gets the same decoded bytes', plain.status === 200 && plain.sha === s, { status: plain.status, encoding: plain.h['content-encoding'] });
+  for (const origin of [...APPS, 'https://untrusted.example']) {
+    const cross = await get(url, { headers: { origin } });
+    note(`CORS after cache warm: ${origin}`, cross.status === 200 && cross.sha === s && cross.h['access-control-allow-origin'] === (APPS.includes(origin) ? origin : null), { status: cross.status, cors: cross.h['access-control-allow-origin'] });
+  }
   // 5. refusals
   const bad = await get(`${cdn}/w/${slug}/assets/${s}.exe`);
   note('malformed path: 400', bad.status === 400 && bad.h['cache-control'] === 'no-store', { status: bad.status, worker: bad.h['x-eden-cdn'] });
@@ -126,12 +130,12 @@ async function selfTest() {
   const listen = (fn) => new Promise((ok) => { const srv = createServer(fn); srv.listen(0, '127.0.0.1', () => ok(srv)); });
   const world = await listen(async (req, res) => {
     const u = new URL(req.url, 'http://x');
-    if (req.method === 'POST' && u.pathname === '/worlds/w/bench-hamlet/v1/god/assets') {
+    if (req.method === 'POST' && u.pathname === '/w/bench-hamlet/v1/god/assets') {
       if (req.headers.authorization !== 'Bearer self-test') { res.writeHead(401).end(); return; }
       const parts = []; for await (const c of req) parts.push(c); const b = Buffer.concat(parts), s = sha(b);
       store.set(s, b); res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ ok: true, asset: { sha: s, ext: 'glb', bytes: b.length } })); return;
     }
-    const m = /^\/worlds\/w\/bench-hamlet\/assets\/([0-9a-f]{64})\.glb$/.exec(u.pathname);
+    const m = /^\/w\/bench-hamlet\/assets\/([0-9a-f]{64})\.glb$/.exec(u.pathname);
     if (m && store.has(m[1])) { res.writeHead(200, { 'content-type': 'model/gltf-binary' }).end(store.get(m[1])); return; }
     if (m && m[1] === ren) { res.writeHead(200, { 'content-type': 'model/gltf-binary' }).end(Buffer.from('a smaller rendition')); return; }
     res.writeHead(404, { 'content-type': 'application/json' }).end('{"error":"not-found"}');
@@ -157,7 +161,7 @@ async function selfTest() {
     await Promise.all(waits);
   });
   try {
-    return await verify({ cdn: `http://127.0.0.1:${worker.address().port}`, world: `http://127.0.0.1:${wport}/worlds/w/bench-hamlet/`, token: 'self-test', slug: 'bench-hamlet' });
+    return await verify({ cdn: `http://127.0.0.1:${worker.address().port}`, world: `http://127.0.0.1:${wport}/w/bench-hamlet/`, token: 'self-test', slug: 'bench-hamlet', app: 'https://souls.game' });
   } finally { world.close(); worker.close(); }
 }
 
@@ -168,8 +172,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   else {
     const dir = opt('god'); if (!dir) throw Error('usage: verify-worker.mjs --god <god folder> [--out receipt.json] [--cdn https://assets.eden.art] | --self-test');
     const { world, token } = session(resolve(dir));
-    const slug = /\/worlds\/w\/([a-z][a-z0-9-]{0,31})\/$/.exec(new URL(world).pathname)?.[1];
-    if (!slug || new URL(world).origin !== APP) throw Error(`the god folder's world is not a ${APP}/worlds/w/<slug> world`);
+    const slug = /^\/(?:worlds\/)?w\/([a-z][a-z0-9-]{0,31})\/$/.exec(new URL(world).pathname)?.[1];
+    if (!slug || !APPS.includes(new URL(world).origin)) throw Error('the god folder must name an allowed app origin and /w/<slug>/ or /worlds/w/<slug>/');
     result = { mode: 'live', world, at: new Date().toISOString(), ...(await verify({ cdn: opt('cdn', 'https://assets.eden.art'), world, token, slug })) };
   }
   const failed = result.checks.filter((c) => !c.ok);
