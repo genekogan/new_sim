@@ -21,6 +21,7 @@ import {Fading} from './fading.ts';
 import {ensureCommsSchema,tx,afterCommit} from './store.ts';
 import {EventStreams, parseCursor} from './stream.ts';
 import {Webhooks, type Fetch} from './webhook.ts';
+import {TokenBuckets} from '../../flood.ts';
 
 export type CommsOptions = {
   now?: () => number;
@@ -56,7 +57,7 @@ export type CommsRuntime = {
   /** Narration/world text to one Soul, some Souls, or every live Soul. */
   publishWorld(text: string, to?: string[]): void;
   /** Spectator `edge` messages (§7) for the hub to broadcast. */
-  onSpectator(listener: (m: SpectatorEdgeMessage) => void): void;
+  onSpectator(listener: (m: SpectatorEdgeMessage) => void): () => void;
   /** Standing spectator state a newly joined viewer needs: the fade roster (also re-broadcast each sweep), then the
    *  recent dialogue (`speech` / `conversation.turn`, marked `replay: true`; see dialogue-replay.ts). */
   spectatorJoin(): SpectatorEdgeMessage[];
@@ -80,7 +81,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     nameMetadata:id=>deps.host.publicNameMetadata?.(id)??{},
     liveSoulIds: () => deps.db.liveSouls(worldId).map(s => s.id),
     isLive: id => { const s = deps.db.soul(id); return !!s && s.world_id === worldId && s.retired_at === null; },
-    spectate: m => { if (!spectators.length) return; const msg = structuredClone({type:'edge',at:now(),...m}) as SpectatorEdgeMessage;afterCommit(db,()=>{for(const l of spectators)try{l(msg);}catch{/* never break comms */}}); },
+    spectate: m => { if (!spectators.length) return; const msg = structuredClone({type:'edge',at:now(),...m}) as SpectatorEdgeMessage;afterCommit(db,()=>{for(const l of [...spectators])try{l(msg);}catch{/* never break comms */}}); },
   };
   const conversations = new Conversations(core, options.conversationTimeoutMs ?? 10 * 60_000, options.inviteTimeoutMs ?? 2 * 60_000);
   const webhooks = new Webhooks(core, options.fetch === null ? undefined : options.fetch ?? (globalThis.fetch as unknown as Fetch));
@@ -91,7 +92,9 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(projectKind);
   objects.register(calendarKind);
   objects.register(rideKind);
-  deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
+  // Audited read-only object offers cannot replace a walk. The ledger still
+  // evaluates/validates this projection; a future non-object offer falls back.
+  deps.ledger.addCapabilityProvider((soul, only, places) => objects.capabilities(soul, only, places),{exactWalk:'objects-only'});
   const steward = new Steward(core, options.stewardToken);
   const fading = new Fading(core, steward, options.fading === true, options.beam);
   core.isFaded = id => fading.status(id)?.colour === 'gone';
@@ -179,7 +182,17 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     if(b.accepted)fading.touch(soul.soulId);
     return b.accepted ? {...rest, receipt: b.receipt} : {accepted: false, code: b.code, reason: b.reason, object: id, action: out.action};
   }));
-  app.get('/v1/edge/calendar', c => c.json(edgeBody({tick: core.tick(), items: objects.all().filter(o => o.kind === 'calendar-item' && (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)}))})));
+  // Public (no Soul token). L8: the items are serialized once per object-table change, not per request, and one visitor
+  // address may read it 60 times a minute (a request with no x-forwarded-for came from this machine: no limit).
+  const calendarReads = new TokenBuckets(1, 60);
+  let calendarItems: {changes: number; json: string} | undefined;
+  app.get('/v1/edge/calendar', c => {
+    const xff = c.req.header('x-forwarded-for'), wait = xff ? calendarReads.take(xff.split(',')[0].trim()) : 0;
+    if (wait) { c.header('Retry-After', String(Math.ceil(wait / 1000))); return failure(c, new EdgeError(429, 'rate-limited', 'More than 60 calendar reads a minute from your address; wait a moment.')); }
+    const changes = objects.generation();
+    if (calendarItems?.changes !== changes) calendarItems = {changes, json: JSON.stringify(objects.ofKind('calendar-item').filter(o => (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)})))};
+    return c.body(`${JSON.stringify(edgeBody({tick: core.tick()})).slice(0, -1)},"items":${calendarItems.json}}`, 200, {'Content-Type': 'application/json'});
+  });
   app.get('/v1/edge/digest', route(() => ({digest: steward.latestDigest()})));
 
   // Steward session endpoints (not Soul-authenticated).
@@ -275,7 +288,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
       for (const id of to ?? core.liveSoulIds()) streams.deliver(id, 'world', tick, {text});
       core.spectate({kind: 'world', tick, text});
     },
-    onSpectator(l) { spectators.push(l); },
+    onSpectator(l) { spectators.push(l); return () => {const i=spectators.indexOf(l);if(i>=0)spectators.splice(i,1);}; },
     spectatorJoin: () => { let replay: SpectatorEdgeMessage[] = []; try { replay = dialogueReplay(core); } catch { /* history is optional */ } return [...roster(), ...replay]; },
     sweep,
     close() { closed = true; if (timer) clearInterval(timer); cancelSweep(); webhooks.close(); streams.wakeAll(); },

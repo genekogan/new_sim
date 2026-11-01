@@ -270,3 +270,34 @@ test('C1b #12: sit:here chooses the nearest usable seat and named sit reports th
   const named = await accept(w.host, w.edge.act(s, { verb: 'sit', target: inner })); assert.equal(named.accepted, false); assert.equal((named as any).code, 'site.under-construction');
   const result = await accept(w.host, w.edge.act(s, { capability: 'sit:here' })); assert.equal(result.accepted, true, JSON.stringify(result));
 });
+
+test('L4 item 5: build events re-perceive only the layered things under the site, and end where a whole pass ends', async t => {
+  const w = world(t);
+  const comms = registerEdgeComms(new Hono(), { host: w.host, db: w.db, souls: w.souls, soul: edgeSoulResolver(w.host, w.souls, () => undefined), ledger: w.edge } as any, { sweepMs: 0 } as any); w.edge.attachComms(comms as any);
+  t.after(() => comms.close?.());
+  await w.build();
+  const r = w.god.act({ ops: [{ op: 'set', id: 'church', owner: 'soul:Other', access: 'private' }, { op: 'place', def: coreRef('fountain'), name: 'far-fountain', p: [60, 60], owner: 'soul:Other' }] }); assert.equal(r.accepted, true, JSON.stringify(r));
+  await w.settle(3);
+  const P = w.bridge.perceive as any; P.sync(true);
+  const wanted = () => JSON.stringify([...(P.desired as Map<string, unknown>).entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+  const church = w.god.model.get('church')!.id;
+  const check = async (label: string, fn: () => void) => {
+    const runs = P.stats.runs; fn();
+    for (let i = 0; i < 200 && (P.pending() || P.stats.runs === runs); i++) await w.settle(1);
+    assert.equal(P.pending(), false, `${label}: caught up`);
+    assert.equal(P.stats.lastFull, false, `${label}: no whole pass`);
+    assert.ok(P.stats.lastIds <= 2, `${label}: only the layered things under the site (${P.stats.lastIds})`);
+    const inc = wanted(); P.sync(true); assert.equal(inc, wanted(), `${label}: equals a whole pass`);
+    return JSON.parse(inc).find(([id]: [string]) => id === church)?.[1]?.what as string;
+  };
+  assert.match(await check('started', () => w.start({ include: ['church', 'church/pew', 'church/bed'].map((n) => w.god.model.get(n)!.id) })), /under construction \(step 1\/2: shell\)/);
+  assert.doesNotMatch(await check('done', () => w.god.builds.done('church', {}, w.caller)), /under construction/);
+  // the load dial: at black no background catch-up starts; back at green it does
+  w.bridge.setLoadLevel('black');
+  const g = w.god.act({ ops: [{ op: 'set', id: 'far-fountain', owner: 'soul:Ana' }] }); assert.equal(g.accepted, true);
+  for (let i = 0; i < 120; i++) await w.settle(1);
+  assert.equal(P.pending(), true, 'black: the change waits');
+  w.bridge.setLoadLevel('green');
+  for (let i = 0; i < 120 && P.pending(); i++) await w.settle(1);
+  assert.equal(P.pending(), false, 'green: caught up');
+});

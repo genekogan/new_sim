@@ -89,10 +89,14 @@ test('private mandatory recall overflow still refuses choice during pending safe
 });
 
 test('a refused native sleep-stop preview immediately restores the full registry rather than choosing from missing options',async t=>{
- const f=await setup(t,false,true),receipt=await f.submit();assert.equal(receipt.phase,'understood');const m=f.host.minds.get(f.row.id)!,original=f.brain.midContext.bind(f.brain),expected=original(m,'new-intent-v2').options,canPerform=f.host.engine.canPerform.bind(f.host.engine);let checks=0;const calls:{deferred:boolean;options:ReturnType<Brain['midContext']>['options'];checks:number}[]=[];
+ const f=await setup(t,false,true),receipt=await f.submit();assert.equal(receipt.phase,'understood');const m=f.host.minds.get(f.row.id)!,original=f.brain.midContext.bind(f.brain),canPerform=f.host.engine.canPerform.bind(f.host.engine);let checks=0;const calls:{deferred:boolean;options:ReturnType<Brain['midContext']>['options'];checks:number}[]=[];
  t.mock.method(f.host.engine,'canPerform',(...args:Parameters<typeof f.host.engine.canPerform>)=>{checks++;return canPerform(...args);});
  t.mock.method(f.brain,'midContext',(...args:Parameters<Brain['midContext']>)=>{const before=checks,ctx=original(...args);calls.push({deferred:args[2]===true,options:ctx.options,checks:checks-before});return ctx;});
- await f.brain.evaluate(m,'new-intent-v2');f.host.drainInputs();assert.equal(calls[0]?.deferred,true);assert.deepEqual(calls[0]?.options,[]);assert.equal(calls[1]?.deferred,false);assert.deepEqual(calls[1].options,expected);assert.ok(calls[1].checks>0,'the fallback actually runs native feasibility checks even when the sleeping body cannot use any option');assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-sleep-stop-v1').length,0);assert.equal(f.pose()?.standingFraction,0);assert.equal(f.db.paidCost(),0);assert.deepEqual(f.host.engine.runtime.violations,[]);
+ const at=`${f.host.engine.world.tick}|${f.host.seq}`;await f.brain.evaluate(m,'new-intent-v2');f.host.drainInputs();
+ // The oracle read comes after the fallback: menuWorldOf's LiveFeasibility caches verdicts per (tick, log seq), so reading it
+ // first would serve the fallback's checks from that cache and the engine-level count below would be 0 (gate 7caf912a7).
+ assert.equal(`${f.host.engine.world.tick}|${f.host.seq}`,at,'the refused preview changed neither tick nor log seq');const expected=original(m,'new-intent-v2').options;
+ assert.equal(calls[0]?.deferred,true);assert.deepEqual(calls[0]?.options,[]);assert.equal(calls[1]?.deferred,false);assert.deepEqual(calls[1].options,expected);assert.ok(calls[1].checks>0,'the fallback actually runs native feasibility checks even when the sleeping body cannot use any option');assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-sleep-stop-v1').length,0);assert.equal(f.pose()?.standingFraction,0);assert.equal(f.db.paidCost(),0);assert.deepEqual(f.host.engine.runtime.violations,[]);
 });
 
 test('deferred safe-wake fallback reconstructs options before native participant admission and cannot choose a denied programme',async t=>{

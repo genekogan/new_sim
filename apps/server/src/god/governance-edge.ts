@@ -39,6 +39,9 @@ function hookEdge(L: EdgeLedger, gov: Governance) {
     try { capabilities(gov, soul, caps); } catch (e) { console.error('[governance] capabilities', (e as Error).message); }
   };
 
+  // Governance adds amendment offers, never modifies an existing walk binding.
+  L.registerExactWalkProfile(L.worldProfile!,prevProfile);
+
   // ---- acts
   const act = L.act.bind(L);
   (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {

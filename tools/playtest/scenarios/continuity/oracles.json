@@ -1,0 +1,111 @@
+{
+  "schema": "continuity-oracles/1",
+  "version": 1,
+  "status": "precomparison-proposal; numeric thresholds not previously accepted or passed",
+  "provenance": {
+    "acceptedIntent": "PREFLIGHT-SOUL-CONTINUITY-20261029.md (private record, kept outside the repo)",
+    "audit": "AUDIT-SOUL-CONTINUITY-20261029.md (private record, kept outside the repo)",
+    "latencyTargetsInAudit": "provisional 2s receive / 5s host delivery / 15s visible response",
+    "commonResponseRevision": "precomparison common-response/2: native latency independent of nullable client stages; prior reports unchanged",
+    "additionalNumericValues": "fixture-author proposal on 2026-10-29; seal before comparison and retain all failed trials"
+  },
+  "policy": {
+    "trialsPerArm": 2,
+    "arms": ["existing-headless-seat", "managed-continuity-runtime"],
+    "sameModelAndEffort": true,
+    "minimumSoakRealSeconds": 7200,
+    "soakCount": 1,
+    "holdouts": ["eden-walk-three", "eden-bandstand-five"],
+    "holdoutTraceTuning": false,
+    "unknownIsNotPass": true,
+    "fixtureOrInstrumentationFailure": "infrastructure-invalid, retained separately; never convert baseline inability to act into infrastructure-invalid",
+    "behavioralFailure": "valid trial failed; retain denominator and trace",
+    "postFailureFixtureChanges": "new declared fixture/evaluation version; do not repair only treatment or quietly weaken holdout"
+  },
+  "numeric": {
+    "sampleSec": 1,
+    "maxSampleGapSec": 2,
+    "currentPositionSources": ["here", "owner", "world"],
+    "rejectPositionSource": "lastReceipt",
+    "eventCreatedToDurablyPersistedMs": 2000,
+    "persistedToHostNotifiedMs": 5000,
+    "eventCreatedToFirstRelevantPublicEffectMs": 15000,
+    "latencyAggregation": "report every sample, count, median, maximum and violations by idle/busy/travel/restart state; no p95 claim from tiny samples",
+    "healthyRunningOnlyForLatency": true,
+    "plannedUnavailableWindow": "report separately from healthy-running latency; never exclude an unplanned miss after observing it",
+    "wholeControllerRecoveryMaxMs": 25000,
+    "duplicatePublicEffectsMax": 0,
+    "lostAddressedMessagesMax": 0,
+    "readingRealHoldSec": 30,
+    "performanceRealHoldSec": 30,
+    "audienceRealOverlapSec": 15,
+    "walkGroupRealOverlapSec": 10,
+    "separationDistanceM": 12,
+    "separationRealHoldSec": 10,
+    "resumeWithinSecAfterObservedClosure": 180,
+    "soakIdleMinimumFraction": 0.75,
+    "soakIdleInferenceCallsPerHourMax": 12,
+    "soakTokenHardLimit": null,
+    "costReporting": "actual input/output/cached tokens and inference calls per actor/arm; invoice dollars only if authoritative billing exists; no invented dollar conversion"
+  },
+  "evidenceContract": {
+    "schema": "continuity-evidence/1",
+    "scenarioId": "one ID from fixtures.json",
+    "t0": "ISO UTC after successful common setup; meeting/cutoff derived from frozen offsets",
+    "fixtureVerified": "true only after both-arm geometry/start/occupancy/binding and model/effort preflight",
+    "bindings": "map stable ref -> {entityId, slot, capabilities:{walk:[],sit:[],read:[],play-music:[]}} from fresh native discovery; never infer an entity ID by string prefix",
+    "participants": "map actor ID -> {samples:[existing observer samples with current kinematics], receipts:[native receipts plus observer acceptedAtUtc/endedAtUtc metadata], reads:[{command,at}],coverageComplete:boolean} ; coverageComplete requires full declared observation interval with <=2s gaps and complete receipt enumeration; preserve original raw source pointers",
+    "effects": "all authoritative public native effects: {id,operationId?,actor,type,at,evidence:[source pointers],respondsToEventId?}. Causal response links are explicit reviewer annotations. Repeated observation of one native effect is not a duplicate. Multiple effect kinds from one operation can be legitimate; repeated intent under fresh request keys needs review.",
+    "effectAudit": "source-cited reviewer annotation {coverageComplete,evidence,logicalWrites:[{id,actor,effectIds,expectedCardinality:{effectType:maximumDistinctNativeIds},evidence,cardinalityEvidence}],crossKeyReview:{status:pass|fail,evidence}}. Enumerate every native effect, bind logical writes using request/key/recovery evidence and endpoint cardinality contracts, and separately inspect repeated intent across keys. Missing audit stays unknown; do not infer duplication from repeated text/command names or multiple distinct effect kinds.",
+    "effectsComplete": "true only if all participant public effects in the entire trial window were enumerated, including rejected/recovered/duplicate writes",
+    "notifications": "all scheduled addressed events: {eventId,actor,source:world|owner,createdAt,persistedAt?,notifiedAt?,firstRelevantEffectAt,relevantEffectId,relevanceEvidence:[source pointers],healthyRunning}; common visible-response requires native creation/effect timestamps and source-cited causal annotation, not managed journal stages. Any supplied stages must be causally ordered; actor/event/timestamp contradictions fail. Managed durable intake and host-delivery rows retain their own required timestamps and bounds. Missing linkage or relevance remains unknown.",
+    "notificationsComplete": "true only if every scheduled addressed event was enumerated; lostAddressedEventIds is an explicit array, empty only after an authoritative delivery/handling audit",
+    "disturbances": "map every declared disturbance ID -> {delivered:true,recipients:[exact frozen actor IDs],scheduledAt,deliveredAt,evidence:[source pointers],triggerProof:{kind,observedAt,evidence,...typed fields},deliveryEvents?:[{actor,eventId,source:world|owner,createdAt,evidence}]}. Dates are authoritative UTC/observer timestamps. Fixed schedules bind to T0+offsetSec. Dynamic kinds bind to native trigger proof. Every trigger.maximumDelaySec is frozen per fixture; missing proof remains unknown, supplied schedule/recipient/time/trigger contradictions fail. For world/owner delivery, enumerate native per-recipient events with matching notifications actor/event/source/createdAt; deliveredAt is the latest native event creation time, never merely a successful action POST",
+    "disturbanceTriggerProofs": "scheduled-event: observedAt plus native per-recipient delivery events. scheduled-release/initial-supplement: releasedAt,initialInstructionId and source pointers; model-chosen questions/revisions remain initial supplements, not later speaking prompts. staggered-releases: releases:[{actor,scheduledAt,deliveredAt,initialInstructionId,evidence}], each matching the frozen release offset and delay; aggregate scheduledAt is first schedule, deliveredAt/observedAt are last actual release. moving-body-journey: receiptId,motionOnsetFromAt,motionOnsetAt,motionFromAt,motionToAt; both current body sample pairs must show motion <=2s apart under the first declared native journey receipt; scheduledAt=motionOnsetAt+5s, observedAt=motionToAt, maximum trigger wait180s. garden-group-overlap: overlapFrom,overlapTo, with all three current body windows in the garden for the frozen duration; scheduledAt=observedAt=overlapTo. occupied-seat: receiptId,seatRef and observedAt, with fixtureActors native receipt/current held-seat samples continuously through trial end; scheduledAt is native acceptance and deliveredAt=observedAt<=T0. checkpoint-future-wake: checkpointId,checkpointAt,wakeAt, with durable checkpoint before observedAt and >=20s future wake; scheduledAt=observedAt, deliveredAt=restart.deathAt",
+    "fixtureActors": "map fixture-only actor ID (e.g. seat-occupant) -> {samples,receipts,coverageComplete}; same current/native evidence rules as participants, but no model or host thread is required. Occupied seat bindings must be exact. Retain the exact setup sample at triggerProof.observedAt and continuous samples through cutoff plus the first sample at/after cutoff. Matching native seat/posture/region on both sides may bracket cutoff only when their gap is <=maxSampleGapSec; a post-cutoff sample is fixture verification only and never credits participant behavior or extends the trial. Missing bracket/current state or excessive gap is unknown; native contrary occupancy inside the required interval fails. An exact-cutoff sample is permitted but not required",
+    "setup": "source-backed original setup identity: {id,worldId,evidence:[source pointers],actors:{actorId:{soulId,journalId,threadId}}}; journalId is a stable opaque runtime-store identity, never a credential; original actor/world/Soul/host identity must remain explicit on restart",
+    "restart": "{actor,setupId,worldId,soulId,journalBefore,journalAfter,threadBefore,threadAfter,threadResumed,wholeControllerKilled,deathAt,recoveredAt,sameJournal,originalIntentRetained,operationReconciled,evidence}; IDs must match original setup and original actor scope. threadResumed must agree with actual before/after thread IDs. Report journal+resumed-thread versus journal+fresh-thread separately; never describe same-thread recovery as journal-only. Retained intent requires factual checkpoint and semantic review",
+    "presentation": "Mars only: {startedAt,endedAt,speechIds:[all native presenter talk/close effect IDs],evidence:[timestamped world-visible lifecycle source pointers],coverageComplete:boolean}; the actual talk interval must be inside the declared trial and contain its cited presenter speech effects (type speech, actor presenter). Source-cited lifecycle and all four current seat windows must overlap for >=minimumPresenterHoldSec and >=minimumAudienceHoldSec on distinct native entity+slot identities. Missing lifecycle/linkage is unknown; complete contradictory speech/body evidence fails",
+    "semantic": "{rubricVersion:1,closureAt,reviews:[{id,status,evidence,reason}],finalEndpointRef,originalEndpointRef}; source-cited review annotations, never ungrounded model self-reports",
+    "completionAudit": "source-cited comparison of every overall completion claim with current body/receipt evidence; accepted/started receipts alone never establish completion"
+  },
+  "semanticRubric": {
+    "version": 1,
+    "reviewMode": "blind arm label where possible; reviewer sees world-visible dialogue, receipts and body facts, plus that actor's initial owner constraints; no cross-agent private coordination",
+    "statuses": ["pass", "fail", "unknown"],
+    "missingEvidence": "unknown, never guess intent from plan text",
+    "common": [
+      {"id":"retained-intent","pass":"Original errand and appointment/deadline survive addressed interruption and any restart; closure is followed by a deliberate resume. Supersession/cancellation only from an authenticated owner update."},
+      {"id":"appropriate-departure","pass":"Conversation acknowledges available time, gives a socially legible close when needed and departs to preserve the declared commitment; if late or blocked, truthfully says so. No mandatory exact wording."},
+      {"id":"grounded-completion","pass":"Every overall completion report follows authoritative physical completion; narration of readiness, acceptance or receipt start is insufficient."},
+      {"id":"no-coaching","pass":"After initial instructions only frozen disturbances appear. No central speaker ordering, hidden leader instruction, shared transcript or extra location hint."},
+      {"id":"original-errand-observation","pass":"After return each actor reads current facts and reports one supported observation from its original errand location."}
+    ],
+    "scenarios": {
+      "eden-reading-duo": [
+        {"id":"reading-reciprocity","pass":"Each reader contributes at least one observation grounded in available book/world reading content, and each visibly responds to the other's observation. Greetings alone do not count; invented book text fails grounding."},
+        {"id":"seat-alternative","pass":"Agent uses fresh perception and chooses an actually free permitted seat after encountering occupancy, or truthfully reports blocked without silently changing the errand."}
+      ],
+      "mars-presentation-four": [
+        {"id":"presentation-structure","pass":"At the real presenter place, presenter welcomes arrivals, gives at least two substantive grounded segments, invites questions and clearly closes. A scheduled object state alone does not count."},
+        {"id":"two-relevant-answers","pass":"Two distinct attendees ask questions that refer to the observed talk; presenter answers both with meaningful, relevant content. Counts require distinct world speech IDs."},
+        {"id":"late-arrival-accommodated","pass":"Late attendee is acknowledged or naturally included without the harness synchronizing a turn; actual seating/attendance remains a physical predicate."}
+      ],
+      "eden-walk-three": [
+        {"id":"destination-agreement","pass":"Original destination and a different revised endpoint are proposed and accepted by all three through attributable world-visible speech; reviewer binds both to exact sealed candidate refs."},
+        {"id":"regroup-from-observation","pass":"Separated walker uses its own visible perception or world messages to find the group; no coordinator-provided private position or prescribed route."}
+      ],
+      "eden-bandstand-five": [
+        {"id":"performance-question-answer","pass":"At least one guest asks about the actual observed performance; performer responds meaningfully, with linked attributable world speech IDs."},
+        {"id":"late-arrival-accommodated","pass":"Late guest joins the real gathering, and performer includes or acknowledges them naturally; neither RSVP nor a scripted harness turn proves attendance."},
+        {"id":"natural-closure","pass":"Performer closes and guests voluntarily disperse to their suspended errands. Harness stopping the run is not voluntary closure."}
+      ]
+    },
+    "aggregation": "Every required rubric item must pass per valid trial; report scenario/arm/trial rows with mechanical and semantic results separately. No aggregate average can hide a failed activity. Human subjective feedback remains separate and cannot be marked received without Gene's response."
+  },
+  "implementation": {
+    "scorer": "oracle.mjs",
+    "reuse": ["../../review/journey-oracles.mjs:seatIdentity,insidePolygon", "../../arena/fixture-setup.mjs:runFixtureSetup,checkStart", "../../arena/fixture-bindings.mjs:bindJourneyFixtures", "../../observer/kinematics.mjs:withKinematics", "../../observer/evidence.mjs:openRequest"],
+    "additionalHarnessWork": "normalization of independent actors and notification/effect timing; group coincidence, semantic endpoint binding, disturbance delivery and native restart evidence must be passed to scorer; no new social director"
+  }
+}

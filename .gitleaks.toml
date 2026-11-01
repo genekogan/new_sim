@@ -53,6 +53,7 @@ regexes = [
   '''^steward-secret-123456$''',
   '''^sim_SYNTHETIC_[A-Z0-9_]+$''',
   '''sk_live_abc(123def456ghi789|defghijkl)''',
+  '''abcdefgh12345678''',
 ]
 
 [[allowlists]]

@@ -85,7 +85,7 @@ const INSTALL = 'PLAYWRIGHT_BROWSERS_PATH="$PWD/.e2e/browsers" pnpm --filter mar
 const BUILDS = [
   { what: 'the web app', file: 'apps/web/dist/index.html', args: ['--filter', '@sim/web', 'build'] },
   // The people's character set (/modular) only exists after the viewer's static build (issue #395).
-  { what: "the viewer's static build (the people's character set, /modular)", file: 'mars/viewer/dist/client/modular', args: ['--filter', 'mars-campus-viewer', 'build:static'] },
+  { what: "the viewer's static build (the people's character set, /modular)", file: 'mars/viewer/dist/client/modular', args: ['build:viewer'] },
 ];
 
 function preflight(a) {

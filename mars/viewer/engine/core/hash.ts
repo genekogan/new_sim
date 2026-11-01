@@ -9,6 +9,15 @@
  *  a physics-shaped copy whose text differs under the same `hash` (a snapshot's encoded data writes -0 as {"~n":"-0"})
  *  must never seed the cache, or the world's state hash would read that text and a restart refuses the snapshot. */
 const PHYSICS_TEXT = new Map<string, { levels: string; byEntity: string; assets: string }>();
+/** srv-hub-physics item 3: texts kept (by physics hash). The current physics and the one before it (a god edit's bridge
+ *  and engine, or a take that straddles the edit, may still read the old one); each is ~3.4 MB on Eden 2026 (was 4). */
+const PHYSICS_TEXT_KEEP = 2;
+/** srv-hub-physics item 3: physics values whose `hash` nextEntityPhysics computed from exactly the texts physicsText
+ *  writes (the same writer over the same parts, PART_TEXT included), sealed after: their texts need no re-hash to be
+ *  trusted as the cache entry for that hash (was a second full sha256 of ~3.4 MB per god edit). A copy (a decoded
+ *  snapshot) is another object and is still checked. */
+const TRUSTED_PHYSICS = new WeakSet<object>();
+export function trustPhysicsText(v: object) { TRUSTED_PHYSICS.add(v); }
 /** G1 (tranche 2026-10-19): the stable text of entity-physics parts, by identity. A part is never mutated (a changed
  *  entity gets a new part), so nextEntityPhysics fills this once per part and a new physics value re-serialises only
  *  its changed parts (was the whole ~3 MB, three times per god edit on Eden 2026). Output is byte-identical. */
@@ -19,8 +28,8 @@ function physicsText(v: Record<string, unknown>): { levels: string; byEntity: st
   if (!hit) {
     hit = { levels: stableStringify(v.levels), byEntity: stableStringify(v.byEntity, PART_TEXT as unknown as ReadonlyMap<object, string>), assets: stableStringify(v.assets, PART_TEXT as unknown as ReadonlyMap<object, string>) };
     hit.byEntity.charCodeAt(0); hit.assets.charCodeAt(0);   // G1: flatten the ropes once (each later hash copies them)
-    if (sha256(`{"assets":${hit.assets},"byEntity":${hit.byEntity},"levels":${hit.levels}}`) !== key) return hit;
-    if (PHYSICS_TEXT.size >= 4) PHYSICS_TEXT.delete(PHYSICS_TEXT.keys().next().value!);
+    if (!TRUSTED_PHYSICS.has(v) && sha256(`{"assets":${hit.assets},"byEntity":${hit.byEntity},"levels":${hit.levels}}`) !== key) return hit;
+    while (PHYSICS_TEXT.size >= PHYSICS_TEXT_KEEP) PHYSICS_TEXT.delete(PHYSICS_TEXT.keys().next().value!);
     PHYSICS_TEXT.set(key, hit);
   }
   return hit;
@@ -209,4 +218,50 @@ export function hashStableResumable(value: Record<string, unknown>, known: Reado
   out.put('}');
   out.end();
   return { hash: h.digest(), mark: { keys, values: keys.map((k) => value[k]), n: c, state: at! } };
+}
+
+/** Where hashPhysicsResumable can pick up next time: the assets and the sorted entity ids and parts it hashed, and the
+ *  digest state before every PHYSICS_MARK_EVERY-th entity of byEntity. States are only ever copied, never updated, so a
+ *  mark may be shared by later marks and resumed from by more than one next value. */
+export type PhysicsHashMark = { assetKeys: string[]; assetValues: unknown[]; ids: string[]; parts: unknown[]; states: Sha256Stream[] };
+const PHYSICS_MARK_EVERY = 16;
+/**
+ * srv-hub-physics item 2: hashStable({levels, byEntity, assets}, known) of entity physics (entity-physics.ts), resuming
+ * the digest at the last checkpoint before the first entity of byEntity (sorted) whose part is not the very one the call
+ * that left `mark` hashed, when the assets are the very same too. The text is `{"assets":…,"byEntity":{…},"levels":…}`:
+ * same bytes in the same order, so the same digest. A one-entity god edit hashes the entities from its checkpoint on
+ * plus the levels (on average half the ~3 MB, was all of it); without a native stream that can copy its state it is
+ * plain hashStable.
+ */
+export function hashPhysicsResumable(p: { levels: unknown; byEntity: Record<string, unknown>; assets: Record<string, unknown> }, known: ReadonlyMap<object, string> | undefined, mark: PhysicsHashMark | undefined): { hash: string; mark?: PhysicsHashMark } {
+  const mk = nativeSha256Stream;
+  const fresh = mk?.();
+  if (!fresh?.copy) return { hash: hashStable({ levels: p.levels, byEntity: p.byEntity, assets: p.assets }, known) };
+  const assetKeys = Object.keys(p.assets).filter((k) => p.assets[k] !== undefined).sort(), assetValues = assetKeys.map((k) => p.assets[k]);
+  const ids = Object.keys(p.byEntity).filter((k) => p.byEntity[k] !== undefined).sort(), parts = ids.map((k) => p.byEntity[k]);
+  const same = (a: readonly unknown[], b: readonly unknown[]) => { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+  let c = 0;   // leading entities that are the same parts as last time (after the same assets)
+  if (mark && same(mark.assetKeys, assetKeys) && same(mark.assetValues, assetValues)) {
+    while (c < ids.length && c < mark.ids.length && ids[c] === mark.ids[c] && parts[c] === mark.parts[c]) c++;
+  } else mark = undefined;
+  const block = mark ? Math.min(Math.floor(c / PHYSICS_MARK_EVERY), mark.states.length - 1) : -1;
+  const states = mark ? mark.states.slice(0, block + 1) : [];
+  let h: Sha256Stream;
+  const out = new Sink((piece) => h.update(piece));
+  let start: number;
+  if (block >= 0) { h = states[block]!.copy!(); start = block * PHYSICS_MARK_EVERY; }
+  else {
+    h = fresh; start = 0;
+    out.put('{"assets":'); writeStable(p.assets, out, known); out.put(',"byEntity":{');
+  }
+  for (let i = start; i < ids.length; i++) {
+    if (i % PHYSICS_MARK_EVERY === 0 && i / PHYSICS_MARK_EVERY >= states.length) { out.end(); states.push(h.copy!()); }
+    if (i) out.put(',');
+    out.put(JSON.stringify(ids[i]));
+    out.put(':');
+    writeStable(parts[i], out, known);
+  }
+  out.put('},"levels":'); writeStable(p.levels, out, known); out.put('}');
+  out.end();
+  return { hash: h.digest(), mark: { assetKeys, assetValues, ids, parts, states } };
 }

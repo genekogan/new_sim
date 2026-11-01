@@ -33,6 +33,25 @@ export function slugFor(name, taken = new Set()) {
   return slug;
 }
 
+/** World process heap (LOAD-CONTRACT §4, lane L1): a registry entry's own `worldHeapMb` wins; otherwise the launcher's
+ *  `--world-heap-mb` (a default only), else 1536 MB. Eden-2026-class worlds (its template, or > 3,000 entities last seen)
+ *  get at least 2048 MB: the 768 MB launcher-wide cap was what Eden 2026 hit on 10-31. */
+export const DEFAULT_WORLD_HEAP_MB = 1536, BIG_WORLD_HEAP_MB = 2048, BIG_WORLD_ENTITIES = 3000;
+export function worldHeapMb(w, fallback = 0) {
+  if (Number.isInteger(w?.worldHeapMb) && w.worldHeapMb >= 256) return w.worldHeapMb;
+  const base = Number.isInteger(fallback) && fallback >= 256 ? fallback : DEFAULT_WORLD_HEAP_MB;
+  const big = w?.template === 'eden-2026' || (Number(w?.entities) || 0) > BIG_WORLD_ENTITIES;
+  return big ? Math.max(base, BIG_WORLD_HEAP_MB) : base;
+}
+
+/** Stage B (lane B-port): a world's read workers (LOAD-CONTRACT §4 `readWorkers`): its registry entry's `readWorkers`
+ *  (0 = off, 1-4) wins; otherwise 1 when the launcher runs with SIM_READ_WORKER=1, else 0 (off: no read env, no ports). */
+export const MAX_READ_WORKERS = 4;
+export function readWorkersOf(w, env = process.env) {
+  if (Number.isInteger(w?.readWorkers) && w.readWorkers >= 0) return Math.min(MAX_READ_WORKERS, w.readWorkers);
+  return env.SIM_READ_WORKER === '1' ? 1 : 0;
+}
+
 export class Registry {
   constructor(dataDir) {
     this.dataDir = resolve(dataDir);

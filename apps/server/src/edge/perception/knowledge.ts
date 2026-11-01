@@ -48,11 +48,11 @@ export class PlaceKnowledge {
   /** Places marked secret themselves (not counting their insides). */
   marked(): Set<string> {
     // keyed on the place count: a god edit that adds or removes places re-derives (a re-added place keeps its id)
-    if (this.secretsCache && this.secretsCache.size === this.L.places.byId.size) return this.secretsCache.set;
+    if (this.secretsCache && this.secretsCache.size === this.L.places.version) return this.secretsCache.set;
     const o = this.overrides(), out = new Set<string>();
     for (const p of this.L.places.byId.values()) if (o.get(p.id) ?? (p as Place & {secret?: boolean}).secret === true) out.add(p.id);
     for (const [id, on] of o) if (on && this.L.places.byId.has(id)) out.add(id);
-    this.secretsCache = {size: this.L.places.byId.size, set: out}; return out;
+    this.secretsCache = {size: this.L.places.version, set: out}; return out;   // keyed on the index version: a replaced place (same count) re-derives
   }
   /** The outermost secret place holding (or being) this place, by the parent chain; null when nothing about it is secret. */
   secretRoot(placeId: string): string | null {
@@ -76,6 +76,8 @@ export class PlaceKnowledge {
   }
   /** Places change (a god edit re-derives them): drop caches. */
   changed() {this.secretsCache = null; this.version++; this.L.invalidateBodies();}
+  /** Read worker: main writes visits and secrets; forget what was read so the next read sees the database (WAL). */
+  reload() {this.memo.clear(); this.secretsCache = null;}
   secrets(): {id: string; name: string}[] {return [...this.marked()].sort().map(id => ({id, name: this.L.places.byId.get(id)?.name ?? id}));}
 
   // ------------------------------------------------------------ memory of visits
@@ -85,8 +87,19 @@ export class PlaceKnowledge {
       .map(r => [r.place_id, {visits: r.visits, firstTick: r.first_tick, lastTick: r.last_tick, how: r.how === 'found' ? 'found' : 'visited'} as Known]));
     this.memo.set(soulId, m); return m;
   }
+  /** Read worker (L.readOnly): the visits/finds a read records, for main to merge (the worker's database is read-only). */
+  readonly outbox: {soulId: string; placeId: string; k: Known}[] = [];
+  /** Main: a read worker's recorded visits/finds, merged as touch/find would (a visit beats a find; never downgraded). */
+  merge(rows: readonly {soulId: string; placeId: string; k: Known}[]) {
+    for (const r of rows) {
+      const have = this.memory(r.soulId).get(r.placeId);
+      if (have?.how === 'visited' || (have && r.k.how === 'found')) continue;
+      this.write(r.soulId, r.placeId, have ? {...r.k, firstTick: have.firstTick} : r.k);
+    }
+  }
   private write(soulId: string, placeId: string, k: Known) {
     this.memory(soulId).set(placeId, k);
+    if (this.L.readOnly) {if (this.outbox.length < 4096) this.outbox.push({soulId, placeId, k}); return;}
     this.L.db.db.prepare(`INSERT INTO edge_place_knowledge_v1 (world_id, soul_id, place_id, how, visits, first_tick, last_tick) VALUES (?,?,?,?,?,?,?)
       ON CONFLICT(world_id, soul_id, place_id) DO UPDATE SET how=excluded.how, visits=excluded.visits, last_tick=excluded.last_tick`).run(this.w, soulId, placeId, k.how, k.visits, k.firstTick, k.lastTick);
   }
@@ -145,7 +158,7 @@ export class PlaceKnowledge {
   }
   /** The district summary and the far-away names, for `here`. Short: a few dozen tokens. */
   scales(soulId: string, placePath: readonly string[], pos: V2 | null, minuteOfDay: number | null) {
-    this.touch(soulId, placePath, this.L.host.engine.world.tick);
+    this.touch(soulId, placePath, this.L.mw.world.tick);
     const district = this.districtOf(placePath[0] ?? null), mem = this.memory(soulId);
     let summary: {name: string; people: number; busy?: string[]; on?: string[]} | undefined;
     if (district) {
@@ -169,7 +182,7 @@ export class PlaceKnowledge {
       const name = districtName && districtName !== d.name ? `${d.name} (${districtName})` : d.name;
       if (!mem.has(d.id)) return `${name} · ${dir}`;
       const been = [...mem].filter(([id, k]) => id !== d.id && k.how === 'visited' && this.L.places.byId.get(id) && this.within(this.L.places.byId.get(id)!, d.id))
-        .sort((a, b) => b[1].lastTick - a[1].lastTick).slice(0, 2).map(([id]) => this.L.places.byId.get(id)!.name);
+        .sort((a, b) => b[1].lastTick - a[1].lastTick || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).slice(0, 2).map(([id]) => this.L.places.byId.get(id)!.name);   // ties (a room and its house, one tick) in id order, not memory order
       return `${name} · ${dir} ${Math.round(m / 10) * 10}m${been.length ? ` · been: ${been.join(', ')}` : ' · been'}`;
     });
     return {...(summary ? {district: summary} : {}), far, ...(others.length > FAR_LISTED ? {farMore: others.length - FAR_LISTED} : {})};

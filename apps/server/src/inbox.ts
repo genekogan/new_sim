@@ -261,6 +261,12 @@ export class AgentInbox {
   messageText(s: InboxScope, id: string): string | null { return this.god(s) ? null : this.get(s, 'AND id=?', id)?.text ?? null; }
   /** D3: whether this Soul's box holds a message with this id (an act may be linked to it). */
   hasMessage(s: InboxScope, id: string): boolean { return !this.god(s) && !!this.get(s, 'AND id=?', id); }
+  /** Read one retained native message without delivering, acknowledging or finishing it.
+   * The queue accessor scopes every lookup by world, Soul and current owner. */
+  messageById(s: InboxScope, id: string): InboxMessage | null {
+    const row = this.get(s, 'AND id=?', id);
+    return row ? this.message(row) : null;
+  }
   /** The owner takes back a command that is not finished (waiting, or one the agent holds and never finished). */
   withdraw(s: InboxScope, id: string) {
     if (!this.god(s)) throw new ApiError(404, 'not-found', 'only god commands can be withdrawn');

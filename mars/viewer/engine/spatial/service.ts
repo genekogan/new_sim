@@ -19,6 +19,7 @@ import type { GroundField } from './ground.ts';
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
 /** Non-human entity that blocks walking where it stands: a static phase, or no phase and a catalog `obstacle` fixture (chair, bench, campfire). */
+import { navTrustChecking, navTrustToken } from './nav-trust.ts';
 const isStatic = (e: Entity) => e.kind !== 'human' && (e.phase ? STATIC_PHASES.has(e.phase) : CATALOG[e.def]?.obstacle === true);
 /**
  * What sync's change test reads of one static entity: id, def, phase, pose (p, yaw, pitch, roll),
@@ -144,6 +145,26 @@ export class Spatial {
   private gridsNow?: GridSet;
   private gridsLater: (() => GridSet) | null = null;
   epoch = 0;
+  /** Paged-ground counters (cheap integers, read by the server's load stats): syncs, rebuilds because only the windows
+   *  moved / because the static world changed, the ms those rebuilds took, and window grids built (and their ms). */
+  readonly stats = { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0, scans: 0, scanMs: 0, trusted: 0 };
+  /** Diagnostic (SIM_L4_SCAN_SITES=1): scans per calling function (the first frame outside this file). */
+  readonly scanSites: Map<string, number> | null = typeof process !== 'undefined' && (process as { env?: Record<string, string | undefined> }).env?.SIM_L4_SCAN_SITES === '1' ? new Map() : null;
+  /** Snapshot restore: the navigation epoch the snapshot recorded, until the engine adopts it (adoptRestoredEpoch). */
+  restoredEpoch?: number;
+  /**
+   * Snapshot restore: after the restoring engine rebuilt this world's derived scene (ground windows, world re-base), take
+   * the captured epoch back. Those rebuilds describe the same static world the capture synced against, so the epoch must
+   * not move: walkers compare it with their own (walk.ts) and would re-verify, re-key narrows and re-smooth mid-walk,
+   * which a live world that kept running never does. Caches keyed by the epochs passed through here are dropped.
+   */
+  adoptRestoredEpoch(): void {
+    const e = this.restoredEpoch;
+    this.restoredEpoch = undefined;
+    if (e === undefined || e === this.epoch) return;
+    this.epoch = e;
+    this.aroundCache.clear(); this.outside.clear(); this.narrowCache.clear();
+  }
   /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
   prof?: Profiler;
   /** Navigation-relevant snapshot of the static entities (in world order) at the last rebuild. */
@@ -196,9 +217,73 @@ export class Spatial {
     this.raster = new StaticRaster(this.base.obstacles, this.base.bounds, this.cell);
     this.scene = undefined as unknown as SpatialScene;
     this.snaps = [];
+    this.trustToken = -1;
     this.aroundCache.clear();
     this.narrowCache.clear();
     this.sync(world);
+    return true;
+  }
+
+  /**
+   * Stage B (lane B-spatial): the surfaces that are the ground field's own (not floors laid on it), when this service was
+   * built from a static scene export (fromStaticScene): its base then holds every composed surface. Absent: the source
+   * scene's (or base's) surfaces, as always.
+   */
+  ownSurfaces?: Set<string>;
+
+  /**
+   * Stage B (lane B-spatial): what the planner sees of the static world at the current navigation epoch, as plain data —
+   * the composed scene lists in the planner's order (base, static entities in world order, contributions), the base
+   * levels, and the ids of the ground's own surfaces. `Spatial.fromStaticScene` builds a service over exactly these
+   * lists that needs no world entities. Syncs first. Pure read (the lists are shared, not copied: never mutate them).
+   */
+  staticScene(world: WorldState): StaticSceneV1 {
+    this.sync(world);
+    const sc = this.pages?.all ?? this.scene;
+    return {
+      v: 1, cell: this.cell, planner: this.planner, baseId: this.baseId, navEpoch: this.epoch, bounds: this.base.bounds,
+      baseLevels: this.base.levels, levels: sc.levels, surfaces: sc.surfaces, obstacles: sc.obstacles, links: sc.links,
+      own: [...(this.ownSurfaces ?? new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id)))],
+      ground: this.ground ? { paged: this.ground.paged } : null,
+    };
+  }
+
+  /**
+   * Stage B (lane B-spatial): a service over a static scene export, with no world entities behind it (the read worker's
+   * replica). Ground worlds pass the field the export names (the caller resolves its recipe). Sync it with a world that
+   * holds bodies only: its composed lists are the export's, in the same order.
+   */
+  static fromStaticScene(s: StaticSceneV1, world: WorldState, field?: GroundField): Spatial {
+    const sp = new Spatial(staticBase(s), { cell: s.cell, baseId: s.baseId, planner: s.planner });
+    sp.ownSurfaces = new Set(s.own); sp.tileReads = true;
+    if (s.ground) {
+      if (!field) throw new Error('spatial.static-scene: a ground scene needs its field');
+      sp.setGround(field, world, [], { paged: s.ground.paged });
+    } else sp.sync(world);
+    sp.epoch = s.navEpoch;
+    return sp;
+  }
+
+  /**
+   * Stage B (lane B-spatial): take a newer export of the same world in place (an epoch change): the next sync rebuilds
+   * the scene, and the ground's tiles are rebuilt only where their content changed (tile caches are keyed by content).
+   * The service's epoch becomes the export's. A different cell, planner or ground mode is not a rebase (false): build anew.
+   */
+  rebaseStatic(s: StaticSceneV1, world: WorldState): boolean {
+    if (s.cell !== this.cell || s.planner !== this.planner || !s.ground !== !this.ground || (s.ground && s.ground.paged !== this.ground!.paged)) return false;
+    this.base = staticBase(s);
+    this.baseId = s.baseId;
+    this.ownSurfaces = new Set(s.own);
+    this.raster = new StaticRaster(this.base.obstacles, this.base.bounds, this.cell);
+    this.scene = undefined as unknown as SpatialScene;
+    this.pages = null;
+    this.snaps = [];
+    this.trustToken = -1;
+    this.aroundCache.clear();
+    this.narrowCache.clear();
+    this.outside.clear();
+    this.sync(world);
+    this.epoch = s.navEpoch;
     return true;
   }
 
@@ -217,6 +302,7 @@ export class Spatial {
     }
     this.scene = undefined as unknown as SpatialScene;
     this.snaps = [];
+    this.trustToken = -1;
     this.aroundCache.clear();
     this.narrowCache.clear();
     this.sync(world);
@@ -332,7 +418,7 @@ export class Spatial {
     }
     this.scene = { bounds: g.bounds(), levels, surfaces, obstacles, links };
     // level-0 floors laid on the ground (not the source scene's own flat field): they raise the standing height
-    const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
+    const own = this.ownSurfaces ?? new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
     g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
     g.setSolids(obstacles);
     const grids = () => g.grids(this.scene);
@@ -354,8 +440,15 @@ export class Spatial {
     const changed = this.navChanged(world, (e) => clip(rectOf([[e.pose.p[0], e.pose.p[2]]]))) || !this.scene;
     for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
     if (!units.length) clip(rectOf([[0, 0]]));
-    const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    const rects = this.pinnedPages ?? clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    this.stats.pagedSyncs++;
     if (!changed && this.pages && this.pages.key === key) return false;
+    const t0 = performance.now();
+    // L4: only the windows moved (no static change, same entity-physics contribution): the scene lists are the same, so the
+    // last ones are kept (re-collecting every static footprint and contribution cost O(entities) per tile crossing).
+    const physics = world.entityPhysicsV1?.hash;
+    if (!changed && this.pages && this.pagesPhysics === physics) return this.pagedWindows(world, rects, key, { ...this.pages.all, bounds: g.boundsOf(rects[0]) }, false, t0);
+    this.pagesPhysics = physics;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
     const links: Link[] = [...this.base.links];
@@ -376,20 +469,31 @@ export class Spatial {
     }
     const all: SpatialScene = { bounds: g.boundsOf(rects[0]), levels, surfaces, obstacles, links };
     if (changed) {
-      const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
+      const own = this.ownSurfaces ?? new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
       g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
       g.setSolids(obstacles);
     }
+    return this.pagedWindows(world, rects, key, all, changed, t0);
+  }
+  /** Entity-physics hash the paged scene lists were last collected under. */
+  private pagesPhysics: string | undefined;
+  /** Paged: install the windows `rects` over the scene lists `all` (keeping the grids of unchanged rects when the static
+   *  world did not change) and focus the stepped actor's window. */
+  private pagedWindows(world: WorldState, rects: TileRect[], key: string, all: SpatialScene, changed: boolean, t0: number): boolean {
+    const g = this.ground!;
     let tiles = 0;
     for (const r of rects) tiles += (r[2] - r[0] + 1) * (r[3] - r[1] + 1);
-    g.fineMax = Math.max(FINE_LRU_PAGED, tiles + 8); g.composedMax = rects.length + 4;
+    g.fineMax = this.tileReads ? FINE_LRU_PAGED : Math.max(FINE_LRU_PAGED, tiles + 8); g.composedMax = this.tileReads ? 2 : rects.length + 4;
     // a window whose rect is unchanged keeps its grids when the static world did not change
     const old = !changed && this.pages ? new Map(this.pages.rects.map((r, i) => [r.join(','), this.pages!.sets[i]])) : null;
     this.pages = { rects, key, sets: rects.map((r) => old?.get(r.join(',')) ?? null), scenes: rects.map((r) => ({ ...all, bounds: g.boundsOf(r) })), all };
     // the navigation epoch moves with the static world only: windows hold the same tiles wherever they lie, so a walk's
     // corridor, smoothing and single-file passages (narrowId: window-independent names) stay valid when windows move
     if (changed) { this.epoch++; this.aroundCache.clear(); }
-    this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
+    if (this.tileReads) this.scene = this.pages.scenes[0];   // a tile-reading replica faces no window: no window grids
+    else this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
+    if (changed) this.stats.pagedChanged++; else this.stats.pagedMoved++;
+    this.stats.pagedMs += performance.now() - t0;
     return true;
   }
 
@@ -411,8 +515,9 @@ export class Spatial {
     this.focusIdx = i;
     let set = pg.sets[i];
     if (!set) {
-      const build = () => this.ground!.gridsOver(pg.rects[i], pg.all);
+      const build = () => this.ground!.gridsOver(pg.rects[i], pg.all), t0 = performance.now();
       set = pg.sets[i] = this.prof ? this.prof.time('spatial.sync.grids', build) : build();
+      this.stats.gridBuilds++; this.stats.gridMs += performance.now() - t0;
       if (this.planner === 'corridor') prepareCorridor(set);
     }
     this.scene = pg.scenes[i];
@@ -435,6 +540,7 @@ export class Spatial {
       const i = this.pageAt(p), r = this.pages.rects[i], tx = Math.floor(p[0] / 64), tz = Math.floor(p[1] / 64);
       // a point no window holds (a recovery target, a far arrival, a far thing a Soul is offered): its own small window, the engine's focus unchanged
       if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.outsideLevel(id, p);
+      if (this.tileReads) return this.ground!.levelOver(r, id, this.pages.all);
       this.focusPage(i);
     }
     return this.grids.levels.get(id);
@@ -450,6 +556,7 @@ export class Spatial {
     if (level === 0 && this.ground?.paged && this.pages) {
       const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
       if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceReader(rectOf([at]), this.pages.all.obstacles);
+      if (this.tileReads) return this.ground.clearanceReader(r, this.pages.all.obstacles);
     }
     const g = this.levelAt(level, at);
     return g ? (q) => clearanceAt(g, q) : null;
@@ -461,6 +568,7 @@ export class Spatial {
     if (level === 0 && this.ground?.paged && this.pages) {
       const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
       if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceCapped(rectOf([at]), this.pages.all.obstacles, cap);
+      if (this.tileReads) return this.ground.clearanceCapped(r, this.pages.all.obstacles, cap);
     }
     const g = this.levelAt(level, at);
     return g ? (q) => Math.min(clearanceAt(g, q), cap) : null;
@@ -489,6 +597,27 @@ export class Spatial {
   }
   private outside = new Map<string, LevelGrid | null>();
 
+  /**
+   * Stage B (lane B-spatial), paged ground: the windows the service faces now (shared: never mutate), or null. A read near
+   * a window's edge answers from that window's grid (the parts of a ring search beyond it read as blocked), so a replica
+   * holds the same windows to give the same answers.
+   */
+  pageRectsV1(): TileRect[] | null { return this.pages?.rects ?? null; }
+  /** Stage B (lane B-spatial), paged ground: hold exactly these windows (another service's pageRectsV1) instead of the
+   *  bodies' clusters; null returns to the clusters. Grids of windows whose rect is unchanged are kept. */
+  pinPagesV1(rects: TileRect[] | null, world: WorldState): void {
+    this.pinnedPages = rects ? rects.map((r) => [...r] as TileRect) : undefined;
+    if (this.ground?.paged) this.sync(world);
+  }
+  private pinnedPages?: TileRect[];
+  /**
+   * Stage B (lane B-spatial), paged ground: answer a read inside a window from the ground's tiles over that window's rect
+   * (GroundNav.clearanceReader / clearanceCapped / levelOver: exactly the window grid's values, 0 beyond its rect) instead
+   * of composing the window's grids and facing it. For a replica that plans no routes (which window is faced never
+   * matters to it): the window grids are the bulk of its memory. Off (the engine): unchanged.
+   */
+  tileReads = false;
+
   /** Paged ground diagnostics: the windows (tile rects) and the bytes their built grids hold. */
   pagesInfo(): { rects: TileRect[]; built: number; bytes: number } | null {
     if (!this.pages) return null;
@@ -507,12 +636,38 @@ export class Spatial {
     // so a world with a body does not look ~4,900 entities up by key every tick; elsewhere the table itself.
     // S1 r2: only its relevant entities (world/relevant.ts): a plain fixture is neither static (no phase, not a catalogue
     // obstacle) nor a body, so the bodies and the static entities come in the same order as from the whole list.
+    // L4: only nav-pure code ran since this table's last scan (nav-trust.ts): no static change; list the bodies again
+    const token = navTrustToken();
+    if (token >= 0 && this.trustToken === token && this.trustEntities === world.entities) {
+      if (navTrustChecking() && this.navScan(world, onBody)) throw new Error('nav-trust: a static entity changed under a nav-pure step');
+      else if (navTrustChecking()) { this.stats.trusted++; return false; }
+      if (onBody) { const ents = world.entities, ids = this.bodyIds; for (let i = 0; i < this.bodyN; i++) onBody(ents[ids[i]]); }
+      this.stats.trusted++;
+      return false;
+    }
+    const t0 = performance.now(), changed = this.navScan(world, onBody);
+    this.stats.scans++; this.stats.scanMs += performance.now() - t0;
+    if (this.scanSites) {
+      const f = (new Error().stack ?? '').split('\n').slice(2).find((l) => !l.includes('/spatial/service.ts')) ?? '?';
+      const k = f.trim().replace(/^at /, '').replace(/\(.*\/([^/]+:\d+):\d+\)$/, '$1');
+      this.scanSites.set(k, (this.scanSites.get(k) ?? 0) + 1);
+    }
+    this.trustToken = token; this.trustEntities = world.entities;
+    return changed;
+  }
+  /** The nav-trust token of the last scan (-1: made while trust was closed) and the table it scanned. */
+  private trustToken = -1;
+  private trustEntities: WorldState['entities'] | null = null;
+  /** The bodies the last scan met, in its order (a trusted sync lists them again for the windows). */
+  private bodyIds: string[] = [];
+  private bodyN = 0;
+  private navScan(world: WorldState, onBody?: (e: Entity) => void): boolean {
     const shared = passRelevant(world);
     if (shared) {
-      this.navN = 0; this.navChangedFlag = false;
+      this.navN = 0; this.navChangedFlag = false; this.bodyN = 0;
       for (let i = 0; i < shared.length; i++) this.navVisit(shared[i], onBody);
     } else {
-      this.navN = 0; this.navChangedFlag = false;
+      this.navN = 0; this.navChangedFlag = false; this.bodyN = 0;
       const ents = world.entities;
       for (const id in ents) this.navVisit(ents[id], onBody);
     }
@@ -523,7 +678,7 @@ export class Spatial {
   private navN = 0;
   private navChangedFlag = false;
   private navVisit(e: Entity, onBody?: (e: Entity) => void) {
-    if (onBody && e.kind === 'human' && e.human) { onBody(e); return; }
+    if (e.kind === 'human' && e.human) { this.bodyIds[this.bodyN++] = e.id; if (onBody) onBody(e); return; }
     if (!isStatic(e)) return;
     const snaps = this.snaps, s = snaps[this.navN];
     if (!s) { snaps.push(navSnap(e)); this.navChangedFlag = true; }
@@ -743,3 +898,26 @@ export function narrowComponents(cl: Float32Array, nx: number, nz: number, r: nu
   return lab;
 }
 let narrowStack = new Int32Array(0);
+
+/** Stage B (lane B-spatial): a synced service's static products at one navigation epoch (Spatial.staticScene). Plain
+ *  data (structured-clone it: obstacle heights may be infinite). */
+export type StaticSceneV1 = {
+  v: 1; cell: number; planner: 'exact' | 'corridor'; baseId: string; navEpoch: number;
+  bounds: SpatialScene['bounds']; baseLevels: SpatialScene['levels'];
+  levels: SpatialScene['levels']; surfaces: Surface[]; obstacles: Obstacle[]; links: Link[];
+  own: string[]; ground: { paged: boolean } | null;
+};
+/** The base a static export stands for: every composed list (the export's base levels stay separate, for levelOf reads). */
+function staticBase(s: StaticSceneV1): SpatialScene {
+  return { bounds: s.bounds, levels: s.levels, surfaces: s.surfaces, obstacles: s.obstacles, links: s.links };
+}
+/** Stage B (lane B-spatial): the engine's static scene export (MarsEngine.exportStaticScene): the service's static
+ *  products plus what the engine adds — its static epoch counter (staticEpochV1), the ground recipe the field is baked from
+ *  (opaque here; the replica registers it), the connectivity anchor (the world's arrival point on the ground), whether
+ *  the engine is a physical binding (whose dry-ground read needs world state), the defs with seats, and the entity-physics hash the scene
+ *  lists were collected under (they can change with it without a navigation epoch). */
+export type StaticExportV1 = StaticSceneV1 & {
+  epoch: number; recipeHash: string | null; recipe: unknown; arrival: Vec2; physical: boolean; physicsHash: string | null;
+  /** Catalogue defs with a seat slot (god defs register into the catalogue at run time, so the worker cannot read it). */
+  seatDefs: string[];
+};
