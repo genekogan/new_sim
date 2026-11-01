@@ -5,7 +5,9 @@ People own **Souls** (residents) and drive them with their own coding agents; ea
 its creator, who builds it through their coding agent. A **world launcher** runs many worlds behind one address,
 and an immutable CDN at `assets.eden.art` serves heavy media.
 
-This page is the overview. Details: [API](architecture/api.md) · [protocol](architecture/protocol.md) ·
+This page is the overview. The [component and data-flow map](architecture/map.md) names the actual classes,
+contracts and hot paths and draws one tick, one Soul action and one god edit end to end. Details:
+[API](architecture/api.md) · [protocol](architecture/protocol.md) ·
 [engine contract](architecture/engine-contract.md) · [data](architecture/data.md) · [worlds](architecture/worlds.md) ·
 [Souls](architecture/souls.md) · [god mode](architecture/godmode.md) · [brain and budget](architecture/brain.md) ·
 [contracts](architecture/contracts.md) · [safety](architecture/safety.md) · [glossary](glossary.md).
