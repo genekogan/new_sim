@@ -69,7 +69,7 @@ export const SMALL_LOAD_KG = 10;
 export type AssetDef = {
   id: string;
   /** XP5 hook: integral seats in a walkable structure approach their slot, rather than the structure's outer box. */
-  seatApproach?: 'slot';
+  seatApproach?: 'slot' | 'front-arc';
   label: string;
   category: 'rack-upright' | 'rack-beam' | 'timber' | 'plywood' | 'stair' | 'human' | 'vehicle' | 'fixture' | 'item' | 'test-block' | 'solar' | 'equipment';
   /** Local axis-aligned box: x = width/length, y = height, z = depth/thickness (m). */

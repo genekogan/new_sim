@@ -261,6 +261,18 @@ export function seatApproach(rt: Runtime, s: Slot, opts: { minClearance?: number
   const tried: { p: Vec2; cl: number }[] = [];
   const required = Math.max(APPROACH_CLEARANCE, opts.minClearance ?? 0);
   if (s.kind === 'berth') return berthApproach(rt, s, e, local, half, required, opts.accept);
+  // A backed chair is approached from its front opening; a blocked front
+  // never authorizes sliding a person through the backrest or armrest.
+  if (d.seatApproach === 'front-arc') {
+    for (const angle of [0, Math.PI/8, -Math.PI/8, Math.PI/4, -Math.PI/4]) {
+      const yawL=s.yaw-e.pose.yaw+angle, u:Vec2=[dcos(yawL),dsin(yawL)], edge=edgeDistance(local,u,half);
+      for (const gap of gaps) {
+        const p=add2(c,rot2([local[0]+u[0]*(edge+gap),local[1]+u[1]*(edge+gap)],e.pose.yaw));
+        if ((g?clearanceAt(g,p):Infinity)>=required && (!opts.accept||opts.accept(p))) return p;
+      }
+    }
+    return {code:'slot.front-blocked',message:`${s.id} has no clear front approach; move nearby objects first.`,subjects:[s.id,s.owner]};
+  }
   for (const side of [1, -1]) {
     const yawL = s.yaw - e.pose.yaw + (side < 0 ? Math.PI : 0);
     const u: Vec2 = [dcos(yawL), dsin(yawL)];
