@@ -28,7 +28,7 @@
     "e2e:install": "PLAYWRIGHT_BROWSERS_PATH=.pw-browsers playwright install chromium"
   },
   "dependencies": {
-    "@modelcontextprotocol/server": "^2.4.0",
+    "@modelcontextprotocol/server": "^2.3.0",
     "lucide-react": "1.63.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
