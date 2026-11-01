@@ -201,12 +201,18 @@ if (process.env.SIM_WAKING_LIMIT === '1' && edge?.bodyRule) {
   monitor.register('waking', (l) => waking!.setLoadLevel(l));
   console.log(`[load] waking limit ON: ${Number(process.env.SIM_MAX_AWAKE) || 12} awake`);
 }
-// A punt install moves the static world (new carriers and rides), so the caches warmed before listening are rebuilt in
-// their own turn shortly after, not by the next Soul's `here`.
-// `closing` is declared before this closure: a slow boot hook below must not let the timer reach it uninitialized (TDZ).
+// `closing` is declared before servingWarm: a slow boot hook below must not let the punt timer reach it uninitialized (TDZ).
 let closing = false;
-const rewarm=()=>{if(closing||!edge)return;try{const w=edge.prepareForServing();console.log(`[activities] edge capability caches rebuilt in ${w.ms} ms for ${w.souls} Souls at tick ${host.engine.world.tick}`);}catch(error){console.error('[activities] edge capability cache rebuild failed; Souls build them on demand',error);}};
-if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`),engineBridge?()=>{setTimeout(rewarm,1000).unref();}:undefined);
+/** A serving warm's god-side step budget (ms; within the ledger's ~40 ms slice). */
+const SERVING_STEP_MS = 20;
+// Continuity (warm after listen, 2026-10-31): the caches a Soul's first rich `here` builds after a restart (on Eden 2026
+// ~1.5-4 s in one go, with 503/429 under it) are built right after the port opens, in ~40 ms slices between whatever else
+// is served (EdgeLedger.warmForServing); rich edge reads wait for it. Before listening, release 404 held Eden 2026's
+// handover ~4 s longer (8.5 s "Reconnecting…"). An optimisation only: a failure is logged and Souls build them on demand.
+const servingWarm=(why:'boot'|'activities')=>{if(closing||!edge||!engineBridge)return;const tick=host.engine.world.tick;
+  void edge.warmForServing({pre:s=>engineBridge.servingWarmGen(s,SERVING_STEP_MS),stop:()=>closing}).then(w=>console.log(`[${why}] edge capability caches ${w.stopped?'stopped':'warm'} after listen: ${w.ms} ms: ${w.slices} slices (longest ${w.maxStepMs} ms) and the listing ${w.listingMs} ms, over ${w.wallMs} ms for ${w.souls} Souls${w.failed?` (${w.failed} failed)`:''} from tick ${tick}`));};
+// A punt install moves the static world (new carriers and rides): its caches are rebuilt the same way shortly after.
+if(edge)installPuntActivities(host,edge,m=>console.log(`[activities] ${m}`),engineBridge?()=>{setTimeout(()=>servingWarm('activities'),1000).unref();}:undefined);
 // Stage B (lane B-port): the read-worker pool, DARK unless SIM_READ_WORKER=1 (split/read-pool.ts; nothing is imported
 // otherwise). SIM_READ_WORKERS = pool size (registry `readWorkers`, 1–4, default 1); SIM_READ_PORTS = the launcher's ports.
 if (process.env.SIM_READ_WORKER === '1' && edge) {
@@ -295,9 +301,8 @@ if (engineBridge) {
     bootPhase('boot:prepare', host.engine.world.tick);
     host.engine.prepareForServing?.();
     console.log(`[boot] prepare ${Math.round(performance.now() - prepareAt)} ms serving caches at tick ${host.engine.world.tick}`);
-    // The first rich `here` after a restart otherwise builds these on its own request (~1.5 s blocked on Eden 2026).
-    // An optimisation only: a failure here is logged and the world still opens HTTP (Souls then build them on demand).
-    if (edge) { try { const w = edge.prepareForServing(); console.log(`[boot] edge capability caches ${w.ms} ms for ${w.souls} Souls${w.failed ? ` (${w.failed} failed)` : ''} at tick ${host.engine.world.tick}`); } catch (error) { console.error('[boot] edge capability cache warm failed; opening HTTP without it', error); } }
+    // The edge capability caches (the first rich `here`'s ~1.5-4 s on Eden 2026) are warmed right after listen, sliced:
+    // see servingWarm below.
   } catch (error) {
     closing = true; console.error('[boot] initial physics unavailable; HTTP was not opened', error);
     try {
@@ -313,7 +318,7 @@ if (engineBridge) {
   }
 }
 server.listen(config.port, config.host, () => {
-  bootPhase('serving', host.engine.world.tick); monitor.start();
+  bootPhase('serving', host.engine.world.tick); monitor.start(); servingWarm('boot');
   console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`);
   const s = (ms: number) => (ms / 1000).toFixed(2);
   console.log(`[boot] listening ${s(performance.now())} s after start: code ${s(bootAt.code)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);

@@ -9,15 +9,15 @@ slug aliases. Never redirect authenticated agent APIs across origins as a substi
 
 1. Deploy the root launcher and migrate its registry with the documented aliases. Verify upload routes at both
    canonical and old slugs reach the same world. The new Worker requires this upstream before serving cache misses.
-2. In the existing static asset bucket's CORS rule, retain `https://sim.eden.art` and add exactly `https://souls.game`.
+2. In the existing static asset bucket's CORS rule, retain `https://sim.eden.art` and `https://souls.game`, and add exactly `https://soul.game`.
    Retain its methods and exposed headers; do not replace unrelated rules or use a wildcard. This bucket rule is
    separate from Worker CORS. Check a known static object with each Origin header.
 3. Record the current Worker version and deployed route/bindings. Deploy this module to that existing Worker using
    the authorized Cloudflare CLI or dashboard, preserving its route and `ASSETS` binding. Account IDs, credentials,
    deployment config and receipts belong in private operational records, not this repository.
 4. Run the verifier against an authorized scratch god folder. It uploads one fresh small GLB but does not place
-   or define it in the world. The folder can name either allowed app origin and `/w/<slug>/` or `/worlds/w/<slug>/`.
-   The verifier exercises miss, immediate R2 hit, cache hits, hash refusal and exact CORS for both origins.
+   or define it in the world. The folder can name any allowed app origin and `/w/<slug>/` or `/worlds/w/<slug>/`.
+   The verifier exercises miss, immediate R2 hit, cache hits, hash refusal and exact CORS for all three origins.
 
 ```sh
 node --test tools/cdn/worker/god-uploads.test.mjs
@@ -25,9 +25,9 @@ node tools/cdn/worker/verify-worker.mjs --self-test --out .local/cdn-self-test.j
 node tools/cdn/worker/verify-worker.mjs --god /path/to/authorized/scratch-god --out .local/cdn-live.json
 ```
 
-Walk the real client on both origins and check static and uploaded assets render without CORS failures. A loopback
+Walk the real client on all three origins and check static and uploaded assets render without CORS failures. A loopback
 receipt proves the handler contract; it does not prove the Cloudflare deployment or a browser's live rendering.
-The Worker grants CORS only to the two exact origins, including on OPTIONS, HEAD, 304, errors and cached replies.
+The Worker grants CORS only to the three exact origins, including on OPTIONS, HEAD, 304, errors and cached replies.
 No Origin or any other Origin gets no allow-origin header. Cached bytes are shared, but responses bind CORS to the
 current request and vary on Origin.
 
@@ -39,3 +39,8 @@ settings, so changing them after a build does not alter the shipped app. A prebu
 Record the fallback in the release receipt and verify origin asset rendering. Re-enable only in a newly built,
 verified release. To roll back the Worker, restore the recorded version; its upstream URL must still reach the
 active world authority.
+
+For the soul.game domain move, keep the pull-through upstream on souls.game while DNS/Clerk are staged.
+The old host must continue proxying asset and authenticated API requests directly; browser-page redirects must
+not redirect these requests. Add the new static-bucket CORS origin and verify both fresh and cached responses
+before canonical activation; stale CDN headers may require a targeted cache purge. No R2 key or token changes.

@@ -23,7 +23,7 @@
 // Tests: god-uploads.test.mjs (fake R2, fake origin, fake edge cache). Post-deploy proof: verify-worker.mjs.
 
 export const APP_ORIGIN = 'https://sim.eden.art';
-export const APP_ORIGINS = [APP_ORIGIN, 'https://souls.game'];
+export const APP_ORIGINS = [APP_ORIGIN, 'https://souls.game', 'https://soul.game'];
 export const ORIGIN = 'https://souls.game';
 /** God uploads are budgeted at 3 MB by default (creation limits); a world can raise its budget. 32 MiB bounds memory. */
 export const MAX_BYTES = 32 * 1024 * 1024;

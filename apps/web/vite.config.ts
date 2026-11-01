@@ -66,7 +66,7 @@ function phasedEntry(): Plugin {
 }
 
 // Lane P4: the installable-app manifest and icons (src/pwa-manifest.ts). Build only, index.html only (the workbench page is
-// not an app). Icons (pwa/icon.svg, the souls.game orb, rendered to pwa/icon-<size>.png; 32 is the tab favicon) are hashed files in assets/; the manifest is
+// not an app). Icons (the supplied halo resized to pwa/icon-<size>.png; 32 is the tab favicon) are hashed files in assets/; the manifest is
 // dist/manifest.webmanifest, linked relative to the page and served beside every page (world servers and the launcher).
 function pwa(): Plugin {
   let base = '/';

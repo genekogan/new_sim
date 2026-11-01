@@ -60,6 +60,7 @@ test('templates: empty first, hello hamlet next, broken files skipped', () => {
 });
 test('homepage and assets come from the web build', async () => {
   const r = await api('/'); assert.equal(r.status, 200); assert.match(await r.text(), /<title>Sim/);
+  for (const path of ['/old', '/old/']) { const old = await api(path); assert.equal(old.status, 200); assert.match(await old.text(), /<title>Sim/); }
   assert.equal((await api('/assets/a.js')).status, 200);
   assert.equal((await api('/assets/../../etc/passwd')).status, 404);
 });
