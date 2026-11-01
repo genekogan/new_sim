@@ -20,7 +20,7 @@ function reaches(file: string, pattern: RegExp): Map<string, number> {
 
 // The act/tick path stays on main and keeps the engine (launch, receipts, program events, ambient life, rides' steering).
 const LEDGER_MAIN_ONLY = new Set(['constructor', 'attachComms', 'attachPresence', 'migrateGone', 'startingPoint', 'loadPlaces', 'insert', 'update',
-  'onDecision', 'onRecovery', 'onProgram', 'afterTick', 'ambientLife', 'unstick', 'arm', 'decide', 'recordRefusal', 'metrics', 'actVerificationSit',
+  'onDecision', 'onRecovery', 'onProgram', 'afterTick', 'contactTicks', 'ambientLife', 'unstick', 'arm', 'decide', 'recordRefusal', 'metrics', 'actVerificationSit',
   'act', 'actMenu', 'actOnce', 'standIfSeated', 'launch', 'relaunchStuck', 'acceptInvite', 'performBodies', 'performAtomicObjectBodies',
   'syncCarrierPlaces', 'boardingIssue', 'steerTarget', 'steerCheck', 'rideFrames', 'godInterrupted', 'setDetail', 'stallGuard', 'conversationPartners', 'posture',
   'ambientChoice']);
@@ -35,6 +35,12 @@ test('grep: no engine reach in the read code (ledger read methods, perception, t
   assert.deepEqual([...reaches('god/nav.ts', /\.h\.engine\b|\.reachV1\(/g)].filter(([m]) => m !== 'E'), [], 'god/nav.ts reaches its engine outside the facade getter');
   const bridge = reaches('god/engine-bridge.ts', /this\.engine\b/g);
   assert.equal(bridge.get('listCapabilities') ?? 0, 0, 'engine-bridge listCapabilities reaches this.engine');
+});
+
+test('contactTicks is exclusively a main tick helper, never called by ledger read methods', () => {
+  // It commits contact effects/receipt changes and can stop an engine program. Keep that write helper on main;
+  // naming it anywhere beyond its declaration and sole afterTick call must trigger a boundary review.
+  assert.deepEqual([...reaches('edge/ledger/ledger.ts', /\bcontactTicks\b/g)], [['contactTicks', 1], ['afterTick', 1]]);
 });
 
 const fakeEngine = (over: Record<string, unknown> = {}) => {

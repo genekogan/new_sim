@@ -757,7 +757,7 @@ export class Together {
   private handOverSteps(me: string, other: string): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return null;
     const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
-    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    const e = menuWorldOf(this.p.host);
     const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
     const free = (p: V2) => (e.clearanceAtV1?.(p[0], p[1]) ?? 1) >= 0.34 && people.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) >= 0.8) && this.lineClear(p, at);
     const off = (p: V2) => Math.abs(Math.atan2(Math.sin(Math.atan2(p[1] - at[1], p[0] - at[0]) - ob.pose.yaw), Math.cos(Math.atan2(p[1] - at[1], p[0] - at[0]) - ob.pose.yaw)));
@@ -852,7 +852,7 @@ export class Together {
    *  people; the hand I hold out is the inner one. Null when no side is free. */
   besideSteps(me: string, other: string): {steps: Steps; hand: 'left' | 'right'} | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return null;
-    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    const e = menuWorldOf(this.p.host);
     const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
     const y = ob.pose.yaw, r: V2 = [-Math.sin(y), Math.cos(y)], from: V2 = [mb.pose.p[0], mb.pose.p[2]];
     const spots = [1, -1].map(s => ({s, p: [r2(ob.pose.p[0] + r[0] * s * HAND_GAP), r2(ob.pose.p[2] + r[1] * s * HAND_GAP)] as V2}))
@@ -871,7 +871,7 @@ export class Together {
   holdingSteps(soul: EdgeSoul, capability: string, steps: Steps): Steps {
     const w = this.handsWith(soul.entityId); if (!w) return steps;
     if (capability === 'let-go:here' || /^(?:accept|decline|withdraw):/.test(capability) && !steps.length || steps.some(s => s.verb === 'mars:hand_hold_v1')) return steps;
-    const partner = this.p.body(w.entityId), led = !!partner?.human?.task && (this.p.host.engine as unknown as {runtime?: {records: Map<string, {verb: string}>}}).runtime?.records.get(partner.human.task)?.verb === 'walk_to';
+    const partner = this.p.body(w.entityId), led = !!partner?.human?.task && menuWorldOf(this.p.host).runtime.records.get(partner.human.task)?.verb === 'walk_to';
     const travel = steps.length > 0 && steps.every(s => ['stand', 'walk_to', 'wave', 'face', 'rest'].includes(s.verb)) && steps.some(s => s.verb === 'walk_to') && steps.every(s => s.verb !== 'walk_to' || !s.params.gait || s.params.gait === 'walk');
     if (travel && !led) {
       const firstWalk = steps.find(s => s.verb === 'walk_to')!, to = firstWalk.params.to, toward = this.pointOfTo(to);
