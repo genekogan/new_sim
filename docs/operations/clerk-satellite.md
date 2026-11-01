@@ -49,7 +49,7 @@ must have the exact satellite HTTPS origin; credentials and external destination
 Existing primary sessions return immediately; signed-out visitors see Clerk's sign-in form. The return URL keeps
 SDK synchronization parameters, world paths and pairing fragments. The page has no-store, no-referrer and
 noindex headers, denies framing and supplies a CSP with a hash for its inline bootstrap and Clerk's documented
-script hosts. Avoid adding a second, conflicting CSP at the proxy on this route. It never renders or logs tokens.
+script hosts, Clerk's blob workers and the primary edge's Cloudflare analytics script. Avoid adding a second, conflicting CSP at the proxy on this route. It never renders or logs tokens.
 
 ## Verify before release
 
