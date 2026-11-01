@@ -2,6 +2,7 @@
 // either (P1 phones: main.tsx loads it only on the homepage).
 import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { useEffect, useRef } from 'react';
+import { clerkSatelliteOptions, startClerkSignIn } from './clerk-satellite.ts';
 import { clerkHomeRoute } from './auth-ui.ts';
 import { signOutAndReturn } from './clerk-sign-out.ts';
 import { BASE } from './base-path.ts';
@@ -13,7 +14,7 @@ export default function LauncherRoot({ list }: { list: LauncherList }) {
   const a = list.auth;
   if (a?.provider === 'clerk' && a.clerkPublishableKey) {
     const route = clerkHomeRoute(a.authenticationOrigin, location.origin, BASE);
-    if (route.initialize) return <ClerkProvider publishableKey={a.clerkPublishableKey}><HomeClerk list={list} /></ClerkProvider>;
+    if (route.initialize) return <ClerkProvider publishableKey={a.clerkPublishableKey} {...clerkSatelliteOptions(a.clerkSatellite, location.origin)}><HomeClerk list={list} /></ClerkProvider>;
     return <HomeWith list={list} session={{ mode: 'clerk', ready: true, authed: false, label: null, signInUrl: route.signInUrl ?? undefined, getToken: async () => null, login: () => { if (route.signInUrl) location.assign(route.signInUrl); }, logout: () => {} }} />;
   }
   const name = localStorage.getItem('sim.dev');
@@ -28,6 +29,6 @@ function HomeClerk({ list }: { list: LauncherList }) {
   const signingOut = useRef(false);
   return <HomeWith list={list} session={{ mode: 'clerk', ready: session.isLoaded, authed: session.isLoaded && !!session.isSignedIn, label: profile.user?.primaryEmailAddress?.emailAddress ?? profile.user?.firstName ?? null,
     getToken: async () => session.isLoaded && session.isSignedIn ? session.getToken({ skipCache: true }) : null,
-    login: () => { if (!signingOut.current) clerk.openSignIn({ afterSignInUrl: location.href, afterSignUpUrl: location.href }); },
+    login: () => { if (!signingOut.current) startClerkSignIn(clerk, list.auth?.clerkSatellite, location.href, url => location.assign(url)); },
     logout: async () => { if (signingOut.current) return; signingOut.current = true; try { await signOutAndReturn(clerk); } catch (error) { signingOut.current = false; throw error; } } }} />;
 }
