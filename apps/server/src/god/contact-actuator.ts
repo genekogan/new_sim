@@ -87,6 +87,12 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     params.opening={bodyPolicy:'door-natural-v2',...(def.tags.includes('wall-window')?{floorY:me[1]}:{}),hinge:[wp.x+hx*c+hz*s,wp.y,wp.z-hx*s+hz*c],yaw:wp.yaw,radius:((knob?.at?.[0]??(Number(def.components.opening?.width??leaf.size?.[0]??.8)/2-.1))-leaf.pivot[0])*sx,height:Number(def.components.opening?.height??leaf.size?.[1]??1.8)*sy,handleY:(knob?.at?.[1]??.85)*sy,from:(opts?.open??actuatedState(e,def).open===true)?HAND_OPEN_ANGLE:0,to:action==='open'?HAND_OPEN_ANGLE:0,side:def.tags.some(t=>['wall-window','hand-cabinet'].includes(t))?1:localZ<0?-1:1};
     if(def.tags.includes('wall-window')&&(wp.y+params.opening.handleY-me[1]>1.65||wp.y+params.opening.handleY-me[1]<.35))return null;
     root=actuatorPoint(params.opening,params.opening.from).root;
+   }else if(def.tags.includes('hand-powered-display')&&def.components.display?.controlAt){
+    const [x,y,z]=def.components.display.controlAt,c=Math.cos(wp.yaw),s=Math.sin(wp.yaw);
+    at[0]=wp.x+(x*c+z*s)*wp.s;at[1]=wp.y+y*wp.s;at[2]=wp.z+(-x*s+z*c)*wp.s;
+    // Stand on the ground in front of the control, including mounted displays.
+    root=[at[0]+s*.55,me[1],at[2]+c*.55];
+    if((d.levelAt?.(me[0],me[2],me[1])??0)===0)root[1]=m.terrain.sample(root[0],root[2]);
    }else{
     // A def's part tinted `valve` (a tap handle) is where the hand goes; otherwise the old switch height at the centre.
     // Entry 37: a radio's tuning knob (tinted `tuner`) is where the hand goes to change the station; she stands where she

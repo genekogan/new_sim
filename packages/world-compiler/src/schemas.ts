@@ -47,7 +47,7 @@ export const componentsSchema = z.object({
   light: lightSchema.optional(),
   /** A list replaces the singular light when supplied. */
   lights: z.array(lightSchema).min(1).max(8).optional(),
-  display: z.object({ w: num.positive(), h: num.positive(), slots: z.number().int().min(1).max(8).optional() }).optional(),
+  display: z.object({ w: num.positive(), h: num.positive(), controlAt: z.tuple([num, num, num]).optional(), slots: z.number().int().min(1).max(8).optional() }).optional(),
   paint: z.object({ faces: z.array(z.enum(['front', 'back', 'all'])).default(['all']) }).optional(),
   plant: z.object({ stages: z.number().int().min(1).max(8).default(3), daysPerStage: num.positive().default(1) }).optional(),
   instrument: z.object({ kind: z.string() }).optional(),

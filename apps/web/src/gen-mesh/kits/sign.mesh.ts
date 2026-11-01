@@ -227,10 +227,16 @@ registerMesh({
     if (typeof document === 'undefined') return root;
     const faces = (ctx.args.faces ?? []) as Face[];
     const st = ctx.entity.state ?? {};
+    const poweredOff=ctx.def.tags.includes('hand-powered-display')&&st.on===false;
     const text = typeof st.text === 'string' && st.text.trim() ? st.text.split('\n') : (ctx.def.components.sign?.lines ?? []);
     for (const f of faces) {
       let map: THREE.Texture;
       const plane = new THREE.Mesh(new THREE.PlaneGeometry(f.w, f.h));
+      // An off display does not resolve or request its saved media.
+      if(poweredOff&&f.media){
+        plane.material=new THREE.MeshBasicMaterial({color:'#090c10',toneMapped:false});
+        plane.position.set(...f.at);plane.rotation.set(f.pitch??0,f.yaw??0,0,'YXZ');plane.name='sign-face';plane.userData.poweredOff=true;root.add(plane);continue;
+      }
       // W6: a media face shows its slot's image or looping video; a gallery wall's empty slots stay plain
       const found = f.media ? artOf(ctx.entity.id, st, f.slot) : null, src = found ? signMediaPath(found.url) : null;
       const art = found && src ? { ...found, url: src } : null;
