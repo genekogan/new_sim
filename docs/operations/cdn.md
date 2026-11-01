@@ -137,18 +137,22 @@ is skipped. `manifest` merges only receipt-verified paths into the manifest's `w
 `tools/cdn/worker/god-uploads.js` is a Cloudflare Worker (one ES module, no imports, no secrets) on the route
 `assets.eden.art/w/*`. It serves exactly `GET /w/<slug>/assets/<sha256>.<ext>` (`glb`, `png`, `jpg`, `json`):
 
-- **R2 hit:** the stored object with the CDN headers (immutable, Content-Type, CORS for `https://sim.eden.art`,
+- **R2 hit:** the stored object with the CDN headers (immutable, Content-Type, CORS matching the exact allowed requesting origin,
   `Content-Encoding: br` when stored so, ETag `"<sha>"`), also kept in the edge cache.
-- **Miss:** it fetches the god world's own route `https://sim.eden.art/worlds/w/<slug>/assets/<sha>.<ext>`, hashes the
+- **Miss:** it fetches the god world's own route `https://souls.game/w/<slug>/assets/<sha>.<ext>`, hashes the
   body while reading it (32 MiB cap), and stores and returns it only when the digest equals the path's sha. The R2
   write completes before the 200, so `x-eden-cdn: miss` means stored.
 - **Refusals** (`no-store`, `x-eden-cdn: refused:<reason>`): a malformed path or a query is 400, origin 404 is 404, a
   hash mismatch, redirect, other origin status or oversize body is 502. Nothing refused is stored.
 
+The root launcher retains old slug aliases, so existing upload keys continue to resolve without rewriting objects.
+CORS permits exactly `https://souls.game` and `https://sim.eden.art`, including cached responses, errors, HEAD,
+OPTIONS and 304. Unknown or absent origins receive no allow-origin header; responses vary on Origin.
+
 The client routes a god upload to the Worker only when the world's snapshot gives its size, so the same length and
 SHA checks apply. `SIM_GOD_UPLOADS_CDN=0` at build time turns that off; a visitor can add `?godcdn=0`.
 
-**Deploying** (Cloudflare dashboard, once):
+**Deploying** (authorized Cloudflare CLI or dashboard, preserving the existing Worker configuration):
 
 | Setting | Value |
 |---|---|
@@ -160,12 +164,15 @@ SHA checks apply. `SIM_GOD_UPLOADS_CDN=0` at build time turns that off; a visito
 | Variables and secrets | none |
 
 Add no other route: published keys all start with `assets/`, and the Worker writes only under `w/`, so the two cannot
-collide. No DNS, CORS-rule or token change is needed; the Worker sets its own CORS header.
+collide. The Worker sets its own CORS headers, but the static asset bucket has a separate CORS rule: retain the
+old origin and add the exact new origin there too. Activate the root upstream and aliases before switching the
+Worker. See the [cutover order, verification and fallback runbook](../../tools/cdn/worker/README.md).
 
 **Proving it:** `node tools/cdn/worker/verify-worker.mjs --god <god folder of a scratch world> --out <receipt>`
 uploads one fresh GLB and checks the origin route, HEAD before any GET is 404, the first GET is a verified `miss`, an
 immediate HEAD is `hit`, a second GET is `hit` or `edge`, the refusals above, and that a published `assets/` key still
-answers from R2. `--self-test` runs the same checks against loopback stand-ins. Unit tests:
+answers from R2. It also checks both allowed browser origins and an unknown origin after warming the cache.
+The god folder may name either allowed site with `/w/<slug>/` or `/worlds/w/<slug>/`. `--self-test` runs the same checks against loopback stand-ins. Unit tests:
 `node --test tools/cdn/worker/god-uploads.test.mjs`.
 
 | Symptom | Cause |
