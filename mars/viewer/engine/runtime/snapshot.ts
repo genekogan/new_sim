@@ -265,6 +265,7 @@ export function applySnapshot(rt: Runtime, int: RuntimeInternals, snap: RuntimeS
     if (!sp || typeof sp.sync !== 'function') throw new SnapshotError('snapshot.services', 'the snapshot was taken with services.spatial; restore needs a Spatial for the same base scene');
     sp.sync(rt.world);
     sp.epoch = snap.spatialEpoch;
+    (sp as { restoredEpoch?: number }).restoredEpoch = snap.spatialEpoch;
   }
   for (const x of g.live) {
     const rec = rt.records.get(x.id)!;

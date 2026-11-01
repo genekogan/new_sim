@@ -13,6 +13,7 @@ import {afterCommit} from '../comms/store.ts';
 //   body's prop), give them (the other accepts), put them down (a small lasting object others can pick up; capped per
 //   place, cleared after a while), eat or drink consumables. Items live in this ledger's table; the body only carries
 //   the visible prop (human.holding), changed when a pose completes, so both agree.
+import {menuWorldOf} from '../../split/menu-world.ts';
 import {randomUUID} from 'node:crypto';
 import {isRigidBody} from '../body/actions.ts';
 import type {Program} from '@sim/engine-contract';
@@ -23,6 +24,7 @@ import type {EdgeCapability, EdgeReceipt, EdgeSoul, NearbyBody} from '../contrac
 import {centroid, type PlaceIndex} from './places.ts';
 import {tokens} from './vocabulary.ts';
 import type {SpotsData} from './activities.ts';
+import {menuStats, cpuNow} from './menu-stats.ts';
 
 type V2 = [number, number];
 type Steps = Program['steps'];
@@ -56,6 +58,16 @@ export const SOLO: Record<string, {seconds: number; seated: boolean; label: stri
   cheer: {seconds: 3, seated: true, label: 'Cheer (params.to: someone)'},
   point: {seconds: 3, seated: true, label: 'Point at someone, a place or a thing (params.at)'},
 };
+/** srv-act-words: every verb an offer of `Together.capabilities` can have. A focused build whose focus names none of them,
+ *  no `…:here`/`…:held` id and no target skips the together listing (edge-bind-one-oracle checks the set). */
+export const TOGETHER_VERBS: ReadonlySet<string> = new Set([...Object.keys(PAIRED), ...Object.keys(SOLO), 'accept', 'decline', 'follow', 'ask-to-stop', 'give', 'put-down', 'eat', 'drink', 'pick-up']);
+/** srv-act-words: whether a focused build may want an offer of the together listing (always, without a focus). */
+export function togetherMayOffer(f: {ids: ReadonlySet<string>; verbs: ReadonlySet<string>; targets: ReadonlySet<string>; here?: boolean} | null | undefined): boolean {
+  if (!f || f.here || f.targets.size) return true;
+  for (const v of f.verbs) if (TOGETHER_VERBS.has(v)) return true;
+  for (const id of f.ids) if (TOGETHER_VERBS.has(id.slice(0, Math.max(0, id.indexOf(':'))))) return true;
+  return false;
+}
 export const ITEM_NAMES: Record<ItemKind, string> = {book: 'a book', flower: 'a flower', cup: 'a cup of tea', food: 'something to eat', letter: 'a letter', tool: 'a tool', frisbee: 'a frisbee'};
 const CONSUMABLE = new Set<ItemKind>(['cup', 'food']);
 /** Where things are found: place words (id + name) per item kind. */
@@ -103,6 +115,8 @@ type Follow = {receipt: string; soulId: string; target: string; untilTick: numbe
 /** What the ledger lends this module (closures over its internals). */
 export type TogetherPort = {
   host: WorldHost; db: Db; places: PlaceIndex; spots: () => SpotsData;
+  /** The static world's version (places, spots, navigation epoch): caches of static reads key on it (L3). */
+  staticVersion?: () => string;
   body(entityId: string): NativeWorld['entities'][string] | undefined;
   perceived(soulId: string, radius: number): NearbyBody[];
   receipt(soulId: string, id: string): EdgeReceipt | null;
@@ -143,15 +157,15 @@ export class Together {
       if (rec && (rec.phase === 'started' || rec.phase === 'waiting')) this.follows.set(f.receipt, f); else this.dropFollow(f.receipt);
     }
   }
-  private get w() {return this.p.host.engine.world as NativeWorld;}
-  private get tick() {return this.p.host.engine.world.tick;}
+  private get w() {return menuWorldOf(this.p.host).world as NativeWorld;}
+  private get tick() {return menuWorldOf(this.p.host).world.tick;}
   private mindOf(soulId: string) {return this.p.host.minds.get(soulId);}
   private posOf(soulId: string): V2 | null {const m = this.mindOf(soulId), b = m ? this.p.body(m.entityId) : undefined; return b ? [b.pose.p[0], b.pose.p[2]] : null;}
   private seated(entityId: string) {const h = this.p.body(entityId)?.human; return !!h && (h.activity === 'sit' || h.baseActivity === 'sit');}
   private standFirst(entityId: string): Steps {return this.seated(entityId) ? [{verb: 'stand', params: {}}] : [];}
   /** A clear straight line between two standing points (nothing solid between two people about to touch). */
   private lineClear(a: V2, b: V2): boolean {
-    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number}; if (!e.clearanceAtV1) return true;
+    const e = menuWorldOf(this.p.host) as unknown as {clearanceAtV1?: (x: number, z: number) => number}; if (!e.clearanceAtV1) return true;
     const n = Math.max(2, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.1));
     for (let i = 1; i < n; i++) if (e.clearanceAtV1(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n) < 0.24) return false;
     return true;
@@ -171,7 +185,7 @@ export class Together {
   meetSteps(me: string, other: string, standoff = 1.1, gap = 0.8, otherAt?: V2): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return [{verb: 'walk_to', params: {to: other, standoff}}];
     const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = otherAt ?? [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
-    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    const e = menuWorldOf(this.p.host) as unknown as {clearanceAtV1?: (x: number, z: number) => number};
     const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
     // hotfix: where both will stand for the gesture (`gap` apart, meeting between) and the way there stay clear of bystanders
     const roomFor = (p: V2) => {
@@ -195,7 +209,11 @@ export class Together {
   // ---------------------------------------------------------------- storage
   invite(id: string): Invite | null {const r = this.p.db.db.prepare('SELECT body FROM edge_invites_v1 WHERE world_id=? AND invite_id=?').get(this.p.host.worldId, id) as {body: string} | undefined; return r ? JSON.parse(r.body) as Invite : null;}
   private pending(): Invite[] {return (this.p.db.db.prepare("SELECT body FROM edge_invites_v1 WHERE world_id=? AND state='pending' ORDER BY created_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Invite);}
-  private saveInvite(i: Invite) {this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
+  /** L3: moves on every invitation, item, item-op or follow write (and again when its in-memory copy updates after the
+   *  commit), so a menu cached on it never keeps an answered invitation or a handed-over item. */
+  version = 0;
+  private bump() {this.version++; try {afterCommit(this.p.db.db, () => this.version++);} catch {/* an untracked outer transaction: the first bump stands */}}
+  private saveInvite(i: Invite) {this.bump(); this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
   inviteForReceipt(receipt:string):Invite|null{const r=this.p.db.db.prepare('SELECT invite_id FROM edge_invite_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId,receipt) as {invite_id:string}|undefined;return r?this.invite(r.invite_id):null;}
   /** A paired gesture or a give whose host receipt is open while nobody has answered yet (quality case 32): the host is
    *  only walking over / holding out a hand, so the receipt reads `waiting` and `here` reads `inviting` until a guest
@@ -215,19 +233,20 @@ export class Together {
   heldBy(soulId: string): Item | null {const r = this.p.db.db.prepare("SELECT body FROM edge_items_v1 WHERE world_id=? AND holder=? AND state='held' LIMIT 1").get(this.p.host.worldId, soulId) as {body: string} | undefined; return r ? JSON.parse(r.body) as Item : null;}
   placed(): Item[] {return (this.p.db.db.prepare("SELECT body FROM edge_items_v1 WHERE world_id=? AND state='placed' ORDER BY updated_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Item);}
   private saveItem(i: Item) {
+    this.bump();
     if (i.state === 'gone') {this.p.db.db.prepare('DELETE FROM edge_items_v1 WHERE world_id=? AND item_id=?').run(this.p.host.worldId, i.id); this.p.spectate({kind: 'item', item: this.publicItem(i)}); return;}
     this.p.db.db.prepare('INSERT INTO edge_items_v1 (world_id,item_id,state,holder,place_id,body,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT (world_id,item_id) DO UPDATE SET state=excluded.state, holder=excluded.holder, place_id=excluded.place_id, body=excluded.body, updated_at=excluded.updated_at')
       .run(this.p.host.worldId, i.id, i.state, i.holder, i.placeId, JSON.stringify(i), Date.now());
     this.p.spectate({kind: 'item', item: this.publicItem(i)});
   }
   publicItem(i: Item) {return {id: i.id, kind: i.kind, name: i.name, state: i.state, holder: i.holder ? {soulId: i.holder, name: this.mindOf(i.holder)?.name ?? 'someone'} : null, placeId: i.placeId, at: i.at, untrusted: true};}
-  private saveOp(receipt: string, op: ItemOp) {this.p.db.db.prepare('INSERT OR REPLACE INTO edge_item_ops_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, receipt, JSON.stringify(op));}
+  private saveOp(receipt: string, op: ItemOp) {this.bump(); this.p.db.db.prepare('INSERT OR REPLACE INTO edge_item_ops_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, receipt, JSON.stringify(op));}
   private takeOp(receipt: string): ItemOp | null {
     const r = this.p.db.db.prepare('SELECT body FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId, receipt) as {body: string} | undefined;
-    if (!r) return null; this.p.db.db.prepare('DELETE FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt); return JSON.parse(r.body) as ItemOp;
+    if (!r) return null; this.bump(); this.p.db.db.prepare('DELETE FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt); return JSON.parse(r.body) as ItemOp;
   }
-  private saveFollow(f: Follow) {this.p.db.db.prepare('INSERT OR REPLACE INTO edge_follows_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, f.receipt, JSON.stringify(f));afterCommit(this.p.db.db,()=>this.follows.set(f.receipt,f));}
-  private dropFollow(receipt: string) {this.p.db.db.prepare('DELETE FROM edge_follows_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt);afterCommit(this.p.db.db,()=>this.follows.delete(receipt));}
+  private saveFollow(f: Follow) {this.bump(); this.p.db.db.prepare('INSERT OR REPLACE INTO edge_follows_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, f.receipt, JSON.stringify(f));afterCommit(this.p.db.db,()=>this.follows.set(f.receipt,f));}
+  private dropFollow(receipt: string) {this.bump(); this.p.db.db.prepare('DELETE FROM edge_follows_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt);afterCommit(this.p.db.db,()=>this.follows.delete(receipt));}
   followingOf(soulId: string) {return [...this.follows.values()].find(f => f.soulId === soulId) ?? null;}
   followersOf(soulId: string) {return [...this.follows.values()].filter(f => f.target === soulId);}
   /** A guest with an unanswered invitation is not idle (ambient life leaves it be while its agent decides). */
@@ -237,22 +256,25 @@ export class Together {
   private sourceCache: {key: string; list: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[]} | null = null;
   /** Deterministic item sources: shelves (books), writing desks (letters) and walkable places by kind (gardens → flowers…). */
   sources() {
-    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = Object.keys(this.w.regions).length + ':' + this.p.places.byId.size + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
-    if (this.sourceCache?.key === key) return this.sourceCache.list;
+    const nav = (this.w as {navV1?: {solids?: unknown[]; ground?: unknown[]}}).navV1, key = (this.p.staticVersion?.() ?? '') + '|' + Object.keys(this.w.regions).length + ':' + this.p.places.version + ':' + (nav?.solids?.length ?? -1) + ':' + (nav?.ground?.length ?? -1);
+    if (this.sourceCache?.key === key) {menuStats.src.hit++; return this.sourceCache.list;}
+    menuStats.src.miss++; const c0 = cpuNow();
     const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
     for (const s of this.p.spots().shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
-    const engine = this.p.host.engine as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
+    // a place source's spot ignores people (withPeople false): people are not in the cache key, so a person-avoiding spot
+    // depended on who stood on the centroid when the cache was built (main's own answers flipped; main vs read worker ~1 m)
+    const engine = menuWorldOf(this.p.host) as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number, withPeople?: boolean) => V2 | null};
     for (const place of [...this.p.places.byId.values()].sort((a, b) => a.id.localeCompare(b.id))) {
       // places come from the place registry (a mars-engine world keeps its places there, not in world.regions)
       if (!place.polygon?.length || place.kind === 'water' || place.carrier) continue;
       const text = (place.id + ' ' + place.name).toLowerCase(), kinds = SOURCE_WORDS.filter(([, re]) => re.test(text)).map(([k]) => k);
       if (!kinds.length) continue;
-      const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24) ?? null; if (!at) continue;
+      const at = engine.nearestStandableV1?.(centroid(place.polygon), undefined, 0.6, 24, false) ?? null; if (!at) continue;
       for (const kind of [...new Set(kinds)]) out.push({id: 'place:' + place.id, kind, label: place.name, at, place: place.id});
     }
-    this.sourceCache = {key, list: out}; return out;
+    this.sourceCache = {key, list: out}; menuStats.src.cpuUs += cpuNow() - c0; return out;
   }
 
   /** GEST-LIVE: the other sources of an item kind within reach, nearest first (the nearest one may have no walkable route). */
@@ -386,7 +408,7 @@ export class Together {
     return true;
   }
   private followSteps(me: string, target: string, gap = 0): Steps {
-    const tb = this.p.body(target), engine = this.p.host.engine as unknown as {movementVerb?: (actor: string, x: number, z: number) => string};
+    const tb = this.p.body(target), engine = menuWorldOf(this.p.host) as unknown as {movementVerb?: (actor: string, x: number, z: number) => string};
     // jogging is dry-ground only: a shore or water leg with a gait would fail the follow
     const dry = !tb || (engine.movementVerb?.(me, tb.pose.p[0], tb.pose.p[2]) ?? 'walk_to') === 'walk_to';
     const legs: Steps = [], jog = gap > CATCH_UP && dry && this.p.body(me)?.body?.family !== 'floater';
@@ -700,7 +722,7 @@ export class Together {
   }
   /** Every second: invitations lapse; follows whose target faded end; placed items are cleared after a while. */
   sweep() {
-    const tick = this.tick, carriers = (this.p.host.engine as unknown as {carriers?: () => {id: string; state: {phase: string; hold?: unknown}}[]}).carriers?.() ?? [];
+    const tick = this.tick, carriers = (menuWorldOf(this.p.host) as unknown as {carriers?: () => {id: string; state: {phase: string; hold?: unknown}}[]}).carriers?.() ?? [];
     for (const inv of this.pending()) {
       // a ride invitation closes once the basket has gone (or stopped keeping the place)
       const gone = inv.kind === 'ride' && (() => {

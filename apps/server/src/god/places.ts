@@ -6,7 +6,7 @@
 //  - an area the god laid out (a plaza, a lawn, a garden, an orchard) is an outdoor place, its outline the area's;
 //  - a pond or a lake is a water place;
 //  - a building is a place (its rooms' outline, a little out for the walls) and each room a place inside it,
-//    enclosed (privacy and earshot as Eden's rooms), its capacity the seats in it;
+//    enclosed (privacy and earshot as Eden's rooms) unless the building is open-sided (a pavilion), its capacity the seats in it;
 //  - a big named thing standing on its own (a fountain, a gazebo, a statue, an old oak) is a landmark place around it,
 //    so "where" says "fountain" and not only "Green field";
 //  - each has a short description of what is in it: "a plaza with a fountain, two benches, a lamp-post and a sign".
@@ -57,6 +57,18 @@ function hull(pts: Vec2[]): Vec2[] {
 }
 /** The kind a def's `place` component gives (plaza, pitch, garden …). */
 function placeKind(m: WorldModel, id: string): string | undefined { const e = m.entities.get(id), k = e ? (m.resolvedDef(e.def)?.components as Record<string, any> | undefined)?.place?.kind : undefined; return typeof k === 'string' && k ? k : undefined; }
+/** Whether a building's rooms are enclosed (privacy, earshot, sight as Eden's rooms). Decided by geometry, not by the
+ *  def's `place.enclosed` (the def schema defaults a missing value to false, so a walled cafe would read open): only a
+ *  building/1 pavilion is open, as its plan is a roof on posts with no walls (building-plan.ts pavilionPlan), and only
+ *  while no explicit `plan` param replaces that layout. Every other room is enclosed. */
+function roomsEnclosed(m: WorldModel, id: string): boolean {
+  const e = m.entities.get(id), def = e ? m.resolvedDef(e.def) : undefined; if (!e || !def) return true;
+  const make = def.make as { kind?: string; gen?: string; args?: Record<string, unknown> } | undefined;
+  if (make?.kind !== 'gen' || make.gen !== 'building/1') return true;
+  const params = { ...Object.fromEntries(Object.entries((def.params ?? {}) as Record<string, { default?: unknown }>).map(([k, p]) => [k, p?.default])), ...(e.params ?? {}) } as Record<string, unknown>;
+  const plan = params.plan as { floors?: unknown } | null | undefined;
+  return (make.args?.style ?? params.style) !== 'pavilion' || (!!plan && typeof plan === 'object' && Array.isArray(plan.floors));
+}
 /** A polygon pushed out from its centroid by `d` metres (walls round a building's rooms). */
 function grow(poly: Vec2[], d: number): Vec2[] { const [cx, cz] = centroid(poly); return poly.map(([x, z]) => { const dx = x - cx, dz = z - cz, n = Math.hypot(dx, dz) || 1; return [r2(x + (dx / n) * d), r2(z + (dz / n) * d)] as Vec2; }); }
 function circle(c: Vec2, r: number, n = 12): Vec2[] { return Array.from({ length: n }, (_, i) => [r2(c[0] + Math.cos((i / n) * Math.PI * 2) * r), r2(c[1] + Math.sin((i / n) * Math.PI * 2) * r)] as Vec2); }
@@ -109,6 +121,9 @@ export type PlacesHost = {
   engineOwned(e: Entity): boolean;
   levelAt(x: number, z: number, y: number): number;
   log(m: string): void;
+  /** B-facade: a read worker derives the places (ofEntity / placeAt) but never installs them: its ledger's index is main's,
+   *  shipped whole with the delta (a worker that installed its own would run ahead of main while main catches up). */
+  readOnly?: boolean;
   /** LAYERS: schedules (today's slots), ownership and who works/lives there, in each place (layers.ts). */
   layers?: { active(): boolean; dayKey(): string; slotsFor(e: Entity, label: string): NonNullable<Place['schedule']>; tag(e: Entity): string; peopleAt(id: string): string; onNow?(e: Entity): string };
 };
@@ -237,7 +252,7 @@ export class GodPlaces {
       if (++n % 48 === 0) yield;
       if (t.kind === 'area' && t.area && t.area.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'area', entity: t.id, name: t.ref, kind: placeKind(m, t.id) ?? 'outdoor', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
       else if (t.kind === 'water' && t.area && t.area.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'water', entity: t.id, name: t.ref, kind: 'water', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
-      else if (t.kind === 'room' && t.poly && t.poly.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'room', entity: t.id, name: t.ref, kind: 'room', enclosed: true, polygon: t.poly.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: t.level });
+      else if (t.kind === 'room' && t.poly && t.poly.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'room', entity: t.id, name: t.ref, kind: 'room', enclosed: roomsEnclosed(m, t.id), polygon: t.poly.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: t.level });
     }
     // GOD-ENV: the god's landforms are places Souls can name and climb: a mountain or hill (round its top), a range, a
     // valley, a ditch or a cliff (a band along it), a plateau or a terrace (its area: already an area place, renamed)
@@ -404,7 +419,7 @@ export class GodPlaces {
     const [w, d] = across(p.polygon);
     if (p.of === 'room') {
       const t = things.find((x) => x.ref === p.ref), n = this.seatsIn(p);
-      return `${t?.what ?? p.ref} (${article(kind)})${items.length ? `, with ${listed(items)}` : ', empty'}${n ? `; seats ${n}` : ''}; indoors, about ${Math.round(w)} by ${Math.round(d)} m`;
+      return `${t?.what ?? p.ref} (${article(kind)})${items.length ? `, with ${listed(items)}` : ', empty'}${n ? `; seats ${n}` : ''}; ${p.enclosed ? 'indoors' : 'open-sided'}, about ${Math.round(w)} by ${Math.round(d)} m`;
     }
     if (p.of === 'building') {
       const t = things.find((x) => x.ref === p.ref), rooms = all.filter((q) => q.of === 'room' && q.entity === p.entity).map((q) => q.ref);
@@ -437,6 +452,7 @@ export class GodPlaces {
   sync(fresh = false) {
     const places = this.h.edge?.places; if (!places) return;
     const want = new Map(this.list(fresh).map((p) => [p.id, p])); this.installedKey = this.cache?.key;
+    if (this.h.readOnly) { this.publishedVersion = this.cache?.publicationVersion; this.published = true; return; }
     for (const id of [...this.installed]) if (!want.has(id)) { places.byId.delete(id); this.installed.delete(id); }
     for (const [id, p] of want) {
       const cur = places.byId.get(id); if (cur && !this.installed.has(id)) continue;   // a boot place keeps its own

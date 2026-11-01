@@ -28,7 +28,11 @@ test('selected existing Eden greenfield admits bounded owner waves with measured
   for(let wave=0;wave<7;wave++){
     const fresh=[];
     for(let j=0;j<4;j++){const index=wave*4+j+1,owner=`capacity${index}`;await invite(f,owner);fresh.push(create(owner,`Friend ${index}`));}
-    const arrivals=await Promise.all(fresh);owners.push(...arrivals);f.host.drainInputs();await delay(0);
+    const arrivals=await Promise.all(fresh);owners.push(...arrivals);
+    // Births are admitted one per macrotask (lane srv-join-stall: one detached probe per tick), so a wave of four
+    // needs several drains; one drainInputs no longer admits the whole wave.
+    const admitted=()=>arrivals.every(o=>{const l=f.souls.lifecycleReceipt('dev:'+o.owner,o.requestId);return l.state==='admitted'&&l.ready;});
+    for(let i=0;i<50&&!admitted();i++){f.host.drainInputs();await delay(0);}
     const admissionMs=[];
     for(const o of arrivals){const r=await f.request(`/v1/lifecycle/${o.requestId}`,undefined,o.owner),receipt=await r.json() as {lifecycle:{state:string;ready:boolean}};assert.equal(r.status,200);assert.equal(receipt.lifecycle.state,'admitted');assert.equal(receipt.lifecycle.ready,true);admissionMs.push(performance.now()-o.start);accepted++;}
     const directed=owners.map(o=>f.request(`/v1/souls/${o.soulId}/intent`,{intent:{goal:'wander',text:'wander in this green field'}},o.owner));

@@ -85,8 +85,17 @@ const SYNONYMS: Record<string, string[]> = {
 };
 /** VOCAB-MECH: everyday words for god things' actuator actions (only used when such an action is offered). */
 const ACT_ALIASES: Record<string, string> = {'turn-on': 'switch-on', 'turn-off': 'switch-off', shut: 'close', 'shut-off': 'switch-off', extinguish: 'put-out', 'blow-out': 'put-out', ignite: 'light', kindle: 'light', 'light-up': 'light', 'fill-up': 'fill', drain: 'empty'};
-export const tokens = (s: string) => s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
-const norm = (s: string) => tokens(s).join(' ');
+// L3 (server reliability): a resolve tokenises every place's and offer's names on every call; the same few thousand names
+// repeat, so their tokens are kept (bounded; callers get their own copy, so an in-place sort never reaches the memo)
+const TOKEN_MEMO = new Map<string, string[]>(), TOKEN_MEMO_MAX = 50_000;
+export const tokens = (s: string): string[] => {
+  const hit = TOKEN_MEMO.get(s); if (hit) return hit.slice();
+  const t = s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
+  if (TOKEN_MEMO.size >= TOKEN_MEMO_MAX) TOKEN_MEMO.clear(); TOKEN_MEMO.set(s, t); return t.slice();
+};
+// (L3 b: norm is asked for every offer's and place's names on every resolve; same bounded memo as tokens)
+const NORM_MEMO = new Map<string, string>();
+const norm = (s: string): string => {let n = NORM_MEMO.get(s); if (n === undefined) {if (NORM_MEMO.size >= TOKEN_MEMO_MAX) NORM_MEMO.clear(); n = tokens(s).join(' '); NORM_MEMO.set(s, n);} return n;};
 // D3b (cloud fix-r3 basics-1 pip-010: "walk to the kitchen in eden-house-2" walked to eden-house-1/kitchen-chair-2, its
 // "chair-2" holding the 2): a number names the word right before it ("house 2", "house two"). A name that numbers that word
 // only otherwise ("house 1") is not what the words say; a name without such a number is unaffected.
@@ -196,6 +205,34 @@ export const NOWHERE = ' Nothing like it exists anywhere in this world, so walki
 const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fishing: 'fish', gardening: 'garden', weeding: 'garden', swinging: 'swing', stargazing: 'stargaze', picnicking: 'picnic', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
+/** srv-act-words: the plain words an act may resolve on a focused build (`EdgeLedger.wordsFocused`): one walk to a named
+ *  place, standing up, a wave, a wander. (Rotation 2: sits and dances went back to the words menu. Their launch admission
+ *  reads the engine's paged clearance, whose answer near a body depends on the windows the last menu queries opened: after
+ *  a focused build 4 of 15 dances were refused pose.no-room that the whole menu's build admitted, the world identical;
+ *  oracle --gap 20, k=230.) Other shapes read offers beyond their own verbs
+ *  (chains, finding, gaits, bikes, rides and steering, "go <doing>", behind / nearest, floors, the refusal table, social
+ *  phrasing) and resolve on the whole menu, as before. */
+const WORDS_FOCUS_SHAPE = /^(?:please\s+)?(?:(?:go|walk|head)(?:\s+over|\s+back)?\s+(?:to|into|inside|towards?)\s+[a-z0-9' -]+|stand(?:\s+up)?|get\s+up|wave|wander)[.!]?$/;
+const WORDS_FOCUS_NOT = /\b(?:then|and|jog\w*|run|running|sprint\w*|hurry|cycl\w*|bik\w*|bicycl\w*|board\w*|embark|aboard|row\w*|boat\w*|ride|rides|riding|fly\w*|flight|leave|disembark|alight|start|depart|carousel|merry|ferris|balloon|punt|basket|behind|nearest|closest|nearby|anywhere|somewhere|upstairs|downstairs|floor|storey|story|top|level|find|seek|search|look)\b/;
+/** srv-act-words: the verbs plain words of a focus shape can read while they resolve (resolveWords), or null (the whole
+ *  menu): every verb parseCapability tests for these words (leading-word candidates and their VERBS synonyms, the INTENTS
+ *  and leisure verbs that match, ACT_ALIASES both ways), the offers the sit / stroll rules read (rest, sit-ground,
+ *  warm-by-fire; wander and stroll) and object offers (a god-built thing's
+ *  actions are verbs too). The offers of these verbs are the whole menu's (bindFocus), so the words resolve the same. */
+export function wordsFocusVerbsV1(input: string): Set<string> | null {
+  const raw = input.trim(), text = raw.toLowerCase().replace(/\s+/g, ' ');
+  if (!raw || raw.length > 160 || raw.includes(':') || !WORDS_FOCUS_SHAPE.test(text) || WORDS_FOCUS_NOT.test(text) || GO_FOR.test(raw) || FIND.test(raw)) return null;
+  if (NOT_YET.some(([re]) => re.test(text))) return null;
+  const out = new Set<string>(['object']), words = raw.split(/\s+/);
+  for (let n = 1; n <= Math.min(4, words.length); n++) {const k = words.slice(0, n).join('-').toLowerCase().trim().replace(/[\s_]+/g, '-'); out.add(k); if (VERBS[k]) out.add(VERBS[k]);}
+  for (const [re, v] of INTENTS) if (re.test(text)) out.add(v);
+  if (LEISURE_LEAD.test(raw)) for (const [re, v] of LEISURE_OBJECTS) if (re.test(text)) out.add(v);
+  for (const v of [...out]) {if (ACT_ALIASES[v]) out.add(ACT_ALIASES[v]); for (const [k, a] of Object.entries(ACT_ALIASES)) if (a === v) out.add(k);}
+  if (out.has('stroll') || out.has('wander')) {out.add('stroll'); out.add('wander');}
+  if (out.has('sit')) {out.add('rest'); out.add('sit-ground'); out.add('warm-by-fire');}
+  if (/\b(?:fire|campfire|warm)\b/.test(text)) out.add('warm-by-fire');
+  return out;
+}
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
 export function parseCapability(input: string, verbs: Set<string>): {verb: string; rest: string} {
   const raw = input.trim(), i = raw.indexOf(':');
@@ -662,10 +699,47 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   return {...unknown(`Nothing offered matches "${input}"; read capabilities again.`), ...(PLACE_VERBS.has(verb) && left.length && !ctx.withheld?.includes(left.join(' ')) ? {seek: left} : {})};
 }
 
+// srv-act-words: the places by id, once per places listing (vocabPlaces keeps the listing; isAncestor is asked for every
+// pair of a pool's offers: a Map per call was 2-3 ms of every walk resolved in words)
+const PLACES_BY_ID = new WeakMap<VocabContext['places'], Map<string, VocabContext['places'][number]>>();
 function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined): boolean {
-  const byId = new Map(ctx.places.map(p => [p.id, p]));
+  let byId = PLACES_BY_ID.get(ctx.places); if (!byId) {byId = new Map(ctx.places.map(p => [p.id, p])); PLACES_BY_ID.set(ctx.places, byId);}
   for (let p = id ? byId.get(id) : undefined, n = 0; p && n < 20; p = p.parent ? byId.get(p.parent) : undefined, n++) if (p.parent === ancestor) return true;
   return false;
+}
+/** srv-act-words (D): for a focused walk to these destination words, a test passing every walk offer the words could choose
+ *  (resolveWords' walk pool rules), so a focused build may skip building the rest (their route goals): an offer is kept
+ *  when any destination word (or its everyday synonym) is one of its own words (target id, id, label, target names, the
+ *  place it stands in, aliases), or its target is a place any such word names (name, id, aliases, kind, description: every
+ *  placeMatch tier and pass, leniently) or one inside or around such a place (3b: the place itself, its inner offers, the
+ *  containing place). Every rule that chooses a walk reads only offers like these; the rest are read by unknown answers,
+ *  which go to the words menu. Null (build every walk) for words other rules read whole: no word left after filler, here
+ *  / now words, numbers (numberWords), and a word the typo fallback could re-read (one no place spells exactly: typoFix
+ *  reads the offers' words). */
+const KEEP_WHOLE = new Set(['here', 'nearby', 'near', 'anywhere', 'somewhere', 'down', 'now', 'nearest']);
+const PLACE_TOKENS = new WeakMap<readonly VocabPlace[], Set<string>>();
+export function walkKeepV1(dest: string, places: VocabPlace[], target: VocabContext['target']): ((c: Pick<EdgeCapability, 'id' | 'verb' | 'label' | 'aliases' | 'target'>) => boolean) | null {
+  const q = tokens(dest);
+  if (!q.some(w => !FILLER.has(w)) || q.some(w => KEEP_WHOLE.has(w) || /\d/.test(w) || w in NUMBER_WORDS)) return null;
+  let exact = PLACE_TOKENS.get(places);
+  if (!exact) {exact = new Set(); for (const p of places) for (const s of [p.name, p.id, p.description ?? '', ...(p.aliases ?? [])]) for (const t of tokens(s)) exact.add(t); PLACE_TOKENS.set(places, exact);}
+  if (q.some(w => w.length >= 4 && !FILLER.has(w) && !exact!.has(w))) return null;
+  const Q = [...new Set([...q, ...q.flatMap(w => SYNONYMS[w] ?? [])])], qs = q.join(' ');
+  const named = new Set(places.filter(p => {const W = placeWords(p); return W.ids.includes(qs) || W.name === qs || W.aliases.includes(qs) || Q.some(w => tokenHit(w, W.nameT) || tokenHit(w, W.kindT) || tokenHit(w, W.descT));}).map(p => p.id));
+  // ... with every place around (isAncestor's chain) and inside them
+  let byId = PLACES_BY_ID.get(places); if (!byId) {byId = new Map(places.map(p => [p.id, p])); PLACES_BY_ID.set(places, byId);}
+  const near = new Set(named);
+  for (const p of places) {
+    const chain: string[] = [];
+    for (let x: VocabPlace | undefined = p, n = 0; x && n < 21; x = x.parent ? byId.get(x.parent) : undefined, n++) chain.push(x.id);
+    if (chain.slice(1).some(id => named.has(id))) near.add(p.id);
+    if (named.has(p.id)) for (const id of chain) near.add(id);
+  }
+  return c => {
+    const id = c.target?.id; if (id && near.has(id)) return true;
+    const t = target(c as EdgeCapability), own = [id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names, ...t.around, ...(c.aliases ?? [])].flatMap(tokens);
+    return Q.some(w => tokenHit(w, own));
+  };
 }
 /** Places named by these words: own name/id first, then everyday synonyms, then description words; the most
  *  obvious first (by name over description, walkable, outermost, larger). */
@@ -690,23 +764,38 @@ function elsewhereReason(verb: string, ctx: VocabContext, here: string, none?: s
 }
 export function placeMatch(words: string[], places: VocabPlace[], withheld: readonly string[] = []): VocabPlace[] {return placeMatchTier(words, places, withheld).found;}
 /** placeMatch, and which tier matched: 0 own name exactly, 1 own name/id words, 2 everyday synonyms, 3 description words. */
+/** L3 (b): what placeMatchTier reads of a place, derived once per VocabPlace object (vocabularyOf keeps them while the
+ *  places, their aliases and what this Soul knows do not change). VocabPlaces are never written after they are built. */
+type PlaceWords = {ids: string[]; name: string; aliases: string[]; nameT: string[]; kindT: string[]; descT: string[]; numberNames: string[][]};
+const PLACE_WORDS = new WeakMap<VocabPlace, PlaceWords>();
+function placeWords(p: VocabPlace): PlaceWords {
+  let w = PLACE_WORDS.get(p); if (w) return w;
+  const aliases = (p.aliases ?? []).filter(a => !p.genericAliases?.includes(a));
+  w = {ids: [norm(p.id), ...(p.ref ? [norm(p.ref)] : [])], name: norm(p.name), aliases: aliases.map(norm),
+    nameT: [...tokens(p.name), ...tokens(p.id), ...aliases.flatMap(tokens)], kindT: [...tokens(p.kind ?? ''), ...(p.genericAliases ?? []).flatMap(tokens)],
+    descT: tokens(p.description ?? ''), numberNames: [tokens(p.name), tokens(p.id)]};
+  PLACE_WORDS.set(p, w); return w;
+}
 export function placeMatchTier(words: string[], places: VocabPlace[], withheld: readonly string[] = []): {found: VocabPlace[]; tier: number} {
   if (!words.length) return {found: [], tier: -1};
   const q=words.join(' ');
-  const aliases=(p:VocabPlace)=>(p.aliases??[]).filter(a=>!p.genericAliases?.includes(a));
-  for(const found of [places.filter(p=>norm(p.id)===q||p.ref&&norm(p.ref)===q),places.filter(p=>norm(p.name)===q),places.filter(p=>aliases(p).some(a=>norm(a)===q))])if(found.length)return {found,tier:0};
-  const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id), ...aliases(p).flatMap(tokens)], descT = (p: VocabPlace) => tokens(p.description ?? '');
-  const hit = (w: string, set: string[]) => tokenHit(w, set) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, set));
+  const W = placeWords;
+  for(const found of [places.filter(p=>W(p).ids.includes(q)),places.filter(p=>W(p).name===q),places.filter(p=>W(p).aliases.includes(q))])if(found.length)return {found,tier:0};
+  const hitAll = (w: string, a: string[], b: string[]) => tokenHit(w, a) || tokenHit(w, b) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, a) || tokenHit(s, b));
+  const noConflict = (p: VocabPlace) => !numberConflict(words, W(p).numberNames);
   const tiers = [
-    places.filter(p => norm(p.name) === q || aliases(p).some(a=>norm(a)===q)),
-    places.filter(p => words.every(w => tokenHit(w, nameT(p))) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
-    places.filter(p => words.every(w => hit(w, [...nameT(p),...tokens(p.kind??''),...(p.genericAliases??[]).flatMap(tokens)])) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
-    places.filter(p => words.every(w => hit(w, [...nameT(p), ...descT(p)])) && !numberConflict(words, [tokens(p.name), tokens(p.id)])),
+    places.filter(p => W(p).name === q || W(p).aliases.includes(q)),
+    places.filter(p => words.every(w => tokenHit(w, W(p).nameT)) && noConflict(p)),
+    places.filter(p => words.every(w => hitAll(w, W(p).nameT, W(p).kindT)) && noConflict(p)),
+    places.filter(p => words.every(w => hitAll(w, W(p).nameT, W(p).descT)) && noConflict(p)),
   ];
   // knowledge/1: a withheld place's own name is not an everyday word for some other place (the grove is not the orchard)
   if (!tiers[0].length && !tiers[1].length && withheld.includes(words.join(' '))) return {found: [], tier: -1};
   const tier = tiers.findIndex(t => t.length), found = tiers[tier] ?? [];
-  const depth = (p: VocabPlace) => {let n = 0; const seen=new Set<string>(); for (let q: VocabPlace | undefined = p; q?.parent && !seen.has(q.id); q = places.find(x => x.id === q!.parent)) {seen.add(q.id);n++;} return n;};
+  if (found.length < 2) return {tier, found: [...found]};
+  // (the parent chain within `places`, as places.find walked it: the first place with each id)
+  const byId = new Map<string, VocabPlace>(); for (const x of places) if (!byId.has(x.id)) byId.set(x.id, x);
+  const depthOf = new Map<VocabPlace, number>(), depth = (p: VocabPlace) => {let d = depthOf.get(p); if (d !== undefined) return d; d = 0; const seen=new Set<string>(); for (let q: VocabPlace | undefined = p; q?.parent && !seen.has(q.id); q = byId.get(q.parent)) {seen.add(q.id);d++;} depthOf.set(p, d); return d;};
   return {tier, found: [...found].sort((a, b) => Number(!!b.walkable) - Number(!!a.walkable) || Number(a.kind === 'water') - Number(b.kind === 'water') || depth(a) - depth(b) || a.id.localeCompare(b.id))};
 }
 

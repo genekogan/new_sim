@@ -145,6 +145,8 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
     verb,
     description,
     schema,
+    // L4 audit: the step writes only its own actor's body (pose, human fields); the approach walk is a child walk_to
+    navPure: true,
     reservations(_w, p) {
       const s = resolved.get(p)?.id ?? p.slot;
       const out: Reservation[] = [{ resource: `actor:${p.actor}`, mode: 'exclusive' }];
@@ -350,6 +352,7 @@ export const stand: ActionDef<{ actor: string }, string, StandExec> = {
     rt.cancel(holder);
     return { released: holder };
   },
+  navPure: true, // L4 audit: the step only reads (the release is cancelled in start)
   step: (rt, ex) => (rt.isActive(ex.released) ? { status: 'running', phase: 'stand-up' } : { status: 'completed', outputs: { released: ex.released } }),
   cancel: () => ({ ok: true }),
   yieldTo: () => [], // social (never pre-empts); holds no one
@@ -375,6 +378,7 @@ function targetYaw(rt: Runtime, actor: Entity, t: FaceParams['target']): number 
 export const face: ActionDef<FaceParams, number, FaceExec> = {
   verb: 'face',
   description: 'Turn a person in place to face an entity ({ entity }) or a ground point ({ point: [x, z] }); activity idle.',
+  navPure: true, // L4 audit: the step turns its own actor only
   schema: z.strictObject({ actor: id80, target: z.union([z.strictObject({ entity: id80 }), z.strictObject({ point: xz })]) }),
   reservations: (_w, p) => [{ resource: `actor:${p.actor}`, mode: 'exclusive' }],
   plan(rt, p) {

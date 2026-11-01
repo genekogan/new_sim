@@ -43,6 +43,7 @@ export function buildDigest(d: DigestInput) {
   const covered = new Set(['conversation.turn', 'conversation.invite', 'conversation.member', 'conversation.closed', 'speech.to-me', 'mention', 'invite', 'invite.lapsed', 'invite.answered', 'arrive.here', 'leave.here', 'approach', 'speech.ambient', 'receipt.started', 'receipt.waiting', 'light.changed', 'world.narration']);
   const salient = env.filter(e => e.salience >= 2 && !covered.has(e.kind)).slice(-6).map(e => `${e.clock ? e.clock + ' ' : ''}${e.kind}: ${oneLine(e.text, 110)}`);
   const mine = env.filter(e => e.kind === 'receipt.terminal' || e.kind === 'blocked').slice(-1)[0];
+  const activity = env.filter(e=>e.kind==='activity.observed').at(-1);
   const notices = env.filter(e => e.kind === 'world.notice').slice(-2).map(e => oneLine(e.text, 120));
   const span = env.length ? {fromTick: env[0]!.tick, toTick: env.at(-1)!.tick, minutes: Math.round((d.now - env[0]!.at) / 60_000)} : null;
   const parts = [
@@ -54,6 +55,7 @@ export function buildDigest(d: DigestInput) {
     names(['arrive.here', 'approach']).length ? `Came by: ${names(['arrive.here', 'approach']).join(', ')}.` : null,
     names(['world.leave']).length ? `Faded out: ${names(['world.leave']).join(', ')}.` : null,
     mine ? `Your last act: ${oneLine(mine.text, 120)}` : null,
+    activity ? `Observed activity (then, not completion): ${oneLine(activity.text,160)}` : null,
   ].filter(Boolean) as string[];
   return {since: cursorOf(from), cursor: cursorOf(head), ...(gap ? {gap: true, oldest: cursorOf(floor)} : {}), span,
     counts: {total: env.length, ...(env.length >= DIGEST_SCAN ? {truncated: true} : {}), byKind},

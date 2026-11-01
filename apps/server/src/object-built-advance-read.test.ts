@@ -32,8 +32,9 @@ function persisted(f: Fixture) {
   };
 }
 function rewrite(f: Fixture, id: string, mutate: (row: ObjectRecord) => void) {
-  const row = f.objects.all().find(o => o.id === id)!; mutate(row);
+  const row = structuredClone(f.objects.all().find(o => o.id === id)!); mutate(row);   // L8: records are frozen; copy first
   f.db.db.prepare('UPDATE edge_comms_objects SET body=?,version=? WHERE world_id=? AND id=?').run(JSON.stringify(row), row.version, f.host.worldId, id);
+  f.objects.reload();   // L8: SQL that bypasses the framework must tell the in-memory table
 }
 
 test('built refresh matches a clone-path oracle for nested JSON, desired replacements and direct row edits', t => {
@@ -49,11 +50,12 @@ test('built refresh matches a clone-path oracle for nested JSON, desired replace
       if (i === 3) rewrite(f, 'b', row => { (row.state as BuiltState).text = 'direct SQL edit'; row.version += 3; });
       if (i === 7) f.desired.delete('a');
     }
-    const a = fast.objects.fresh(), b = old.objects.fresh();
+    // L8: built advances are refresh-only: listings skip them (no want() call), the sweep applies them
+    const calls = fast.calls.length; fast.objects.fresh(); assert.equal(fast.calls.length, calls, 'fresh() skips a refresh-only advance');
+    const a = fast.objects.sweep(), b = old.objects.fresh();
     assert.deepEqual(a, b); assert.deepEqual(persisted(fast), persisted(old)); assert.deepEqual(fast.calls, old.calls);
-    // Public detached reads remain independent: neither all() nor unchanged fresh() may alias storage.
-    (a.find(x => x.id === 'b')!.state as BuiltState).near.push('local mutation');
-    (b.find(x => x.id === 'b')!.state as BuiltState).near.push('local mutation');
+    // Shared reads are frozen: a caller cannot change storage through them.
+    assert.throws(() => (fast.objects.all().find(x => x.id === 'b')!.state as BuiltState).near.push('local mutation'), TypeError);
     assert.deepEqual(persisted(fast), persisted(old));
     assert.ok(!(fast.objects.all().find(x => x.id === 'b')!.state as BuiltState).near.includes('local mutation'));
   }
@@ -63,10 +65,10 @@ test('a transition retains the original desired-state alias but storage remains 
   for (const legacy of [false, true]) {
     const f = fixture(t, legacy); f.add('a');
     const desired = state('a', 'changed'); f.desired.set('a', desired);
-    const out = f.objects.fresh()[0]; assert.equal(out.state, desired);
+    const out = (legacy ? f.objects.fresh() : f.objects.sweep())[0]; assert.equal(out.state, desired);
     desired.near.push('later alias mutation');
     assert.ok(!(f.objects.all()[0].state as BuiltState).near.includes('later alias mutation'));
-    assert.deepEqual(f.objects.fresh()[0].state, desired, 'next call sees changed desired JSON');
+    assert.deepEqual((legacy ? f.objects.fresh() : f.objects.sweep())[0].state, desired, 'next pass sees changed desired JSON');
   }
 });
 
@@ -94,14 +96,16 @@ test('invalid non-null advance callbacks retain optional-call errors and argumen
 for (const prototype of [false, true]) test(`overridden ${prototype ? 'prototype' : 'instance'} all() retains clone isolation for shared records`, t => {
   for (const legacy of [false, true]) {
     const f = fixture(t, legacy); f.add('a');
-    const shared = f.objects.all(), original = structuredClone(shared[0].state) as BuiltState;
+    // an override hands out its own mutable records (the framework's are frozen)
+    const shared = structuredClone(f.objects.all()), original = structuredClone(shared[0].state) as BuiltState;
     f.desired.set('a', original); let reads = 0;
     const override = function () { reads++; return shared; };
     const mock = t.mock.method(prototype ? Objects.prototype : f.objects, 'all', override);
     f.hooks.want = () => { (shared[0].state as BuiltState).text = 'external alias changed during want'; };
     const result = f.objects.fresh();
     assert.equal(reads, 1); assert.equal(result[0].version, 1);
-    assert.equal((result[0].state as BuiltState).text, 'external alias changed during want');
+    // L8: a listing skips the refresh-only built advance (want is never asked); the legacy unmarked one still runs
+    assert.equal((result[0].state as BuiltState).text, legacy ? 'external alias changed during want' : 'initial');
     mock.mock.restore();
     assert.equal((f.objects.all()[0].state as BuiltState).text, 'initial');
     assert.equal(f.objects.all()[0].version, 1, 'no spurious transition from comparing a mutable external alias');
@@ -120,7 +124,7 @@ test('reentrant reads/writes and the first transition preserve subsequent live r
       assert.equal(f.objects.all().find(o => o.id === 'b')!.version, 8);
       f.objects.get('b', f.soul);
     };
-    returned.push(f.objects.fresh());
+    returned.push(f === fast ? f.objects.sweep() : f.objects.fresh());
     assert.equal(f.objects.all().find(o => o.id === 'b')!.version, 9);
     assert.ok(!(returned.at(-1) as ObjectRecord[]).some(o => o.id === 'c'), 'initial ordered listing owns this pass');
   }
@@ -151,7 +155,7 @@ test('after the first write and in get(), advance still receives detached state'
   const seen: unknown[] = [];
   const realClone = structuredClone;
   t.mock.method(globalThis, 'structuredClone', (value: unknown) => { seen.push(value); return realClone(value); });
-  f.objects.fresh();
+  f.objects.sweep();
   assert.ok(seen.some(s => (s as BuiltState)?.key === 'b'), 'post-firstwrite uses the existing advanced path');
   seen.length = 0; f.objects.get('a', f.soul);
   assert.ok(seen.some(s => (s as BuiltState)?.key === 'a'), 'direct get retains defensive clone');

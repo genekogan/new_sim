@@ -92,8 +92,18 @@ export function derivePlaceData(world: NativeWorld): PlaceData {
   return {contract: 'place-data/1', world: 'derived', places: [root, ...regions.filter(r => r.id !== 'world').map(r => ({id: r.id, name: r.label ?? r.id, kind: r.kind === 'place' ? 'outdoor' : (r.kind ?? 'outdoor'), parent: 'world', polygon: r.polygon, level: r.level ?? 0, enclosed: false, capacity: null, starting: false}))]};
 }
 
+/** A Map that counts its writes (L3: the place index's version, so caches keyed on it see a moved or renamed place). */
+class VersionedMap<K, V> extends Map<K, V> {
+  version = 0;
+  override set(k: K, v: V) {this.version++; return super.set(k, v);}
+  override delete(k: K) {const had = super.delete(k); if (had) this.version++; return had;}
+  override clear() {this.version++; super.clear();}
+}
+
 export class PlaceIndex {
-  readonly byId = new Map<string, Place>();
+  readonly byId: Map<string, Place> = new VersionedMap<string, Place>();
+  /** Moves on every add, replace or removal of a place. */
+  get version(): number {return (this.byId as VersionedMap<string, Place>).version;}
   readonly occupierOf = new Map<string, {occ: Occupier; place: Place}>();
   readonly data: PlaceData;
   /** carrier/1: carrier entity id → its place (declared in the data, or derived by the ledger). */
@@ -105,6 +115,14 @@ export class PlaceIndex {
   add(p: Place) {this.byId.set(p.id, p); for (const o of p.occupiers ?? []) this.occupierOf.set(o.fixture + '#' + o.slot, {occ: o, place: p}); if (p.carrier) this.carrierPlaces.set(p.carrier.entity, p);}
   /** Places containing the point, innermost (smallest) first; occupier (if seated) prepended by caller. Carrier places never contain by geometry. */
   containing(x: number, z: number, level = 0): Place[] {
+    // L3 (b): memoised per point while the index does not change (static geometry: a seat, a spot or a thing is asked
+    // about on every menu build; 1 s of a 90 s live-copy profile). Callers get their own copy of the answer.
+    const v = this.version; if (this.containMemo.v !== v || this.containMemo.m.size > 20000) this.containMemo = {v, m: new Map()};
+    const key = `${level},${x},${z}`, hit = this.containMemo.m.get(key); if (hit) return hit.slice();
+    const out = this.containingNow(x, z, level); this.containMemo.m.set(key, out); return out.slice();
+  }
+  private containMemo: {v: number; m: Map<string, Place[]>} = {v: -1, m: new Map()};
+  private containingNow(x: number, z: number, level: number): Place[] {
     return [...this.byId.values()].filter(p => !p.carrier && ((p.level ?? 0) === level && inOutline(x, z, p.polygon) || p.parent === null)).sort((a, b) => (a.parent === null ? 1 : 0) - (b.parent === null ? 1 : 0) || outlineOf(a.polygon).area - outlineOf(b.polygon).area);
   }
   ref(p: Place): PlaceRef {return {id: p.id, name: p.name, kind: p.kind};}

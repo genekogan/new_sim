@@ -18,10 +18,11 @@ export function resolvedParts(L:EdgeLedger,soul:EdgeSoul,selected:EdgeCapability
   const score=(p:NonNullable<typeof place.parts>[number])=>terms.filter(w=>[p.title,...(p.aliases??[])].join(' ').toLowerCase().includes(w)).length;
   const parts=place.parts.filter(part=>knownPart(L,soul,place,part))
     .map((p,i)=>({p,i,score:score(p)})).sort((a,b)=>b.score-a.score||a.i-b.i).slice(0,8);
-  const bound=L.coreA.binds(soul);
+  // L3 (b): each part's own id as offered now (the one offer, else on demand), without building the whole menu
+  const asOffered=(capability:string)=>L.resolveIdV1(soul,capability);
   return {parts:parts.map(({p})=>{
     const affordances=[p.walk,p.sit].filter((x):x is string=>!!x).map(capability=>{
-      const r=L.resolveOnDemand(soul,capability,bound.caps,bound.plans).v;
+      const r=asOffered(capability);
       if(r.kind==='unknown')return {capability,available:false,reason:r.reason};
       if(r.cap.id!==capability)return {capability,available:false,reason:'This exact part action is not offered now.'};
       return {capability:r.cap.id,available:r.cap.available,...(r.cap.blocked?{reason:r.cap.blocked.reason,code:r.cap.blocked.code}:{})};

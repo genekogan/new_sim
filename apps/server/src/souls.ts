@@ -81,7 +81,7 @@ export class Souls {
       const user=this.db.user(op.scope.owner);return !!user&&this.invited(user);
     });
     runner.onCommitted=()=>runner.pump();
-    this.lifecycle=runner;this.host.listeners.push({onApplied:()=>runner.pump(),afterTick:()=>runner.pump()});runner.pump();
+    this.lifecycle=runner;this.host.listeners.push({onApplied:()=>runner.pump(false),afterTick:()=>runner.pump()});runner.pump();
     return runner;
   }
   controlReady(soul:SoulRow):boolean{

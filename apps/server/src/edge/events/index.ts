@@ -13,6 +13,7 @@ import type {CommsRuntime} from '../comms/index.ts';
 import {cursorOf, parseCursor, type StreamEvent} from '../comms/stream.ts';
 import {oneLine, parseFilter, passes, relativeBearing, toEnvelope, type Envelope, type Filter} from './envelope.ts';
 import {buildDigest} from './digest.ts';
+import {activityObserver} from './activity-observation.ts';
 
 export const HEARTBEAT_MS = 15_000;
 export const MAX_STREAMS_PER_SOUL = 3;
@@ -326,9 +327,10 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
       if (lastApproach.size > 5000) for (const [k, t] of lastApproach) if (now - t > APPROACH_COOLDOWN_MS) lastApproach.delete(k);
     } catch { /* proximity is best effort */ }
   }
-  const listeners = (deps.host as {listeners?: {afterTick?: (tick: number) => void}[]}).listeners;
+  const activity = activityObserver({host:deps.host,db:deps.db,deliver:(soulId,tick,body)=>streams.deliver(soulId,'activity.observed',tick,body)});
+  const listeners = deps.host.listeners;
   const tickListener = {afterTick: (tick: number) => { if (tick % 20 === 0) sweep(tick); }};
-  listeners?.push(tickListener);
+  listeners?.push(tickListener,activity.listener);
 
   if (options.bootNotice) { try { notice({text: options.bootNotice, level: 'restart'}); } catch { /* best effort */ } }
 
@@ -338,7 +340,8 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
     close() {
       for (const set of conns.values()) for (const c of set) c.close('server stopping');
       conns.clear(); wss.close();
-      if (listeners) { const i = listeners.indexOf(tickListener); if (i >= 0) listeners.splice(i, 1); }
+      activity.close();
+      if (listeners) for(const listener of [tickListener,activity.listener]) { const i = listeners.indexOf(listener); if (i >= 0) listeners.splice(i, 1); }
       streams.enrich = null;
     },
   };

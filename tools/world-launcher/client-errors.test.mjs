@@ -124,3 +124,15 @@ test('lane DASH: arrivals are a 24 h time sample (p50/p90 per world, exact count
   t += 25 * 3_600_000; s = ce.summary();
   assert.equal(s.arrivals.n, 0); assert.equal(s.arrivals.sampled, 0); assert.deepEqual(s.arrivals.worlds, []);
 });
+
+test('rate counters: socket errors per 10 min slide out, totals per kind only grow (lane L7)', () => {
+  let t = 1_800_000_000_000; const { ce } = fresh({}, () => t);
+  const send = (e, ip) => ce.ingest(ip, UA_DESK, body({ b: 'we-bbbbbbbbbbbb', w: 'eden-2026', e }));
+  // the freeze's ramp: 1, 3, 4, 7 socket errors in successive ~3-min steps, plus a js error that never counts in the rate
+  for (const [i, n] of [1, 3, 4, 7].entries()) { send([{ k: 'ws', m: 'close 1006', n }, { k: 'js', m: 'Error: x' }], `10.0.0.${i}`); t += 180_000; }
+  assert.equal(ce.rate10m(), 14, 'ws events of the last 10 min (the 1 sent 12 min ago slid out)');
+  assert.equal(ce.rate10m(['js']), 3);
+  assert.deepEqual({ ws: ce.totals().ws, js: ce.totals().js, gl: ce.totals().gl }, { ws: 15, js: 4, gl: 0 });
+  t += 11 * 60_000; assert.equal(ce.rate10m(), 0); assert.equal(ce.totals().ws, 15);
+  send([{ k: 'storm', m: 'reconnect storm' }], '10.0.1.1'); assert.equal(ce.rate10m(), 1);
+});
