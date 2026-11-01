@@ -10,7 +10,7 @@ const names=(p:Place)=>[p.name,...(p.aliases??[]),...(p.ref?[p.ref]:[])];
 const words=(xs:string[])=>new Set(xs.flatMap(tokens));
 const covers=(q:string[],set:Set<string>)=>q.every(w=>set.has(w));
 const GENERIC_SEAT=new Set(['down','here','nearby','nearest','closest','somewhere','seat','chair','bench']);
-const PURPOSE=/^(?:(?:find|show|suggest|choose|take me to|go to|head to)\s+)?(?:somewhere|(?:a|the|any)\s+(?:place|venue|spot))\s+(?:to|for)\s+(.+)$|^where\s+(?:can|could|should)\s+(?:i|we)\s+(.+)$/i;
+export const PURPOSE=/^(?:(?:find|show|suggest|choose|take me to|go to|head to)\s+)?(?:somewhere|(?:a|the|any)\s+(?:place|venue|spot))\s+(?:to|for)\s+(.+)$|^where\s+(?:can|could|should)\s+(?:i|we)\s+(.+)$/i;
 const stem=(w:string)=>w.length>5&&w.endsWith('ing')?w.slice(0,-3):w.length>4&&w.endsWith('ed')?w.slice(0,-2):w.length>3&&w.endsWith('s')?w.slice(0,-1):w;
 const purposeWords=(xs:string[])=>new Set(xs.flatMap(tokens).map(stem));
 const PURPOSE_FILLER=new Set(['do','doing','have','having','get','go','going','find','somewhere','place','venue','spot']);

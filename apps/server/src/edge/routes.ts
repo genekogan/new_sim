@@ -3,11 +3,13 @@ import type {Context, Hono} from 'hono';
 import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeReceipt, type EdgeSoul, edgeErrorOf} from './contract.ts';
 import type {EdgeLedger} from './ledger/ledger.ts';
 import {registerEdgeComms} from './comms/index.ts';
-import {hereFrame} from './perception/here.ts';
+import {hereFrame,hereBodyFrame} from './perception/here.ts';
 import {aroundFrame} from './perception/around.ts';
 import {routeFrame} from './perception/route.ts';
 import {registerEdgeEvents} from './events/index.ts';
+import {captureNativeEvidence,type CaptureGate} from './events/evidence-capture.ts';
 import {mountIdempotency} from './events/idempotency.ts';
+import {mountOperationLookup} from './events/operations.ts';
 import {mountSchema,EDGE_ACT_VERBS} from './events/schema.ts';
 import {mountBootRoutes} from './boot/routes.ts';
 import {INTENT_VERBS} from './intents/intents.ts';
@@ -22,6 +24,7 @@ import {livePlatforms} from './eyes/platforms.ts';
 import {OwnerLoop, type OwnerLoopInbox} from './owner-loop.ts';
 import type {WorldHost} from '../world.ts';
 import type {Souls} from '../souls.ts';
+import {loadOf, worldBlock} from '../load/admission.ts';
 
 export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Context) => string | undefined) {
   return (c: Context): EdgeSoul => {
@@ -31,7 +34,7 @@ export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Cont
     return {soulId: s.id, entityId: m.entityId, name: m.name, owner: s.owner};
   };
 }
-export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}) {
+export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, options:{evidenceCapture?:CaptureGate}={}) {
   const L = deps.ledger;
   // D3: an act names the owner message it serves (`for`); the world closes that message when the act ends
   const box = deps.ownerInbox as Partial<OwnerLoopInbox> | undefined;
@@ -43,9 +46,11 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   mountOwnerDay(app,{ledger:L,db:deps.db,ownerSoul:deps.ownerSoul});
   // EVENTS-v1: idempotency keys guard act/say/converse/plan writes; it must be mounted before those routes.
   mountIdempotency(app, deps);
+  mountOperationLookup(app,deps,(soulId,key)=>L.coreA.byClientRef(soulId,key));
   const wrap = (fn: (c: Context) => unknown | Promise<unknown>) => async (c: Context) => {
     c.header('Cache-Control', 'no-store');
-    try {return c.json(edgeBody(await fn(c) as object));}
+    // LOAD-CONTRACT §3: at amber and above a frame says so in world words (admission sets the level it was admitted at)
+    try {const out = edgeBody(await fn(c) as object), lv = loadOf(c); return c.json(lv && lv !== 'green' && !('world' in out) ? {...out, world: worldBlock(lv)} : out);}
     catch (error) {
       if (error instanceof EdgeError) return c.json({contract: EDGE_CONTRACT, error: edgeErrorOf(error)}, error.status as 400);
       console.error('[edge] ledger fault', c.req.method, c.req.path, error instanceof Error ? (error.stack ?? error.message).split('\n').slice(0, 4).join(' | ') : String(error));
@@ -54,7 +59,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   };
   const limit = (s: EdgeSoul, key: string, n: number) => {const r = deps.souls.limits.allow(`edge-${key}:${s.soulId}`, n, 60_000); if (!r.ok) throw new EdgeError(429, 'rate-limited', 'too many requests; slow down');};
   app.get('/v1/edge/observe', wrap(c => {const s = deps.soul(c); limit(s, 'observe', 240); return L.observe(s, new Set((c.req.query('include') ?? '').split(',').filter(Boolean)));}));
-  app.get('/v1/edge/capabilities', wrap(c => {const s = deps.soul(c); limit(s, 'capabilities', 240); return {tick: deps.host.engine.world.tick, capabilities: L.capabilities(s)};}));
+  app.get('/v1/edge/capabilities', wrap(c => {const s = deps.soul(c); limit(s, 'capabilities', 240); return {tick: deps.host.engine.world.tick, ...L.capabilitiesPage(s, {all: c.req.query('all') === '1'})};}));
   app.post('/v1/edge/act', wrap(async c => {const s = deps.soul(c); limit(s, 'act', 60); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {capability, params?, clientRef?} or {verb, target, …}'); }); const {for: forMessage, forDefault, ...input} = (body ?? {}) as Record<string, unknown>;
     if (forMessage !== undefined && loop) {const no = loop.check(s, forMessage); if (no) throw new EdgeError(400, 'invalid', no);}
     const out = await L.act(s, input) as {accepted?: boolean; receipt?: EdgeReceipt};
@@ -62,7 +67,12 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
     if (forMessage !== undefined && loop && out?.accepted && out.receipt) {const {open} = loop.link(s, out.receipt, forMessage as string, forDefault === true); return {...out, for: forMessage, ...(open ? {open} : {})};}
     return out;}));
   // perception/1 + intents/1 (Core-A, EDGE-CONTRACT-v1 §8): a compact first-person frame, and the dry run of act.
-  app.get('/v1/edge/here', wrap(c => {const s = deps.soul(c); limit(s, 'here', 240); const modern=(c.req.query('include')??'').split(',').includes('doHere');return {tick: deps.host.engine.world.tick, here: hereFrame(L, s,{doHere:modern}),...(modern?{apiContract:'eden-edge/1.1'}:{})};}));
+  app.get('/v1/edge/here', wrap(c => {const s = deps.soul(c); limit(s, 'here', 240);
+    const view=c.req.query('view'),include=c.req.query('include');
+    if(view!==undefined&&view!=='body')throw new EdgeError(400,'invalid','here view must be body when supplied');
+    if(view==='body'&&include)throw new EdgeError(400,'invalid','body view cannot include rich context');
+    const modern=(include??'').split(',').includes('doHere');
+    return {tick: deps.host.engine.world.tick,here:view==='body'?hereBodyFrame(L,s):hereFrame(L,s,{doHere:modern}),...(modern?{apiContract:'eden-edge/1.1'}:{})};}));
   // knowledge/1: look around / explore — more of what is near, places close by, and secret places found (remembered).
   app.get('/v1/edge/around', wrap(c => {const s = deps.soul(c); limit(s, 'around', 30); const to = c.req.query('to'); return {tick: deps.host.engine.world.tick, around: aroundFrame(L, s), ...(to !== undefined ? {route: routeFrame(L, s, to)} : {})};}));
   app.post('/v1/edge/resolve', wrap(async c => {const s = deps.soul(c); limit(s, 'resolve', 120); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {verb, target} or {capability}'); }); if (!body || typeof body !== 'object' || (body.verb === undefined && body.capability === undefined)) throw new EdgeError(400, 'invalid', 'body must be JSON {verb, target} or {capability}'); return {tick: deps.host.engine.world.tick, resolve: L.intents.dryRun(s, body)};}));
@@ -90,6 +100,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   plans = registerEdgePlans(app, deps, comms, events, L);
   const reminders=mountPersonalReminders(app,deps,comms);
   mountSchema(app);
+  const capture=options.evidenceCapture?captureNativeEvidence({gate:options.evidenceCapture,db:deps.db,worldId:deps.host.worldId,comms}):null;
   const close = comms.close;
-  return Object.assign(comms, {events, plans, close() { reminders.close(); plans?.close(); events.close(); eyes.close(); close(); }});
+  return Object.assign(comms, {events, plans, eyes, close() { capture?.close(); reminders.close(); plans?.close(); events.close(); eyes.close(); close(); }});
 }

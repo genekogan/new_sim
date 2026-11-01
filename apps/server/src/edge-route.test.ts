@@ -35,3 +35,43 @@ test('here opens with now; around?to gives directions to a place and finds a Sou
   const miss = (await w.http(a, 'GET', '/v1/edge/around?to=zzqx-nowhere')).body.route; assert.equal(miss.found, false); assert.match(miss.reason, /No place or Soul/);
   const plain = await w.http(a, 'GET', '/v1/edge/around'); assert.equal(plain.body.route, undefined);
 });
+
+test('exact known destinations beat partial Soul names while exact Souls, ambiguity and secrecy retain their meaning', {timeout: 300000}, async t => {
+  const w = await coreAWorld(2); t.after(() => w.close());
+  const [a, b] = w.souls, L = w.ledger, venue = L.places.byId.get('commons-deck')!, other = L.places.byId.get('eden-housing')!;
+  assert.ok(L.knowledge.knows(a.soulId, venue.id) && L.knowledge.knows(a.soulId, other.id));
+  // Authored vocabulary on real native places; only the perception names change.
+  venue.name = 'Cedar Hall'; venue.aliases = ['Lantern Auditorium'];
+  const nameSoul = (name: string) => {b.name = name; w.f.host.minds.get(b.soulId)!.name = name;};
+  const route = async (name: string) => {const r = await w.http(a, 'GET', '/v1/edge/around?to=' + encodeURIComponent(name)); assert.equal(r.status, 200, JSON.stringify(r.body)); return r.body.route;};
+  const before = JSON.stringify(w.body(b).pose);
+
+  nameSoul('Cedar HallGuest');
+  const exactPlace = await route('Cedar Hall'); assert.equal(exactPlace.found, true); assert.equal(exactPlace.place.id, venue.id); assert.equal(exactPlace.soul, undefined);
+  const exactSoul = await route('Cedar HallGuest'); assert.equal(exactSoul.soul.id, b.soulId);
+  const partialSoul = await route('HallGuest'); assert.equal(partialSoul.soul.id, b.soulId, 'partial Soul fallback still works when no exact destination is named');
+
+  nameSoul('Lantern AuditoriumGuest');
+  assert.equal((await route('Lantern Auditorium')).place.id, venue.id, 'exact authored alias wins over a partial Soul');
+  nameSoul(venue.id + 'Guest');
+  assert.equal((await route(venue.id)).place.id, venue.id, 'exact place id wins over a partial Soul');
+  other.aliases = ['Lantern Auditorium']; nameSoul('Lantern AuditoriumGuest');
+  const ambiguous = await route('Lantern Auditorium'); assert.equal(ambiguous.found, false); assert.equal(ambiguous.code, 'place.ambiguous'); assert.deepEqual(new Set(ambiguous.candidates.map((p: {id: string}) => p.id)), new Set([venue.id, other.id]));
+  nameSoul('Cedar Hall'); assert.equal((await route('Cedar Hall')).soul.id, b.soulId, 'an exact Soul keeps the existing precedence even when a place has the same exact name');
+
+  venue.parts = [{id: 'copper-alcove', title: 'Copper Alcove', aliases: ['Copper Corner'], what: 'A named descriptive alcove.'}];
+  nameSoul('Copper AlcoveGuest');
+  const part = await route('Copper Alcove'); assert.equal(part.part.id, 'copper-alcove'); assert.equal(part.navigable, false); assert.equal(part.soul, undefined);
+  nameSoul('Copper CornerGuest'); assert.equal((await route('Copper Corner')).part.id, 'copper-alcove', 'exact part aliases also beat partial Souls');
+  venue.parts.push({id: 'second-alcove', title: 'Second Alcove', aliases: ['Copper Corner']});
+  const ambiguousParts = await route('Copper Corner'); assert.equal(ambiguousParts.found, false); assert.equal(ambiguousParts.code, 'place.ambiguous'); assert.equal(ambiguousParts.candidates.length, 2);
+
+  const hidden = L.places.byId.get('region-park')!; hidden.name = 'Silver Archive'; hidden.ref = 'silver-archive';
+  assert.equal(L.knowledge.setSecret(hidden.id, true), true); assert.equal(L.knowledge.knows(a.soulId, hidden.id), false);
+  nameSoul('Silver ArchiveGuest'); const withheld = await route('Silver Archive');
+  assert.equal(withheld.soul.id, b.soulId); assert.equal(withheld.place, undefined); assert.ok(!JSON.stringify(withheld).includes(hidden.id), 'an unknown secret place cannot suppress visible partial Soul lookup');
+  venue.parts = [{id: 'hidden-alcove', title: 'Private Alcove', target: {ref: hidden.ref}}];
+  nameSoul('Private AlcoveGuest'); const withheldPart = await route('Private Alcove');
+  assert.equal(withheldPart.soul.id, b.soulId); assert.equal(withheldPart.part, undefined); assert.equal(L.knowledge.knows(a.soulId, hidden.id), false);
+  assert.equal(JSON.stringify(w.body(b).pose), before, 'asking for names never moves the Soul');
+});

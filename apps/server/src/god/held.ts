@@ -54,6 +54,8 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
       ...(face !== yaw0 ? [{ verb: 'mars:walk_to', params: { x: p[0], z: p[2], level, face: Math.atan2(Math.sin(face), Math.cos(face)) } }] : []),
       { verb: 'mars:put_item', params: { item: x.id, surfaceSlot: 'ground' } }] });
   };
+  // These wrappers add only put/give offers; existing walks are unchanged.
+  L.registerExactWalkProfile(L.worldProfile!,prev);
   // E-life (quality case 35): hand a god-built thing to someone near: walk up to them and set it down at their feet for
   // them to pick up (the engine has no hand-to-hand transfer); they hear of it. Offered where the edge offers no give.
   const prev2 = L.worldProfile;
@@ -68,6 +70,7 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
       plans.set(id, { label, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), { verb: 'walk_to', params: { to: o.entityId, standoff: 1.2 } }, { verb: 'mars:put_item', params: { item: x.id, surfaceSlot: 'ground' } }] });
     }
   };
+  L.registerExactWalkProfile(L.worldProfile!,prev2);
   // receipts: what changed
   const outcomes = (L as any).outcomes, terminal = outcomes.terminal.bind(outcomes);
   outcomes.terminal = (receipt: any, snapshot: any, effects: any = {}) => {

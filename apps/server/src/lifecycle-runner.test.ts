@@ -177,3 +177,33 @@ test('old histories replay unchanged: a birth with lane PB\'s {at} hint (births 
   assert.equal(restart.engine.stateHash(),f.host.engine.stateHash());
   assert.deepEqual(restart.engine.world.entities.h_old?.pose.p,f.host.engine.world.entities.h_old?.pose.p);
 });
+
+// lane srv-join-stall (2026-10-31): each detached birth probe is a full world snapshot + restore on the tick thread
+// (eden2 Stage B: ~2 s each, three per Soul, so a 4-Soul join burst held main for 30 s+ and the launcher restarted the
+// world as wedged). One admission now probes twice: the plan (pump) and the guard under the write lock; the journal link
+// in that same transaction re-checks identity only.
+test('one lifecycle admission restores the detached probe engine twice, not three times',async t=>{
+  const counted=await marsFactory({...GREEN_FIELD_WORLD,safeCrewRemoval:true});let restores=0;
+  const restore=counted.restore.bind(counted);(counted as {restore:typeof restore}).restore=(s:Parameters<typeof restore>[0])=>{restores++;return restore(s);};
+  const f=fixture(':memory:',counted);t.after(()=>f.db.close());
+  const before=restores;f.journal.acceptCreate(scope,requestId,input,()=>true);await settle(f);
+  assert.equal(f.journal.get(scope,requestId)!.state,'complete');assert.equal(f.runner.faults.size,0);
+  assert.equal(restores-before,2);
+});
+
+test('four pending births are admitted one at a time: no single drainInputs or pump runs more than one detached probe',async t=>{
+  const counted=await marsFactory({...GREEN_FIELD_WORLD,safeCrewRemoval:true});let restores=0;
+  const restore=counted.restore.bind(counted);(counted as {restore:typeof restore}).restore=(s:Parameters<typeof restore>[0])=>{restores++;return restore(s);};
+  const f=fixture(':memory:',counted);t.after(()=>f.db.close());
+  const ids=[0,1,2,3].map(i=>({scope:{...scope,soulId:'s_J'+i,entityId:'h_J'+i},requestId:'lc_'+(0xa0+i).toString(16).padStart(32,'0'),name:'Joiner '+i}));
+  for(const j of ids)f.journal.acceptCreate(j.scope,j.requestId,{...input,name:j.name},()=>true);
+  const perCall:number[]=[];const wrap=(o:{[k:string]:unknown},k:string)=>{const fn=o[k] as ()=>void;o[k]=()=>{const b=restores;try{fn.call(o);}finally{perCall.push(restores-b);}};};
+  wrap(f.host as unknown as {[k:string]:unknown},'drainInputs');wrap(f.runner as unknown as {[k:string]:unknown},'pump');
+  const before=restores;await settle(f,10);
+  assert.equal(f.runner.faults.size,0);
+  for(const j of ids)assert.equal(f.journal.get(j.scope,j.requestId)!.state,'complete',j.name);
+  assert.equal(f.db.events(worldId).filter(e=>e.kind==='birth').length,4);
+  assert.equal(restores-before,8);assert.ok(Math.max(...perCall)<=1,`a single call ran ${Math.max(...perCall)} probes`);
+  const births=f.db.events(worldId).filter(e=>e.kind==='birth').map(e=>(e.payload as {soulId:string}).soulId);
+  assert.deepEqual(births,ids.map(j=>j.scope.soulId));
+});

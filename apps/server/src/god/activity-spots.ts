@@ -19,6 +19,8 @@ export type SpotsHost = {
   engine: { world: { entities: Record<string, any> }; standableNearV1?(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null };
   /** Bumped by every god edit (not by a Soul carrying a cup about). */
   version(): string | number;
+  /** How many of the model's entities are Souls' bodies (derive never reads them): a birth or retire keeps the spots. */
+  bodies?(): number;
   levelAt(x: number, z: number, y: number): number;
   /** Innermost place holding a point (a room, a building, an area), and its name. */
   placeAt(at: V2, level: number): string | null;
@@ -31,7 +33,10 @@ export type SpotsHost = {
    *  read the places, so while it runs a read keeps the spots it has (≤ ~2 s old, as the places themselves) instead of
    *  forcing the whole places derive into the request; the first read after the catch-up derives them. */
   catchingUp?(): boolean;
+  /** L4 item 6: a served world derives in tick slices (warm(budgetMs)); a world stepped by hand derives at once. */
+  sliced?(): boolean;
 };
+type SpotsDerive = { locate: ((at: V2, level: number) => string | null) | null; memo: WeakMap<V2, { level: number; v: string | undefined }> | null };
 
 /** How many seats per place offer the same seated activity (old Eden: 24 reading spots over the whole town). */
 const PER_PLACE = { read: 4, eat: 3, write: 2, 'use-computer': 3, listen: 8 } as const;
@@ -55,6 +60,11 @@ const SEAT_KINDS = ['chair', 'armchair', 'sofa', 'stool', 'bench-seat', 'bench',
  *  waiting seat from anywhere within SPOT_REACH (200 m), about 150 s on foot, so a shorter wait (the see-saw had 60 s) let
  *  the first rider give up while the second was still walking over (both failed partner-absent). */
 export const TOGETHER_WAIT = 150;
+/** Standing work positions that ordinary room visitors should leave usable.
+ * These are geometric hints, not claims: explicit activity plans still use them. */
+export type ActivityServicePoint = {id: string; at: V2; level: number};
+const SERVICE_ACTIVITIES = new Set(['read', 'write', 'paint', 'use-computer', 'craft', 'cook', 'post-letter', 'play-music', 'play-piano']);
+
 export class GodActivitySpots {
   private h: SpotsHost;
   private cache: { key: string; value: SpotsData } | null = null;
@@ -64,27 +74,83 @@ export class GodActivitySpots {
 
   /** A reader asked for the spots since the last warm(): worth deriving them ahead of the next read. */
   private wanted = false;
+  private services: {from: SpotsData; points: readonly ActivityServicePoint[]} | null = null;
+  /** Same authored/derived positions as activities, before per-Soul distance or
+   * occupancy filtering. Seated, social and roaming activities are not stations. */
+  serviceStandingPoints(): readonly ActivityServicePoint[] {
+    const data = this.data();
+    if (this.services?.from !== data) {
+      const points = data.spots
+        .filter(s => s.base === 'idle' && SERVICE_ACTIVITIES.has(s.activity))
+        .map(s => ({id: s.id, at: [...s.at] as V2, level: s.level ?? 0}));
+      // A re-derive that moved no station (a sign rewritten) keeps the array identity, so GodNav does not drop its
+      // per-epoch room goals for it (busy-costs S2: no room re-routed)
+      const same = !!this.services && JSON.stringify(this.services.points) === JSON.stringify(points);
+      this.services = {from: data, points: same ? this.services!.points : points};
+    }
+    return this.services.points;
+  }
   data(): SpotsData { this.wanted = true; return this.get(); }
   /** Derive now, off a Soul's listing, if the spots are stale and someone reads them (the host calls it once a god
-   *  edit has been caught up with). Same derive and cache as data(): the next read finds them. True when it derived. */
-  warm(): boolean {
-    if (!this.wanted || this.cache?.key === this.key() || this.h.catchingUp?.()) return false;
-    this.wanted = false; this.get(); return true;
+   *  edit has been caught up with). Same derive and cache as data(): the next read finds them. True when it derived.
+   *  L4 item 6: a served world (SpotsHost.sliced) derives in slices of `budgetMs` (one per tick while deriving()), and a
+   *  read meanwhile keeps the spots it has; the first spots of a boot are warmed the same way, unasked. */
+  warm(budgetMs = Infinity): boolean {
+    if (this.pass) return this.continue(budgetMs);
+    const sliced = !!this.h.sliced?.();
+    if (!(this.wanted || (sliced && !this.cache)) || this.cache?.key === this.key() || this.h.catchingUp?.()) return false;
+    this.wanted = false;
+    if (!sliced) { this.get(); return true; }
+    const key = this.key(), gen = this.start();
+    this.pass = { key, gen, locate: this.locate, memo: this.placeMemo, ms: 0 };
+    this.locate = null; this.placeMemo = null;
+    return this.continue(budgetMs);
   }
-  private key() { return `${this.h.version()}:${this.h.model.entities.size}`; }
+  /** L4 item 6: a served world before its first spots: none yet (the host offers its base spots), a warm is asked for. */
+  pendingFirst(): boolean { if (this.cache || !this.h.sliced?.()) return false; this.wanted = true; return true; }
+  /** A sliced derive is under way. */
+  deriving(): boolean { return this.pass !== null; }
+  /** The sliced derive: what it is a derive of (key), where it is, the place lookups it began with, CPU ms so far. */
+  private pass: { key: string; gen: Generator<void, SpotsData>; locate: SpotsDerive['locate']; memo: SpotsDerive['memo']; ms: number } | null = null;
+  /** What the spots are a function of: the god's edits (and entity physics) and how many non-body entities the model
+   *  holds. L4: bodies are left out — a Soul arriving or leaving re-derived all ~1,000 spots (~130 ms on eden2). */
+  private key() { return `${this.h.version()}:${this.h.model.entities.size - (this.h.bodies?.() ?? 0)}`; }
+  /** Begin a derive: the god's places into the index, the place locator as it is now. */
+  private start(): Generator<void, SpotsData> {
+    this.h.prepare?.();
+    this.locate = this.h.placeLocator?.() ?? null;
+    this.placeMemo = new WeakMap();
+    return this.deriveGen();
+  }
+  /** Run the sliced derive for up to budgetMs; true when it finished (cache and stats set). A derive whose inputs moved
+   *  (the key) is dropped and begun again at the next warm. */
+  private continue(budgetMs: number): boolean {
+    const p = this.pass!;
+    if (p.key !== this.key()) { this.pass = null; this.wanted = true; return false; }
+    const t0 = performance.now();
+    this.locate = p.locate; this.placeMemo = p.memo;
+    let r: IteratorResult<void, SpotsData>;
+    try { do r = p.gen.next(); while (!r.done && performance.now() - t0 < budgetMs); }
+    catch (e) { this.pass = null; throw e; }
+    finally { this.locate = null; this.placeMemo = null; p.ms += performance.now() - t0; }
+    if (!r.done) return false;
+    this.pass = null; this.finish(p.key, r.value, p.ms); return true;
+  }
+  private finish(key: string, value: SpotsData, ms: number) {
+    this.stats = { ms: Math.round(ms), spots: value.spots.length, shelves: value.shelves.length, derives: this.stats.derives + 1, kept: this.stats.kept };
+    this.cache = { key, value };
+  }
   private get(): SpotsData {
     const key = this.key();
     if (this.cache?.key === key) return this.cache.value;
-    if (this.cache && this.h.catchingUp?.()) { this.stats.kept++; return this.cache.value; }
-    this.h.prepare?.();
-    const t0 = performance.now();
-    let value: SpotsData;
-    this.locate = this.h.placeLocator?.() ?? null;
-    this.placeMemo = new WeakMap();
-    try { value = this.derive(); } finally { this.locate = null; this.placeMemo = null; }
-    this.stats = { ms: Math.round(performance.now() - t0), spots: value.spots.length, shelves: value.shelves.length, derives: this.stats.derives + 1, kept: this.stats.kept };
-    this.cache = { key, value };
-    return value;
+    if (this.cache && (this.h.catchingUp?.() || this.h.sliced?.())) { this.stats.kept++; this.wanted = true; return this.cache.value; }
+    if (this.pass?.key === key) { this.continue(Infinity); if (this.cache?.key === key) return this.cache.value; }
+    this.pass = null;
+    const t0 = performance.now(), gen = this.start();
+    let r: IteratorResult<void, SpotsData>;
+    try { do r = gen.next(); while (!r.done); } finally { this.locate = null; this.placeMemo = null; }
+    this.finish(key, r.value, performance.now() - t0);
+    return r.value;
   }
 
   private things(): Thing[] {
@@ -123,7 +189,8 @@ export class GodActivitySpots {
   }
   private label(t: Thing, place?: string) { const p = place ? this.h.placeName(place) : null; return `${t.name}${p && p.toLowerCase() !== t.name.toLowerCase() ? ` in ${p}` : ''}`.slice(0, 80); }
 
-  private derive(): SpotsData {
+  private *deriveGen(): Generator<void, SpotsData> {
+    let slice = 0;
     const all = this.things(), spots: Spot[] = [], shelves: Shelf[] = [], used = new Set<string>();
     // Authored mesh furniture (e.g. mars-study-chair) carries its kind in tags rather than the exact def name.
     // Keep the real seat-slot requirement: a bed or a merely chair-labelled decoration is not an activity seat.
@@ -150,20 +217,24 @@ export class GodActivitySpots {
     // armchairs and sofas near shelves in the same place are where to sit and read.
     const shelfThings = all.filter(t => is(t, 'bookcase', 'bookshelf', 'books', 'library') && (t.c.container || t.c.readable) && !t.c.carryable);
     for (const t of shelfThings) {
+      if ((++slice & 127) === 0) yield;
       const at = this.standAt(t, 'browse'); if (!at) continue;
       const place = this.place(at, t.level);
       shelves.push({ id: `shelf.${t.id}`.toLowerCase(), at, faceTo: [r2(t.at[0]), r2(t.at[1])], ...(place ? { place } : {}), ...(t.level ? { level: t.level } : {}) });
     }
     for (const s of seats) {
+      if ((++slice & 127) === 0) yield;
       if (kindOf(s) === 'office-chair') continue;
       const shelf = shelves.filter(q => (q.level ?? 0) === s.level && d2(q.at, s.at) <= SHELF_READ_RADIUS).sort((a, b) => d2(a.at, s.at) - d2(b.at, s.at))[0]; if (!shelf) continue;
       const place = this.place(s.at, s.level); if (shelf.place && place && shelf.place !== place) continue;
       if (room('read', place)) seatSpot(s, 'read', undefined, { prop: 'book' });
     }
+    yield;
     for (const t of all) if (is(t, 'lectern') && t.c.readable) standSpot(t, 'read', { prop: 'book' }, 'reader');
 
     // B1 write / B4 computers: a desk with a chair is a place to write (or to use its computer); without one, standing
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       const computer = t.c.workstation?.kind === 'computer', desk = computer || t.c.workstation?.kind === 'desk' || is(t, 'school-desk', 'desk', 'office-desk');
       if (!desk) continue;
       const activity = computer ? 'use-computer' : 'write', chair = seatsAt(t).find(s => !used.has(`write.${s.id}`) && !used.has(`use-computer.${s.id}`) && !used.has(`read.${s.id}`));
@@ -173,6 +244,7 @@ export class GodActivitySpots {
     }
     // B4 paint at easels; other workstations by kind
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       const k = t.c.workstation?.kind;
       if (k === 'painting' || is(t, 'easel')) standSpot(t, 'paint', paintingEasel(t.def) ? { paintingTarget: t.id } : {});
       else if (k === 'cooking' || is(t, 'stove', 'hearth')) standSpot(t, 'cook');
@@ -182,12 +254,15 @@ export class GodActivitySpots {
     }
     // B2 a preparation table with a cooking pot on it (old Eden's commons kitchen tables) is a place to cook
     const potsOn = new Set(all.filter(t => t.on && is(t, 'pot', 'cooking', 'kettle')).map(t => t.on!));
+    yield;
     for (const t of all) if (potsOn.has(t.id) && t.c.surface && !t.c.workstation) standSpot(t, 'cook', { label: `the cooking pot on ${this.label(t, this.place(t.at, t.level))}` });
     // B8 post letters at postboxes and mailboxes
+    yield;
     for (const t of all) if (is(t, 'postbox', 'mailbox', 'post-box', 'letterbox')) standSpot(t, 'post-letter', {}, 'post');
 
     // B2 eat and drink: a picnic or parasol table seats its own diners; a café or dining table, the chairs round it
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       if (!t.c.surface || !(is(t, 'table', 'cafe', 'picnic-table', 'parasol-table', 'round-table', 'long-table') || t.tags.has('table'))) continue;
       if (t.c.workstation || is(t, 'school-desk', 'desk', 'office-desk', 'workbench')) continue;
       const place = this.place(t.at, t.level), face: V2 = [r2(t.at[0]), r2(t.at[1])];
@@ -199,14 +274,17 @@ export class GodActivitySpots {
 
     // B3 the piano from its own bench; a stage: the microphone at its centre and a band behind; audience seats facing it
     for (const t of all) if (t.c.instrument?.kind === 'piano' || is(t, 'piano')) {
+      if ((++slice & 127) === 0) yield;
       if (t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'play-piano', undefined, { instrument: 'piano' }); else standSpot(t, 'play-piano', { instrument: 'piano' });
     }
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       const inst = INSTRUMENT_TAGS.find(([tag]) => t.tags.has(tag));
       if (inst) standSpot(t, 'play-music', { instrument: inst[1] });
       if (is(t, 'microphone', 'mic-stand')) standSpot(t, 'sing');
     }
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       if (!t.c.venue) continue;
       const floorY = Number(t.c.floor?.y ?? 0), level = floorY > 0.3 ? this.h.levelAt(t.at[0], t.at[1], t.y + floorY) : t.level, place = this.place(t.at, t.level);
       const on = (l: V2): V2 => this.world(t, l), stage = is(t, 'stage', 'bandstand');
@@ -225,6 +303,7 @@ export class GodActivitySpots {
     // B9 talks and classes: the classroom's teacher desk, a lectern or a podium is where a resident gives a talk or a
     // lesson; the seats of that room (or facing the podium) attend it, once someone is giving it
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       const at0 = this.place(t.at, t.level), pname = at0 ? this.h.placeName(at0) ?? '' : '';
       const front = is(t, 'podium', 'lectern') || (/teacher/i.test(t.name) && /classroom|lecture|school/i.test(`${pname} ${at0 ?? ''}`));
       if (!front) continue;
@@ -242,6 +321,7 @@ export class GodActivitySpots {
     }
     // B5 the playground and the gym and courts the god put up (tags say which apparatus)
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       if (is(t, 'swings') && t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'swing', undefined);
       if (is(t, 'see-saw') && t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'seesaw', undefined, { together: { group: `seesaw-${t.id}`.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 80), need: 1, wait: TOGETHER_WAIT, alone: 'fail' } });
       for (const [tag, activity, base] of APPARATUS) if (t.tags.has(tag)) {
@@ -253,23 +333,26 @@ export class GodActivitySpots {
     }
     // B5 courts: a volleyball net gives two places a side; a pétanque piste two throwing places at one end
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       const place = this.place(t.at, t.level);
       if (t.tags.has('volleyball-net')) for (const [k, l, f] of [['a1', [-1.5, -3], [-1.5, 3]], ['a2', [1.5, -3], [1.5, 3]], ['b1', [-1.5, 3], [-1.5, -3]], ['b2', [1.5, 3], [1.5, -3]]] as const)
         add({ id: `play-volleyball.${t.id}.${k}`.toLowerCase(), activity: 'play-volleyball', base: 'idle', at: this.world(t, l as unknown as V2), faceTo: this.world(t, f as unknown as V2), label: this.label(t, place), ...(place ? { place } : {}) });
       if (t.tags.has('petanque')) for (const [k, x] of [['a', -0.6], ['b', 0.6]] as const)
         add({ id: `play-petanque.${t.id}.${k}`.toLowerCase(), activity: 'play-petanque', base: 'idle', at: this.world(t, [x, -t.size[2] / 2 + 0.6]), faceTo: this.world(t, [x, t.size[2] / 2]), label: this.label(t, place), ...(place ? { place } : {}) });
     }
-    this.groupLife(all, seats, add, seatSpot, standSpot);
-    this.grounds(add);
+    yield* this.groupLife(all, seats, add, seatSpot, standSpot);
+    yield* this.grounds(add);
     return { contract: 'activity-spots/1', spots, shelves, interiors: [], solids: [], rings: [], platforms: [], nearest: NEAREST };
   }
 
   /** R5 group life on god things: stories round a campfire, book club at library tables, cooking together at prep
    *  tables, dancing on a bandstand, a yoga class round the lawn mat; and hammocks. Done together (Spot.together). */
-  private groupLife(all: Thing[], seats: Thing[], add: (s: Spot) => void, seatSpot: (seat: Thing, activity: string, faceTo: V2 | undefined, extra?: Partial<Spot>) => void, standSpot: (t: Thing, activity: string, extra?: Partial<Spot>, slot?: string) => void) {
+  private *groupLife(all: Thing[], seats: Thing[], add: (s: Spot) => void, seatSpot: (seat: Thing, activity: string, faceTo: V2 | undefined, extra?: Partial<Spot>) => void, standSpot: (t: Thing, activity: string, extra?: Partial<Spot>, slot?: string) => void): Generator<void, void> {
+    let slice = 0;
     const grp = (k: string) => k.replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 80);
     const potOn = new Set(all.filter(o => o.on !== undefined && is(o, 'pot', 'cooking')).map(o => o.on!));
     for (const t of all) {
+      if ((++slice & 127) === 0) yield;
       const place = this.place(t.at, t.level);
       // a campfire with seats: one storyteller's place by the fire, its seats listen (once the story has started)
       if (t.slots.some(q => q.kind === 'fire-circle') && t.slots.some(q => q.kind === 'seat')) {
@@ -307,12 +390,15 @@ export class GodActivitySpots {
 
   /** Areas and paths the god laid out: garden beds to tend, a pier to fish and feed the ducks from, a pitch to throw a
    *  frisbee on. Read from the entity world (they are ground, not engine fixtures). */
-  private grounds(add: (s: Spot) => void) {
+  private *grounds(add: (s: Spot) => void): Generator<void, void> {
+    let slice = 0;
     const m = this.h.model, creatures: V2[] = [];
     const kinds = new Map<string, string>();
+    yield;
     for (const e of m.entities.values()) { const d = m.resolvedDef(e.def); const k = d ? ['duck', 'swan', 'koi', 'goose'].find(x => d.tags.includes(x) || d.name.includes(x)) : undefined; if (k) { const wp = m.worldPose(e); creatures.push([wp.x, wp.z]); kinds.set(`${Math.round(wp.x)},${Math.round(wp.z)}`, k); } }
     const kindAt = (q: V2) => kinds.get(`${Math.round(q[0])},${Math.round(q[1])}`) ?? 'fish';
     for (const e of m.entities.values()) {
+      if ((++slice & 127) === 0) yield;
       if (e.in.parent !== 'world' || !e.shape) continue;
       const def = m.resolvedDef(e.def); if (!def) continue;
       const sh = e.shape as { area?: V2[]; path?: V2[] }, kind = def.name.replace(/^core-/, ''), name = (e.name ?? kind).replace(/-/g, ' ');

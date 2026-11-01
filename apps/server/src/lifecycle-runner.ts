@@ -65,6 +65,21 @@ export class LifecycleRunner {
    * or deferred guards never trigger an immediate retry loop. */
   onCommitted?:()=>void;
   private inflight=new Set<string>();
+  /** Births queued and not yet settled (lane srv-join-stall). Each birth costs a full detached-world probe when
+   * planned and again under the host writer lock; with every pending birth queued at once, one drainInputs ran
+   * every guard back to back (4 joins ~ 8 s of one tick on eden2) and /healthz missed its 5 s answer. */
+  private births=new Set<string>();
+  /** A detached probe already ran in this macrotask. pump plans no further birth while it is set; the host's guard itself
+   * always runs. Cleared by whichever of setImmediate / setTimeout(0) fires first: either is a later macrotask, after
+   * this one's microtasks (the commit's onCommitted pump) have drained. setImmediate alone was coarser than "this
+   * macrotask": a probe made in the check phase stayed set through the next timers phase, so a create accepted in a
+   * setTimeout continuation planned no birth until some later pump (srv-r5 gate, lifecycle-ws tests). */
+  private probed=false;
+  /** A birth was held back by `probed` or by the onApplied hook (`planBirths:false`) while none is in flight: one
+   * later pump is owed, run when `probed` clears (else from a setImmediate) (lane srv-r5fix-births). Without it the queue only moved
+   * on the next tick or request, so a world driven by drainInputs alone (the commit's own pump lands in the probed
+   * macrotask) left every later birth pending. The owed pump never owes another, so a deferred guard cannot spin. */
+  private owed=false;private owing=false;private probeGen=0;
   private recoveryAfter:{requestedAt:number;requestId:string}|undefined;
   private authority:(op:LifecycleOperation)=>boolean;
   constructor(host:WorldHost,journal:LifecycleJournal,authority:(op:LifecycleOperation)=>boolean){
@@ -75,24 +90,50 @@ export class LifecycleRunner {
     this.host=host;this.journal=journal;this.authority=authority;
   }
   private current(op:LifecycleOperation){const current=this.journal.get(op.scope,op.requestId);if(!current||current.state!==op.state)throw new LifecycleDeferred('Lifecycle state changed');return current;}
-  private queue(op:LifecycleOperation,promise:Promise<unknown>){
-    this.inflight.add(op.requestId);
+  private spendProbe(){
+    if(this.probed)return;this.probed=true;
+    // Cleared by whichever of setImmediate / setTimeout(0) fires first (lane srv-r5fix-ws); the generation keeps the
+    // later of the pair from clearing a newer probe's flag.
+    const gen=++this.probeGen,clear=()=>{if(gen!==this.probeGen||!this.probed)return;this.probed=false;this.settleOwed();};
+    setImmediate(clear).unref?.();setTimeout(clear,0).unref?.();
+  }
+  private owe(){
+    if(this.owed||this.owing)return;this.owed=true;
+    if(!this.probed)setImmediate(()=>this.settleOwed()).unref?.();
+  }
+  private settleOwed(){
+    if(!this.owed)return;this.owed=false;this.owing=true;
+    // Opportunistic: a host stopped or a db closed before this check phase is not a lifecycle fault.
+    try{this.pump();}catch{}finally{this.owing=false;}
+  }
+  private queue(op:LifecycleOperation,promise:Promise<unknown>,birth=false){
+    this.inflight.add(op.requestId);if(birth)this.births.add(op.requestId);
     void promise.then(()=>{
-      this.inflight.delete(op.requestId);this.onCommitted?.();
+      this.inflight.delete(op.requestId);this.births.delete(op.requestId);this.onCommitted?.();
     },error=>{
-      this.inflight.delete(op.requestId);
+      this.inflight.delete(op.requestId);this.births.delete(op.requestId);
       if(!(error instanceof LifecycleDeferred))this.faults.set(op.requestId,error);
     }).catch(error=>this.faults.set(op.requestId,error));
   }
   /** Explicit bounded reconciliation, invoked after boot and on owned ticks by
    * a future opt-in installer. It creates no timers, paid work or default hooks. */
-  pump(){
+  /** `planBirths:false` (the host's onApplied hook): an event applied inside drainInputs plans no birth there, since
+   * the same tick's durable second drain would then run that birth's guard probe too (two probes in one tick, seen in
+   * the profiled join); afterTick, the create's commit and committed promises plan births instead. */
+  pump(planBirths=true){
     const page=this.journal.recover(this.host.worldId,20,this.recoveryAfter),last=page.at(-1);
     // Round-robin keyset scanning prevents twenty deferred requests from
     // starving later work. This is a bounded scan, not a capacity claim.
     this.recoveryAfter=page.length===20&&last?{requestedAt:last.requestedAt,requestId:last.requestId}:undefined;
     for(const op of page){
       if(this.inflight.has(op.requestId)||this.faults.has(op.requestId))continue;
+      // At most one lifecycle birth in flight, and none planned in a macrotask that already probed: later births stay
+      // pending in request order and are planned by a later pump (next tick, request or commit), so no single tick or
+      // handler runs more than one detached probe. The create's HTTP wait still answers lifecycle-pending at 2 s.
+      if(op.operation==='create'&&op.state!=='recorded'&&(!planBirths||this.births.size>0||this.probed)){
+        // With a birth in flight its commit pumps again; otherwise one check-phase pump is owed.
+        if(this.births.size===0)this.owe();continue;
+      }
       try{this.advance(op);}catch(error){if(!(error instanceof LifecycleDeferred))this.faults.set(op.requestId,error);}
     }
   }
@@ -122,8 +163,9 @@ export class LifecycleRunner {
       if(this.host.minds.has(s.soulId)||this.host.mindByEntity.has(s.entityId)||this.host.kernel.things[s.soulId]||this.host.kernel.decks[s.soulId])throw new Error('Pending lifecycle birth already owns canonical Mind/kernel identity');
     };
     checks();
+    this.spendProbe();
     const {probe:preview,near}=planNativeBirth(this.host,who);
-    const probe=()=>{checks();return probeNativeHumanBirth(this.host.engine,this.host.factory,{...who,...(near?{near}:{})});};
+    const probe=()=>{checks();this.spendProbe();return probeNativeHumanBirth(this.host.engine,this.host.factory,{...who,...(near?{near}:{})});};
     if(preview.outcome==='deferred')return;
     if(preview.outcome==='unavailable'&&preview.diagnostic.code==='birth.arrival-unavailable'){
       this.journal.refuseArrival(s,op.requestId,()=>{
@@ -136,8 +178,13 @@ export class LifecycleRunner {
     // A changed placement remains pending; it is reclassified only by pump's
     // exact ordinary-unavailable path, never an arbitrary exception handler.
     const guard=()=>{const p=probe();if(p.outcome!=='ready')throw new LifecycleDeferred('Native admission changed');return true as const;};
+    // The journal link runs inside the same host write transaction, synchronously after `guard` above (drainInputs:
+    // BEGIN IMMEDIATE, guard, append, link), with no engine change in between, so it re-checks the identity/authority
+    // (checks) but not the native placement: that second detached-engine probe was a full snapshot+restore of the world
+    // (~0.7 s laptop, ~2 s eden2 per Soul) answering the same question on the same state (lane srv-join-stall).
+    const linkGuard=()=>{checks();return true as const;};
     const payload={soulId:s.soulId,entityId:s.entityId,owner:s.owner,name:op.name,description:op.description,...(near?{near}:{})};
-    this.queue(op,this.host.enqueueChecked('birth',op.native?'world':`soul:${s.soulId}`,payload,guard,e=>this.journal.linkAccepted(s,op.requestId,e,guard,near)));
+    this.queue(op,this.host.enqueueChecked('birth',op.native?'world':`soul:${s.soulId}`,payload,guard,e=>this.journal.linkAccepted(s,op.requestId,e,linkGuard,near)),true);
   }
   ownerPage(owner:string,cursor:string|null=null,associated:readonly string[]=[]){
     const page=this.journal.ownerPage(this.host.worldId,owner,cursor,associated);

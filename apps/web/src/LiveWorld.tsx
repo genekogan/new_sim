@@ -1296,6 +1296,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const s = shown.current, r = sim.conn.replica, state = sim.conn.stats.state;
   const takes = takesOf(sim);
   const status = state !== 'open' ? 'Reconnecting to the world…' : !takes ? 'Waiting for the world…' : null;
+  const load = state === 'open' && sim.conn.load && sim.conn.load !== 'green' ? sim.conn.load : null;   // LOAD-CONTRACT §3 pill
   const when = clockText(s.datetime);
   const ago = p && now !== null ? agoText((now - p.tick) * dt) : '';
   const soul = selected ? r.souls.get(selected) : undefined;
@@ -1308,6 +1309,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         {mode === 'live' && !status ? <span className="ok"><b>● Live</b></span> : null}
         {mode === 'past' ? <span className="warn"><b>⏪ Replaying {ago}</b></span> : null}
         {status ? <span className="dim">{status}</span> : null}
+        {load ? <span className="dim" data-world-load={load}>the world is busy</span> : null}
         {when ? <span className="dim">world time {when}</span> : null}
         <span style={{ marginLeft: 'auto' }} />
         <button aria-pressed={cameraMode === 'broadcast'} className={cameraMode === 'broadcast' ? 'on primary' : ''} onClick={() => setCameraMode('broadcast')}>Broadcast</button>

@@ -7,9 +7,11 @@
 // The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
+import { menuWorldOf, type MenuWorld } from '../split/menu-world.ts';
 import { deckRaised, railGaps, rasterOf } from '@sim/generators';
 import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
-import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, buildWorldEditPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import { createHash } from 'node:crypto';
 import type { WorldHost } from '../world.ts';
 import type { LogEvent } from '@sim/protocol';
 import type { EdgeLedger, FloorNear } from '../edge/ledger/ledger.ts';
@@ -19,6 +21,7 @@ import { reachProviders, seatProviders, syncProviders, usesProviders, type Reach
 import { GodNav } from './nav.ts';
 import { hasStraightLandings, railRaster } from './rail-raster.ts';
 import { tokenHit } from '../edge/ledger/vocabulary.ts';
+import {outdoorRegionExclusions} from '../edge/ledger/region-arrival.ts';
 import { doorInGap, freeDoorOpening, isDoorDef, isShut } from './doors.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
@@ -43,6 +46,7 @@ import type { ApplyContext, WalkoutPrep } from './god.ts';
 import type { BuildNotice } from './builds.ts';
 import { arrivalNote } from '../arrival-placement.ts';
 import { seatTopsOf } from './use-check.ts';
+import { wants, wantsPrefix, type MenuFocus } from '../edge/ledger/focus.ts';
 /** arrival-search/1: the upserts whose geometry (def, place, size, shape, params) differs from the before-model. */
 const titleOf = (e: Entity): string | undefined => (e as Entity & {about?: {title?: string}}).about?.title;
 const geometryOf = (e: Entity) => JSON.stringify([e.def, e.in, e.p, e.r, e.s, e.shape, e.anchor, e.params, e.seed]);
@@ -131,19 +135,83 @@ export function helixEnds(path: Vec2[]): { foot: Vec2; head: Vec2; stepFrom: Vec
   return { foot, head, stepFrom: into(path[1], foot, HELIX_STAND), stepTo: into(path[n - 2], head, HELIX_STAND) };
 }
 
-export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** Highest level id levelFor hands out (default and most: MAX_LEVEL_ID; tests use fewer to reach the reuse path) */ maxLevel?: number; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
+export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** Highest level id levelFor hands out (default and most: MAX_LEVEL_ID; tests use fewer to reach the reuse path) */ maxLevel?: number; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean; /** B-facade: the read worker's bridge (split/read-bridge.ts): the read side only, over a GodReplica and the
+ *  worker's MenuWorld (no engine listeners, no projection, no writes; acts go to main) */ read?: boolean };
 
+/** Load lane L4: per-step ms of the bridge's tick work, the tick-ms distribution and the derived-work counters since the
+ *  last line. Only built with SIM_L4_STATS=1. */
+class BridgeStats {
+  private steps = new Map<string, { n: number; ms: number; max: number }>();
+  private lastReuse = 0;
+  private last = { spatial: { pagedSyncs: 0, pagedMoved: 0, pagedChanged: 0, pagedMs: 0, gridBuilds: 0, gridMs: 0, scans: 0, scanMs: 0, trusted: 0 }, perceive: 0, spots: 0, wall: performance.now(), cpu: process.cpuUsage() };
+  /** A line is due a minute of wall time after the last (ticks may run slow). */
+  due(): boolean { return performance.now() - this.last.wall >= 60_000; }
+  add(name: string, t0: number): number {
+    const now = performance.now(), ms = now - t0; let s = this.steps.get(name); if (!s) this.steps.set(name, (s = { n: 0, ms: 0, max: 0 }));
+    s.n++; s.ms += ms; if (ms > s.max) s.max = ms; return now;
+  }
+  line(b: EngineBridge): string {
+    const sp = ((b.host.engine as unknown as { rt?: { services?: { spatial?: unknown } } }).rt?.services?.spatial as { stats?: BridgeStats['last']['spatial'] } | undefined)?.stats, now = performance.now(), cpu = process.cpuUsage();
+    const wallS = (now - this.last.wall) / 1000, cpuS = ((cpu.user - this.last.cpu.user) + (cpu.system - this.last.cpu.system)) / 1e6;
+    const ticks = [...b.host.tickMs].sort((x, y) => x - y), q = (f: number) => ticks.length ? Math.round(10 * ticks[Math.min(ticks.length - 1, Math.floor(f * ticks.length))]) / 10 : 0;
+    const steps = [...this.steps].filter(([, v]) => v.ms >= 1).sort((x, y) => y[1].ms - x[1].ms).map(([k, v]) => `${k}=${Math.round(v.ms)}/${v.n}/${Math.round(v.max)}`).join(' ');
+    const d = (k: keyof BridgeStats['last']['spatial']) => Math.round((sp?.[k] ?? 0) - this.last.spatial[k]);
+    const pr = b.perceive.stats.runs - this.last.perceive, ds = b.activitySpots.stats.derives - this.last.spots;
+    const out = `[l4] cpu ${(cpuS / wallS).toFixed(3)} core over ${Math.round(wallS)} s; tick p50 ${q(.5)} p99 ${q(.99)} max ${q(1)} ms (n ${ticks.length}); paged syncs ${d('pagedSyncs')} moved ${d('pagedMoved')} changed ${d('pagedChanged')} ${d('pagedMs')} ms, grids ${d('gridBuilds')} ${d('gridMs')} ms, nav scans ${d('scans')} ${d('scanMs')} ms trusted ${d('trusted')}; perceive runs ${pr} (last ${b.perceive.stats.lastIds}${b.perceive.stats.lastFull ? ' whole' : ''} ${b.perceive.stats.lastMs} ms); spots derives ${ds} (last ${b.activitySpots.stats.ms} ms); steps ms/n/max ${steps}`;
+    const sites = ((b.host.engine as unknown as { rt?: { services?: { spatial?: { scanSites?: Map<string, number> | null } } } }).rt?.services?.spatial)?.scanSites;
+    let extra = '';
+    if (sites) {
+      extra = `; scan sites ${[...sites].sort((x, y) => y[1] - x[1]).slice(0, 8).map(([k, v]) => `${k}=${v}`).join(' ')}`;
+      sites.clear();
+      const live = (b.host.engine as unknown as { rt?: { live?: Map<string, { rec: { verb: string } }> } }).rt?.live, verbs = new Map<string, number>();
+      for (const l of live?.values() ?? []) verbs.set(l.rec.verb, (verbs.get(l.rec.verb) ?? 0) + 1);
+      extra += `; live ${[...verbs].map(([k, v]) => `${k}=${v}`).join(' ') || 'none'}`;
+      const ents = (b.host.engine as unknown as { ents?: Record<string, unknown> }).ents;
+      if (ents) {
+        let t = performance.now(), k: string[] = []; for (let i = 0; i < 20; i++) k = Object.keys(ents); const keysUs = (performance.now() - t) * 50;
+        t = performance.now(); for (let i = 0; i < 20; i++) { const l = new Array(k.length); for (let j = 0; j < k.length; j++) l[j] = ents[k[j]]; } const fillUs = (performance.now() - t) * 50;
+        extra += `; table ${k.length} keys ${Math.round(keysUs)} us fill ${Math.round(fillUs)} us`;
+        const calls = ((b.host.engine as unknown as { constructor?: { tableWriteSitesV1?: Map<string, number> | null } }).constructor)?.tableWriteSitesV1;
+        if (calls) { extra += `; engine calls ${[...calls].sort((x, y) => y[1] - x[1]).slice(0, 14).map(([k, v]) => `${k}=${v}`).join(' ')}`; calls.clear(); }
+
+      }
+    }
+    const reuse = (b.host.engine as unknown as { tableReusesV1?: number }).tableReusesV1 ?? 0;
+    extra += `; table reused ${reuse - this.lastReuse} steps`; this.lastReuse = reuse;
+    if (sp) this.last.spatial = { ...sp }; this.last.perceive = b.perceive.stats.runs; this.last.spots = b.activitySpots.stats.derives; this.last.wall = now; this.last.cpu = cpu; this.steps.clear();
+    return out + extra;
+  }
+}
+
+/** B-facade: the facts of main's entity physics the bridge's listing reads, shipped to read workers. */
+export type BridgePhysicsV1 = { hash: string; levels: Level[]; assets: Record<string, { slots?: { kind: string }[]; surfaceSlots?: { id: string; local?: number[] }[]; category?: string }>; /** the floors of upper levels (hasFloorAt: which level a god thing stands on) */ floors?: Record<string, { level: number; obb: OBB2 }[]> };
 export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
 /** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
 const PERCEIVE_SLICE_MS = Number(process.env.PERCEIVE_SLICE_MS ?? 8);
+/** LOAD-CONTRACT dial (L4): background perception cadence per load level. `sliceMs` = tick-thread budget per slice,
+ *  `settle` = least ticks between the starts of two background catch-ups (green 20 = the old fixed spacing). Black runs no background catch-up (a Soul's read
+ *  still catches up at once through perceive.ensure, and the boot pass still runs). The radius stays 30 m at every level:
+ *  it is here.ts's SIGHT_RADIUS (L3's menu-radius dial owns shrinking what a Soul sees). */
+export const PERCEIVE_DIAL = {
+  green: { sliceMs: PERCEIVE_SLICE_MS, settle: 20 },
+  amber: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 2), settle: 40 },
+  red: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 4), settle: 100 },
+  black: { sliceMs: Math.max(1, PERCEIVE_SLICE_MS / 4), settle: Infinity },
+} as const;
+export type LoadLevel = keyof typeof PERCEIVE_DIAL;
+/** Build notices that change nothing a Soul perceives (no step label, no closure): they never start a catch-up. */
+const PERCEPTION_QUIET_BUILD = new Set<string>(['alive', 'claimed', 'released', 'taken']);
 const WRITE_BACK_SLICE_MS = 8;
 type WriteBackUnit = { key: string; ops: Op[]; body?: string };
 type WriteBackBody = { pose: string; entity: Entity | undefined };
 
 export class EngineBridge {
   readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
-  /** What the engine was last told, per entity (JSON of its part), and the physics state that produced. */
+  /** B-facade: the read worker's bridge (BridgeOptions.read) */
+  private readonly readSide: boolean;
+  /** What the engine was last told, per entity (sentKey of its part's JSON: a digest, not the text), and the physics
+   *  state that produced (the engine's own value once it folds the edit: entity-physics.ts buildWorldEditPhysics). */
   private sent = new Map<string, string>();
   private physics: EntityPhysicsV1 | undefined;
   private levels: Level[] = [];
@@ -191,16 +259,20 @@ export class EngineBridge {
   private describeEpoch = 0;
 
   constructor(o: BridgeOptions) {
-    this.host = o.host; this.god = o.god; this.edge = o.edge; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    this.host = o.host; this.god = o.god; this.edge = o.edge; this.readSide = !!o.read; const R = this.readSide; this.maxLevel = Math.min(o.maxLevel ?? MAX_LEVEL_ID, MAX_LEVEL_ID); this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     this.initialEngine = this.host.engine;
     engineBridges.set(this.god.model, this);
-    this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
-    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
+    this.nav = new GodNav({ model: this.god.model, serviceStandingPoints: () => this.activitySpots?.serviceStandingPoints(), outdoorRegionExclusions: ref => {const id = this.places.forRef(ref)?.id;return this.edge && id ? outdoorRegionExclusions(this.edge.places, id) : undefined;}, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), authoredPlaceRef: id => {
+      if(!this.edge||!this.places.walkable(id))return undefined;
+      const ref=(this.edge.places.byId.get(id) as {ref?:unknown}|undefined)?.ref;
+      return typeof ref==='string'&&this.places.forRef(ref)?.id===id?ref:undefined;
+    }, calendarPlaces: (sources) => this.calendarPlaces(sources), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, publicationVersion: () => this.godEdits, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
-    this.god.builds.inventoryContext = () => {
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, publicationVersion: () => this.godEdits, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, structuralVersion: () => `${this.version}:${this.describeEpoch}:${this.levels.length}`, deferred: () => this.layerPlacesPending !== null || this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers, readOnly: R });
+    if (!R) this.god.builds.inventoryContext = () => {
       this.places.sync(true);
       return {
         occupied: id => this.seatTakers(id).length > 0,
@@ -209,19 +281,26 @@ export class EngineBridge {
       };
     };
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
+    // L3 (server reliability): kept Soul menus read god state the ledger does not version (ownership, construction sites)
+    // the bridge runs without an edge ledger too (toy/engine-only hosts): guard the ledger, not only the method
+    if (!R) (this.edge as { addMenuInput?(f: () => string): void } | undefined)?.addMenuInput?.(() => `${this.version}|${this.god.builds.closingSites().map((x) => x.id).join(',')}`);
     this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0, c.by === 'engine' ? 'engine' : 'authored'); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
-    this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
-    this.host.listeners.push({
-      afterTick: (tick, context) => { try { if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; } else { this.flush(); this.projectedEdits = this.godEdits; if (tick % 10 === 0 || this.writeBackPass) this.writeBack(WRITE_BACK_SLICE_MS); this.perceiveStep(tick); if (tick % 5 === 4) this.spotsStep(); if (tick % 40 === 7 || this.layerPlacesPending !== null) this.layersStep(tick % 40 === 7); if (tick % 20 === 13) this.flushMapNotices(); if (!this.navWarm || this.navPending) this.navStep(context?.startedAtMs); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } } catch (error) { this.failProjection(error); throw error; } },
+    // L4 (audit #8): only notices that change what a build's things are seen as (started, a new step, paused/resumed,
+    // done, abandoned, closure lifted, rewound) re-derive perception; the lead's `alive` heartbeat (sent on its ordinary
+    // requests) and claim hand-offs change no step and no closure, and each one forced a whole pass over ~5,000 things.
+    // L4 item 5: a build event moves only the layer tags of layered things under (or just out of) a closing site; was a whole pass
+    this.god.onBuild((e) => { if (!PERCEPTION_QUIET_BUILD.has(e.kind)) { const ids = this.layers.buildRetag(); if (ids.length) { this.perceive.noteRetag(ids); this.notePerceive([], false); } } });
+    if (!R) this.host.listeners.push({
+      afterTick: (tick, context) => { try { this.afterTickWork(tick, context?.startedAtMs); } catch (error) { this.failProjection(error); throw error; } },
       onApplied: (e) => { this.projectionApplied(e); if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
       afterTickComplete: () => { this.completedTicks++; this.completedEdits = this.projectedEdits; this.checkProjectionSoon(); },
       onClockUnavailable: () => this.failProjection(new Error('bridge.readiness.clock-unavailable')),
       onStop: () => this.failProjection(new Error('bridge.readiness.stopped')),
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
-    syncProviders.set(this.god.model, () => { this.flush(); return this.physics?.hash === this.engine.world.entityPhysicsV1?.hash; });
+    if (!R) syncProviders.set(this.god.model, () => { this.flush(); return this.physics?.hash === this.engine.world.entityPhysicsV1?.hash; });
     seatProviders.set(this.god.model, (id) => { const f = (this.engine as unknown as { seatOccupantsV1?: (id: string) => { slot: string; body: string }[] }).seatOccupantsV1; return f ? f.call(this.engine, id).map((x) => ({ slot: x.slot, soul: this.soulName(x.body) })) : []; });
     usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
     // G1 "god rules": god edits are never refused for residents; the ones in the way are walked out (walkout.ts).
@@ -232,7 +311,7 @@ export class EngineBridge {
     this.notices.streams = () => this.edge?.comms?.streams;
     // A native mind hears a notice through the log (folded into its recent memory, deterministic on replay).
     this.notices.native = (soulId, text) => { try { void this.host.enqueue('rules', 'god:notice', { godNoticeV1: { soulId, text } }).catch(() => { /* best effort */ }); } catch { /* clock not ready */ } };
-    this.god.bodies = {
+    if (!R) this.god.bodies = {
       uses: id => this.usesOne(id),
       refuse: (after, diff, ops, o) => this.protectedBody(after, diff, ops, o?.undo === true),
       prepare: (before, after, diff, _ops, o) => { if (o?.dry !== true) { try { this.arrivalShaped = shapedIds(before, diff); } catch { this.arrivalShaped = null; } this.navShaped = this.arrivalShaped && navDoorFlips(before, diff, this.arrivalShaped); this.navBefore = this.navSpots(before, [...diff.removes, ...(this.navShaped ?? diff.upserts.map(e => e.id))]); } return this.prepareWalkouts(before, after, diff, o?.dry === true); },
@@ -242,25 +321,27 @@ export class EngineBridge {
     };
     // R8: residents near a visible map change hear of it once per request; a build near them, at start and at done.
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
-    this.god.onBuild(e => this.buildNotice(e));
-    this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
-      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
-    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
+    if (!R) this.god.onBuild(e => this.buildNotice(e));
+    this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, bodies: () => this.modelBodies(), levelAt: (x, z, y) => this.levelAt(x, z, y),
+      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), catchingUp: () => this.perceiveRunning || !!this.perceive?.pending(), sliced: () => !!this.host.running, placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
+    if (this.edge && !R) this.edge.spotsProvider = () => { if (!this.reconciled || this.activitySpots.pendingFirst()) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.logSpots(); return d; };
     if (this.edge) {
       const edge = this.edge;
       this.meals = new GodMeals({ db: this.god.db, worldId: this.host.worldId, spots: () => edge.spots, place: (id) => edge.places.byId.get(id) as never, day: () => this.layers.dayKey() });
-      edge.onReceipt((r) => { try { this.meals!.onReceipt(r); } catch (e) { this.log(`meals: ${(e as Error).message}`); } });
-      this.rides = installGodRides({ host: this.host, edge, model: this.god.model, log: (m) => this.log(m) });
+      if (!R) edge.onReceipt((r) => { try { this.meals!.onReceipt(r); } catch (e) { this.log(`meals: ${(e as Error).message}`); } });
+      if (!R) this.rides = installGodRides({ host: this.host, edge, model: this.god.model, log: (m) => this.log(m) });
     }
     if (this.edge) this.hookEdge(this.edge);
     // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
     if (this.edge) installHeld(this.edge, { engine: this.host.engine as never, model: this.model, minds: this.host.minds });
     // F3: a god's world keeps time like the live worlds (a logged dayConfig; world-clock.ts)
-    if (o.worldClock ?? (!config.livingWorld && !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) installWorldClock(this.host, this.god, this.log);
+    if (!R && (o.worldClock ?? (!config.livingWorld && !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey)))) installWorldClock(this.host, this.god, this.log);
     // F3: a god's new world serves its constitution (or a neutral line) as lore, never Eden's (world-lore.ts)
     if (this.edge && (o.worldLore ?? !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) installWorldLore(this.edge, this.god);
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
+  /** B-facade: the Soul listing (`capabilities`) reads the world through the read-only facade (split/menu-world.ts). */
+  private get mw(): MenuWorld { return menuWorldOf(this.host); }
   private get model(): WorldModel { return this.god.model; }
 
   /** True only at a completed normal tick frontier, with every derived draft accepted by this engine.
@@ -353,8 +434,8 @@ export class EngineBridge {
     // engine share its parts and their cached hash texts (a clone made the first edit after boot stringify every part twice)
     this.physics = ep; this.levels = ep ? structuredClone(ep.levels) : [];
     // seed `sent` from the engine's own state so only real differences are sent
-    for (const [id, part] of Object.entries(ep?.byEntity ?? {})) this.sent.set(id, JSON.stringify(normPart(part as Part)));
-    for (const [id, e] of Object.entries(this.engine.world.entities)) if (e.tags?.includes('entity-world')) this.sent.set(id, JSON.stringify(normPart({ ...(ep?.byEntity[id] ?? {}), fixture: fixtureOfEngine(e) } as Part)));
+    for (const [id, part] of Object.entries(ep?.byEntity ?? {})) this.sent.set(id, sentKey(JSON.stringify(normPart(part as Part))));
+    for (const [id, e] of Object.entries(this.engine.world.entities)) if (e.tags?.includes('entity-world')) this.sent.set(id, sentKey(JSON.stringify(normPart({ ...(ep?.byEntity[id] ?? {}), fixture: fixtureOfEngine(e) } as Part))));
     const all = new Set<string>([...this.model.entities.keys(), ...this.sent.keys()]);
     this.send(all, 0, 'boot');
   }
@@ -390,11 +471,11 @@ export class EngineBridge {
       if (e && this.engineOwned(e)) continue;            // bodies and what they carry belong to the engine
       const part = e ? this.derive(e, assets, known) : null;
       for (const f of part?.surfaces ?? []) if (f.level) { const a = this.sendFloors.get(f.level) ?? []; a.push(f.obb); this.sendFloors.set(f.level, a); }
-      const key = part ? JSON.stringify(normPart(part)) : null;
+      const key = part ? sentKey(JSON.stringify(normPart(part))) : null;
       // A removed thing the engine still has (one a Soul held when it went: `sent` forgot it) is removed there too.
       const lingering = !e && (this.engine.world.entities[id]?.tags?.includes('entity-world') || !!this.physics?.byEntity[id]);
       if ((this.sent.get(id) ?? null) === key && !lingering) continue;
-      if (this.sent.get(id)?.includes('"links"') || part?.links?.length) linksMoved = true;
+      if (this.sent.get(id)?.startsWith('L') || part?.links?.length) linksMoved = true;
       set[id] = part;
       if (key) this.sent.set(id, key); else this.sent.delete(id);
     }
@@ -402,7 +483,7 @@ export class EngineBridge {
     // came, went or moved, every raised deck is derived again (only the changed ones are sent)
     if (linksMoved) for (const e of this.model.entities.values()) {
       if (set[e.id] !== undefined || !this.isRaisedDeck(e)) continue;
-      const part = this.derive(e, assets, known), key = part ? JSON.stringify(normPart(part)) : null;
+      const part = this.derive(e, assets, known), key = part ? sentKey(JSON.stringify(normPart(part))) : null;
       if ((this.sent.get(e.id) ?? null) === key) continue;
       set[e.id] = part;
       if (key) this.sent.set(e.id, key); else this.sent.delete(e.id);
@@ -410,7 +491,7 @@ export class EngineBridge {
     this.sendIds = null;
     if (!Object.keys(set).length) return;
     const draft: WorldEditV1 = { contract: 'world-edit/1', seq, hash: '', levels: structuredClone(this.levels), set, ...(Object.keys(assets).length ? { assets } : {}) };
-    this.physics = nextEntityPhysics(this.physics, draft);
+    this.physics = buildWorldEditPhysics(this.physics, draft);
     draft.hash = this.physics.hash;
     this.stats.edits++; this.stats.entities += Object.keys(set).length; this.stats.lastMs = Math.round((performance.now() - t0) * 10) / 10;
     const acceptance = { applied: false };
@@ -462,7 +543,7 @@ export class EngineBridge {
   /** Level ids still in use: by a part the engine holds (surfaces, link ends), one derived in this send, or a Soul. */
   private levelsInUse(): Set<number> {
     const live = new Set(this.levelsNow);
-    for (const key of this.sent.values()) for (const m of key.matchAll(/"level":(\d+)/g)) live.add(Number(m[1]));
+    for (const key of this.sent.values()) { const bar = key.indexOf('|'); if (bar > 1) for (const n of key.slice(1, bar).split(',')) live.add(Number(n)); }
     for (const e of Object.values(this.engine.world.entities) as { human?: { level?: number } }[]) if (e.human?.level) live.add(e.human.level);
     return live;
   }
@@ -762,6 +843,23 @@ export class EngineBridge {
     }
   }
 
+  /** The bridge's per-tick work (each step on its own cadence). With SIM_L4_STATS=1 every step is timed and one
+   *  `[l4] …` line a minute says where the tick thread went (load lane L4 measurements; off: no clock reads). */
+  private afterTickWork(tick: number, startedAtMs?: number) {
+    if (!this.reconciled) { this.reconcile(); this.projectedEdits = this.godEdits; return; }
+    const S = this.loadStats; let t = S ? performance.now() : 0;
+    this.flush(); this.projectedEdits = this.godEdits; if (S) t = S.add('flush', t);
+    if (tick % 10 === 0 || this.writeBackPass) { this.writeBack(WRITE_BACK_SLICE_MS); if (S) t = S.add('writeBack', t); }
+    this.perceiveStep(tick); if (S) t = S.add('perceive', t);
+    if (tick % 5 === 4 || this.activitySpots.deriving()) { this.spotsStep(); if (S) t = S.add('spots', t); }
+    if (tick % 40 === 7 || this.layerPlacesPending !== null) { this.layersStep(tick % 40 === 7); if (S) t = S.add('layers', t); }
+    if (tick % 20 === 13) { this.flushMapNotices(); if (S) t = S.add('mapNotices', t); }
+    if (!this.navWarm || this.navPending) { this.navStep(startedAtMs); if (S) t = S.add('nav', t); }
+    if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); if (S) t = S.add('evacuate', t); }
+    if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); if (S) t = S.add('rescue', t); }
+    if (S && S.due()) this.log(S.line(this));
+  }
+  private loadStats = process.env.SIM_L4_STATS === '1' ? new BridgeStats() : null;
   private perceiveSync(now = false) { try { if (now) this.perceive.sync(); else this.perceive.ensure(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
   /** G1 (tranche 2026-10-19): what Souls perceive of god edits (built objects, the places layer) catches up off the
    *  request path. An edit only notes what changed; the catch-up starts a second after the last edit, or ~2 s after the
@@ -781,9 +879,14 @@ export class EngineBridge {
     this.perceive.note(ids, all, origin);
     if (this.perceiveFirst < 0) this.perceiveFirst = tick; this.perceiveLast = tick;
   }
+  private perceiveDial: (typeof PERCEIVE_DIAL)[LoadLevel] = PERCEIVE_DIAL.green;
+  /** LOAD-CONTRACT: the load monitor sets the level; only the perception cadence changes (PERCEIVE_DIAL). */
+  setLoadLevel(level: LoadLevel) { this.perceiveDial = PERCEIVE_DIAL[level] ?? PERCEIVE_DIAL.green; }
   private perceiveStep(tick: number) {
+    const dial = this.perceiveDial;
     if (!this.perceiveRunning) {
       if (!this.perceive.pending() || tick - this.perceiveStarted < 20) return;
+      if (this.perceive.stats.runs && tick - this.perceiveStarted < dial.settle) return;   // amber/red/black: catch-ups start further apart
       // boot: the first catch-up is a whole pass (~0.4 s at 4,900 entities). A served world runs it in slices too (lane P5):
       // at once it held a cold-booted world's first visitor. A Soul's read before it ends catches up at once (perceive.ensure).
       // A world stepped by hand (tests, tools) runs it at once, as before.
@@ -792,7 +895,7 @@ export class EngineBridge {
       this.perceiveRunning = true; this.perceiveStarted = tick; this.perceiveFirst = -1; this.catchUp = { slices: 0, maxMs: 0, t0: performance.now() };
     }
     const t0 = performance.now();
-    try { if (this.perceive.step(PERCEIVE_SLICE_MS)) this.perceiveRunning = false; }
+    try { if (this.perceive.step(dial.sliceMs)) this.perceiveRunning = false; }
     catch (e) { this.perceiveRunning = false; this.log(`perceive: ${(e as Error).message}`); }   // retried on the next catch-up, never every tick
     const c = this.catchUp, ms = performance.now() - t0; c.slices++; if (ms > c.maxMs) c.maxMs = ms;
     // a slice that ran long (one place or the named things re-derived at once) is worth a line in the world's log
@@ -852,7 +955,8 @@ export class EngineBridge {
    *  Soul's listing (only when a listing has read them since the last such derive). */
   private spotsStep() {
     if (!this.edge || this.perceiveRunning || this.perceive.pending()) return;
-    try { if (this.activitySpots.warm()) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
+    // L4 item 6: a served world derives the spots in slices of the perception budget, one per tick until done
+    try { if (this.activitySpots.warm(this.perceiveDial?.sliceMs ?? PERCEIVE_SLICE_MS)) this.logSpots(); } catch (e) { this.log(`activity spots: ${(e as Error).message}`); }
   }
   private navStep(tickStartedAtMs?: number) {
     try {
@@ -863,12 +967,20 @@ export class EngineBridge {
       // authoritative even at zero; the engine polls and invalidates without compiling a stale graph.
       const budgetMs = tickStartedAtMs === undefined ? 20
         : Math.min(20, Math.max(0, 40 - (performance.now() - tickStartedAtMs)));
+      const st = this.loadStats ? this.navProbe() : null, t0 = st ? performance.now() : 0;
       this.navWarm = E.navWarmV1(budgetMs);
+      if (st) { const ms = performance.now() - t0; if (ms > 50) { const now = this.navProbe(); this.log(`[l4] nav warm slice ${Math.round(ms)} ms: spatial paged ${Math.round(now.paged - st.paged)} grids ${Math.round(now.grids - st.grids)} scan ${Math.round(now.scan - st.scan)} ms; largest unit ${Math.round(now.unit)} ms (${now.phase})`); } }
       if (this.navWarm && this.navPending) {
         this.navPending = false; const spots = this.navDeferred; this.navDeferred = [];
         const lines = this.navLines(spots, this.navRescueSouls()); if (lines.length) this.navLater = [...this.navLater, ...lines].slice(-4);
       }
     } catch (e) { this.navWarm = true; this.navPending = false; this.log(`nav warm: ${(e as Error).message}`); }
+  }
+  /** L4 diagnostic (SIM_L4_STATS=1): the spatial ms counters and the connectivity build's largest unit so far. */
+  private navProbe() {
+    const rt = (this.engine as unknown as { rt?: { services?: { spatial?: { stats?: { pagedMs: number; gridMs: number; scanMs: number } } } }; conn?: { stats?: { maxStepMs: number; maxStepPhase: string } } });
+    const sp = rt.rt?.services?.spatial?.stats, c = rt.conn?.stats;
+    return { paged: sp?.pagedMs ?? 0, grids: sp?.gridMs ?? 0, scan: sp?.scanMs ?? 0, unit: c?.maxStepMs ?? 0, phase: c?.maxStepPhase ?? '' };
   }
   /** Last tick each Soul was stepped out (nav-connect/1): at most once a minute each, as the ledger's walk rescue. */
   private navRescuedAt = new Map<string, number>();
@@ -1101,7 +1213,7 @@ export class EngineBridge {
           this.layerPlacesPending = null;
         } else {
           this.layerPlacesPending ??= day;
-          if (!this.places.syncStep(PERCEIVE_SLICE_MS)) return;
+          if (!this.places.syncStep(this.perceiveDial?.sliceMs ?? PERCEIVE_SLICE_MS)) return;
           // Keep deferral through both syncStep's final sync() and the calendar lookup:
           // an edit/minute boundary during the pass must not force another full derive.
           // The completed list has the existing deferred-place semantics. If the day
@@ -1155,7 +1267,7 @@ export class EngineBridge {
       const e = this.model.entities.get(sid)!;
       // A thing in a body's hands is the engine's: forget what it was last told, so the god placing it again is sent.
       if (this.engineOwned(e)) { this.sent.delete(e.id); continue; }
-      this.sent.set(e.id, JSON.stringify(normPart(this.derive(e, {}, this.physics?.assets ?? {}) ?? {})));
+      this.sent.set(e.id, sentKey(JSON.stringify(normPart(this.derive(e, {}, this.physics?.assets ?? {}) ?? {}))));
     }
   }
 
@@ -1318,6 +1430,15 @@ export class EngineBridge {
   }
 
   /** Birth: the Soul's body becomes an entity (core/humanoid) with the engine's own id (spec 31 §3 rule 3). */
+  /** The model's body entities (L4: the activity-spot key leaves them out). Seeded by one scan, kept by births, retires
+   *  and commits; each read re-checks membership, so a body missed here only costs an extra derive. */
+  private bodyIds: Set<string> | null = null;
+  private modelBodies(): number {
+    const m = this.model;
+    if (!this.bodyIds) { this.bodyIds = new Set(); for (const [id, e] of m.entities) if (e.def === BODY_DEF) this.bodyIds.add(id); }
+    let n = 0; for (const id of this.bodyIds) if (m.entities.get(id)?.def === BODY_DEF) n++; else this.bodyIds.delete(id);
+    return n;
+  }
   bodyBorn(p: { entityId: string; soulId: string; name: string }) {
     if (this.model.entities.has(p.entityId) || !this.model.def(BODY_DEF)) return;
     const b = this.engine.world.entities[p.entityId];
@@ -1326,7 +1447,7 @@ export class EngineBridge {
     const name = this.model.names.has(`world/${slug}`) ? `${slug}-${p.entityId.slice(2, 6)}` : slug;
     const entity = { id: p.entityId, name, def: BODY_DEF, in: { parent: 'world' }, p: pos, r: 0, anchor: 'center', state: {}, by: 'engine', born: this.god.opts.tick(), v: 1 } as unknown as Entity;
     const r = this.engineAct([{ op: 'restore', entity } as Op], `birth: ${p.name}'s body`);
-    if (r.accepted) this.stats.bodies++; else this.log(`body entity for ${p.entityId} refused: ${JSON.stringify(r.failures).slice(0, 300)}`);
+    if (r.accepted) { this.stats.bodies++; this.bodyIds?.add(p.entityId); } else this.log(`body entity for ${p.entityId} refused: ${JSON.stringify(r.failures).slice(0, 300)}`);
   }
   bodyRetired(p: { entityId: string }) {
     if (!this.model.entities.has(p.entityId)) return;
@@ -1433,7 +1554,9 @@ export class EngineBridge {
   // ------------------------------------------------------------------ Souls: capabilities on god things, prayers
 
   private hookEdge(L: EdgeLedger) {
-    L.bodyPlacesReady = () => this.places.hasPublished();
+    L.bodyPlacesReady = () => this.readSide || this.places.hasPublished();
+    // B-facade: read workers get this bridge's physics facts with the delta (split/verdict-pump.ts ledgerEnv)
+    if (!this.readSide) (L as unknown as { godPhysicsV1?: unknown }).godPhysicsV1 = { hash: () => this.physics?.hash ?? '', read: () => this.readPhysicsV1() };
     // G1/R8: a resident's next observation carries what the god just did around it (newest first).
     const observe = L.observe.bind(L);
     L.observe = (soul, include) => {
@@ -1445,22 +1568,59 @@ export class EngineBridge {
     const priorUseRefusal = L.nativeUseRefusal;
     L.nativeUseRefusal = (capability, steps) => priorUseRefusal?.(capability, steps) ?? this.bedUseRefusal(capability, steps);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
-    L.placeWalkable = (id) => this.places.walkable(id);
-    // a far named place asked for by name ("go to the big top" from across town): its walk, offered for that act only
-    L.gaitOnDemand = (soul, id, gait, caps, plans) => { let added = false; try { const go = () => { added = this.nav.gaitOnDemand(soul, id, gait, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`gait on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
-    L.walkOnDemand = (soul, id, caps, plans) => { let added = false; try { const go = () => { added = this.nav.walkOnDemand(soul, id, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`walk on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
-    // RESOLVE: a named thing beyond the listing (the horse, a boat), a building's floor ("go upstairs"), and the words of
-    // named things for reading a misspelt name; offered for that resolution only, like walkOnDemand
+    L.placeWalkable = (id) => this.readSide ? this.readWalkable.has(id) : this.places.walkable(id);
+    // On-demand plans are appended after the full profile's layer pass. Apply
+    // the same admission to just those new offers, with no economy enumeration.
+    // Keep blocked offers and the builder's result: resolution must report that
+    // exact refusal rather than silently try another destination.
     const pass = <T>(what: string, f: () => T, none: T): T => { let out = none; try { const go = () => { out = f(); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`${what}: ${(e as Error).message}`); } releaseBigScratch(); return out; };
-    L.thingOnDemand = (soul, ask, caps, plans) => pass('thing on demand', () => this.nav.thingOnDemand(soul, ask, caps, plans, tokenHit), null);
-    L.walkRefOnDemand = (soul, ref, caps, plans) => pass('walk ref on demand', () => this.nav.walkRefOnDemand(soul, ref, caps, plans), false);
-    L.floorOnDemand = (soul, q, caps, plans) => pass('floor on demand', () => this.nav.floorOnDemand(soul, q, caps, plans, tokenHit), null);
+    const offer = <T>(what:string,soul:EdgeSoul,caps:EdgeCapability[],plans:Parameters<GodNav['walkOnDemand']>[3],f:()=>T,none:T):T => pass(what,()=>{
+      const start=caps.length;
+      try {
+        const out=f();
+        if(caps.length>start&&this.layers.active())this.layers.capabilities(soul,caps.slice(start),plans as never,null);
+        return out;
+      } catch(error) {
+        // A failed admission pass cannot leave an unmasked offer reachable by
+        // the resolver's later exact-ID or vocabulary fallback.
+        for(const c of caps.splice(start))plans.delete(c.id);
+        throw error;
+      }
+    },none);
+    // A far named place asked for by name, by exact ID/ref, as a floor or
+    // a named thing gets one ordinary offer with the same layer admission.
+    L.gaitOnDemand = (soul,id,gait,caps,plans) => offer('gait on demand',soul,caps,plans,()=>this.nav.gaitOnDemand(soul,id,gait,caps,plans),false);
+    L.walkOnDemand = (soul,id,caps,plans) => offer('walk on demand',soul,caps,plans,()=>this.nav.walkOnDemand(soul,id,caps,plans),false);
+    L.thingOnDemand = (soul,ask,caps,plans) => offer('thing on demand',soul,caps,plans,()=>this.nav.thingOnDemand(soul,ask,caps,plans,tokenHit),null);
+    L.walkRefOnDemand = (soul,ref,caps,plans) => offer('walk ref on demand',soul,caps,plans,()=>this.nav.walkRefOnDemand(soul,ref,caps,plans),false);
+    L.floorOnDemand = (soul,q,caps,plans) => offer('floor on demand',soul,caps,plans,()=>this.nav.floorOnDemand(soul,q,caps,plans,tokenHit),null);
     L.floorsNear = (at, radius) => pass('floors near', () => this.floorsNear(at, radius), []);
     L.thingAt = (id) => { const t = this.nav.thingById(id); return t ? [t.at[0], t.at[1]] : null; };
     L.thingWords = () => pass('thing words', () => this.nav.thingWords(), [] as string[]);
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
+    L.exactAuthoredWalkRef=ref=>this.nav.exactPlaceWalkRef(ref);
+    // Match resolveOnDemand's exact place-ID precedence, before its by-ref
+    // fallback. A colliding native/authored place ID must keep full resolution.
+    const exactAreaPlace=(ref:string)=>[ref,'g-'+ref].find(id=>L.places.byId.has(id));
+    L.exactAuthoredAreaWalkRef=ref=>{const id=exactAreaPlace(ref);return !!id&&this.places.forRef(ref)?.of==='area'&&this.nav.exactAreaWalkRef(ref,id);};
+    L.registerExactWalkProfile(L.worldProfile,prev,(soul,asked,caps,plans)=>{
+      let selected=false;
+      const read=()=>{
+        // Native bindings/profile precede GodNav exactly as in the full list.
+        const ref=asked.slice(5),areaPlace=exactAreaPlace(ref);
+        selected=caps.some(c=>c.id===asked)||this.nav.exactListedWalk(soul,ref,caps,plans)
+          || (!!areaPlace&&L.exactAuthoredAreaWalkRef!(ref)&&this.nav.exactAreaWalkOnDemand(soul,ref,areaPlace,caps,plans));
+        if(!selected)return;
+        const me=this.engine.world.entities[soul.entityId];
+        if(this.layers.active())this.layers.capabilities(soul,caps,plans as never,me?[me.pose.p[0],me.pose.p[2]]:null);
+      };
+      const eng=this.engine as unknown as {readPassV1?:(f:()=>void)=>void};
+      try{if(eng.readPassV1)eng.readPassV1(read);else read();}finally{releaseBigScratch();}
+      return selected;
+    });
+    if (this.readSide) return;   // a worker never acts: main does
     const act = L.act.bind(L), self = this;
     (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
       if (input?.capability === 'pray' || (typeof input?.capability === 'string' && /^pray(\s|:|$)/.test(input.capability))) return self.pray(L, soul, input);
@@ -1521,109 +1681,144 @@ export class EngineBridge {
     return { accepted: true as const, receipt: (L as any).receipt(soul.soulId, row.id), result: r.result };
   }
 
+  // ---- B-facade: the read side in a read worker (split/read-bridge.ts)
+  /** The god places main's layer installed in the ledger (PlaceIndex ids; shipped with the static layer). */
+  private readWalkable = new Set<string>();
+  /** What main's bridge last derived for the engine (physics hash, its levels, the asset facts the listing reads). */
+  readPhysicsV1(): BridgePhysicsV1 | null {
+    const p = this.physics; if (!p) return null;
+    const assets: BridgePhysicsV1['assets'] = {};
+    for (const [k, a] of Object.entries(p.assets ?? {}) as [string, { slots?: { kind: string }[]; surfaceSlots?: { id: string; local?: number[] }[]; category?: string }][])
+      assets[k] = { ...(a.slots ? { slots: a.slots.map((s) => ({ kind: s.kind })) } : {}), ...(a.surfaceSlots ? { surfaceSlots: a.surfaceSlots.map((s) => ({ id: s.id, ...(s.local ? { local: [...s.local] } : {}) })) } : {}), ...(a.category ? { category: a.category } : {}) };
+    const floors: NonNullable<BridgePhysicsV1['floors']> = {};
+    for (const [id, part] of Object.entries(p.byEntity ?? {}) as [string, Part][]) for (const f of part.surfaces ?? []) if (f.level) (floors[id] ??= []).push({ level: f.level, obb: structuredClone(f.obb) });
+    return { hash: p.hash ?? '', levels: structuredClone(this.levels), assets, floors };
+  }
+  /** A read worker: adopt main's physics facts and walkable god places; bring the god model to main's last commit
+   *  (GodReplica.sync) and catch perception up at once (main does it in slices after its ticks). */
+  readAdopt(o: { physics?: BridgePhysicsV1 | null; walkable?: readonly string[] }) {
+    if (o.physics !== undefined) { this.physics = (o.physics ? { hash: o.physics.hash, assets: o.physics.assets, levels: o.physics.levels, byEntity: Object.fromEntries(Object.entries(o.physics.floors ?? {}).map(([id, fs]) => [id, { surfaces: fs }])) } : undefined) as never; this.floorIndex = null as never; this.levels = o.physics ? structuredClone(o.physics.levels) as Level[] : []; }
+    if (o.walkable) this.readWalkable = new Set(o.walkable);
+  }
+  readSync(): boolean {
+    const moved = (this.god as unknown as { sync(): boolean }).sync();
+    if (moved || this.perceive.pending()) this.perceiveSync(true);
+    return moved;
+  }
+
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
     // L1: the walk listing only reads the world; the engine's planner syncs once for all of it (readPassV1). S2: so does
     // the rest of this listing (the standing points beside near items, seats, layers): one sync and one list of bodies.
-    const list = () => this.listCapabilities(soul, caps, plans), eng = this.engine as unknown as { readPassV1?: (f: () => void) => void };
+    const list = () => this.listCapabilities(soul, caps, plans), eng = this.mw;
     if (eng.readPassV1) eng.readPassV1(list); else list();
   }
   private listCapabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
-    try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
+    // L3 item 4: a focused build (EdgeLedger.bindOne) offers only the walks the focus names
+    const focus = (this.edge as { menuFocusV1?(): MenuFocus | null } | undefined)?.menuFocusV1?.() ?? null;
+    try { this.nav.capabilities(soul, caps, plans, focus); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
     releaseBigScratch();   // L1: room-reach searches inside a multi-storey house share one ~110 MB workspace; not kept after
-    try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
+    // B-facade item 4 (L3 b4): a focused build (bindOne / words act) runs only the sections whose offers the focus can name:
+    // the object scans read every entity of the world (three passes) and perceive/layers scan signs and stalls
+    const named = (...verbs: string[]) => !focus || focus.targets.size > 0 || verbs.some((v) => wantsPrefix(focus, v + ':', v));
+    if (named('read')) try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
-    const ents = this.engine.world.entities, me = ents[soul.entityId]; if (!me?.human) return;
+    const ents = this.mw.world.entities as Record<string, any>, me = ents[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
-    const held = Object.values(ents).find((x: any) => x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId) as any;
-    const name = (id: string) => (this.model.entities.has(id) ? this.model.pathOf(id) : String(ents[id]?.label ?? id));
-    // MARSLIVED: a thing resting on a table is reached from the table's floor (its top's height matched Mimos's 0.53 m
-    // raised floor, so a cup on the ground-floor tea table read "floor 1" and Souls were sent up there for it)
-    const levelOf = (x: any) => { let s = x; for (let i = 0; i < 4 && s.support?.kind === 'resting-on' && ents[s.support.on]; i++) s = ents[s.support.on]; return this.levelOfY(s.pose.p[1]); };
-    const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR) as any[];
-    near.sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1));
-    // SOULSIM-H F2: "sit on the bench" from 77 m sat on the ground (the bench was past NEAR, so only sit:here was offered).
-    // The nearest few seats beyond NEAR are offered too (sit only), so a named seat resolves to its own walk-and-sit.
-    const seatAsset = (x: any) => !!(this.physics?.assets[x.def] as { slots?: { kind: string }[] } | undefined)?.slots?.some((sl) => sl.kind === 'seat');
-    near.push(...(Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && x.support?.kind !== 'in-hand' && seatAsset(x) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) > NEAR && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= FAR_SEAT) as any[])
-      .sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1)).slice(0, FAR_SEATS));
-    const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
-      const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
-      const at = this.engine.standableNearV1([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
-      return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
-    };
-    const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
-    // floors (2026-10-26): a seat the body cannot use names the nearest one it can (or the ground)
-    const unusable: number[] = [], usable: { id: string; label: string; d: number }[] = [];
-    for (const x of near) {
-      const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
-      const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
-      if (asset.slots?.some((s) => s.kind === 'seat')) {
-        const u = this.engine.bodyUsesV1(x.id), mine = u?.body === soul.entityId;
-        const seats = asset.slots.filter((s) => s.kind === 'seat').length, taken = this.seatTakers(x.id), others = taken.filter((b) => b !== soul.entityId);
-        // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
-        // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
-        const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
-        const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
-        const id = `sit:${x.id}`, labelOf = (seatWords: string) => `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${seatWords}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-        // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
-        const full = others.length >= seats || (!!u && !mine && seats <= 1);
-        // seat fit (engine bodies/humanoid.ts): a body whose look sets its height cannot get onto a seat too high for it.
-        // SEATDEF: the heights are the def's seat heights as the use-check reads them (seatTopsOf: engine seat slots carry
-        // none, so this read nothing before). Only too-high blocks: a seat lower than a body likes (a floor cushion) is sat on.
-        const tops = [...seatTopsOf(this.model, x.id).values()].filter((y) => Number.isFinite(y));
-        const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
-        // floors (2026-10-26): the sitter's feet rest on the floor under the seat (the terrain, or a floor plate on it); a
-        // thing standing higher than that floor (on a deck the world does not walk on) would seat the body inside it
-        const feet = levelOf(x) === 0 ? this.engine.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
-        // a floating thing (a moored canoe, party S8) rides above the pond floor by design and is boarded from its side
-        const afloat = !!ent && isFloatingDef(this.model.resolvedDef(ent.def) as { components: Record<string, unknown> });
-        const inside = !afloat && lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
-        const top = tops.length ? Math.min(...tops) : undefined, ownDef = ent ? this.model.resolvedDef(ent.def) : undefined;
-        const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `sit on top, ${top.toFixed(2)} m high; ` : top !== undefined ? `seat ${top.toFixed(2)} m high; ` : '';
-        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : inside;
-        const label = labelOf(onTop);
-        if (block?.code === 'seat.inside' || block?.code === 'seat.too-high') unusable.push(caps.length); else if (!block) usable.push({ id, label, d });
-        caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
-        plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
-      }
-      if (d > NEAR) continue; // F2: a far seat is offered for sitting only
-      // beds/1: a bed with native berths is lain on through the engine's take_slot (walk to its side, lie down on the
-      // mattress, rest, get up); a bed no adult fits on is not offered at all (bedUseRefusal names it if asked by id)
-      const berths = x.support?.kind !== 'in-hand' && this.isBed(x.id) ? this.berthsOf(x.id) : 0;
-      if (berths) {
-        const occ = (this.engine as unknown as { seatOccupantsV1?: (id: string, kind?: string) => { body: string }[] }).seatOccupantsV1?.call(this.engine, x.id, 'berth') ?? [];
-        const mine = occ.some((o) => o.body === soul.entityId), others = occ.filter((o) => o.body !== soul.entityId).map((o) => o.body);
-        const block = mine ? { code: 'bed.yours', reason: `You are lying on ${name(x.id)} already; stand:here to get up.` }
-          : others.length >= berths ? { code: 'bed.taken', reason: `${others.map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} lying there.` } : null;
-        for (const [verb, activity, sec] of [['lie', 'lie', 120], ['sleep', 'nap', 600]] as const) {
-          const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-          caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: sec } } });
-          plans.set(id, { label, steps: [...stand, { verb: 'mars:take_slot', params: { owner: x.id, activity } }, { verb: 'rest', params: { seconds: sec } }, { verb: 'stand', params: {} }], seconds: true });
+    if (named('sit', 'lie', 'sleep', 'pick-up', 'put-on')) {
+      const held = Object.values(ents).find((x: any) => x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId) as any;
+      const name = (id: string) => (this.model.entities.has(id) ? this.model.pathOf(id) : String(ents[id]?.label ?? id));
+      // MARSLIVED: a thing resting on a table is reached from the table's floor (its top's height matched Mimos's 0.53 m
+      // raised floor, so a cup on the ground-floor tea table read "floor 1" and Souls were sent up there for it)
+      const levelOf = (x: any) => { let s = x; for (let i = 0; i < 4 && s.support?.kind === 'resting-on' && ents[s.support.on]; i++) s = ents[s.support.on]; return this.levelOfY(s.pose.p[1]); };
+      const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR) as any[];
+      near.sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1));
+      // SOULSIM-H F2: "sit on the bench" from 77 m sat on the ground (the bench was past NEAR, so only sit:here was offered).
+      // The nearest few seats beyond NEAR are offered too (sit only), so a named seat resolves to its own walk-and-sit.
+      const seatAsset = (x: any) => !!(this.physics?.assets[x.def] as { slots?: { kind: string }[] } | undefined)?.slots?.some((sl) => sl.kind === 'seat');
+      near.push(...(Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && x.support?.kind !== 'in-hand' && seatAsset(x) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) > NEAR && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= FAR_SEAT) as any[])
+        .sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1)).slice(0, FAR_SEATS));
+      const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
+        const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
+        const at = this.mw.standableNearV1!([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
+        return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
+      };
+      const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
+      // floors (2026-10-26): a seat the body cannot use names the nearest one it can (or the ground)
+      const unusable: number[] = [], usable: { id: string; label: string; d: number }[] = [];
+      for (const x of near) {
+        const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
+        const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
+        if (asset.slots?.some((s) => s.kind === 'seat')) {
+          const u = this.mw.bodyUsesV1!(x.id), mine = u?.body === soul.entityId;
+          const seats = asset.slots.filter((s) => s.kind === 'seat').length, taken = this.seatTakers(x.id), others = taken.filter((b) => b !== soul.entityId);
+          // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
+          // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
+          const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
+          const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
+          const id = `sit:${x.id}`, labelOf = (seatWords: string) => `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${seatWords}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+          // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
+          const full = others.length >= seats || (!!u && !mine && seats <= 1);
+          // seat fit (engine bodies/humanoid.ts): a body whose look sets its height cannot get onto a seat too high for it.
+          // SEATDEF: the heights are the def's seat heights as the use-check reads them (seatTopsOf: engine seat slots carry
+          // none, so this read nothing before). Only too-high blocks: a seat lower than a body likes (a floor cushion) is sat on.
+          const tops = [...seatTopsOf(this.model, x.id).values()].filter((y) => Number.isFinite(y));
+          const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)?.code === 'seat.too-high') ? seatFitProblem(me.body, Math.min(...tops)) : null;
+          // floors (2026-10-26): the sitter's feet rest on the floor under the seat (the terrain, or a floor plate on it); a
+          // thing standing higher than that floor (on a deck the world does not walk on) would seat the body inside it
+          const feet = levelOf(x) === 0 ? this.mw.standYAtV1?.(x.pose.p[0], x.pose.p[2], 0) : undefined, lift = typeof feet === 'number' ? x.pose.p[1] - feet : 0;
+          // a floating thing (a moored canoe, party S8) rides above the pond floor by design and is boarded from its side
+          const afloat = !!ent && isFloatingDef(this.model.resolvedDef(ent.def) as { components: Record<string, unknown> });
+          const inside = !afloat && lift > SEAT_LIFT ? { code: 'seat.inside', reason: `${name(x.id)} stands ${lift.toFixed(2)} m above the floor you would stand on there, on something the world does not walk on: sitting on it would put you inside it.` } : null;
+          const top = tops.length ? Math.min(...tops) : undefined, ownDef = ent ? this.model.resolvedDef(ent.def) : undefined;
+          const onTop = top !== undefined && ownDef && ownDef.size.box[1] > 0 && top >= ownDef.size.box[1] * (ent ? this.model.worldPose(ent).s : 1) - 0.05 ? `sit on top, ${top.toFixed(2)} m high; ` : top !== undefined ? `seat ${top.toFixed(2)} m high; ` : '';
+          const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : inside;
+          const label = labelOf(onTop);
+          if (block?.code === 'seat.inside' || block?.code === 'seat.too-high') unusable.push(caps.length); else if (!block) usable.push({ id, label, d });
+          caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
+          plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
+        }
+        if (d > NEAR) continue; // F2: a far seat is offered for sitting only
+        // beds/1: a bed with native berths is lain on through the engine's take_slot (walk to its side, lie down on the
+        // mattress, rest, get up); a bed no adult fits on is not offered at all (bedUseRefusal names it if asked by id)
+        const berths = x.support?.kind !== 'in-hand' && this.isBed(x.id) ? this.berthsOf(x.id) : 0;
+        if (berths) {
+          const occ = this.mw.seatOccupantsV1?.(x.id, 'berth') ?? [];
+          const mine = occ.some((o) => o.body === soul.entityId), others = occ.filter((o) => o.body !== soul.entityId).map((o) => o.body);
+          const block = mine ? { code: 'bed.yours', reason: `You are lying on ${name(x.id)} already; stand:here to get up.` }
+            : others.length >= berths ? { code: 'bed.taken', reason: `${others.map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} lying there.` } : null;
+          for (const [verb, activity, sec] of [['lie', 'lie', 120], ['sleep', 'nap', 600]] as const) {
+            const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+            caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: sec } } });
+            plans.set(id, { label, steps: [...stand, { verb: 'mars:take_slot', params: { owner: x.id, activity } }, { verb: 'rest', params: { seconds: sec } }, { verb: 'stand', params: {} }], seconds: true });
+          }
+        }
+        if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
+          const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+          caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
+          plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
+        }
+        if (held && asset.surfaceSlots?.length) {
+          const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
+          // MARSLIVED: the free place nearest the Soul (the first free one was often on a table's far side, against a
+          // counter: "put the cup on the prep table" failed as unreachable while the near end was free)
+          // MARSLAND: engine poses carry the negated three.js yaw (fixtureSpec registers yaw: −wp.yaw); turn the slot's local
+          // offset with the entity's own (three.js) yaw, or a turned table's places are mirrored and the far one is chosen
+          const yw = -(x.pose.yaw ?? 0), at = (sl: { local?: number[] }) => { const l = sl.local ?? [0, 0, 0]; return [x.pose.p[0] + l[0] * Math.cos(yw) + l[2] * Math.sin(yw), x.pose.p[2] - l[0] * Math.sin(yw) + l[2] * Math.cos(yw)]; };
+          const free = (asset.surfaceSlots as { id: string; local?: number[] }[]).filter((s) => !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
+          const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
+          caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
+          if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
         }
       }
-      if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
-        const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-        caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
-        plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
-      }
-      if (held && asset.surfaceSlots?.length) {
-        const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
-        // MARSLIVED: the free place nearest the Soul (the first free one was often on a table's far side, against a
-        // counter: "put the cup on the prep table" failed as unreachable while the near end was free)
-        // MARSLAND: engine poses carry the negated three.js yaw (fixtureSpec registers yaw: −wp.yaw); turn the slot's local
-        // offset with the entity's own (three.js) yaw, or a turned table's places are mirrored and the far one is chosen
-        const yw = -(x.pose.yaw ?? 0), at = (sl: { local?: number[] }) => { const l = sl.local ?? [0, 0, 0]; return [x.pose.p[0] + l[0] * Math.cos(yw) + l[2] * Math.sin(yw), x.pose.p[2] - l[0] * Math.sin(yw) + l[2] * Math.cos(yw)]; };
-        const free = (asset.surfaceSlots as { id: string; local?: number[] }[]).filter((s) => !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
-        const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
-        caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
-        if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
-      }
+      const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
+      for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
     }
-    const alt = usable.sort((a, b) => a.d - b.d || a.id.localeCompare(b.id))[0];
-    for (const i of unusable) { const b = caps[i].blocked; if (b) b.reason = `${b.reason} ${alt ? `Nearest seat you can use: ${alt.id} (${alt.label}).` : 'Sit on the ground instead: sit-ground:here.'}`; }
-    if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
-    this.sitHere(caps, plans, here, soul.entityId);
+    // (srv-r5 stroll fix: the construction / private / for-sale refusals read only the offers already built, so they run on
+    // every focused build as on the whole menu; only the economy's buy/pay listing waits for a focus that names it. A words
+    // walk to a closed site was offered available on its focused build.)
+    if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here, named('buy', 'pay', 'sell')); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
+    if (wants(focus, 'sit:here')) this.sitHere(caps, plans, here, soul.entityId);
     this.fireLit(caps);
     try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
   }
@@ -1703,6 +1898,13 @@ export function rectOf(poly: Vec2[]): { c: Vec2; half: Vec2; yaw: number } {
   return { c: [r3(cu * ux - cv * uz), r3(cu * uz + cv * ux)], half: [r3((u1 - u0) / 2), r3((v1 - v0) / 2)], yaw: Math.abs(yaw) < 1e-9 ? 0 : r3(yaw) };
 }
 
+/** L4 #7: what `sent` keeps for a part's JSON: 'L' when it names stairs ("links": linksMoved), the levels it names
+ *  (levelsInUse), then a sha256 of the text (was the text itself: ~1 KB per entity, for equality only). Equal texts give
+ *  equal keys; RELEASED has no '|' and so never equals one. */
+function sentKey(json: string): string {
+  const levels = new Set<number>(); for (const m of json.matchAll(/"level":(\d+)/g)) levels.add(Number(m[1]));
+  return `${json.includes('"links"') ? 'L' : '-'}${[...levels].join(',')}|${createHash('sha256').update(json).digest('base64')}`;
+}
 function normPart(p: Part): Part { const o: Part = {}; if (p.surfaces?.length) o.surfaces = p.surfaces; if (p.solids?.length) o.solids = p.solids; if (p.links?.length) o.links = p.links; if (p.fixture) o.fixture = p.fixture; return o; }
 function fixtureOfEngine(e: any): FixtureSpecV1 { return { def: e.def, kind: e.kind === 'component' ? 'item' : 'fixture', label: e.label, p: [e.pose.p[0], e.pose.p[1], e.pose.p[2]], yaw: e.pose.yaw, ...(e.support ? { support: e.support } : {}), ...(e.kind !== 'component' && typeof e.level === 'number' ? { level: e.level } : {}) }; }
 function describeOp(op: Op, w: WorldModel): string {

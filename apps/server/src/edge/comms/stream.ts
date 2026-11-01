@@ -24,7 +24,7 @@ export class EventStreams {
   private db: Sql; private worldId: string; private opts: StreamOptions;
   constructor(db: Sql, worldId: string, opts: StreamOptions) { this.db = db; this.worldId = worldId; this.opts = opts; }
 
-  onEvent(listener: (soulId: string, e: StreamEvent) => void) { this.listeners.push(listener); }
+  onEvent(listener: (soulId: string, e: StreamEvent) => void) { this.listeners.push(listener); return () => {const i=this.listeners.indexOf(listener);if(i>=0)this.listeners.splice(i,1);}; }
 
   private headRow(soulId: string): {head: number; floor: number} {
     const row = this.db.prepare('SELECT head, floor FROM edge_comms_heads WHERE world_id = ? AND soul_id = ?').get(this.worldId, soulId) as {head: number; floor: number} | undefined;
@@ -55,7 +55,7 @@ export class EventStreams {
       afterCommit(this.db,()=>{
         const waiting=this.waiters.get(soulId);
         if(waiting){this.waiters.delete(soulId);for(const wake of waiting)wake();}
-        for(const listener of this.listeners){try{listener(soulId,notification);}catch{/* listener faults never break committed delivery */}}
+        for(const listener of [...this.listeners]){try{listener(soulId,notification);}catch{/* listener faults never break committed delivery */}}
       });
       return event;
     });

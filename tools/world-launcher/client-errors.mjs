@@ -65,7 +65,12 @@ const fpOf = (k, m, s) => createHash('sha256').update(`${k}|${m.replace(/\d+/g, 
 const bump = (map, key, max) => { if (key in map || Object.keys(map).length < max) map[key] = (map[key] ?? 0) + 1; else map['…'] = (map['…'] ?? 0) + 1; };
 
 /**
- * clientErrors({dir, build}) → {ingest(ip, ua, body:Buffer) → [status, json|null], summary(q), newSinceRelease(), flush()}.
+ * clientErrors({dir, build}) → {ingest(ip, ua, body:Buffer) → [status, json|null], summary(q), newSinceRelease(), rate10m(kinds?),
+ *   totals(), flush()}.
+ * Rate counters (lane L7, 2026-10-31): totals() = events accepted per kind since this process started (a Prometheus counter,
+ * `sim_client_errors_total{kind}`) and rate10m() = events of the socket kinds (ws, storm, arrival) accepted in the last
+ * 10 minutes, from per-minute buckets kept in memory only (11 of them). The freeze of 2026-10-31 was preceded by a 1→3→4→7
+ * per-10-min ramp of socket errors that `clientErrorsNew` (kinds) could not show.
  * `dir` holds agg.json (the table) and events.jsonl (+ events.1.jsonl), both bounded.
  */
 export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, log = () => {} } = {}) {
@@ -92,6 +97,12 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
     const keep = hourOf(from - 3_600_000); for (const h of Object.keys(agg.arrivalHours)) if (h < keep) delete agg.arrivalHours[h];
   };
   const stats = { accepted: 0, rate: 0, size: 0, bad: 0 };
+  const totalsByKind = Object.fromEntries([...KINDS].map((k) => [k, 0])), minutes = new Map();   // minute index → {kind: n}
+  const count = (k, n, t) => {
+    totalsByKind[k] += n; const m = Math.floor(t / 60_000);
+    const b = minutes.get(m) ?? {}; b[k] = (b[k] ?? 0) + n; minutes.set(m, b);
+    for (const old of minutes.keys()) if (old < m - 10) minutes.delete(old);
+  };
   let salt = { day: '', key: Buffer.alloc(0) }, timer = null, dirty = false, logSize = -1;
   const visitor = (ip, ua, day) => {
     if (salt.day !== day) salt = { day, key: randomBytes(16) };
@@ -146,7 +157,7 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
       bump(a.builds, b, L.maxKeys); bump(a.worlds, w, L.maxKeys); bump(a.browsers, c, L.maxKeys);
       if (a.vday !== day) { a.vday = day; a.vh = []; }
       if (!a.vh.includes(v) && a.vh.length < L.maxVisitorsPerDay) { a.vh.push(v); a.visitorDays++; }
-      append({ t, fp, k, w, b, c, v, n });
+      append({ t, fp, k, w, b, c, v, n }); count(k, n, t);
       took++; stats.accepted++;
     }
     if (took) later();
@@ -173,6 +184,13 @@ export function clientErrors({ dir, build = 'dev', limits = {}, now = Date.now, 
       .map(([w, v]) => { v.sort((a, b) => a - b); return { world: w, n: v.length, p50: pct(v, 0.5), p90: pct(v, 0.9) }; });
     return { n: Math.max(n, rows.length), sampled: rows.length, p50: pct(sorted, 0.5), p90: pct(sorted, 0.9), worlds };
   }
+  /** Events of `kinds` accepted in the last 10 minutes (the current minute and the 9 whole ones before it, ~10 min). */
+  function rate10m(kinds = ['ws', 'storm', 'arrival']) {
+    const m = Math.floor(now() / 60_000); let n = 0;
+    for (const [i, b] of minutes) if (i > m - 10) for (const k of kinds) n += b[k] ?? 0;
+    return n;
+  }
+  const totals = () => ({ ...totalsByKind });
   function newSinceRelease() { load(); const s = since(); let n = 0; for (const a of Object.values(agg.kinds)) if (a.first >= s) n++; return n; }
-  return { ingest, summary, newSinceRelease, flush };
+  return { ingest, summary, newSinceRelease, rate10m, totals, flush };
 }

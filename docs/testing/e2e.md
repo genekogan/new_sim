@@ -39,7 +39,7 @@ node e2e/local-smoke.mjs --port 9950 --clip      # also one uncut, real-speed cl
 - **Exit** 0 pass, 1 a check failed, 2 a precondition is missing: the message names the command that fixes it
   (`--build` builds the web app and the viewer's static build when they are missing).
 - **People need the viewer's static build.** The character models (`/modular`) come from
-  `pnpm --filter mars-campus-viewer build:static` (issue #395). Without it the world never draws Ada and the run
+  `pnpm build:viewer` (issue #395). Without it the world never draws Ada and the run
   fails with the 404s in the summary.
 - CI runs it on PRs that touch `apps/web`, `apps/server` or `e2e` (the `smoke` job in `.github/workflows/ci.yml`).
 - Use it as a PR's proof: upload `summary.json` and the screenshots (and the clip) with `node tools/proof/upload.mjs`.

@@ -153,6 +153,14 @@ export function mountAgentInbox(app: Hono, d: Deps) {
   };
   if (d.god) agentRoutes('/v1/god/inbox', 'god');
   agentRoutes('/v1/edge/inbox', 'soul');
+  // Readback uses the native queue, including finished messages that listen no
+  // longer returns. This route is mounted before the edge middleware.
+  app.get('/v1/edge/inbox/:id', c => {
+    const s = requireAgent(c, 'soul'); limit(`inbox-read:soul:${JSON.stringify(s)}`, 120);
+    const message = inbox.messageById(s, c.req.param('id')!);
+    if (!message) throw new ApiError(404, 'not-found', 'no such message (it may be too old)');
+    return c.json({message});
+  });
   // MSG: a Soul's second answer, when its work ends ("Arrived" / "Couldn't: ..."); the first is the ack's reply.
   app.post('/v1/edge/inbox/:id/result', async c => {
     const s = requireAgent(c, 'soul'), b = await json(c); limit(`inbox-ack:soul:${JSON.stringify(s)}`, 120);
