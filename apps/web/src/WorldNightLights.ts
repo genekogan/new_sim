@@ -266,6 +266,16 @@ export class PatternNightMap {
   for(const [key,data,size] of [['center',centers,2],['shape',shapes,4],['tint',colors,4],['kind',kinds,1]] as const)g.setAttribute(key,new THREE.InstancedBufferAttribute(new Float32Array(data),size));
   g.instanceCount=sources.length;this.geometry.dispose();this.geometry=g;this.mesh.geometry=g;
  }
+ /** An active portable source moves in the existing instance buffer. No geometry
+  * allocation, CPU texture repaint or re-upload of the static light catalogue. */
+ moveSource(index:number,x:number,z:number,base:number){
+  const centers=this.geometry.getAttribute('center') as THREE.InstancedBufferAttribute;
+  const tint=this.geometry.getAttribute('tint') as THREE.InstancedBufferAttribute;
+  if(!centers||index<0||index>=centers.count)return;
+  centers.setXY(index,x,z);if(!centers.updateRanges.some(r=>r.start===index*2))centers.addUpdateRange(index*2,2);centers.needsUpdate=true;
+  tint.setW(index,Math.max(0,Math.min(1,(base-BASE_MIN)/BASE_RANGE)));if(!tint.updateRanges.some(r=>r.start===index*4+3))tint.addUpdateRange(index*4+3,1);tint.needsUpdate=true;
+ }
+ inspect(){const c=this.geometry.getAttribute('center');return{geometry:this.geometry.uuid,centers:c?Array.from(c.array):[]};}
  render(renderer:THREE.WebGLRenderer,seconds:number,reducedMotion=false){
   this.material.uniforms.seconds.value=seconds%600;this.material.uniforms.reduced.value=reducedMotion?1:0;
   const target=renderer.getRenderTarget(),face=renderer.getActiveCubeFace(),mip=renderer.getActiveMipmapLevel(),auto=renderer.autoClear,shadow=renderer.shadowMap.autoUpdate,xr=renderer.xr.enabled;

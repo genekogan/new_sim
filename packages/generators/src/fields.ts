@@ -31,7 +31,7 @@ export const fieldSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('number'), min: num.optional(), max: num.optional(), default: num.optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),
   z.object({ type: z.literal('int'), min: z.number().int().optional(), max: z.number().int().optional(), default: z.number().int().optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),
   z.object({ type: z.literal('bool'), default: z.boolean().optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),
-  z.object({ type: z.literal('string'), max: z.number().int().max(2000).default(200), default: z.string().optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('string'), max: z.number().int().max(2000).default(200), lines: z.number().int().min(1).max(64).optional(), default: z.string().optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),
   z.object({ type: z.literal('enum'), values: z.array(z.string()).min(1).max(64), default: z.string().optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),
   z.object({ type: z.literal('color'), default: color.optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),
   z.object({ type: z.literal('ref'), default: z.string().optional(), doc: z.string().max(200).optional(), vis: z.array(z.string()).optional() }),

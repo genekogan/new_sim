@@ -101,3 +101,28 @@ test('a world calendar dates the sky (Eden 2026: early June) and leaves the hour
   const { solarPosition } = await import('../../../../mars/viewer/engine/env/sun.ts');
   assert.ok(solarPosition(calendarClock('2026-10-03T19:00:00', june)!).elevationDeg > solarPosition('2026-10-03T19:00:00').elevationDeg + 8, 'the June sun stands higher at 19:00');
 });
+
+
+test('switching a published light updates halos before the next expensive atmosphere scan', () => {
+ const scene=new THREE.Scene(), camera=new THREE.PerspectiveCamera(), source=new THREE.Group();
+ source.userData.edenLightSources=[[0,0,0,'lamp',1],[3,0,0,'lamp',1]];scene.add(source);
+ const atmosphere=createWorldAtmosphere(scene);
+ const frame=(seconds:number)=>atmosphere.update({seconds,dt:1/30,clock:'2026-10-15T21:00:00',daylight:0,camera,eden:true,profile:'world',reducedMotion:true});
+ try {
+  frame(0);const halos=scene.getObjectByName('atmosphere: lamp glow') as THREE.InstancedMesh;
+  assert.equal(halos.count,2);const scans=atmosphere.inspect().scans;
+  source.userData.edenLightSources=[[0,0,0,'lamp',1]];frame(.01);assert.equal(halos.count,1,'off removes only that halo on the next frame');
+  source.userData.edenLightSources=[];frame(.02);assert.equal(halos.count,0,'all lights off clears halos');
+  source.userData.edenLightSources=[[3,0,0,'lamp',1]];frame(.03);assert.equal(halos.count,1,'on returns without a structural rescan');
+  frame(.04);assert.equal(halos.count,1,'unchanged publications stay stable');assert.equal(atmosphere.inspect().scans,scans,'light changes do not trigger expensive scene scans');
+ } finally {atmosphere.dispose();}
+});
+
+
+test('a light-state world diff bypasses the half-second pool throttle and refreshes mesh/pools/halos in one frame',()=>{
+ const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(),atmosphere=createWorldAtmosphere(scene);
+ const entity={id:'lamp',def:'lamp@1',state:{on:true}},model={state:{datetime:'2026-10-15T21:00:00'},entities:new Map([['lamp',entity]]),resolvedDef:()=>({components:{light:{color:'#ffe9c4',range:8}}}),worldPose:()=>({x:0,y:0,z:0})};
+ const layer={active:true,group:new THREE.Group(),groundAt:()=>0,model,seq:1};const living=new GodWorldLiving(layer);scene.add(living.group);
+ const frame=(ms:number)=>{living.update(ms,0);atmosphere.update({seconds:ms/1000,dt:1/30,clock:model.state.datetime,daylight:0,camera,eden:true,profile:'world',reducedMotion:true});};
+ try{frame(0);assert.equal(living.lights,1);const halos=scene.getObjectByName('atmosphere: lamp glow') as THREE.InstancedMesh;assert.equal(halos.count,1);entity.state.on=false;layer.seq++;frame(16);assert.equal(living.lights,0,'pool disappears on diff frame, not 500 ms later');assert.equal(halos.count,0,'halo disappears on the same frame');entity.state.on=true;layer.seq++;frame(32);assert.equal(living.lights,1);assert.equal(halos.count,1);}finally{living.dispose();atmosphere.dispose();}
+});

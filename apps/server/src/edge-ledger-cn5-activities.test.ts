@@ -34,7 +34,11 @@ test('cn5 spots: every World spot and platform is accepted (no refused kinds)', 
   for (const id of ['stage-mic-1', 'stage-mic-2', 'amph-mic', 'amph-seat-2-1', 'amph-seat-3-6', 'pc-office-1', 'gym-bench-press', 'sport-petanque-1', 'sport-frisbee-2', 'sport-volleyball-4']) assert.ok(out.data.spots.some(s => s.id === id), id);
   assert.equal(out.data.platforms.length, 5);
   const courts = gameCourts(out.data.spots, {clearance: () => 1});
-  assert.deepEqual(courts.map(c => [c.activity, c.slots.length]), [['play-frisbee', 6], ['play-petanque', 6], ['play-volleyball', 6]]);
+  // Soul Actions entry 7 (frisbee clearance, accepted 2026-10-30): a frisbee court with two authored ends is a pair plus one
+  // broad triangle corner (3 places, maxPlayers 3) under the clear-v1 flight policy, no longer padded to six like the other games.
+  assert.deepEqual(courts.map(c => [c.activity, c.slots.length]), [['play-frisbee', 3], ['play-petanque', 6], ['play-volleyball', 6]]);
+  const frisbee = courts.find(c => c.game.kind === 'frisbee')!;
+  assert.equal(frisbee.game.flightPolicy, 'clear-v1'); assert.equal(frisbee.maxPlayers, 3); assert.equal(frisbee.slots[2].id, 'sport-frisbee-1.triangle');
   assert.deepEqual(courts.find(c => c.game.kind === 'volleyball')!.game.net, [18, 111, 18, 121], 'the net halfway between the sides');
 });
 
@@ -111,7 +115,8 @@ test('cn5 games: pétanque (two, then a third joins and one leaves), frisbee pai
   });
   t.diagnostic('frisbee ' + JSON.stringify({flights: flights.slice(0, 6), held, ends: [w.body(c).pose.p, w.body(d).pose.p].map(p => [p[0].toFixed(1), p[2].toFixed(1)])}));
   assert.ok(flights.length >= 6, 'back and forth'); assert.equal(flights[0].split('>')[0], d.entityId, 'the frisbee owner throws first');
-  assert.ok(Math.abs(w.body(c).pose.p[2] - w.body(d).pose.p[2]) > 10, 'at the two ends of the lawn');
+  // entry 7: both ends stand clear of the pond's rim and the bench by the flight margin (z 117.25 and 126.5, was 116.5 and 127)
+  assert.ok(Math.abs(w.body(c).pose.p[2] - w.body(d).pose.p[2]) > 9, 'at the two ends of the lawn');
   assert.equal(h(d).holding, 'frisbee', 'the frisbee is still d\'s');
   // volleyball: two players across the net, the rally alternates sides
   const va = await w.act(a, 'play volleyball', {seconds: 40}), vb = await w.act(b, 'play beach volleyball', {seconds: 40});
