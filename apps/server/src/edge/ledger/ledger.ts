@@ -2191,7 +2191,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         .sort((a, b) => a.distance - b.distance || a.label.localeCompare(b.label))[0];
       if (!best) return null;
       // entry 36: who is singing at the nearest mic (a sing spot is one singer's), for a polite refusal that names them
-      const {at, ...out} = best, w = this.host.engine.world as NativeWorld;
+      const {at, ...out} = best;
       if (verb === 'sing') for (const e of Object.values(w.entities)) if (e.kind === 'human' && e.id !== me?.id && e.human?.activity === 'sing' && Math.hypot(e.pose.p[0] - at[0], e.pose.p[2] - at[1]) < 0.7) {const n = this.host.mindByEntity?.get(e.id)?.name; if (n) return {...out, by: n};}
       return out;
     };
