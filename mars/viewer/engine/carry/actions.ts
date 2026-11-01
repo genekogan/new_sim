@@ -4,11 +4,12 @@
 // derived from the load pose every tick, so grips never drift. Cancelling
 // never drops a load: it becomes a controlled set-down (deferred cancel) at
 // the current pose if that spot is clear, otherwise it is refused.
+import {CARRY_REACH_SECONDS, CARRY_RELEASE_SECONDS, carryContactWeight} from './contact.ts';
 import { blockedWait } from '../runtime/waits.ts';
 import { z } from 'zod';
 import { angleDelta, clamp, dcos, dsin, rot2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, CancelResult, StepResult } from '../actions/types.ts';
-import type { Runtime } from '../runtime/runtime.ts';
+import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { makeWay, stairBlocker, traffic, walkTo, takeReplan } from '../locomotion/walk.ts';
@@ -45,6 +46,7 @@ export type CarryExec = {
   cancelling: boolean;
   epoch: number;
   replans?: number;
+  reachStart?: number;
   waited?: number;
   /** Climb (between levels): traversal parameter, whether the flight's traffic resource is held, done. */
   s?: number;
@@ -308,6 +310,13 @@ export const carry: ActionDef<CarryParams, CarryProgram, CarryExec> = {
         makeWay(rt, inWay, [p.pickup.x, p.pickup.z]);
         return blockedWait(rt, ex.id, p.item, [inWay], { code: 'carry.pickup-occupied', message: `the crew cannot take up ${p.item}: ${inWay} is standing at a grip position`, subjects: [p.item, inWay], at: [p.pickup.x, p.levelY, p.pickup.z] }, p.crew);
       }
+      if (itemOf(rt, ex).tags?.includes('entity-world-transport')) {
+        if (ex.reachStart === undefined) {
+          ex.reachStart = rt.tick;
+          crewOf(rt, ex).forEach((h, i) => { h.human!.carryContactV1 = {item:p.item, slot:p.f.carriers[i].slot, startTick:rt.tick}; });
+        }
+        if ((rt.tick - ex.reachStart) * dt < CARRY_REACH_SECONDS) return {status:'running',phase:'reach'};
+      }
       // lift: the load leaves the ground, held by exactly the crew
       const item = itemOf(rt, ex);
       item.phase = 'carried';
@@ -403,17 +412,18 @@ export const carry: ActionDef<CarryParams, CarryProgram, CarryExec> = {
         item.phase = ex.tr!.final;
         item.support = { kind: 'ground' };
         item.reservedBy = undefined;
-        for (const h of crewOf(rt, ex)) { h.human!.grip = undefined; h.human!.activity = 'release'; }
+        for (const h of crewOf(rt, ex)) { h.human!.grip = undefined; h.human!.activity = 'release'; if(h.human!.carryContactV1) h.human!.carryContactV1!.releaseTick=rt.tick; }
         ex.phase = 'release';
         ex.t = 0;
       }
       return { status: 'running', phase: ex.phase };
     }
     ex.t += dt;
-    if (ex.t < RELEASE_S) return { status: 'running', phase: 'release' };
-    for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; }
+    if (ex.t < (ex.reachStart === undefined ? RELEASE_S : CARRY_RELEASE_SECONDS)) return { status: 'running', phase: 'release' };
+    for (const h of crewOf(rt, ex)) { h.human!.activity = 'idle'; h.human!.task = undefined; h.human!.carryContactV1 = undefined; }
     carryExecsOf(rt).delete(ex.id);
     const e = itemOf(rt, ex);
+    e.reservedBy = undefined;
     return {
       status: 'completed',
       outputs: {
@@ -442,6 +452,15 @@ export const carry: ActionDef<CarryParams, CarryProgram, CarryExec> = {
   },
   cancel(rt, ex): CancelResult {
     const p = ex.p;
+    if (ex.phase === 'gather' && ex.reachStart !== undefined) {
+      for (const h of crewOf(rt, ex)) {
+        const contact=h.human!.carryContactV1!;
+        h.human!.carryContactV1={...contact,releaseTick:rt.tick,releaseFrom:carryContactWeight(contact,rt.tick,DT)};
+        h.human!.activity='release';
+      }
+      ex.phase='release'; ex.t=0; ex.cancelling=true;
+      return {ok:true,deferred:true};
+    }
     if (ex.phase === 'gather') {
       // a walker mid-stair finishes the flight at the nearer landing first (walk_to deferred cancel, review M2)
       ex.walks = ex.walks.map((w) => {

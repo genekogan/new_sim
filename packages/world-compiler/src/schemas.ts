@@ -18,7 +18,7 @@ export const DEF_REF = /^((?:core|eden|lm|mars)\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0
 // ---------- defs ----------
 
 /** W7 sound kinds (viewer, procedural WebAudio). */
-export const SOUND_KINDS = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps', 'leaves', 'flag', 'waterfowl', 'bees'] as const;
+export const SOUND_KINDS = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps', 'leaves', 'flag', 'waterfowl', 'bees', 'kettle'] as const;
 const soundSpec = z.object({ kind: z.enum(SOUND_KINDS), radius: num.positive().max(200).default(14), volume: num.min(0).max(1).default(0.5), when: z.string().regex(/^!?[a-z][a-zA-Z0-9]*$/).optional(), mode: z.enum(['loop', 'change']).default('loop'), variant: z.number().int().min(0).max(15).optional() });
 /** More sounds on the same thing: `also` lists up to 3 further specs (a fountain splashes and hums). */
 const soundSchema = soundSpec.extend({ also: z.array(soundSpec).min(1).max(3).optional() });
@@ -35,7 +35,10 @@ export const componentsSchema = z.object({
   seat: z.object({ height: num.default(0.45) }).optional(),
   bed: z.object({ height: num.default(0.5) }).optional(),
   surface: z.object({ height: num }).optional(),
-  container: z.object({ capacity: num.positive(), of: z.array(z.string()).optional() }).optional(),
+  /** Soul Actions entry 42: `inside` makes a hand-operated container's `shelf` slots real storage places (contact.ts
+   *  containerInside): its mouth in the def frame at scale 1 (the lip a stored thing passes over, the front face, where a
+   *  body stands to reach in), what fits (`fit`, m) and the word for its inside ("drawer"). */
+  container: z.object({ capacity: num.positive(), of: z.array(z.string()).optional(), inside: z.object({ lip: num, face: num, stand: v2, fit: v3, word: z.string().max(24) }).strict().optional() }).optional(),
   carryable: z.object({ mass: num.positive(), grips: z.number().int().min(1).max(4).default(1) }).optional(),
   opening: z.object({ width: num.positive(), height: num.positive(), state: z.enum(['open', 'closed', 'always']).default('always') }).optional(),
   floor: z.object({ level: z.number().int().default(0), y: num.default(0) }).optional(),
@@ -47,7 +50,8 @@ export const componentsSchema = z.object({
   light: lightSchema.optional(),
   /** A list replaces the singular light when supplied. */
   lights: z.array(lightSchema).min(1).max(8).optional(),
-  display: z.object({ w: num.positive(), h: num.positive(), slots: z.number().int().min(1).max(8).optional() }).optional(),
+  bell: z.object({ gripAt: z.tuple([num, num, num]), pullAngle: num.positive().max(0.6) }).optional(),
+  display: z.object({ w: num.positive(), h: num.positive(), controlAt: z.tuple([num, num, num]).optional(), slots: z.number().int().min(1).max(8).optional() }).optional(),
   paint: z.object({ faces: z.array(z.enum(['front', 'back', 'all'])).default(['all']) }).optional(),
   plant: z.object({ stages: z.number().int().min(1).max(8).default(3), daysPerStage: num.positive().default(1) }).optional(),
   instrument: z.object({ kind: z.string() }).optional(),
@@ -101,6 +105,9 @@ export const actionSchema = z.object({
   then: z.array(z.discriminatedUnion('op', [
     z.object({ op: z.literal('set'), field: z.string(), value: z.union([value, z.object({ param: z.string() })]) }),
     z.object({ op: z.literal('toggle'), field: z.string() }),
+    /** Soul Actions entry 37: step a field to the next of `values` (wrapping), e.g. a radio's station. */
+    z.object({ op: z.literal('cycle'), field: z.string(), values: z.array(z.string().max(80)).min(2).max(16) }),
+    z.object({ op: z.literal('increment'), field: z.string(), by: z.number().int().min(1).max(10).default(1) }),
     z.object({ op: z.literal('attach'), what: z.enum(['actor', 'held']), slot: z.string() }),
     z.object({ op: z.literal('detach'), what: z.enum(['actor', 'held']) }),
   ])).min(1).max(8),

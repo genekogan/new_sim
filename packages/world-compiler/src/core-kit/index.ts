@@ -4,6 +4,24 @@
 import creatures from './creatures.json' with { type: 'json' };
 import furniture from './furniture.json' with { type: 'json' };
 import { PAINTING_EASEL_DEF } from './painting-easel.ts';
+import { POWERED_DISPLAYS } from './powered-displays.ts';
+import { HAND_BELL } from './hand-bell.ts';
+import { SWITCHABLE_LIGHTS } from './switchable-lights.ts';
+import { PORTABLE_ITEMS } from './portable-items.ts';
+import { INSTRUMENTS } from './instruments.ts';
+import { HAND_OPENINGS, LOCKABLE_DOOR } from './hand-openings.ts';
+import { TEA_DEFS } from './tea.ts';
+import { WRITABLE_BOARDS } from './writable-boards.ts';
+import { HAND_WATER } from './hand-water.ts';
+import { HAND_MUSIC } from './hand-music.ts';
+import { HAND_FIRE } from './hand-fire.ts';
+import { HAND_COVERINGS } from './hand-coverings.ts';
+import { HAND_CABINETS } from './hand-cabinets.ts';
+import { HAND_DRAWERS } from './hand-drawers.ts';
+import { WATERING_CAN } from './watering-can.ts';
+import { MOVABLE_SEATING } from './movable-seating.ts';
+import { UPRIGHT_LOADS } from './upright-loads.ts';
+import { HAND_STORAGE } from './hand-storage.ts';
 import { OFFICE_DESK_DEF } from './office-desk.ts';
 import props from './props.json' with { type: 'json' };
 import structures from './structures.json' with { type: 'json' };
@@ -43,7 +61,7 @@ import figures from './figures.json' with { type: 'json' };
 import meshLods from '../core-mesh-lods.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ ([creatures, furniture, [PAINTING_EASEL_DEF, OFFICE_DESK_DEF], props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert, scenery, lightMotion, figures].flat() as unknown as DefInput[]).map((def) => {
+export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ ([creatures, furniture, [PAINTING_EASEL_DEF, OFFICE_DESK_DEF, ...SWITCHABLE_LIGHTS, ...HAND_OPENINGS, ...PORTABLE_ITEMS, LOCKABLE_DOOR, ...WRITABLE_BOARDS, ...HAND_WATER, ...WATERING_CAN, ...HAND_MUSIC, ...HAND_FIRE, ...HAND_COVERINGS, ...INSTRUMENTS, ...HAND_CABINETS, ...HAND_DRAWERS, ...UPRIGHT_LOADS, ...MOVABLE_SEATING, ...POWERED_DISPLAYS, HAND_BELL, ...TEA_DEFS, ...HAND_STORAGE], props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert, scenery, lightMotion, figures].flat() as unknown as DefInput[]).map((def) => {
   const lod = def.make.kind === 'mesh' ? (meshLods as Record<string, { lod1: string }>)[def.make.asset] : undefined;
   return lod ? { ...def, make: { ...def.make, ...lod } } as DefInput : def;
 });

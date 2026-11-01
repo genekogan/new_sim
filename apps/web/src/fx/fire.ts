@@ -92,6 +92,10 @@ void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoot
 const SMOKE_FS = /* glsl */ `varying float vAge, vTw; uniform float uStrength;
 void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.10, 1.0, r)) * sin(3.14159 * vAge) * 0.27 * uStrength;
   gl_FragColor = vec4(vec3(0.55, 0.52, 0.48), a); }`;
+// Soul Actions entry 33: a torch's thin sooty wisp (darker and fainter than a campfire's smoke), fading in above the tip.
+const WISP_FS = /* glsl */ `varying float vAge, vTw; uniform float uStrength;
+void main(){ float r = length(gl_PointCoord - 0.5) * 2.0; float a = (1.0 - smoothstep(0.0, 1.0, r)) * (1.0 - smoothstep(0.0, 1.0, r)) * smoothstep(0.0, 0.3, vAge) * (1.0 - vAge) * 0.13 * uStrength;
+  gl_FragColor = vec4(mix(vec3(0.16, 0.14, 0.13), vec3(0.34, 0.32, 0.3), vAge), a); }`;
 
 export type FireKind = 'candle' | 'torch' | 'full';
 export type Fire = {
@@ -104,8 +108,9 @@ export type Fire = {
   dispose(): void;
 };
 
-/** A fire of flame radius `radius` m (flame height ≈ 2.6 radius), seeded by `seed` (see `seedOf`). */
-export function createFire(seed: number, radius: number, kind: FireKind = 'full', height = radius * 2.6): Fire {
+/** A fire of flame radius `radius` m (flame height ≈ 2.6 radius), seeded by `seed` (see `seedOf`). `wisp`: a torch's
+ *  thin dark smoke rising from the flame tip (only with embers, at full detail). */
+export function createFire(seed: number, radius: number, kind: FireKind = 'full', height = radius * 2.6, wisp = false): Fire {
   let s = seed >>> 0;
   const rnd = () => { // mulberry32
     s = (s + 0x6d2b79f5) >>> 0;
@@ -127,7 +132,8 @@ export function createFire(seed: number, radius: number, kind: FireKind = 'full'
   const pos: number[] = [], corner: number[] = [], tongue: number[] = [], angle: number[] = [], index: number[] = [];
   // tongues are sized by the flame's own height (kit flames can be taller or squatter than 2.6 radii)
   const hk = height / (radius * 2.6);
-  const tongues = kind === 'candle' ? [[1, 1.7, 2.4, 0.7]] : kind === 'torch' ? [[3, 1.0, 2.5, 0.2], [2, 0.7, 2.2, 0.8]] : [[4, 1.1, 2.4, 0], [3, 0.85, 2.6, 0.5], [2, 0.6, 1.8, 1]];
+  // a torch (entry 33): one body of flame (two broad tongues), three licking tips and a short hot core, not a crown of petals
+  const tongues = kind === 'candle' ? [[1, 1.7, 2.4, 0.7]] : kind === 'torch' ? (wisp ? [[2, 1.3, 2.7, 0.15], [3, 0.75, 2.4, 0.55], [1, 0.6, 1.5, 1]] : [[3, 1.0, 2.5, 0.2], [2, 0.7, 2.2, 0.8]]) : [[4, 1.1, 2.4, 0], [3, 0.85, 2.6, 0.5], [2, 0.6, 1.8, 1]];
   for (const [count, w, h0, heat] of tongues) {
     const h = h0 * hk;
     for (let k = 0; k < count; k++) {
@@ -191,6 +197,9 @@ export function createFire(seed: number, radius: number, kind: FireKind = 'full'
   // Composite the translucent column behind the flames; overhead smoke otherwise hides every tongue.
   smoke.renderOrder = 1;
 
+  // a wisp drifts and widens as it rises (about 0.9 m for a torch), slow enough to read as smoke rather than sparks
+  const smokeWisp = wisp ? points(30, height * 0.85, 0.3, { uSize: { value: radius * 1.3 }, uGrow: { value: 2.6 }, uRise: { value: radius * 12 }, uRate: { value: 0.22 }, uSpread: { value: radius * 1.4 }, uMax: { value: 260 } }, WISP_FS, THREE.NormalBlending) : null;
+  if (smokeWisp) { smokeWisp.name = 'wisp'; smokeWisp.renderOrder = 1; group.add(smokeWisp); }
   group.add(flame);
   if (kind !== 'candle') group.add(embers);
   if (kind === 'full') group.add(bed, smoke);
@@ -207,7 +216,7 @@ export function createFire(seed: number, radius: number, kind: FireKind = 'full'
     },
     setDetail(level) {
       if (level === detail) return;
-      detail = level; group.visible = level > 0; embers.visible = smoke.visible = level > 1;
+      detail = level; group.visible = level > 0; embers.visible = smoke.visible = level > 1; if (smokeWisp) smokeWisp.visible = level > 1;
     },
     dispose() {
       for (const g of geos) g.dispose();

@@ -43,6 +43,8 @@ export type Mars = {
   nextRandom: (st: [number, number, number, number]) => number;
   /** carrier/1: advance every carrier one tick (before the runtime steps), and the carrier entity factory. */
   stepCarriers: (rt: any, table?: any) => void;
+  /** entry 35: finish letting go and let go of a pair that is no longer one (before the runtime steps; no holds: no effect). */
+  stepHandHolds: (rt: any) => void;
   carrierEntity: (spec: any, tick: number) => any;
 };
 
@@ -53,6 +55,7 @@ export async function loadMars(): Promise<Mars> {
   const carrier = await at('vehicles/carrier.ts');
   const edits = await at('spatial/edits.ts');
   const pose = await at('social/pose.ts');
+  const handHold = await at('social/hand-hold.ts');
   // The server uses the identical UTF-8 SHA-256 digest in native code. The
   // browser/Worker engine retains its portable default and the same addresses.
   hashes.setSha256Provider((text: string) => createHash('sha256').update(text, 'utf8').digest('hex'),
@@ -62,7 +65,7 @@ export async function loadMars(): Promise<Mars> {
   campScene.bounds = [-30,-30,30,30]; campScene.surfaces[0].obb.half = [30,30];
   const campWorld = (seed?: string) => { const w = camp.edenCampWorld(seed); w.base.staticHash = hashes.hashOf(campScene); return w; };
   return {
-    Runtime: rt.Runtime, makeWay:walk.makeWay, admitFloaters:bodies.admitFloaters, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, finalStateOf: recorder.finalStateOf, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: (extra: any[] = []) => reg.createRegistry([...carrier.CARRIER_ACTIONS, pose.poseV1, ...extra]), stepCarriers: carrier.stepCarriers, carrierEntity: carrier.carrierEntity, servicesFor: entityPhysicsServices(reg.servicesFor, edits.entityPhysicsContribution),
+    Runtime: rt.Runtime, makeWay:walk.makeWay, admitFloaters:bodies.admitFloaters, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, finalStateOf: recorder.finalStateOf, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: (extra: any[] = []) => reg.createRegistry([...carrier.CARRIER_ACTIONS, pose.poseV1, ...extra]), stepCarriers: carrier.stepCarriers, stepHandHolds: handHold.stepHandHolds, carrierEntity: carrier.carrierEntity, servicesFor: entityPhysicsServices(reg.servicesFor, edits.entityPhysicsContribution),
     littleMartiansWorld: lm.littleMartiansWorld, greenFieldWorld:field.greenFieldWorld,edenCommonsWorld:commons.edenCommonsWorld,commonsLayout:commons.COMMONS_LAYOUT,littleMartiansRender:lm.LITTLE_MARTIANS_RENDER,
     invariants: [...reg.ENGINE_INVARIANTS, carrier.carrierInvariant], describeVerbs: reg.describeVerbs, scenes: {...seeds.ENGINE_SCENES, [camp.EDEN_CAMP_CAMPUS]: campScene,littlemartians:lm.LITTLE_MARTIANS_SCENE,greenfield:field.GREEN_FIELD_SCENE,'eden-commons':commons.EDEN_COMMONS_SCENE}, edenCampWorld: campWorld, campActivities: camp.edenCampActivities, bindCampActivity: camp.bindCampActivity, bindCampChess: camp.bindCampChess, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom, mealWorld: meal.mealWorld, mealSteps: meal.mealSteps,
   };

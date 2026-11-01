@@ -114,7 +114,11 @@ export function checkFields(fields: Record<string, Field>, values: Record<string
         if (f.max !== undefined && v > f.max) return { ok: false, detail: `${k} > ${f.max}` };
         break;
       case 'bool': if (typeof v !== 'boolean') return { ok: false, detail: `${k} must be boolean` }; break;
-      case 'string': if (typeof v !== 'string' || v.length > f.max) return { ok: false, detail: `${k} must be a string ≤ ${f.max}` }; break;
+      case 'string':
+        if (typeof v !== 'string' || v.length > f.max) return { ok: false, detail: `${k} must be a string ≤ ${f.max}` };
+        // `lines`: a text shown on a fixed face (a neon sign's two tube rows) refuses more lines than it can show
+        if (f.lines !== undefined && v.split(/\r\n|\r|\n/).length > f.lines) return { ok: false, detail: `${k} must be at most ${f.lines} lines` };
+        break;
       case 'enum': if (typeof v !== 'string' || !f.values.includes(v)) return { ok: false, detail: `${k} must be one of ${f.values.join(', ')}` }; break;
       case 'color': if (typeof v !== 'string' || !/^#[0-9a-f]{6}$/.test(v)) return { ok: false, detail: `${k} must be #rrggbb` }; break;
       case 'ref': if (typeof v !== 'string') return { ok: false, detail: `${k} must be an id` }; break;

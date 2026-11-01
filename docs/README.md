@@ -12,6 +12,7 @@ The code is the authority. When a doc and the code disagree, the code wins: fix 
 | change the server API or protocol | [API](architecture/api.md), [protocol](architecture/protocol.md), [contracts](architecture/contracts.md) |
 | work on Souls or the Soul client | [Souls at the edge](architecture/souls.md) |
 | work on god mode | [god mode](architecture/godmode.md), [safety](architecture/safety.md) |
+| know what Souls do by hand (lamps, doors, water, carrying, boards, music, play, tea) | [Soul Actions](architecture/soul-actions.md) |
 | work on worlds or the launcher | [worlds](architecture/worlds.md), [data](architecture/data.md), [load](architecture/load.md), [split](architecture/split.md) |
 | touch an engine | [engine contract](architecture/engine-contract.md), the [Mars engine docs](mars/README.md) |
 | touch model calls or the budget | [brain](architecture/brain.md) |
@@ -28,7 +29,7 @@ The code is the authority. When a doc and the code disagree, the code wins: fix 
   - [architecture/](architecture/): [map](architecture/map.md), [api](architecture/api.md), [protocol](architecture/protocol.md),
     [engine contract](architecture/engine-contract.md), [brain](architecture/brain.md), [data](architecture/data.md),
     [worlds](architecture/worlds.md), [souls](architecture/souls.md), [god mode](architecture/godmode.md),
-    [contracts](architecture/contracts.md), [load](architecture/load.md), [split](architecture/split.md), [safety](architecture/safety.md)
+    [contracts](architecture/contracts.md), [load](architecture/load.md), [split](architecture/split.md), [Soul Actions](architecture/soul-actions.md), [safety](architecture/safety.md)
 - [glossary.md](glossary.md)
 - [development.md](development.md): setup, environment variables, local worlds, media
 - [testing.md](testing.md): unit tests, gates, e2e, playtests, proof tiers

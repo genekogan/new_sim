@@ -25,6 +25,9 @@ import {centroid, type PlaceIndex} from './places.ts';
 import {tokens} from './vocabulary.ts';
 import type {SpotsData} from './activities.ts';
 import {menuStats, cpuNow} from './menu-stats.ts';
+import {RPS, RPS_SHAPES, isRpsShape, rpsResult, type RpsShape} from '../../../../../mars/viewer/engine/social/rps.ts';
+import {HAND_GAP} from '../../../../../mars/viewer/engine/social/hand-hold.ts';
+import {HANDOVER_GAP} from '../../../../../mars/viewer/engine/items/handover.ts';
 
 type V2 = [number, number];
 type Steps = Program['steps'];
@@ -34,12 +37,16 @@ export type TogetherPlan = {label: string; steps: Steps; seconds?: boolean;
 type Tag =
   | {kind: 'paired'; what: Paired; guest: string; approach?: boolean}
   | {kind: 'give'; guest: string; item: string; approach?: boolean}
+  /** entry 41: hand a held world thing (an opted-in lantern, bowl) to a Soul, hand to hand, if they accept */
+  | {kind: 'hand-over'; guest: string; item: string; name: string; approach?: boolean}
   | {kind: 'accept'; invite: string}
   | {kind: 'decline'; invite: string}
+  | {kind: 'withdraw'; invite: string}
+  | {kind: 'let-go'}
   | {kind: 'follow'; target: string}
   | {kind: 'unfollow'; follower: string}
   | {kind: 'item'; op: 'pick-up' | 'put-down' | 'consume'; item?: string; source?: string; itemKind?: string};
-export type Paired = 'hug' | 'high-five' | 'handshake' | 'dance-with';
+export type Paired = 'hug' | 'high-five' | 'handshake' | 'dance-with' | 'rps' | 'hold-hands';
 export type ItemKind = 'book' | 'flower' | 'cup' | 'food' | 'letter' | 'tool' | 'frisbee';
 
 /** Paired gestures: pose id, distance between body points (m), seconds, invitation lapse (s). */
@@ -48,7 +55,14 @@ export const PAIRED: Record<Paired, {activity: string; gap: number; seconds: num
   'high-five': {activity: 'high-five', gap: 0.75, seconds: 2.5, lapse: 30, ask: 'a high five', label: n => `High-five ${n} (asks first)`},
   handshake: {activity: 'handshake', gap: 0.85, seconds: 3.5, lapse: 30, ask: 'a handshake', label: n => `Shake hands with ${n} (asks first)`},
   'dance-with': {activity: 'dance', gap: 1.0, seconds: 60, lapse: 45, ask: 'a dance', label: n => `Dance with ${n}, facing each other (asks first)`},
+  // entry 35 (packet 44): a game of rock-paper-scissors face to face at arm's length; each throw is chosen alone and kept by
+  // the world until "shoot" (params.shape here, and with the acceptance); the world says who won
+  rps: {activity: 'rps', gap: 1.0, seconds: RPS.SECONDS, lapse: 30, ask: 'a game of rock-paper-scissors', label: n => `Play rock-paper-scissors with ${n} (asks first; choose your throw in shape: rock, paper or scissors, kept hidden until "shoot")`},
+  // entry 35: holding hands, side by side; walks together until either lets go (hand_hold_v1, not a pose)
+  'hold-hands': {activity: 'hold-hands', gap: HAND_GAP, seconds: 0, lapse: 30, ask: 'a hand to hold', label: n => `Offer ${n} your hand to hold (asks first; then you walk together hand in hand until either of you lets go)`},
 };
+const SHAPE_PARAM = {shape: {type: 'string', enum: [...RPS_SHAPES], description: 'your throw: rock, paper or scissors (the world keeps it hidden until "shoot")'}};
+const SHAPE_REFUSAL = {code: 'rps.choose', reason: 'Choose your throw first: {"shape": "rock"}, "paper" or "scissors". The world keeps it hidden until "shoot".'};
 /** Solo gestures (overlay poses): seconds, whether it can be done seated. */
 export const SOLO: Record<string, {seconds: number; seated: boolean; label: string}> = {
   bow: {seconds: 2.5, seated: false, label: 'Bow (params.to: someone to bow to)'},
@@ -105,11 +119,17 @@ export type Invite = {id: string; what: string; host: {soulId: string; name: str
   /** F1 (2026-10-20): where the host will stand for a paired gesture or hand-over (its meet spot, or where it already
    *  stood), or the destination of an invited activity, so a guest who accepts while the host is still walking there
    *  plans against that spot, not the moving body. */
-  meetAt?: V2; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null};
+  meetAt?: V2; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null;
+  /** entry 35: rock-paper-scissors throws, kept by the world (never shown to the other before "shoot"), and who was told. */
+  rps?: {host?: RpsShape; guest?: RpsShape; told?: string[]};
+  /** entry 35: the hand an offerer holds out (hold-hands). */
+  hand?: 'left' | 'right';
+  /** entry 41: the world thing a hand-over passes (what = 'hand-over'; custody is the engine's, never this table's). */
+  thing?: {id: string; name: string}};
 export type Item = {id: string; kind: ItemKind; name: string; holder: string | null; placeId: string | null; at: V2 | null; state: 'held' | 'placed' | 'gone'; claimedBy: string | null; by: string | null; createdAt: number; placedAt: number | null};
 type ItemOp = {soulId: string; op: 'pick-up' | 'put-down' | 'consume' | 'give' | 'take'; item?: string; kind?: ItemKind; source?: string; to?: string; invite?: string};
 /** SOCIAL-APPROACH: the act waiting at the end of a walk over to its partner (its pose steps, params, label). */
-type Approach = {tag: Extract<Tag, {kind: 'paired' | 'give'}>; capability: string; label: string; act: Steps; params: Record<string, unknown>; untilTick: number};
+type Approach = {tag: Extract<Tag, {kind: 'paired' | 'give' | 'hand-over'}>; capability: string; label: string; act: Steps; params: Record<string, unknown>; untilTick: number};
 type Follow = {receipt: string; soulId: string; target: string; untilTick: number; withHost?: string};
 
 /** What the ledger lends this module (closures over its internals). */
@@ -293,9 +313,16 @@ export class Together {
     const seated = this.seated(soul.entityId), aloft = this.p.aboard(soul.entityId);
     // invitations to me lead (accept / decline)
     for (const inv of this.invitesFor(soul.soulId)) {
-      add({id: 'accept:' + inv.id, verb: 'accept', label: `Accept: ${inv.host.name} ${inv.label} (${Math.max(0, Math.round((inv.expiresTick - this.tick) / 20))} s left)`, target: {id: inv.host.soulId, kind: 'soul'}, available: true}, {label: 'Accept the invitation', steps: [], together: {kind: 'accept', invite: inv.id}});
+      add({id: 'accept:' + inv.id, verb: 'accept', label: `Accept: ${inv.host.name} ${inv.label} (${Math.max(0, Math.round((inv.expiresTick - this.tick) / 20))} s left)${inv.what === 'rps' ? '; choose your throw in shape' : ''}`, target: {id: inv.host.soulId, kind: 'soul'}, available: true, ...(inv.what === 'rps' ? {params: SHAPE_PARAM} : {})}, {label: 'Accept the invitation', steps: [], together: {kind: 'accept', invite: inv.id}});
       add({id: 'decline:' + inv.id, verb: 'decline', label: `Decline ${inv.host.name}'s invitation (${inv.what})`, target: {id: inv.host.soulId, kind: 'soul'}, available: true}, {label: 'Decline the invitation', steps: [], together: {kind: 'decline', invite: inv.id}});
     }
+    // entry 35: my own open offers of a hand or a game can be withdrawn; joined hands can be let go
+    for (const inv of this.pending()) if (inv.host.soulId === soul.soulId && (inv.what === 'rps' || inv.what === 'hold-hands' || inv.what === 'hand-over') && !Object.values(inv.responses).includes('accepted')) {
+      const to = inv.guests.map(g => this.mindOf(g.soulId)?.name ?? g.name).join(', ');
+      add({id: 'withdraw:' + inv.id, verb: 'withdraw', label: `Withdraw your offer to ${to} (${inv.what === 'rps' ? 'rock-paper-scissors' : inv.what === 'hand-over' ? `the ${inv.thing?.name ?? 'thing'}` : 'your hand'})`, target: {id: inv.guests[0].soulId, kind: 'soul'}, available: true}, {label: 'Withdraw the offer', steps: [], together: {kind: 'withdraw', invite: inv.id}});
+    }
+    const hands = this.handsWith(soul.entityId);
+    if (hands) add({id: 'let-go:here', verb: 'let-go', label: `Let go of ${hands.name}'s hand`, target: {id: hands.soulId, kind: 'soul'}, available: true}, {label: `Let go of ${hands.name}'s hand`, steps: [{verb: 'mars:hand_hold_v1', params: {mode: 'release'}}], together: {kind: 'let-go'}});
     const held = this.heldBy(soul.soulId), mine = this.followingOf(soul.soulId);
     for (const o of this.p.perceived(soul.soulId, INVITE_RADIUS)) {
       if (this.p.faded(o.soulId)) continue;
@@ -345,10 +372,24 @@ export class Together {
    *  first (follow-style legs that track a moving partner) and asks once it is there, never "not nearby". */
   private socialCaps(soul: EdgeSoul, o: {soulId: string; name: string; entityId: string; distance: number}, busy: string | null, aloft: unknown, held: Item | null | undefined, add: (c: EdgeCapability, plan: TogetherPlan) => void) {
     const far = o.distance > GESTURE_RADIUS, then = far ? ' (walks over to them first, then asks)' : '';
+    const mineHands = this.handsWith(soul.entityId);
     for (const g of Object.keys(PAIRED) as Paired[]) {
-      const def = PAIRED[g], blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : aloft ? {code: 'ride.aboard', reason: 'Not while riding.'} : null;
-      add({id: `${g}:${o.soulId}`, verb: g, label: far ? def.label(o.name).replace(/ \(.*\)$/, '') + then : def.label(o.name), target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {}), ...(g === 'dance-with' ? {params: {seconds: {type: 'integer', min: 5, max: 600, default: 60}}} : {})},
-        {label: def.label(o.name).replace(/ \(.*\)$/, ''), seconds: g === 'dance-with', steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose(def.activity, def.seconds, {gap: def.gap, waitSeconds: 45, alone: 'fail', clear: true})], together: {kind: 'paired', what: g, guest: o.soulId, ...(far ? {approach: true} : {})}});
+      const def = PAIRED[g];
+      // entry 35: holding hands needs free hands on both sides (an item in the hand, or someone else's hand, comes first)
+      const handsBusy = g === 'hold-hands' ? (mineHands ? {code: 'hands.holding', reason: mineHands.soulId === o.soulId ? `You are already holding ${o.name}'s hand.` : `You are holding ${mineHands.name}'s hand; let go first.`} : held ? {code: 'hands.full', reason: `You are holding ${held.name}; put it down first.`} : this.heldBy(o.soulId) ? {code: 'hands.full', reason: `${o.name}'s hands are full.`} : this.handsWith(o.entityId) ? {code: 'gesture.partner-unavailable', reason: `${o.name} is holding someone's hand.`} : null) : null;
+      const blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : aloft ? {code: 'ride.aboard', reason: 'Not while riding.'} : handsBusy;
+      const steps: Steps = g === 'hold-hands'
+        ? [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, {verb: 'mars:hand_hold_v1', params: {mode: 'join', partner: o.entityId, offer: true, waitSeconds: def.lapse + 5}}]
+        : [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose(def.activity, def.seconds, {gap: def.gap, waitSeconds: 45, alone: 'fail', clear: true})];
+      add({id: `${g}:${o.soulId}`, verb: g, label: far ? def.label(o.name).replace(/ \(.*\)$/, '') + then : def.label(o.name), target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {}), ...(g === 'dance-with' ? {params: {seconds: {type: 'integer', min: 5, max: 600, default: 60}}} : g === 'rps' ? {params: SHAPE_PARAM} : {})},
+        {label: def.label(o.name).replace(/ \(.*\)$/, ''), seconds: g === 'dance-with', steps, together: {kind: 'paired', what: g, guest: o.soulId, ...(far ? {approach: true} : {})}});
+    }
+    // entry 41: a held world thing that opted in to hand-to-hand transfer (the lantern, the bowl) is handed over, not dropped
+    const thing = held ? null : this.thingIn(soul.entityId);
+    if (thing) {
+      const blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : aloft ? {code: 'ride.aboard', reason: 'Not while riding.'} : this.handsFull(o.soulId, o.entityId) ? {code: 'hands.full', reason: `${o.name}'s hands are full.`} : null;
+      add({id: 'give:' + o.soulId, verb: 'give', label: `Give ${o.name} the ${thing.name} you are holding: ${far ? 'walks over to them first, then ' : ''}hold it out for them to take (they accept or decline)`, target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {})},
+        {label: `Give ${o.name} the ${thing.name}`, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: HANDOVER_GAP}}, {verb: 'mars:hand_over_v1', params: {mode: 'offer', partner: o.entityId, item: thing.id, waitSeconds: 40}}], together: {kind: 'hand-over', guest: o.soulId, item: thing.id, name: thing.name, ...(far ? {approach: true} : {})}});
     }
     if (held) {
       const blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : this.heldBy(o.soulId) ? {code: 'hands.full', reason: `${o.name}'s hands are full.`} : null;
@@ -436,6 +477,8 @@ export class Together {
    *  No side effects here (a refusal later in act leaves nothing behind). */
   prepare(soul: EdgeSoul, cap: EdgeCapability, plan: TogetherPlan, params: Record<string, unknown>, steps: Steps): {code: string; reason: string; did_you_mean?: {id: string; label: string}[]} | {steps: Steps; label?: string; commit?: (receipt: string) => void; noBody?: boolean} {
     const tag = plan.together;
+    // entry 41: a hand-over of a held world thing: walk to stand facing them, hold it out, wait for their answer
+    if (tag?.kind === 'hand-over') return this.prepareHandOver(soul, cap, plan, params, steps, tag);
     // an earlier invitation of mine that this act replaces is withdrawn when its receipt ends (onReceipt)
     if (tag?.kind === 'paired' || tag?.kind === 'give') {
       const g = this.mindOf(tag.guest), gb = g ? this.p.body(g.entityId) : undefined, me = this.p.body(soul.entityId);
@@ -458,16 +501,26 @@ export class Together {
       if (tag.kind === 'give' && (!held || held.id !== tag.item)) return {code: 'hands.empty', reason: 'You are not holding that any more.'};
       const id = 'inv_' + randomUUID().slice(0, 12), def = tag.kind === 'paired' ? PAIRED[tag.what] : null;
       const seconds = tag.kind === 'paired' && tag.what === 'dance-with' && Number.isInteger(params.seconds) ? params.seconds as number : def?.seconds ?? 2.5;
-      // walk to a spot facing them with nothing between (never across a fire or a bench)
-      const meet = tag.kind === 'give' ? this.handSteps(soul.entityId, g.entityId) : this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
+      // entry 35: a game needs my throw now (kept by the world); a hand needs both hands free
+      const shape = tag.kind === 'paired' && tag.what === 'rps' ? params.shape : undefined;
+      if (tag.kind === 'paired' && tag.what === 'rps' && !isRpsShape(shape)) return SHAPE_REFUSAL;
+      const holding = tag.kind === 'paired' && tag.what === 'hold-hands';
+      if (holding && this.handsWith(soul.entityId)) return {code: 'hands.holding', reason: `You are holding ${this.handsWith(soul.entityId)!.name}'s hand; let go first.`};
+      if (holding && this.heldBy(soul.soulId)) return {code: 'hands.full', reason: `You are holding ${this.heldBy(soul.soulId)!.name}; put it down first.`};
+      // walk to a spot facing them with nothing between (never across a fire or a bench); a hand: a spot beside them
+      const beside = holding ? this.besideSteps(soul.entityId, g.entityId) : null;
+      if (holding && !beside) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now; try again somewhere roomier.`, did_you_mean: [{id: 'go-near:' + g.soulId, label: `Go near ${g.name}`}]};
+      const meet = beside ? beside.steps : tag.kind === 'give' ? this.handSteps(soul.entityId, g.entityId) : this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`, did_you_mean: [{id: 'go-near:' + g.soulId, label: `Go near ${g.name}`}]};
       const out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? meet : [s]);
-      const meetAt: V2 = meet[0].verb === 'walk_to' ? meet[0].params.to as V2 : [r2(me.pose.p[0]), r2(me.pose.p[2])];
-      for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;if(tag.kind==='paired')s.params.pairedPolicy='ready-v1';}
+      const meetAt: V2 = meet[0]?.verb === 'walk_to' ? meet[0].params.to as V2 : [r2(me.pose.p[0]), r2(me.pose.p[2])];
+      for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;if(tag.kind==='paired')s.params.pairedPolicy='ready-v1';if(shape)s.params.throw=shape;}
+      for (const s of out) if (s.verb === 'mars:hand_hold_v1') {s.params.group = id; s.params.hand = beside!.hand;}
       return {steps: out, commit: receipt => {
         const inv: Invite = {id, what: tag.kind === 'paired' ? tag.what : 'give', kind: tag.kind, host: {soulId: soul.soulId, name: soul.name}, guests: [{soulId: g.soulId, name: g.name}], capability: cap.id,
           ...(tag.kind==='paired'?{pairedPolicy:'ready-v1' as const}:{}), meetAt, label: tag.kind === 'paired' ? `offers you ${def!.ask}` : `wants to give you ${held!.name}`, activity: def?.activity ?? 'take', seconds, gap: def?.gap ?? 0.8, ...(held ? {item: {id: held.id, kind: held.kind, name: held.name}, prop: held.kind} : {}),
-          createdTick: this.tick, expiresTick: this.tick + (def?.lapse ?? 30) * 20, state: 'pending', responses: {}, hostReceipt: receipt, guestReceipts: {}};
+          createdTick: this.tick, expiresTick: this.tick + (def?.lapse ?? 30) * 20, state: 'pending', responses: {}, hostReceipt: receipt, guestReceipts: {},
+          ...(isRpsShape(shape) ? {rps: {host: shape}} : {}), ...(beside ? {hand: beside.hand} : {})};
         this.saveInvite(inv); this.announce(inv);
         if (held) this.saveOp(receipt, {soulId: soul.soulId, op: 'give', item: held.id, to: g.soulId, invite: id});
       }};
@@ -483,6 +536,17 @@ export class Together {
     if (tag?.kind === 'unfollow') {
       const f = this.followingOf(tag.follower); if (!f || f.target !== soul.soulId) return {code: 'follow.none', reason: 'They are not following you.'};
       return {steps: [], noBody: true, commit: () => {this.endFollow(f, 'failed', 'follow.asked-to-stop', `${soul.name} asked you to stop following.`);}};
+    }
+    if (tag?.kind === 'withdraw') {
+      const inv = this.invite(tag.invite); if (!inv || inv.state !== 'pending' || inv.host.soulId !== soul.soulId || Object.values(inv.responses).includes('accepted')) return {code: 'invite.gone', reason: 'That offer is no longer open.'};
+      return {steps: [], noBody: true, commit: () => {
+        for (const g of inv.guests) if (!inv.responses[g.soulId]) {inv.responses[g.soulId] = 'cancelled'; this.p.deliver(g.soulId, 'invite.withdrawn', {invite: {id: inv.id, what: inv.what}, from: inv.host, text: `${soul.name} withdrew the offer (${inv.what === 'rps' ? 'rock-paper-scissors' : inv.what === 'hand-over' ? `the ${inv.thing?.name ?? 'thing'}` : 'a hand to hold'}).`, untrusted: true});}
+        inv.state = 'closed'; this.saveInvite(inv); this.hostAlone(inv, 'invite.withdrawn', 'You withdrew your offer.');
+      }};
+    }
+    if (tag?.kind === 'let-go') {
+      const w = this.handsWith(soul.entityId); if (!w) return {code: 'hands.not-holding', reason: 'You are not holding anyone\'s hand.'};
+      return {steps, commit: () => this.p.deliver(w.soulId, 'hands.released', {from: {soulId: soul.soulId, name: soul.name}, text: `${soul.name} let go of your hand.`, untrusted: true})};
     }
     if (tag?.kind === 'decline') {
       const inv = this.invite(tag.invite); if (!inv || inv.state !== 'pending' || inv.responses[soul.soulId]) return {code: 'invite.gone', reason: 'That invitation is no longer open.'};
@@ -576,7 +640,7 @@ export class Together {
     return near && ownPlans.get(near.c.id);
   }
   /** accept:<invite> → the guest's own plan to join (computed now, from where everyone is). */
-  acceptPlan(soul: EdgeSoul, inviteId: string, ownCaps: EdgeCapability[], ownPlans: Map<string, TogetherPlan>): {code: string; reason: string} | {label: string; steps: Steps; capability: string; ride?: {object: string}; commit: (receipt: string) => void} {
+  acceptPlan(soul: EdgeSoul, inviteId: string, ownCaps: EdgeCapability[], ownPlans: Map<string, TogetherPlan>, params: Record<string, unknown> = {}): {code: string; reason: string} | {label: string; steps: Steps; capability: string; ride?: {object: string}; commit: (receipt: string) => void} {
     const inv = this.invite(inviteId);
     if (!inv || inv.state !== 'pending' || !inv.guests.some(g => g.soulId === soul.soulId) || inv.responses[soul.soulId]) return {code: 'invite.gone', reason: 'That invitation is no longer open.'};
     if(inv.pairedPolicy!==undefined&&inv.pairedPolicy!=='ready-v1')return {code:'gesture.policy-unsupported',reason:'That invitation names an unsupported paired policy.'};
@@ -585,9 +649,23 @@ export class Together {
     const commit = (receipt: string) => this.respond(inv.id, soul, 'accepted', receipt);
     const activityAt: V2 = inv.kind === 'activity' && inv.meetAt ? inv.meetAt : [hb.pose.p[0], hb.pose.p[2]];
     const d = Math.hypot(activityAt[0] - me.pose.p[0], activityAt[1] - me.pose.p[2]), go = (standoff: number): Steps => d > standoff + 0.6 ? [{verb: 'walk_to', params: {to: inv.kind === 'activity' && inv.meetAt ? inv.meetAt : host.entityId, standoff}}] : [{verb: 'wave', params: {at: host.entityId, seconds: 0.2}}];
+    if (inv.what === 'hand-over') return this.acceptHandOver(soul, inv, hb, me, commit);
     if (inv.kind === 'paired' || inv.kind === 'give') {
       if (inv.kind === 'give' && this.heldBy(soul.soulId)) return {code: 'hands.full', reason: `Your hands are full; put down ${this.heldBy(soul.soulId)!.name} first.`};
       if (this.asleep(soul.entityId)) return {code: 'state.asleep', reason: 'Wake up first.'};
+      // entry 35: my own throw, chosen now without seeing theirs; a hand needs free hands
+      if (inv.what === 'rps' && !isRpsShape(params.shape)) return SHAPE_REFUSAL;
+      if (inv.what === 'hold-hands') {
+        if (this.heldBy(soul.soulId)) return {code: 'hands.full', reason: `Your hands are full; put down ${this.heldBy(soul.soulId)!.name} first.`};
+        const other = this.handsWith(soul.entityId); if (other) return {code: 'hands.holding', reason: `You are holding ${other.name}'s hand; let go first.`};
+        // they are still walking over to stand beside me: I wait here for them (walking to meet them as well would cross
+        // their path); beside me already: take the hand; standing apart (I moved): walk to their free side first
+        const coming = hb.human?.handHold?.offered === undefined, near = Math.hypot(hb.pose.p[0] - me.pose.p[0], hb.pose.p[2] - me.pose.p[2]);
+        const side = coming || near <= 1.2 ? null : this.besideSteps(soul.entityId, host.entityId);
+        if (!coming && near > 1.2 && !side) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${inv.host.name} right now; try again in a moment.`};
+        return {label: `Take ${inv.host.name}'s hand`, capability: 'accept:' + inv.id, commit,
+          steps: [...this.standFirst(soul.entityId), ...(side?.steps ?? []), {verb: 'mars:hand_hold_v1', params: {mode: 'join', partner: host.entityId, group: inv.id, waitSeconds: 30}}]};
+      }
       const seatedTake = inv.kind === 'give' && this.seated(soul.entityId);
       // F1: until the host has reached its own meet spot (its grouped pose not yet begun), meet it there; planning against
       // the still-walking body sent the guest across the host's path and could leave a bystander standing between them
@@ -595,8 +673,10 @@ export class Together {
       const meet = seatedTake ? [] : inv.kind === 'give' ? this.handSteps(soul.entityId, host.entityId, hostAt) : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8, hostAt);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${inv.host.name} right now (someone else is standing too close); try again in a moment.`};
       const steps: Steps = [...(seatedTake ? [] : [...this.standFirst(soul.entityId), ...meet]),
-        pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, ...(inv.pairedPolicy?{pairedPolicy:inv.pairedPolicy}:{}), waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
-      return {label: inv.kind === 'give' ? `Take ${inv.item!.name} from ${inv.host.name}` : `${inv.what} with ${inv.host.name}`, steps, capability: 'accept:' + inv.id, commit: receipt => {
+        pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, ...(inv.pairedPolicy?{pairedPolicy:inv.pairedPolicy}:{}), waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {}), ...(inv.what === 'rps' ? {throw: params.shape} : {})})];
+      return {label: inv.kind === 'give' ? `Take ${inv.item!.name} from ${inv.host.name}` : inv.what === 'rps' ? `Play rock-paper-scissors with ${inv.host.name}` : `${inv.what} with ${inv.host.name}`, steps, capability: 'accept:' + inv.id, commit: receipt => {
+        // the guest's throw joins the host's in the world's keeping (neither is shown before "shoot")
+        if (inv.what === 'rps' && isRpsShape(params.shape)) {const fresh = this.invite(inv.id); if (fresh) {fresh.rps = {...fresh.rps, guest: params.shape}; this.saveInvite(fresh);}}
         commit(receipt); if (inv.kind === 'give') this.saveOp(receipt, {soulId: soul.soulId, op: 'take', item: inv.item!.id, invite: inv.id});
       }};
     }
@@ -651,10 +731,89 @@ export class Together {
   /** A pending invitation from `other` to `me` of this paired gesture (doing it back is accepting). */
   reciprocal(me: string, other: string, what: string): Invite | null {return this.invitesFor(me).find(i => i.host.soulId === other && i.what === what) ?? null;}
 
+  // ---------------------------------------------------------------- entry 41: hand-overs of held world things
+  /** How a world names its things (god/held.ts sets it: the thing's own name); else the engine label. */
+  thingName?: (id: string) => string;
+  private thingMemo: {tick: number; map: Map<string, {id: string; name: string} | null>} | null = null;
+  /** The opted-in world thing this body holds (in-hand, recorded item pose: the lantern, the bowl), or null. One scan per
+   *  body per tick (capability listings only; never per tick on their own). */
+  thingIn(entityId: string): {id: string; name: string} | null {
+    if (this.thingMemo?.tick !== this.tick) this.thingMemo = {tick: this.tick, map: new Map()};
+    const memo = this.thingMemo.map; if (memo.has(entityId)) return memo.get(entityId)!;
+    let out: {id: string; name: string} | null = null;
+    for (const x of Object.values(this.w.entities)) if (x.support?.kind === 'in-hand' && x.support.by === entityId && x.tags?.includes('entity-world-item-pose')) {out = {id: x.id, name: this.thingName?.(x.id) ?? String(x.label ?? x.id)}; break;}
+    memo.set(entityId, out); return out;
+  }
+  /** Anything in this body's hands (a ledger item, or any world thing): a hand-over is to free hands only. */
+  private handsFull(soulId: string, entityId: string): boolean {
+    if (this.heldBy(soulId) || this.handsWith(entityId)) return true;
+    for (const x of Object.values(this.w.entities)) if (x.support?.kind === 'in-hand' && x.support.by === entityId) return true;
+    return false;
+  }
+  /** Where the giver stands to hand something over: HANDOVER_GAP in front of the receiver (the way they face, then up to
+   *  45° either side, nearest to the giver), else beside or behind them, with a clear line and room for both; [] when the
+   *  giver already stands about there (the engine settles the last few centimetres and turns). Never at their back while
+   *  a front spot is free (take 1: Ada held the lantern out to Ben's back and he turned half round to take it). */
+  private handOverSteps(me: string, other: string): Steps | null {
+    const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return null;
+    const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
+    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
+    const free = (p: V2) => (e.clearanceAtV1?.(p[0], p[1]) ?? 1) >= 0.34 && people.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) >= 0.8) && this.lineClear(p, at);
+    const off = (p: V2) => Math.abs(Math.atan2(Math.sin(Math.atan2(p[1] - at[1], p[0] - at[0]) - ob.pose.yaw), Math.cos(Math.atan2(p[1] - at[1], p[0] - at[0]) - ob.pose.yaw)));
+    if (Math.abs(d - HANDOVER_GAP) <= 0.15 && off(from) <= Math.PI / 4 + 1e-6 && free(from)) return [];
+    const spots: {p: V2; front: boolean; d: number}[] = [];
+    for (let k = -7; k <= 8; k++) {
+      const ang = ob.pose.yaw + k * Math.PI / 8, p: V2 = [r2(at[0] + Math.cos(ang) * HANDOVER_GAP), r2(at[1] + Math.sin(ang) * HANDOVER_GAP)];
+      if (free(p)) spots.push({p, front: Math.abs(k) <= 2, d: Math.hypot(p[0] - from[0], p[1] - from[1])});
+    }
+    spots.sort((a, b) => Number(b.front) - Number(a.front) || a.d - b.d || a.p[0] - b.p[0] || a.p[1] - b.p[1]);
+    return spots.length ? [{verb: 'walk_to', params: {to: spots[0].p, standoff: 0}}] : null;
+  }
+  private prepareHandOver(soul: EdgeSoul, cap: EdgeCapability, plan: TogetherPlan, params: Record<string, unknown>, steps: Steps, tag: Extract<Tag, {kind: 'hand-over'}>): {code: string; reason: string; did_you_mean?: {id: string; label: string}[]} | {steps: Steps; label?: string; commit?: (receipt: string) => void} {
+    const g = this.mindOf(tag.guest), gb = g ? this.p.body(g.entityId) : undefined, me = this.p.body(soul.entityId);
+    if (!g || !gb || !me || this.p.faded(tag.guest)) return {code: 'gesture.partner-unavailable', reason: 'They are not here any more.'};
+    if (isRigidBody(me) || isRigidBody(gb)) return {code: 'body.unsupported', reason: 'A hand-over needs two humanoid bodies with hands.'};
+    if (this.thingIn(soul.entityId)?.id !== tag.item) return {code: 'hands.empty', reason: 'You are not holding that any more.'};
+    if (this.handsFull(tag.guest, g.entityId)) return {code: 'hands.full', reason: `${g.name}'s hands are full.`};
+    const apart = Math.hypot(gb.pose.p[0] - me.pose.p[0], gb.pose.p[2] - me.pose.p[2]);
+    if (tag.approach && apart > GESTURE_RADIUS) {
+      const act = steps.filter(s => s.verb !== 'stand' && !(s.verb === 'walk_to' && s.params.to === g.entityId)), label = plan.label;
+      return {steps: this.followSteps(soul.entityId, g.entityId, apart), label: `Walk over to ${g.name} (${label.toLowerCase()} on arrival)`, commit: receipt => {
+        this.approaches.set(receipt, {tag, capability: cap.id, label, act, params, untilTick: this.tick + APPROACH_SECONDS * 20});
+        this.p.deliver(soul.soulId, 'world', {text: `${g.name} is ${Math.round(apart)} m away; walking over to them first.`});
+      }};
+    }
+    if (apart > GESTURE_RADIUS + 2) return {code: 'gesture.too-far', reason: `${g.name} is too far away; go near them first.`};
+    const meet = this.handOverSteps(soul.entityId, g.entityId);
+    if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot in front of ${g.name} right now; try again in a moment or somewhere roomier.`, did_you_mean: [{id: 'go-near:' + g.soulId, label: `Go near ${g.name}`}]};
+    const id = 'inv_' + randomUUID().slice(0, 12), out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? meet : [s]);
+    for (const s of out) if (s.verb === 'mars:hand_over_v1') s.params.group = id;
+    const meetAt: V2 = meet[0]?.verb === 'walk_to' ? meet[0].params.to as V2 : [r2(me.pose.p[0]), r2(me.pose.p[2])];
+    return {steps: out, commit: receipt => {
+      const inv: Invite = {id, what: 'hand-over', kind: 'give', host: {soulId: soul.soulId, name: soul.name}, guests: [{soulId: g.soulId, name: g.name}], capability: cap.id, meetAt,
+        label: `wants to give you the ${tag.name}`, thing: {id: tag.item, name: tag.name}, createdTick: this.tick, expiresTick: this.tick + 30 * 20, state: 'pending', responses: {}, hostReceipt: receipt, guestReceipts: {}};
+      this.saveInvite(inv); this.announce(inv);
+    }};
+  }
+  private acceptHandOver(soul: EdgeSoul, inv: Invite, hb: NonNullable<ReturnType<TogetherPort['body']>>, me: NonNullable<ReturnType<TogetherPort['body']>>, commit: (receipt: string) => void): {code: string; reason: string} | {label: string; steps: Steps; capability: string; commit: (receipt: string) => void} {
+    const host = this.mindOf(inv.host.soulId)!, thing = inv.thing!;
+    if (this.asleep(soul.entityId)) return {code: 'state.asleep', reason: 'Wake up first.'};
+    if (this.handsFull(soul.soulId, soul.entityId)) return {code: 'hands.full', reason: 'Your hands are full; put down what you are holding first.'};
+    const x = this.w.entities[thing.id];
+    if (x?.support?.kind !== 'in-hand' || x.support.by !== host.entityId) return {code: 'invite.gone', reason: `${inv.host.name} is not holding the ${thing.name} any more.`};
+    // the giver comes to stand in front of me; if I have walked off, I go back to them first
+    const d = Math.hypot(hb.pose.p[0] - me.pose.p[0], hb.pose.p[2] - me.pose.p[2]), coming = !hb.human?.itemTransferV1;
+    const go: Steps = !coming && d > HANDOVER_GAP + 0.5 ? [{verb: 'walk_to', params: {to: host.entityId, standoff: HANDOVER_GAP}}] : [];
+    return {label: `Take the ${thing.name} from ${inv.host.name}`, capability: 'accept:' + inv.id, commit,
+      steps: [...this.standFirst(soul.entityId), ...go, {verb: 'mars:hand_over_v1', params: {mode: 'receive', partner: host.entityId, item: thing.id, group: inv.id, waitSeconds: 40}}]};
+  }
+
   // ---------------------------------------------------------------- receipts, follows, time
   /** Receipt phase changes (live): items change hands, invitations close with their host's act, follows end. */
   onReceipt(r: EdgeReceipt) {
     if (r.phase === 'started' || r.phase === 'waiting') return;
+    if (r.phase === 'completed') this.tellRps(r);
     const op = this.takeOp(r.id);
     if (op) this.applyOp(op, r);
     if (this.follows.has(r.id)) this.dropFollow(r.id);
@@ -667,6 +826,76 @@ export class Together {
     }
   }
   private dropPlace(soulId: string) {return this.p.innermostPlace(soulId) ?? 'world';}
+
+  // ---------------------------------------------------------------- entry 35: rock-paper-scissors and holding hands
+  /** The world's verdict on a finished game, from this Soul's side (null until both throws are in). */
+  rpsVerdict(inv: Invite, soulId: string): {mine: RpsShape; theirs: RpsShape; other: string; result: 'win' | 'lose' | 'draw'; text: string} | null {
+    if (inv.what !== 'rps' || !inv.rps?.host || !inv.rps.guest) return null;
+    const host = inv.host.soulId === soulId, mine = host ? inv.rps.host : inv.rps.guest, theirs = host ? inv.rps.guest : inv.rps.host;
+    const other = host ? (this.mindOf(inv.guests[0].soulId)?.name ?? inv.guests[0].name) : (this.mindOf(inv.host.soulId)?.name ?? inv.host.name), result = rpsResult(mine, theirs);
+    return {mine, theirs, other, result, text: `Rock, paper, scissors, shoot! You threw ${mine}; ${other} threw ${theirs}. ${result === 'win' ? 'You win.' : result === 'lose' ? `${other} wins.` : 'A draw.'}`};
+  }
+  /** Each player hears the result when their own game ends (after the throw has been seen). */
+  private tellRps(r: EdgeReceipt) {
+    const inv = this.inviteForReceipt(r.id); if (!inv || inv.what !== 'rps') return;
+    const v = this.rpsVerdict(inv, r.soulId); if (!v || inv.rps?.told?.includes(r.soulId)) return;
+    inv.rps = {...inv.rps, told: [...(inv.rps?.told ?? []), r.soulId]}; this.saveInvite(inv);
+    this.p.deliver(r.soulId, 'rps.result', {text: v.text, you: v.mine, them: v.theirs, result: v.result});
+  }
+  /** The Soul whose hand this body holds (joined, not letting go), or null. */
+  handsWith(entityId: string): {soulId: string; name: string; entityId: string} | null {
+    const h = this.p.body(entityId)?.human?.handHold; if (!h || h.since === undefined || h.release !== undefined) return null;
+    const m = this.p.host.mindByEntity?.get(h.with) as {soulId: string; name: string} | undefined;
+    return m ? {soulId: m.soulId, name: m.name, entityId: h.with} : null;
+  }
+  /** A spot beside a Soul (side by side, facing the way they face) for holding hands, nearest to me, clear of things and
+   *  people; the hand I hold out is the inner one. Null when no side is free. */
+  besideSteps(me: string, other: string): {steps: Steps; hand: 'left' | 'right'} | null {
+    const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return null;
+    const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
+    const y = ob.pose.yaw, r: V2 = [-Math.sin(y), Math.cos(y)], from: V2 = [mb.pose.p[0], mb.pose.p[2]];
+    const spots = [1, -1].map(s => ({s, p: [r2(ob.pose.p[0] + r[0] * s * HAND_GAP), r2(ob.pose.p[2] + r[1] * s * HAND_GAP)] as V2}))
+      .filter(({p}) => (e.clearanceAtV1?.(p[0], p[1]) ?? 1) >= 0.34 && people.every(q => Math.hypot(q[0] - p[0], q[1] - p[1]) >= 0.8) && this.lineClear(p, [ob.pose.p[0], ob.pose.p[2]]))
+      .sort((a, b) => Math.hypot(a.p[0] - from[0], a.p[1] - from[1]) - Math.hypot(b.p[0] - from[0], b.p[1] - from[1]) || b.s - a.s);
+    const best = spots[0]; if (!best) return null;
+    // on their right (s = +1) I hold out my left hand; on their left, my right
+    const hand = best.s > 0 ? 'left' : 'right', d = Math.hypot(best.p[0] - from[0], best.p[1] - from[1]);
+    return {hand, steps: d > 0.05 ? [{verb: 'walk_to', params: {to: best.p, standoff: 0}}] : []};
+  }
+  /**
+   * Before any act of a Soul holding hands (ledger.decide): a plain walk becomes a walk together (the pair turns
+   * together toward the goal, then walks at a stroll with the other beside); anything else (or any act of the one being
+   * led) lets go first. Returns the steps to perform and whom to tell.
+   */
+  holdingSteps(soul: EdgeSoul, capability: string, steps: Steps): Steps {
+    const w = this.handsWith(soul.entityId); if (!w) return steps;
+    if (capability === 'let-go:here' || /^(?:accept|decline|withdraw):/.test(capability) && !steps.length || steps.some(s => s.verb === 'mars:hand_hold_v1')) return steps;
+    const partner = this.p.body(w.entityId), led = !!partner?.human?.task && (this.p.host.engine as unknown as {runtime?: {records: Map<string, {verb: string}>}}).runtime?.records.get(partner.human.task)?.verb === 'walk_to';
+    const travel = steps.length > 0 && steps.every(s => ['stand', 'walk_to', 'wave', 'face', 'rest'].includes(s.verb)) && steps.some(s => s.verb === 'walk_to') && steps.every(s => s.verb !== 'walk_to' || !s.params.gait || s.params.gait === 'walk');
+    if (travel && !led) {
+      const firstWalk = steps.find(s => s.verb === 'walk_to')!, to = firstWalk.params.to, toward = this.pointOfTo(to);
+      this.p.deliver(w.soulId, 'hands.walk', {from: {soulId: soul.soulId, name: soul.name}, text: `${soul.name} walks on with you, hand in hand. (Let go any time: let-go:here.)`, untrusted: true});
+      return [...(toward ? [{verb: 'mars:hand_hold_v1', params: {mode: 'turn', toward}}] : []), ...steps.filter(s => s.verb === 'walk_to' || s.verb === 'rest').map(s => s.verb === 'walk_to' ? {...s, params: {...s.params, pace: 'together'}} : s)];
+    }
+    this.p.deliver(w.soulId, 'hands.released', {from: {soulId: soul.soulId, name: soul.name}, text: `${soul.name} let go of your hand to do something else.`, untrusted: true});
+    return [{verb: 'mars:hand_hold_v1', params: {mode: 'release'}}, ...steps];
+  }
+  private pointOfTo(to: unknown): V2 | null {
+    if (Array.isArray(to) && to.length === 2 && to.every(Number.isFinite)) return [to[0], to[1]];
+    if (typeof to !== 'string') return null;
+    const e = this.w.entities[to]; if (e) return [e.pose.p[0], e.pose.p[2]];
+    const place = this.p.places.byId.get(to); return place?.polygon?.length ? centroid(place.polygon) : null;
+  }
+  /** The one line an offeree sees for a pending offer of a game or a hand, and the line a held hand shows. */
+  handLines(soul: EdgeSoul): {offer?: string; hands?: string} {
+    const out: {offer?: string; hands?: string} = {};
+    const inv = this.invitesFor(soul.soulId).filter(i => i.what === 'rps' || i.what === 'hold-hands' || i.what === 'hand-over').at(-1);
+    if (inv) out.offer = inv.what === 'hand-over' ? `${inv.host.name} holds out the ${inv.thing?.name ?? 'thing'} for you: accept or decline (${Math.max(0, Math.round((inv.expiresTick - this.tick) / 20))} s)`
+      : `${inv.host.name} offers you ${PAIRED[inv.what as Paired].ask}: accept${inv.what === 'rps' ? ' with your throw' : ''} or decline (${Math.max(0, Math.round((inv.expiresTick - this.tick) / 20))} s)`;
+    const w = this.handsWith(soul.entityId); if (w) out.hands = `holding hands with ${w.name}`;
+    return out;
+  }
   private applyOp(op: ItemOp, r: EdgeReceipt) {
     const done = r.phase === 'completed', m = this.mindOf(op.soulId), b = m ? this.p.body(m.entityId) : undefined;
     const it = op.item ? this.item(op.item) : null;
@@ -832,15 +1061,42 @@ export class Together {
       const o = named.length ? null : who(acc[1]), i = named.at(-1) ?? (o ? mine.filter(x => x.host.soulId === o.soulId).at(-1) : undefined);
       if (i) return {capability: 'accept:' + i.id, note: `accepting ${i.host.name}'s invitation (${i.what})`};
     }
+    // entry 35: hands and games in plain words. "take her hand" / "hold Ada's hand" answers an offered hand; with none
+    // offered, "hold hands with Bea" / "offer Bea my hand" offers mine; "let go (of her hand)"; "withdraw my offer";
+    // "play rock-paper-scissors with Bea" (the throw in params.shape)
+    const handOffer = (from?: string) => {const o = from ? who(from) : null; return mine.filter(x => x.what === 'hold-hands' && (!o || x.host.soulId === o.soulId)).at(-1);};
+    const take = /^(?:take|hold|grab|accept|clasp)\s+(?:(?:her|his|their|the)\s+hand|(.+?)['’]s\s+hand|hands?\s+with\s+(.+)|(.+?)\s+by\s+the\s+hand)$/.exec(t);
+    if (take) {const from = take[1] ?? take[2] ?? take[3], i = handOffer(from); if (i) return {capability: 'accept:' + i.id, note: `taking ${i.host.name}'s hand`};}
+    const offerHand = /^(?:offer|give|hold\s+out)\s+(?:my\s+hand\s+to\s+(.+)|(.+?)\s+(?:my|a)\s+hand(?:\s+to\s+hold)?)$/.exec(t) ?? /^(?:hold|take|grab)\s+(?:hands\s+with\s+(.+)|(.+?)['’]s\s+hand)$/.exec(t) ?? /^(?:ask\s+(.+?)\s+to\s+hold\s+hands|hold\s+hands\s+with\s+(.+))$/.exec(t);
+    if (offerHand) {
+      const name = (offerHand[1] ?? offerHand[2] ?? '').trim();
+      const o = name ? who(name) : null; if (!o) return name ? walkOver('hold-hands', name) ?? notHere('hold hands', name) : null;
+      const back = this.reciprocal(soul.soulId, o.soulId, 'hold-hands'); if (back) return {capability: 'accept:' + back.id, note: `${o.name} already offered a hand; taking it`};
+      const c = capFor('hold-hands', o); if (!c) return tooFar('hold hands', o);
+      return {capability: c.id, note: `${raw} is ${c.id}`};
+    }
+    if (/^(?:let\s+go|release|drop|let\s+go\s+of\s+(?:(?:her|his|their|the|my)\s+)?hands?|let\s+go\s+of\s+.+?(?:['’]s\s+hand)?|let\s+(?:her|his|their|.+?['’]s)\s+hand\s+go|stop\s+holding\s+hands(?:\s+with\s+.+)?|release\s+(?:her|his|their|.+?['’]s)\s+hand|drop\s+(?:her|his|their|.+?['’]s)\s+hand)$/.test(t) && caps.some(c => c.id === 'let-go:here'))
+      return {capability: 'let-go:here', note: `${raw} is let-go:here`};
+    if (/^(?:withdraw|take\s+back|cancel|retract)\s+(?:my|the)\s+(?:offer|invitation|hand)(?:\s+to\s+.+)?$/.test(t)) {
+      const c = caps.filter(c => c.verb === 'withdraw').at(-1); if (c) return {capability: c.id, note: `${raw} is ${c.id}`};
+      return {code: 'invite.none', reason: 'You have no open offer to withdraw.', did_you_mean: []};
+    }
+    const rps = /^(?:play\s+)?(?:a\s+(?:game|round)\s+of\s+)?(?:rock[-\s,]*paper[-\s,]*scissors?|rps|roshambo)\s+(?:with|against)\s+(.+)$/.exec(t) ?? /^(?:challenge|ask)\s+(.+?)\s+(?:to\s+)?(?:a\s+game\s+of\s+)?(?:play\s+)?(?:rock[-\s,]*paper[-\s,]*scissors?|rps)$/.exec(t);
+    if (rps) {
+      const name = rps[1].trim(), o = who(name); if (!o) return walkOver('rps', name) ?? notHere('play rock-paper-scissors', name);
+      const back = this.reciprocal(soul.soulId, o.soulId, 'rps'); if (back) return {capability: 'accept:' + back.id, note: `${o.name} already offered a game; accepting`};
+      const c = capFor('rps', o); if (!c) return tooFar('play rock-paper-scissors', o);
+      return {capability: c.id, note: `${raw} is ${c.id}`};
+    }
     // "take the book" / "take it" / "take X's flower" while someone offers me an item: accept that hand-over (never a pick-up elsewhere)
     const tk = /^(?:take|accept|receive|grab|get)\s+(?:it|that|this|(?:(.+?)['’]s\s+|the\s+|their\s+|his\s+|her\s+|an?\s+)?(.+?))(?:\s+from\s+(.+))?$/.exec(t);
     if (tk && mine.some(x => x.kind === 'give')) {
       const from = tk[1] ?? tk[3], o = from ? who(from) : undefined, what = tk[2]?.replace(/^(?:the|a|an)\s+/, '');
-      const i = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId) && (!what || x.item?.kind === what || x.item?.name.toLowerCase().includes(what) || what === 'gift' || what === 'offer')).at(-1);
-      if (i) return {capability: 'accept:' + i.id, note: `taking ${i.item?.name ?? 'the item'} ${i.host.name} offers you`};
+      const i = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId) && (!what || x.item?.kind === what || x.item?.name.toLowerCase().includes(what) || !!x.thing && x.thing.name.toLowerCase().includes(what) || what === 'gift' || what === 'offer')).at(-1);
+      if (i) return {capability: 'accept:' + i.id, note: `taking ${i.item?.name ?? (i.thing ? 'the ' + i.thing.name : 'the item')} ${i.host.name} offers you`};
       const askedKind = what ? ITEM_WORDS.find(([, re]) => re.test(' ' + what + ' '))?.[0] : undefined, offered = mine.filter(x => x.kind === 'give' && (!o || x.host.soulId === o.soulId)).at(-1);
       if (!i && offered && askedKind && !caps.some(c => c.verb === 'pick-up' && (c.id === 'pick-up:' + askedKind || this.item(c.target?.id ?? '')?.kind === askedKind)))
-        return {code: 'give.other-item', reason: `${offered.host.name} offers you ${offered.item?.name ?? 'something'}, not ${ITEM_NAMES[askedKind]}.`, did_you_mean: [{id: 'accept:' + offered.id, label: `Accept: take ${offered.item?.name ?? 'it'} from ${offered.host.name}`}, {id: 'decline:' + offered.id, label: 'Decline'}]};
+        return {code: 'give.other-item', reason: `${offered.host.name} offers you ${offered.item?.name ?? (offered.thing ? 'the ' + offered.thing.name : 'something')}, not ${ITEM_NAMES[askedKind]}.`, did_you_mean: [{id: 'accept:' + offered.id, label: `Accept: take ${offered.item?.name ?? 'it'} from ${offered.host.name}`}, {id: 'decline:' + offered.id, label: 'Decline'}]};
     }
     // gestures
     // SOUL3 SOCIAL: "wave to/at <Soul>" keeps its target — wave:<id> walks up and waves facing them (on demand when they
@@ -920,12 +1176,17 @@ export class Together {
     if (held && ((held.kind === 'food' && /^(?:eat|have|finish)\b/.test(t) && (/\b(?:it|this|that|food|snack|bread|apple|cake)\b/.test(t) || t === 'eat')) || (held.kind === 'cup' && /^(?:drink|sip|have|finish)\b/.test(t) && (/\b(?:it|this|that|tea|coffee|cup|drink)\b/.test(t) || t === 'drink'))))
       return {capability: (held.kind === 'food' ? 'eat' : 'drink') + ':held', note: `${raw}: ${held.name} you are holding`};
     const pick = /^(?:pick\s+up|take|grab|get|fetch|collect|pluck|borrow)\s+(?:me\s+)?(?:(?:a|an|some|the|one)\s+)?(.+)$/.exec(t);
-    if (pick && !/^(?:a\s+)?(?:walk|stroll|nap|seat|rest|break|swim|ride|look|dip|turn|picture)/.test(pick[1]) && !/\b(?:read|reading|write|writing)\b/.test(pick[1])) {
+    if (pick && !/^(?:a\s+)?(?:walk|stroll|nap|seat|rest|break|swim|ride|look|dip|turn|picture|down\s|on\s)/.test(pick[1]) && !/\b(?:read|reading|write|writing)\b/.test(pick[1])) {
       const what = pick[1], kind = ITEM_WORDS.find(([, re]) => re.test(' ' + what + ' '))?.[0];
       if (kind) {
         if (held) return {code: 'hands.full', reason: `You are holding ${held.name}; put it down or give it away first.`, did_you_mean: caps.filter(c => c.id === 'put-down:here' || c.verb === 'give').slice(0, 4).map(c => ({id: c.id, label: c.label}))};
         const lying = caps.filter(c => c.verb === 'pick-up' && c.target?.kind === 'item' && this.item(c.target.id)?.kind === kind)[0];
         const c = lying ?? caps.find(c => c.id === 'pick-up:' + kind);
+        // entry 43: a world thing of that word lying near (a god-built mug) when no prop of the kind is: the one called
+        // exactly that first, then one whose name has the word, nearest first (labels end "(N m)")
+        const named = !c ? caps.filter(c => c.verb === 'pick-up' && c.target?.kind === 'item' && /^e_/.test(c.target.id)).map(c => {const n = (c.label.replace(/^Pick up\s+/, '').replace(/\s*\([^)]*\)\s*$/, '').split('/').pop() ?? '').toLowerCase(), d = Number(/\(([\d.]+) m/.exec(c.label)?.[1] ?? 99);
+          const w = what.replace(/^(?:the|a|an|my|that|this)\s+/, '').trim(); return {c, rank: n === w ? 0 : new RegExp(`(^|[^a-z])${w.replace(/[^a-z ]/g, '')}([^a-z]|$)`).test(n) ? 1 : 9, d};}).filter(x => x.rank < 9).sort((a, b) => a.rank - b.rank || a.d - b.d)[0]?.c : undefined;
+        if (!c && named) return {capability: named.id, note: `${raw} is ${named.id} (${named.label})`};
         if (!c) {
           const me = this.posOf(soul.soulId), far = me ? this.sources().filter(s => s.kind === kind && s.place).map(s => ({s, d: Math.hypot(s.at[0] - me[0], s.at[1] - me[1])})).sort((a, b) => a.d - b.d) : [];
           const hit = far.map(f => ({f, w: caps.find(c => c.verb === 'walk' && c.target && (c.target.id === f.s.place || this.p.places.byId.get(f.s.place!)?.parent === c.target.id))})).find(x => x.w), walk = hit?.w;
