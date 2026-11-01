@@ -1,8 +1,7 @@
 # Browser end-to-end checks
 
-Markdown scenarios in `e2e/scenarios/` drive an isolated client fixture in headless Chromium from an explicit
-browser cache, never a signed-in browser profile. Runs write screenshots, page text and a machine-readable summary
-under `.e2e/runs/` (gitignored).
+Markdown scenarios in `e2e/scenarios/` drive the app in headless Chromium from an explicit browser cache, never a
+signed-in browser profile. `e2e/config.mjs` holds the paths, the client fixture's reserved ports and the attempt cap.
 
 Install Chromium into the workspace cache first:
 
@@ -10,11 +9,49 @@ Install Chromium into the workspace cache first:
 PLAYWRIGHT_BROWSERS_PATH="$PWD/.e2e/browsers" pnpm --filter mars-campus-viewer exec playwright install chromium
 ```
 
-## Client fixture scenarios (`e2e/scenarios/`)
+## Local smoke
+
+`local-smoke.md` is the quick proof that the app works: one command boots an isolated instance on a free port, opens
+the world list and one world, and checks that a person is drawn with no console errors and no failed requests. Any
+agent, laptop, cloud session or CI runner can run it; it takes about 30 seconds after the builds.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm assets:pull --set web,runtime
+PLAYWRIGHT_BROWSERS_PATH="$PWD/.e2e/browsers" pnpm --filter mars-campus-viewer exec playwright install chromium
+node e2e/local-smoke.mjs --build                 # any free port; or --port 9950, or E2E_PORT=9950
+node e2e/local-smoke.mjs --port 9950 --clip      # also one uncut, real-speed clip of the whole run
+```
+
+- **Isolated.** It runs the world launcher (`tools/world-launcher/launcher.mjs`) on the port and its one world on the
+  next two ports, with fake minds, dev sign-in and a data dir under the run directory. It creates a `hello-hamlet`
+  world as `dev:smoke` and one Soul, Ada. It refuses ports reserved in `e2e/config.mjs`, and ports in use.
+- **Checks**, step by step: the launcher answers healthy; the world list shows the world's card; clicking it opens
+  the world, whose canvas has a live WebGL context and draws Ada's figure (a skinned person rig) with no "could not be
+  prepared" notice; Explore → "Ada" → Enter follows her into the frame. Each step fails on any console error, page
+  error, failed request or HTTP error. Requests the page cancels itself (`net::ERR_ABORTED`, an AbortController
+  superseding a fetch) are listed as `cancelledRequests` and don't fail it.
+- **Output** in `.local/e2e/<UTC timestamp>/` (`--out` to choose): `summary.json` (status, commit, port, PIDs, timings,
+  every assertion, every error and failed request, teardown), `shots/1-world-list.png`, `2-world.png`,
+  `3-person.png`, `launcher.log`, and with `--clip` `clip.mp4` (`clip.webm` without ffmpeg).
+- **Teardown** always: it closes the browser and stops the launcher and its world by their exact PIDs, and records
+  in the summary that both are gone. The data dir is removed after a pass (`--keep-data` keeps it).
+- **Exit** 0 pass, 1 a check failed, 2 a precondition is missing: the message names the command that fixes it
+  (`--build` builds the web app and the viewer's static build when they are missing).
+- **People need the viewer's static build.** The character models (`/modular`) come from
+  `pnpm --filter mars-campus-viewer build:static` (issue #395). Without it the world never draws Ada and the run
+  fails with the 404s in the summary.
+- CI runs it on PRs that touch `apps/web`, `apps/server` or `e2e` (the `smoke` job in `.github/workflows/ci.yml`).
+- Use it as a PR's proof: upload `summary.json` and the screenshots (and the clip) with `node tools/proof/upload.mjs`.
+  It is a scripted e2e, so it proves the page loads and draws; a T2 change still needs a clip of its own journey
+  (the `proof` skill).
+
+## Client fixture scenarios (`e2e/scenarios/client-fixture-arrival.md`)
 
 Scenarios are Markdown files with front matter (`id`, `tier`, `fixture`, `critical_path`) and numbered steps of
-actions plus `expect`, `expect-url`, `expect-console` and `screenshot` lines. `e2e/config.mjs` sets the paths, the
-ports and an iteration cap of three failed attempts per scenario.
+actions plus `expect`, `expect-url`, `expect-console` and `screenshot` lines. An agent runs them with the `e2e` repo
+skill and writes screenshots, page text and a machine-readable summary under `.e2e/runs/` (gitignored); a scenario
+with a `runner` in its front matter runs as that command instead.
 
 `client-fixture-arrival.md` covers arrival, camera and selection, and leaving and re-entering an isolated world:
 
