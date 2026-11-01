@@ -104,5 +104,5 @@ createServer(async (req, res) => {
     else if (u.pathname === '/busy') {const ms = Number(u.searchParams.get('ms') ?? 2000), t0 = host!.engine.world.tick; setTimeout(() => {const end = performance.now() + ms; while (performance.now() < end) { /* the tick thread is deliberately busy */ }}, 50); v = {busyFromTick: t0, ms};}
     else {res.statusCode = 404; v = {error: 'unknown'};}
     res.end(JSON.stringify(v));
-  } catch (e) {res.statusCode = 500; res.end(JSON.stringify({error: (e as Error).stack}));}
+  } catch (e) {res.statusCode = 500; log(`control: ${(e as Error).stack}`); res.end(JSON.stringify({error: (e as Error).message}));}   // the stack goes to the log, not the socket
 }).listen(CONTROL, '127.0.0.1', () => log(`control on ${CONTROL}, worker http on ${WPORT}`));

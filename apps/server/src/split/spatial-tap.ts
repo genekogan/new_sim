@@ -150,6 +150,6 @@ function install() {
       else if (u.pathname === '/pause') { recording = u.searchParams.get('on') !== '1'; v = { recording }; }
       else { res.statusCode = 404; v = { error: 'unknown' }; }
       res.end(JSON.stringify(v));
-    } catch (e) { res.statusCode = 500; res.end(JSON.stringify({ error: (e as Error).stack })); }
+    } catch (e) { res.statusCode = 500; log(`control: ${(e as Error).stack}`); res.end(JSON.stringify({ error: (e as Error).message })); }   // the stack goes to the log, not the socket
   }).listen(PORT, '127.0.0.1', () => log(`control on ${PORT}`));
 }
