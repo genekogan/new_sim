@@ -5,7 +5,7 @@ import {agentOnboarding} from './auth-ui.ts';
 import {windowCode} from './god-ui/join-api.ts';
 import './BringAgent.css';
 import {copyText,manualCopyHint} from './clipboard.ts';
-const NEW_SOUL_ICON=<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M2.5 16v-1.5a5 5 0 0 1 10 0V16M15.5 7v6M12.5 10h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>;
+const NEW_SOUL_ICON=<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.75" fill="none" stroke="currentColor" strokeWidth="1.6"/></svg>;
 /** VF3: the "New Soul" button (top right of the Eden viewer) and its "Bring a new Soul to Eden" dialog. Opens on #join, so the link itself can be shared. */
 export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean;showButton?:boolean;worldName?:string}){
  // lane PUX (LAP: every world): when signed in the prompt carries this window's code; the agent's request then comes up right here

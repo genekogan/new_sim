@@ -16,9 +16,9 @@ export type PwaIcons = { icon32: string; icon180: string; icon192: string; icon5
 export function pwaManifest(base: string, icons: PwaIcons) {
   const at = (f: string) => `${base}assets/${f}`;
   return {
-    name: 'Sim',
-    short_name: 'Sim',
-    description: 'Persistent worlds to watch, explore and live in.',
+    name: 'Souls',
+    short_name: 'Souls',
+    description: 'MMO World Simulator',
     start_url: './',
     scope: base,
     display: 'standalone',

@@ -9,7 +9,7 @@ export const HUD_FIT_STEPS=[
  'keys',       // the ⌘K / ⌘G hints
  'broadcast',  // "Broadcast" (its red dot stays), and a long "Following <name>" shortens
  'god',        // "God" (the bolt stays)
- 'newsoul',    // "New Soul" (the person-plus icon stays)
+ 'newsoul',    // "New Soul" (the halo icon stays)
  'explore',    // "Explore" (the magnifier stays)
  'live',       // "Live" and the weekday (the green dot and the time stay)
  'fullscreen', // small screens: Full screen → More
