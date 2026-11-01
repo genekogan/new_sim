@@ -5,18 +5,20 @@
 #
 #   tools/test-harness/one-validation.sh <outDir> [--baseline <tree at the previous production source>] [--skip V5,V8,…]
 #
+# Optional defaults: SUITE_BASELINE and SUITE_DESCRIPTORS; --baseline overrides SUITE_BASELINE.
 # Ports: 5400–5449 only (port-remap moves Codex-era 4930–4969 test ports to 5400–5439, one step at a time).
 # Never touches 4930–4970/4986/4987. Production data is only ever copied read-only (V8). Chrome steps take the lease.
 # Steps run strictly one after another, so at most one heavy job is ever running.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${1:?usage: one-validation.sh <outDir> [--baseline <tree>] [--skip V1,V2]}"; shift
-BASELINE=<worktrees>/reconcile-main-e8; SKIP=""
+# Local paths are caller configuration; quoted placeholders are literal, never shell redirections.
+BASELINE="${SUITE_BASELINE:-<worktrees>/reconcile-main-e8}"; SKIP=""
 while [ $# -gt 0 ]; do case "$1" in --baseline) BASELINE="$2"; shift;; --skip) SKIP="$2"; shift;; esac; shift; done
 mkdir -p "$OUT"; SUM="$OUT/SUMMARY.tsv"; echo -e "step\texit\tseconds\tlog" > "$SUM"
 export SUITE_COVERAGE_DIR="$OUT"
 REMAP="--import=$ROOT/tools/test-harness/port-remap.mjs"
-DESCRIPTORS=<team>/pm-integration/auth-account-20261009/runtime-modern-context-prep-001
+DESCRIPTORS="${SUITE_DESCRIPTORS:-<team>/pm-integration/auth-account-20261009/runtime-modern-context-prep-001}"
 cd "$ROOT" || exit 1
 # Fan-out (modal_suite.py runs step groups in separate containers, then merges SUMMARY rows and logs):
 #   SUITE_ONLY=V1-types,V3-packages,…  run only these steps (rows for nothing else); the cheap V2 builds still run
