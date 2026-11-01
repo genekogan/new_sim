@@ -26,6 +26,7 @@ const fail=(code:string,reason:string)=>({ok:false as const,code,reason});
 export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:number)=>number;clearance?:(x:number,z:number,level?:number)=>number;model:()=>WorldModel;body:(id:string)=>{pose:{p:number[]};human?:{hands?:{left?:number[];right?:number[]};handActuator?:import('../../../../mars/viewer/engine/social/hand-actuator.ts').HandActuatorMotion}}|undefined;access:(id:string,soul:EdgeSoul)=>{code:string;reason:string}|null;
  /** entry 32: the thing's owner (a name) and whether it is this Soul; null when nobody owns it */ owner?:(id:string,soul:EdgeSoul)=>{name:string;mine:boolean}|null;
  /** entry 32: a knock on the leaf landed (the first rap): tell those who hear it */ knock?:(soul:EdgeSoul,id:string)=>void;
+ /** Entry 43: compact facts of things that are not contact actuators (a kettle, a cup of tea), or null. */ moreFacts?:(id:string)=>Record<string,unknown>|null;
  record:(soul:EdgeSoul,id:string,action:string,params?:Record<string,unknown>)=>void;commit:(ops:Op[],note:string,done:()=>void)=>{accepted:boolean}}){
  const binding=(id:string)=>{const m=d.model(),e=m.entities.get(id);return e?createHash('sha256').update(JSON.stringify([e,m.worldPose(e),m.resolvedDef(e.def)?.hash])).digest('hex'):null;};
  return {
@@ -169,6 +170,7 @@ export function createContactActuatorService(d:{levelAt?:(x:number,z:number,y:nu
     // Entry 34: a growing planter says its stage in a word (and dry only when dry)
     const stage=st.growth?.type==='number'?stageWord(e.state?.growth??st.growth.default):null;
     return stage?{stage,...(dry?{dry:true}:{})}:dry?{dry:true}:null;}
+   if(e&&def&&!key)return d.moreFacts?.(target)??null;
    if(!e||!def||!key)return null;const state=actuatedState(e,def),facts:Record<string,boolean|string>={};
    if(typeof state[key]==='boolean')facts[key]=state[key] as boolean;
    if(key==='open'&&typeof state.locked==='boolean')facts.locked=state.locked;

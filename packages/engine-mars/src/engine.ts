@@ -917,8 +917,9 @@ export class MarsEngine implements Engine {
     const pots = program.steps.filter(s => ['mars:serve','mars:shared_food_break'].includes(s.verb)).map(s => s.params.pot);
     if (this.cfg.scene === 'eden-camp' && pots.length && [...this.programs.values()].some(p => p.actor !== program.actor && p.steps.some(s => ['mars:serve','mars:shared_food_break'].includes(s.verb) && pots.includes(s.params.pot)))) return {code:'food.service-in-use',message:'Someone is already using this pot and its serving space'};
     for (const step of program.steps) if (step.verb.startsWith('mars:')) {
-      // entry 35: a hand hold names the other body only to find its hand; it never borrows it (consent is the ledger's)
-      const busy = step.verb === 'mars:hand_hold_v1' ? null : this.jointIssue(step.params, program.actor,step.verb==='mars:classroom_session'); if (busy) return busy;
+      // entry 35: a hand hold names the other body only to find its hand; it never borrows it (consent is the ledger's);
+      // entry 41: a hand-over likewise (each body runs its own half)
+      const busy = step.verb === 'mars:hand_hold_v1' || step.verb === 'mars:hand_over_v1' ? null : this.jointIssue(step.params, program.actor,step.verb==='mars:classroom_session'); if (busy) return busy;
       if (step.verb === 'mars:serve') {
         const pot = this.ents[String(step.params.pot)];
         if (!pot?.contents || pot.contents.fraction < 0.25 || pot.foodPreparation?.complete === false) return {code: 'food.unavailable', message: 'there is no completed serving left in the pot'};

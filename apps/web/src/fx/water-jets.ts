@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { RIPPLE } from '../atmosphere/motion.ts';
 
-export type WaterJetKind = 'sprinkler' | 'stream' | 'shower' | 'fountain' | 'pour';
+export type WaterJetKind = 'sprinkler' | 'stream' | 'shower' | 'fountain' | 'pour' | 'spout';
 type Def = { tags?: readonly string[]; params?: Record<string, { default?: unknown }>; make?: { kind: string; args?: unknown } };
 /** Which moving water a def draws while it is on (by its tags), or null. */
 export function waterJetKind(def: Def): WaterJetKind | null {
@@ -44,6 +44,20 @@ const KINDS: Record<WaterJetKind, { n: number; life: number; size: number; strea
     p = o + d * v * fa + vec3(0.0, -4.9 * fa * fa, 0.0);
     if (a > tl) { float s = a - tl, sa = r3 * 6.2831853; p += vec3(cos(sa), 0.0, sin(sa)) * (0.12 + 0.3 * r4) * s + vec3(0.0, 0.45 * s - 4.9 * s * s, 0.0); alpha = clamp(1.0 - s / 0.12, 0.0, 1.0) * 0.6; size *= 0.7; }
     else alpha = 0.88;
+    alpha *= on;` },
+  // Entry 43: a kettle's spout. One coherent stream: drops leave the tip along the spout (uDir: its angle above the
+  // horizontal, which falls as the kettle tips) at uSpeed, fall under gravity uDrop to the tea's surface and vanish there in
+  // a small ring; uFlow thins it as the water reaches the spout and as it stops. Sideways spread is a few millimetres.
+  spout: { n: 900, life: 0.45, size: 0.011, streak: 0.85, glsl: `
+    float on = step(fract(aSeed.y * 0.0731 + aSeed.z * 0.013), uFlow);
+    float ang = r1 * 6.2831853, rad = 0.0045 * sqrt(r2);
+    float v = uSpeed * (0.35 + 0.65 * uFlow) * (0.94 + 0.12 * r3);
+    vec3 d = vec3(cos(uDir), sin(uDir), 0.0);
+    float tl = (v * d.y + sqrt(max(0.0, v * v * d.y * d.y + 2.0 * 9.8 * uDrop))) / 9.8;
+    float fa = min(a, tl);
+    p = vec3(0.0, cos(ang) * rad, sin(ang) * rad) + d * v * fa + vec3(0.0, -4.9 * fa * fa, 0.0);
+    if (a > tl) { float s = a - tl, sa = r4 * 6.2831853; p += vec3(cos(sa), 0.0, sin(sa)) * (0.05 + 0.1 * r3) * s; alpha = clamp(1.0 - s / 0.06, 0.0, 1.0) * 0.5; size *= 0.8; }
+    else alpha = 0.9;
     alpha *= on;` },
   // An oscillating garden sprinkler: a fan of twelve jets sweeps ±45° about the forward axis every 6 s; each droplet keeps the
   // direction it was launched in and falls under gravity to the ground (uDrop below the nozzle), then splashes.
@@ -143,7 +157,9 @@ export function waterJets(def: Def, state: Record<string, unknown> | undefined, 
   // a sprinkler's, a fountain's and a tap's own copy (a tap's stream is caught short by a can held under it: entry 34)
   const m = kind === 'sprinkler' || kind === 'fountain' || kind === 'stream' ? material(kind).clone() : material(kind);
   if (m !== material(kind)) m.uniforms.uEdenRipple = RIPPLE;
-  m.uniforms.uDrop.value = Math.max(0.05, at[1] - (kind === 'stream' ? 0.1 : kind === 'shower' ? 0.04 : 0));
+  // entry 43: a sink's stream falls to its basin (`basinHeight`), a garden tap's to the ground basin
+  const basin = Number(params.basinHeight ?? def.params?.basinHeight?.default ?? 0.1);
+  m.uniforms.uDrop.value = Math.max(0.05, at[1] - (kind === 'stream' ? basin : kind === 'shower' ? 0.04 : 0));
   // a sprinkler's speed carries the farthest drops to its reach (flat-ground range at the mean launch angle, plus height)
   // a fountain's jet falls into its upper bowl and the bowl spills from its rim into the pool (distances below the nozzle)
   if (kind === 'fountain') { const w = waterSurfaces(def); if (!w) return null; m.uniforms.uEdenRipple = RIPPLE; m.uniforms.uSpeed.value = 2.4; m.uniforms.uBowl.value = new THREE.Vector3(at[1] - w.bowl[0], w.bowl[1] + 0.05, at[1] - w.pool[0]); }
@@ -160,5 +176,13 @@ export function pourJets(): THREE.Points {
   const m = material('pour').clone(); m.uniforms.uEdenRipple = RIPPLE; m.uniforms.uSpeed.value = 1.15; m.uniforms.uFlow.value = 0;
   const pts = new THREE.Points(geometry('pour'), m);
   pts.name = 'water jets (pour)'; pts.frustumCulled = false; pts.renderOrder = 2; pts.userData.cameraTransparent = true;
+  return pts;
+}
+/** Entry 43: a kettle's spout stream (its own material: the layer drives uFlow, uDir and uDrop per frame from the
+ *  kettle's recorded tilt). In world space; the layer places it at the drawn spout tip and turns it to the spout. */
+export function spoutJets(speed: number): THREE.Points {
+  const m = material('spout').clone(); m.uniforms.uEdenRipple = RIPPLE; m.uniforms.uSpeed.value = speed; m.uniforms.uFlow.value = 0;
+  const pts = new THREE.Points(geometry('spout'), m);
+  pts.name = 'water jets (spout)'; pts.frustumCulled = false; pts.renderOrder = 2; pts.userData.cameraTransparent = true;
   return pts;
 }

@@ -305,7 +305,8 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
   // Only six selected objects, at most 4 m away and in sight. No stored-state dump.
   const objects = picked.map(t => {
     // M01: the few facts first; enclosure and sightline (entity-world walls) only for a thing that has some.
-    const facts=t.kind==='object'&&t.distance<=4?ledger.contactActuator?.facts(t.id):null;
+    // entry 43: a kettle or a cup (items) has a fact or two as well: "boiling", a cup of tea
+    const facts=(t.kind==='object'||t.kind==='item')&&t.distance<=4?ledger.contactActuator?.facts(t.id):null;
     const state=facts&&Object.keys(facts).length&&P.sameEnclosure(t.at)&&P.sees(t.at,t.id)?facts:null;
     // entry 33: a neon sign's words, only for a Soul this near it; attributed and untrusted (never in offers)
     const said=state?ledger.contactActuator?.words?.(t.id):null;

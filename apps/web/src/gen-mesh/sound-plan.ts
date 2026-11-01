@@ -18,7 +18,7 @@ import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 
 export type SoundKind =
   | 'water' | 'stream' | 'fire' | 'wind' | 'creak' | 'birds' | 'bell' | 'hum' | 'engine' | 'chime' | 'frogs' | 'music'
-  | 'waves' | 'crickets' | 'chatter' | 'footsteps' | 'leaves' | 'flag' | 'waterfowl' | 'bees';
+  | 'waves' | 'crickets' | 'chatter' | 'footsteps' | 'leaves' | 'flag' | 'waterfowl' | 'bees' | 'kettle';
 export type SoundSpec = { kind: SoundKind; radius: number; volume: number; when?: string; mode?: 'loop' | 'change'; variant?: number };
 export type Source = 'object' | 'ambient' | 'resident' | 'visitor';
 /** `cloud`: pts is a set of separate points (a cluster of trees); the distance is to the nearest one. */
@@ -26,10 +26,10 @@ export type Source = 'object' | 'ambient' | 'resident' | 'visitor';
  *  camera is, so a fast camera move never drops it out of range and restarts it (lane S3). */
 export type Emitter = { id: string; spec: SoundSpec; pts: [number, number, number][]; area: boolean; cloud?: boolean; follow?: boolean; state: Record<string, unknown>; source: Source };
 
-export const KINDS: readonly SoundKind[] = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps', 'leaves', 'flag', 'waterfowl', 'bees'];
+export const KINDS: readonly SoundKind[] = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps', 'leaves', 'flag', 'waterfowl', 'bees', 'kettle'];
 const KIND_SET = new Set<string>(KINDS);
 /** How many distinct voicings each kind has (variant = index mod this). */
-export const VARIANTS: Record<SoundKind, number> = { water: 3, stream: 2, fire: 2, wind: 2, creak: 2, birds: 4, bell: 3, hum: 2, engine: 3, chime: 3, frogs: 2, music: 4, waves: 2, crickets: 2, chatter: 3, footsteps: 2, leaves: 2, flag: 2, waterfowl: 2, bees: 2 };
+export const VARIANTS: Record<SoundKind, number> = { water: 3, stream: 2, fire: 2, wind: 2, creak: 2, birds: 4, bell: 3, hum: 2, engine: 3, chime: 3, frogs: 2, music: 4, waves: 2, crickets: 2, chatter: 3, footsteps: 2, leaves: 2, flag: 2, waterfowl: 2, bees: 2, kettle: 1 };
 export const MASTER_DEFAULT = 0.32;
 export const isKind = (k: unknown): k is SoundKind => typeof k === 'string' && KIND_SET.has(k);
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);

@@ -53,7 +53,7 @@ export type Dims = {
   foot: [number, number][];
 };
 
-export type Style = 'knees' | 'hips' | 'up' | 'walk' | 'stand';
+export type Style = 'knees' | 'hips' | 'up' | 'walk' | 'lean' | 'stand';
 export type Target = { f: number; up: number; lat: number };
 export type Posture = { drop: number; bend: number; rise: number; kneel: number };
 export const NEUTRAL: Posture = { drop: 0, bend: 0, rise: 0, kneel: 0 };
@@ -70,15 +70,18 @@ const PLAN_REACH = 0.92;
 /** A standing hip bend past this costs extra (it reads as lying on the load); kneeling is the alternative. */
 const DEEP_BEND = 60 * DEG;
 
-const STYLE: Record<Style, { bendMax: number; wDrop: number; wBend: number; rise: boolean; dropMax?: number; kneel?: number }> = {
+const STYLE: Record<Style, { bendMax: number; wDrop: number; wBend: number; rise: boolean; dropMax?: number; kneel?: number; deep?: number }> = {
   knees: { bendMax: BODY_MODEL.bendMax.knees, wDrop: 0.5, wBend: 1.4, rise: false, kneel: 2.0 }, // kneel only when a squat + bend cannot do it
   hips: { bendMax: BODY_MODEL.bendMax.hips, wDrop: 0.8, wBend: 0.35, rise: false, kneel: 0.45 },
   up: { bendMax: 30 * DEG, wDrop: 4, wBend: 3, rise: true },
-  walk: { bendMax: 25 * DEG, wDrop: 4, wBend: 2, rise: false, dropMax: 0.08 },
+  // Soul Actions 43: a standing hand reach to a counter or table top (a mug set down, a kettle held over a cup): bend at
+  // the hips, the knees only a little. 'hips' let a 1.6 m body squat 0.26 m to set a mug 0.49 m ahead on a 0.75 m table.
+  lean: { bendMax: BODY_MODEL.bendMax.hips, wDrop: 2.4, wBend: 0.35, rise: false, kneel: 3.0, deep: 75 * DEG },
+  walk: { bendMax: 25 * DEG, wDrop: 4, wBend: 2, rise: false, dropMax: 0.08 }, // 25°: walking a load held out ahead (hang_beam walk-in: hands 0.5–0.65 m ahead at hip height)
   // Entry 33 (retest on M04): a hand reach to a switch or a torch at or above the hips is made standing. A target just
   // past the plan reach (a 1.2 m switch from 0.55 m on a 1.67 m body) leans a few degrees in; under 'knees' the 0.04 m knee
   // dip cost a fortieth of that lean, so the body dipped at the knees for a switch at chest height.
-  stand: { bendMax: BODY_MODEL.bendMax.knees, wDrop: 4, wBend: 1.4, rise: false }, // 25°: walking a load held out ahead (hang_beam walk-in: hands 0.5–0.65 m ahead at hip height)
+  stand: { bendMax: BODY_MODEL.bendMax.knees, wDrop: 4, wBend: 1.4, rise: false },
 };
 
 /** Style for an engine activity (engine/construction/handup.ts phases, carry, raise, items). */
@@ -140,7 +143,7 @@ export function solvePosture(d: Dims, ts: Target[], style: Style): Posture {
     for (let j = 0; j <= NB; j++)
       for (const rise of rises) {
         const p = { drop: (dropMax * i) / ND, bend: (st.bendMax * j) / NB, rise, kneel: 0 };
-        score(p, st.wDrop * p.drop + st.wBend * p.bend + 3 * rise + (st.kneel !== undefined ? 2.5 * Math.max(0, p.bend - DEEP_BEND) : 0));
+        score(p, st.wDrop * p.drop + st.wBend * p.bend + 3 * rise + (st.kneel !== undefined ? 2.5 * Math.max(0, p.bend - (st.deep ?? DEEP_BEND)) : 0));
       }
   if (st.kneel !== undefined) {
     // one knee down: the pelvis height is fixed by the thigh, the torso may bend over an edge

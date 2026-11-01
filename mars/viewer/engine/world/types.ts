@@ -31,7 +31,7 @@ export type Support =
   | { kind: 'ground' }
   | { kind: 'resting-on'; on: string; slot?: string } // slot: a table surfaceSlot id, or 'lap' (engine/items)
   | { kind: 'held'; by: string[] }
-  | { kind: 'in-hand'; by: string; hand: 'left' | 'right' } // a small item in one person's hand (engine/items)
+  | { kind: 'in-hand'; by: string; hand: 'left' | 'right'; /** entry 41: item yaw − holder yaw kept from a hand-over (absent: 0) */ turn?: number } // a small item in one person's hand (engine/items)
   | { kind: 'connected'; to: string[] }
   | { kind: 'forks'; vehicle: string }
   | { kind: 'ridden-by'; by: string } // a vehicle under its rider (engine/vehicles)
@@ -66,6 +66,10 @@ export type HumanState = {
   wateringV1?: import('../items/watering.ts').WateringMotion;
   /** Soul Actions 34: a handle-held item being taken or put by hand (the arm blends in and out on this timeline). */
   handTransferV1?: import('../items/watering.ts').HandTransfer;
+  /** Soul Actions 43: the last let-go before a reach (an idle gesture fades out on it); never controller context. */
+  letGoV1?: import('../items/let-go.ts').LetGoV1;
+  /** Soul Actions 44: one recorded mug stage (drinking in sips, rinsing at a tap); never controller context. */
+  cupV1?: import('../items/cup.ts').CupMotion;
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };

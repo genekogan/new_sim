@@ -24,6 +24,17 @@ export const wateringParams = z.object({
   sweep: vec2.optional(),
   /** fill: seconds the water runs; pour: seconds the stream runs. */
   seconds: z.number().min(0.5).max(20),
+  /** Entry 43 (a kettle over a cup), pour only: the free (left) hand rests here on the cup's side for the pour; the
+   *  vessel turns this much (rad, + = to the body's left) about the grip as the hand comes in, so the spout points at the
+   *  cup; and the pour's own tilt (rad) and its rise as the vessel empties. Absent: entry 34's can, unchanged. */
+  steady: vec3.optional(),
+  spoutYaw: z.number().min(-1.6).max(1.6).optional(),
+  tilt: z.number().min(0.3).max(1.4).optional(),
+  tiltMore: z.number().min(0).max(0.3).optional(),
+  /** The tilts (rad) where water first reaches the outlet and where it runs fully (a kettle's spout only near its pour
+   *  tilt: from entry 34's 25/35°, a kettle's stream ran full at 33° and overshot the cup). */
+  flowFrom: z.number().min(0.1).max(1.4).optional(),
+  flowFull: z.number().min(0.1).max(1.4).optional(),
   /** The can's level after this stage (0..1): a full can is carried a little lower. */
   levelAfter: z.number().min(0).max(1),
   /** Litres this stage moves (the server's book-keeping; the motion does not read it). */
@@ -49,6 +60,8 @@ export type WateringFrame = {
   left: number;
   /** The can's spout tilt (rad, down) and the stream's strength 0..1. */
   tilt: number; flow: number;
+  /** Entry 43: the vessel's turn about the grip relative to the body (rad), eased in and out with the hand. */
+  yaw: number;
   /** Times (s) of the world moments: valve contacts (fill); the stream's start, thirds and end (pour). */
   done: boolean; end: number;
 };
@@ -60,10 +73,10 @@ export function pourWindow(m: Pick<WateringMotion, 'seconds' | 'abortedAt'>) {
   return { tilt0, start, natural, untilt: u0, out: u0 + W.untilt, end: Math.max(u0, tilt0) + (u0 > tilt0 ? W.untilt : 0) + W.pourOut };
 }
 function rawTilt(m: WateringMotion, s: number) {
-  const w = pourWindow({ seconds: m.seconds });
+  const w = pourWindow({ seconds: m.seconds }), T = m.tilt ?? TILT;
   if (s <= w.tilt0) return 0;
-  if (s <= w.start) return TILT * smooth((s - w.tilt0) / W.tiltIn);
-  return TILT + TILT_MORE * clamp01((s - w.start) / m.seconds);
+  if (s <= w.start) return T * smooth((s - w.tilt0) / W.tiltIn);
+  return T + (m.tiltMore ?? TILT_MORE) * clamp01((s - w.start) / m.seconds);
 }
 /** The whole visible timeline of one stage at `s` seconds after its start. */
 export function wateringFrame(m: WateringMotion, s: number): WateringFrame {
@@ -79,9 +92,9 @@ export function wateringFrame(m: WateringMotion, s: number): WateringFrame {
     const end = Math.max(out + W.fullOut, c.off + W.valveHold + W.valveRelease);
     if (m.abortedAt !== undefined && m.abortedAt < c.on) { // before the first contact: nothing happens; the hands come back
       const a = m.abortedAt, k = 1 - smooth((s - a) / W.abortOut), e = a + W.abortOut;
-      return { right: right(Math.min(s, a)) * (s > a ? k : 1), left: valve(Math.min(s, a)) * (s > a ? k : 1), sweepK: 0, tilt: 0, flow: 0, done: s >= e, end: e };
+      return { right: right(Math.min(s, a)) * (s > a ? k : 1), left: valve(Math.min(s, a)) * (s > a ? k : 1), sweepK: 0, tilt: 0, flow: 0, yaw: 0, done: s >= e, end: e };
     }
-    return { right: right(s), left: valve(s), sweepK: 0, tilt: 0, flow: 0, done: s >= end, end };
+    return { right: right(s), left: valve(s), sweepK: 0, tilt: 0, flow: 0, yaw: 0, done: s >= end, end };
   }
   const w = pourWindow(m), aborted = m.abortedAt !== undefined && m.abortedAt < w.natural;
   const tiltAtUntilt = rawTilt(m, w.untilt);
@@ -91,7 +104,10 @@ export function wateringFrame(m: WateringMotion, s: number): WateringFrame {
   const right = s <= outStart ? inK : inK * (1 - smooth((s - outStart) / W.pourOut));
   const u = clamp01((Math.min(s, w.untilt) - w.start) / m.seconds);
   const end = outStart + W.pourOut;
-  return { right, left: 0, sweepK: Math.sin(2 * Math.PI * u), tilt, flow: smooth((tilt - FLOW_FROM) / (FLOW_FULL - FLOW_FROM)), done: s >= end, end };
+  // entry 43: the free hand comes to the cup with the pouring hand and leaves it as that hand goes back (one ease each)
+  const left = m.steady ? right : 0;
+  const f0 = m.flowFrom ?? FLOW_FROM, f1 = m.flowFull ?? FLOW_FULL;
+  return { right, left, sweepK: m.sweep ? Math.sin(2 * Math.PI * u) : 0, tilt, flow: smooth((tilt - f0) / (f1 - f0)), yaw: (m.spoutYaw ?? 0) * right, done: s >= end, end };
 }
 
 /** A handle-held item taken or put by hand (take_item / put_item): the reach and the hand back, `reach` s each. */
@@ -115,14 +131,14 @@ export function wateringEvents(m: WateringMotion): WateringEvent[] {
     if (m.abortedAt !== undefined && m.abortedAt < c.on) return [];
     return [{ key: 'valve-on', at: c.on, data: { on: true } }, { key: 'valve-off', at: c.off, data: { on: false, level: m.levelAfter } }];
   }
-  const w = pourWindow(m), flowAt = w.tilt0 + smoothAt(FLOW_FROM / TILT) * W.tiltIn;
+  const F0 = m.flowFrom ?? FLOW_FROM, w = pourWindow(m), flowAt = w.tilt0 + smoothAt(F0 / (m.tilt ?? TILT)) * W.tiltIn;
   if (w.untilt <= flowAt) return [];
   const out: WateringEvent[] = [{ key: 'pour-start', at: flowAt, data: {} }];
   let done = 0;
   for (const k of [1, 2, 3]) { const at = w.start + k / 3 * m.seconds; if (at <= w.untilt + 1e-9) { out.push({ key: 'pour-' + k, at, data: { fraction: 1 / 3 } }); done = k; } }
   const reached = Math.max(0, Math.min(1, (w.untilt - w.start) / m.seconds));
   if (done < 3) out.push({ key: 'pour-abort', at: w.untilt, data: { fraction: Math.max(0, reached - done / 3) } });
-  const tu = rawTilt(m, w.untilt), endAt = w.untilt + (tu > FLOW_FROM ? smoothAt(1 - FLOW_FROM / tu) * W.untilt : 0);
+  const tu = rawTilt(m, w.untilt), endAt = w.untilt + (tu > F0 ? smoothAt(1 - F0 / tu) * W.untilt : 0);
   out.push({ key: 'pour-end', at: endAt, data: { level: done === 3 ? m.levelAfter : undefined, poured: done === 3 ? 1 : reached } });
   return out;
 }
@@ -181,15 +197,18 @@ export const watering: ActionDef<WateringParams, true, Exec> = {
       if (e.key === 'valve-off' || e.key === 'pour-end') it.carryDropV1 = FULL_DROP * (typeof e.data.level === 'number' ? e.data.level : Math.max(0, ex.p.levelAfter));
     }
     let hold: Vec3 = ex.p.hold;
+    const yaw = a.pose.yaw + f.yaw;
     if (m.stage === 'pour') { const sw = ex.p.sweep ?? [0, 0]; hold = [hold[0] + sw[0] * f.sweepK, hold[1], hold[2] + sw[1] * f.sweepK]; }
     const carry = carryPoint(it, b, 'right');
     // in from where the hand was; out to the carry point (a full can's is lower)
     const goingOut = m.stage === 'fill' ? s >= fillContacts(m).off : s >= pourWindow(m).untilt;
     const right = goingOut ? lerp3(carry, hold, f.right) : lerp3(ex.from, hold, f.right);
     h.hands = { ...(h.hands ?? {}), right: [...right] };
-    followHand(it, right, a.pose.yaw);
-    // the free hand's point is the valve itself; the drawn arm blends to it from the clip's pose on `left` (one ease, not two)
-    if (ex.p.valve && f.left > 1e-4) h.hands.left = [...ex.p.valve];
+    followHand(it, right, yaw);
+    // the free hand's point is the valve itself (or the cup it steadies); the drawn arm blends to it from the clip's pose
+    // on `left` (one ease, not two)
+    const free = ex.p.valve ?? ex.p.steady;
+    if (free && f.left > 1e-4) h.hands.left = [...free];
     else delete h.hands.left;
     // 'reach': the drawn posture leans from the hips toward a low hold (a can under a tap), it does not crouch
     h.activity = 'reach';
