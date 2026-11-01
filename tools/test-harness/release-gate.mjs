@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
+import { isUtf8 } from 'node:buffer';
 import { execFileSync, spawn } from 'node:child_process';
-import { closeSync, constants, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, renameSync, writeFileSync, writeSync } from 'node:fs';
+import { closeSync, constants, copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, writeFileSync, writeSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -140,14 +141,18 @@ export function validateQuarantine(manifest) {
 export function readRun(dir, expected, manifest, requiredSteps = REQUIRED_STEPS, options = {}) {
   const errors = [], steps = {}, evidence = {};
   const q = validateQuarantine(manifest);
-  const read = path => { const b = readFileSync(path); evidence[path] = sha256(b); return b.toString(); };
+  const read = path => {
+    if (!lstatSync(path).isFile() || !realpathSync(path).startsWith(realpathSync(dir) + '/')) throw Error('evidence must be a regular file inside the run');
+    const b = readFileSync(path); evidence[path] = sha256(b);
+    if (!isUtf8(b)) throw Error('evidence is not valid UTF-8');
+    return b.toString();
+  };
   let metadata;
   try {
     metadata = JSON.parse(read(join(dir, 'out/RUN-METADATA.json')));
     for (const [field, value] of Object.entries(expected)) {
       if (JSON.stringify(metadata[field]) !== JSON.stringify(value)) errors.push(`metadata mismatch: ${field}`);
     }
-    if (metadata.suiteCompleted !== true) errors.push('Modal suite did not complete');
     if (metadata.only !== undefined && !('only' in expected)) errors.push('scoped run (a subset of steps) is not a full gate run');
     if (metadata.baselineSha !== null) errors.push('unexpected embedded baseline');
     if (JSON.stringify(metadata.skip) !== JSON.stringify(EXPECTED_SKIP)) errors.push('unexpected suite skips');
@@ -235,7 +240,97 @@ export function readRun(dir, expected, manifest, requiredSteps = REQUIRED_STEPS,
     }
     for (const step of requiredSteps) if (!steps[step]) errors.push(`missing mandatory step: ${step}`);
   } catch (e) { errors.push(`missing/invalid summary: ${e.message}`); }
-  return { dir: resolve(dir), metadata, steps, evidence, errors };
+  let collectionRecovery;
+  if (metadata && metadata.suiteCompleted !== true) {
+    try {
+      collectionRecovery = recoverAssetCollisions(dir, metadata, requiredSteps, read, options.root || ROOT);
+    } catch (e) { errors.push(`Modal suite did not complete: ${e.message}`); }
+  }
+  return { dir: resolve(dir), metadata, steps, evidence, errors, ...(collectionRecovery && { collectionRecovery }) };
+}
+
+// Historical collector compatibility, not a waiver: this exact collector discards duplicate informational asset
+// diagnostics after retaining every group's completion/summary and V5 shards. Future collectors fail closed here.
+const ASSET_COLLISION_COLLECTOR = 'f2812707466098b30ab8fd7f280cd65bee6a8481';
+const COLLISION_GROUPS = {
+  a: { only: 'V1-types,V2-build-root,V2-build-worlds,V3-harness,V3-bundle,V3-packages,V4-web,V4-web-baseline,V6-scenarios,V6-join-clerk,V6-join-dev,V7-old-worlds,V7-new-world,V7-camera-dpr2,V7-god-modal,V8-history-boot', shard: null, suiteExit: 0 },
+  s: { only: 'V3-walk,V3-mars-engine,V3-client-cli,V3-launcher-unit,V6-party,V6-souls-r2,V6-souls-ux,V6-mars-two,V6-lm-two', shard: null, suiteExit: 0 },
+  'v5-1': { only: 'V5-server-full', shard: '1/2', suiteExit: 0 },
+  'v5-2': { only: 'V5-server-full', shard: '2/2', suiteExit: 0 },
+};
+function verifyHarnessArchive(metadata, root) {
+  if (!/^[0-9a-f]{40}$/.test(metadata.harnessRef || '')) throw Error('missing exact harness commit');
+  if (gitAt(root, 'rev-parse', `${metadata.harnessRef}:tools/test-harness`) !== metadata.harnessTree) throw Error('metadata mismatch: harnessTree');
+  const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', metadata.harnessRef, 'tools/test-harness'], { maxBuffer: MAX_BUFFER });
+  if (sha256(archive) !== metadata.harnessArchiveSha256) throw Error('metadata mismatch: harnessArchiveSha256');
+}
+function recoverAssetCollisions(dir, m, requiredSteps, read, root) {
+  const require = (ok, why) => { if (!ok) throw Error(`asset collection recovery: ${why}`); };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  require(m.suiteCompleted === false && m.suiteExit === 0 && m.only === undefined && same(requiredSteps, REQUIRED_STEPS), 'not a full completed execution');
+  verifyHarnessArchive(m, root);
+  require(gitAt(root, 'rev-parse', `${m.harnessRef}:tools/test-harness/modal_suite.py`) === ASSET_COLLISION_COLLECTOR, 'unsupported collector');
+  require(same(m.fanout?.groups, COLLISION_GROUPS), 'unexpected group plan');
+  const problems = ['s', 'v5-1', 'v5-2'].map(g => `group ${g}: file collision V0-assets.log`);
+  require(same(m.fanout?.problems, problems), 'unexpected collector problems');
+  require(same(readdirSync(join(dir, 'out/groups')).sort(), Object.keys(COLLISION_GROUPS).sort()), 'missing/extra retained group');
+  require(/^[0-9a-f]{40}$/.test(m.sourceSha || '') && /^[0-9a-f]{64}$/.test(m.sourceArchiveSha256 || ''), 'missing source identity');
+  read(join(dir, 'out/suite/V0-assets.log')); // --check --quiet legitimately produces an empty file.
+  const rows = path => {
+    const lines = read(path).trimEnd().split('\n');
+    require(lines.shift() === 'step\texit\tseconds\tlog', 'invalid group summary header');
+    const parsed = lines.map(l => l.split('\t'));
+    require(parsed.every(r => r.length === 4 && /^\d+$/.test(r[2]) && (r[3] === '-' || r[3] === `/out/suite/${r[0]}.log`)), 'malformed group summary');
+    require(new Set(parsed.map(r => r[0])).size === parsed.length, 'duplicate summary row');
+    return parsed;
+  };
+  const summaries = {};
+  for (const [name, plan] of Object.entries(COLLISION_GROUPS)) {
+    const gm = JSON.parse(read(join(dir, 'out/groups', name, 'RUN-METADATA.json')));
+    const { fanout, suiteCompleted, ...identity } = m;
+    require(same(Object.keys(gm).sort(), [...Object.keys(identity), 'suiteCompleted'].sort()), `${name}: metadata fields differ`);
+    require(gm.suiteCompleted === true && Object.entries(identity).every(([k, v]) => same(gm[k], v)), `${name}: incomplete or mismatched identity/runtime`);
+    const rs = summaries[name] = rows(join(dir, 'out/groups', name, 'SUMMARY.tsv'));
+    const wanted = plan.only.split(',').filter(s => REQUIRED_STEPS.includes(s) || s === 'V8-history-boot');
+    require(same(rs.map(r => r[0]), wanted), `${name}: missing/extra/reordered steps`);
+    for (const r of rs) require(r[0] === 'V8-history-boot' ? same(r, ['V8-history-boot', 'SKIP', '0', '-']) : /^\d+$/.test(r[1]) && r[3] === `/out/suite/${r[0]}.log`, `${name}: unexpected exit/log`);
+  }
+  const all = gitAt(root, 'ls-tree', '-r', '--name-only', m.sourceSha, '--', 'apps/server/src').split('\n')
+    .filter(f => f.endsWith('.test.ts')).map(f => f.slice('apps/server/'.length)).sort().join('\n') + '\n';
+  require(all !== '\n', 'empty source server inventory');
+  const picked = [], logs = [], attribution = [];
+  for (const name of ['v5-1', 'v5-2']) {
+    const path = file => join(dir, 'out/groups', name, file);
+    require(read(path('V5-all-files.txt')) === all, `${name}: server inventory differs from source`);
+    picked.push(read(path('V5-shard-files.txt')));
+    require(picked.at(-1).trim().length > 0, `${name}: empty shard`);
+    logs.push(read(path('V5-server-full.log')));
+    attribution.push(read(path('V5-server-full-files.jsonl')));
+    const parsed = parseTap(logs.at(-1), name), events = attribution.at(-1).trim().split('\n').map(JSON.parse);
+    require(!parsed.errors.length, `${name}: incomplete server TAP`);
+    require(events.at(-1)?.event === 'test:summary', `${name}: incomplete server attribution`);
+    const exit = Number(summaries[name][0][1]), failures = parsed.tests.filter(t => t.status === 'fail' && !t.aggregate);
+    require(exit < 128 && exit !== 124 && (exit === 0 ? !failures.length : failures.length > 0), `${name}: exit/assertion mismatch or infrastructure exit`);
+    const counters = { tests: 'tests', suites: 'suites', pass: 'passed', fail: 'failed', cancelled: 'cancelled', skipped: 'skipped', todo: 'todo', topLevel: 'topLevel' };
+    require(Object.entries(counters).every(([k, v]) => parsed.counts[k] === events.at(-1).counts?.[v]), `${name}: attribution/TAP counts differ`);
+    const files = new Set();
+    for (const event of events.slice(0, -1)) {
+      // Node emits per-file summaries too; the last event is the complete shard's aggregate (checked above).
+      if (event.event === 'test:summary') continue;
+      require(['test:pass', 'test:fail'].includes(event.event) && typeof event.file === 'string' && typeof event.name === 'string' && ['test', 'suite'].includes(event.type), `${name}: malformed server attribution`);
+      files.add(sourceFile(event.file).replace(/^apps\/server\//, ''));
+    }
+    require([...files].sort().join('\n') + '\n' === picked.at(-1), `${name}: executed files differ from shard inventory`);
+  }
+  require(picked.join('') === all, 'server shards are not an exact ordered cover');
+  require(read(join(dir, 'out/suite/V5-server-full.log')) === logs.join(''), 'merged server log differs from shards');
+  require(read(join(dir, 'out/suite/V5-server-full-files.jsonl')) === attribution.join(''), 'merged server attribution differs from shards');
+  const shardRows = [summaries['v5-1'][0], summaries['v5-2'][0]];
+  const server = ['V5-server-full', String(Math.max(...shardRows.map(r => Number(r[1])))), String(Math.max(...shardRows.map(r => Number(r[2])))), '/out/suite/V5-server-full.log'];
+  const merged = [...summaries.a, ...summaries.s, server].sort(([a], [b]) => a.localeCompare(b));
+  require(same(rows(join(dir, 'out/suite/SUMMARY.tsv')).sort(([a], [b]) => a.localeCompare(b)), merged), 'merged summary differs from groups');
+  return { schemaVersion: 1, kind: 'informational-assets-collision', rawSuiteCompleted: false, executionCompleted: true,
+    collectorBlob: ASSET_COLLISION_COLLECTOR, groups: Object.keys(COLLISION_GROUPS), problems, serverFiles: all.trimEnd().split('\n').length };
 }
 
 /** options.driverTestsChanged: the cached baseline ran other laptop-side driver files (same suite tree, see DRIVER_ONLY);
@@ -351,11 +446,10 @@ export const cacheKey = ({ sourceSha, suiteTree, node }) => `${sourceSha}-${suit
 /** Read a run for reuse under a suite identity: source, Node major and complete contract by readRun; the suite tree from
  * the run's own harness commit, which must also match the run's recorded full harnessTree. */
 export function readSuiteRun(dir, { sourceSha, suiteTree: suite, node }, manifest, root = ROOT, requiredSteps = REQUIRED_STEPS, readOptions = {}) {
-  const run = readRun(dir, { schemaVersion: 1, sourceSha, node }, manifest, requiredSteps, readOptions);
+  const run = readRun(dir, { schemaVersion: 1, sourceSha, node }, manifest, requiredSteps, { ...readOptions, root });
   const ref = run.metadata?.harnessRef;
   try {
-    if (!/^[0-9a-f]{40}$/.test(ref || '')) throw Error('no harness commit in the run metadata');
-    if (gitAt(root, 'rev-parse', `${ref}:tools/test-harness`) !== run.metadata.harnessTree) run.errors.push('metadata mismatch: harnessTree');
+    verifyHarnessArchive(run.metadata, root);
     run.suiteTree = suiteTree(root, ref);
     if (run.suiteTree !== suite) run.errors.push('metadata mismatch: suiteTree');
   } catch (e) { run.errors.push(`unverifiable harness ${ref}: ${e.message.split('\n')[0]}`); }
@@ -531,7 +625,7 @@ export function cacheAdd(runDir, { root = ROOT, cacheDir = defaultCacheDir(root)
     const harnessTree = gitAt(root, 'rev-parse', `${meta.harnessRef}:tools/test-harness`);
     const archive = execFileSync('git', ['-C', root, 'archive', '--format=tar.gz', meta.harnessRef, 'tools/test-harness'], { maxBuffer: MAX_BUFFER });
     const manifest = JSON.parse(execFileSync('git', ['-C', root, 'show', `${meta.harnessRef}:tools/test-harness/quarantine.json`], { maxBuffer: MAX_BUFFER }));
-    run = readRun(runDir, { schemaVersion: 1, sourceSha: meta.sourceSha, harnessRef: meta.harnessRef, harnessTree, harnessArchiveSha256: sha256(archive), node: meta.node }, manifest);
+    run = readRun(runDir, { schemaVersion: 1, sourceSha: meta.sourceSha, harnessRef: meta.harnessRef, harnessTree, harnessArchiveSha256: sha256(archive), node: meta.node }, manifest, REQUIRED_STEPS, { root });
     // On its own terms, the run must pass as a gate baseline: every failure, skip and TODO has its exact quarantine,
     // no test file failed to load and no V6 scenario failed (compareRuns of the run with itself, on its own source tree).
     const sourceFiles = new Set(gitAt(root, 'ls-tree', '-r', '--name-only', meta.sourceSha).split('\n'));
@@ -711,10 +805,10 @@ export async function main(args = process.argv.slice(2), deps = {}) {
       if (rechecked.pinsSha256 !== bundleCarry.pinsSha256) throw Error('bundle baseline carry: original evidence or expectations changed during candidate execution; no baseline fallback allowed');
       bundleCarry = rechecked;
     }
-    const readBaseline = () => bundleCarry ? bundleCarry.originalRun : base.source === 'cached' ? readSuiteRun(base.dir, { sourceSha: baselineSha, suiteTree: suite, node }, manifest, root)
-      : readRun(base.dir, base.exact ? { ...identity, sourceSha: baselineSha } : reuseIdentity({ sourceSha: baselineSha, harnessTree, node }), manifest);
+    const readBaseline = () => bundleCarry ? bundleCarry.originalRun : base.source === 'cached' || (base.source === 'imported' && !base.exact) ? readSuiteRun(base.dir, { sourceSha: baselineSha, suiteTree: suite, node }, manifest, root)
+      : readRun(base.dir, { ...identity, sourceSha: baselineSha }, manifest, REQUIRED_STEPS, { root });
     let baseline = readBaseline();
-    const candidate = readRun(candidateDir, candidateIdentity, manifest, scope.steps);
+    const candidate = readRun(candidateDir, candidateIdentity, manifest, scope.steps, { root });
     if (drivers.candidate && (drivers.candidate.exit !== 0 || drivers.candidate.timedOut)) candidate.errors.push(`Modal driver failed (${drivers.candidate.timedOut ? 'timeout' : drivers.candidate.exit})`);
     // A cached baseline is only comparable on the candidate's exact runtime (the node:<major> image can move its patch).
     const runtime = r => r.metadata && `${r.metadata.nodeVersion}/${r.metadata.pnpmVersion}`;
@@ -729,8 +823,9 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     }
     if (drivers.baseline && (drivers.baseline.exit !== 0 || drivers.baseline.timedOut)) baseline.errors.push(`Modal driver failed (${drivers.baseline.timedOut ? 'timeout' : drivers.baseline.exit})`);
     const candidateSourceFiles = new Set(git('ls-tree', '-r', '--name-only', candidateSha).split('\n'));
-    const driverTestsChanged = base.source === 'cached' && baseline.metadata?.harnessTree !== harnessTree;
-    if (base.source === 'cached') receipt.baseline = { ...receipt.baseline, harnessRef: baseline.metadata?.harnessRef, harnessTree: baseline.metadata?.harnessTree, suiteTree: baseline.suiteTree, driverTestsChanged };
+    const suiteReuse = base.source === 'cached' || (base.source === 'imported' && !base.exact);
+    const driverTestsChanged = suiteReuse && !baseline.errors.length && baseline.suiteTree === suite && baseline.metadata?.harnessTree !== harnessTree;
+    if (suiteReuse) receipt.baseline = { ...receipt.baseline, harnessRef: baseline.metadata?.harnessRef, harnessTree: baseline.metadata?.harnessTree, suiteTree: baseline.suiteTree, driverTestsChanged };
     receipt = { ...receipt, ...compareRuns(bundleCarry ? bundleCarry.comparisonRun : baseline, candidate, manifest, candidateSourceFiles, { driverTestsChanged }), drivers,
       runs: { baseline, candidate } };
     // Cache what this gate proved: a fresh baseline run that validated, and the candidate of a passing gate
