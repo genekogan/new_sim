@@ -1,4 +1,4 @@
 ---
 type: internal
 ---
-Release validation shards finish their summaries when local history checks are skipped.
+Release validation handles skipped history checks and verifies completed fanout evidence after informational-log collisions while preserving failures and reusing identical suites across driver-only changes.

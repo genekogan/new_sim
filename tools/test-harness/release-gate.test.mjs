@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, mkdirSync, writeFileSync, renameSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, renameSync, readFileSync, symlinkSync } from 'node:fs';
 import { tmpdir, homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cacheAdd, cacheKey, compareRuns, lookupCache, prepareBundleBaselineCarry, suiteTree, DRIVER_ONLY, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
+import { cacheAdd, cacheKey, compareRuns, lookupCache, prepareBundleBaselineCarry, readSuiteRun, suiteTree, DRIVER_ONLY, main, parseArgs, parseTap, readRun, scopeFor, storeCache, validateQuarantine, REQUIRED_PACKAGES, REQUIRED_STEPS } from './release-gate.mjs';
 import { combineReceipts } from './ship-receipt.mjs';
 
 // Preserve fixture artifacts under the same no-delete rule as release work.
@@ -345,6 +345,130 @@ function fakeModal(calls, nodeVersionFor = () => 'v22.23.0', onlys = []) {
 }
 const gate = async (repo, args, remoteRun, lines = []) => ({ rc: await main(args, { root: repo.dir, remoteRun, log: l => lines.push(l) }), lines });
 const receiptOf = out => JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8'));
+
+function collisionFixture(t) {
+  const repo = gateRepo(t);
+  repo.commit('tools/test-harness/modal_suite.py', readFileSync(new URL('./modal_suite.py', import.meta.url), 'utf8'));
+  repo.commit('apps/server/src/one.test.ts', '// first server file\n');
+  const ref = repo.commit('apps/server/src/two.test.ts', '// second server file\n'), dir = join(repo.dir, '.lane/collision');
+  const meta = { schemaVersion: 1, sourceSha: ref, harnessRef: ref, harnessTree: gitIn(repo.dir, 'rev-parse', `${ref}:tools/test-harness`),
+    harnessArchiveSha256: shaOf(execFileSync('git', ['-C', repo.dir, 'archive', '--format=tar.gz', ref, 'tools/test-harness'])),
+    sourceArchiveSha256: shaOf('retained source archive'), node: '22', suiteExit: 0 };
+  writeFullRun(dir, meta);
+  const plans = {
+    a: ['V1-types,V2-build-root,V2-build-worlds,V3-harness,V3-bundle,V3-packages,V4-web,V4-web-baseline,V6-scenarios,V6-join-clerk,V6-join-dev,V7-old-worlds,V7-new-world,V7-camera-dpr2,V7-god-modal,V8-history-boot', null],
+    s: ['V3-walk,V3-mars-engine,V3-client-cli,V3-launcher-unit,V6-party,V6-souls-r2,V6-souls-ux,V6-mars-two,V6-lm-two', null],
+    'v5-1': ['V5-server-full', '1/2'], 'v5-2': ['V5-server-full', '2/2'],
+  };
+  const file = p => join(dir, 'out', p), load = p => JSON.parse(readFileSync(file(p), 'utf8'));
+  const original = load('RUN-METADATA.json');
+  const rawRows = readFileSync(file('suite/SUMMARY.tsv'), 'utf8').trimEnd().split('\n'), header = rawRows.shift();
+  const rows = new Map(rawRows.map(r => [r.split('\t')[0], r]));
+  const logs = [], attrs = [];
+  for (const [name, [only, shard]] of Object.entries(plans)) {
+    mkdirSync(file(`groups/${name}`), { recursive: true });
+    writeFileSync(file(`groups/${name}/RUN-METADATA.json`), JSON.stringify(original));
+    writeFileSync(file(`groups/${name}/SUMMARY.tsv`), header + '\n' + only.split(',').filter(s => rows.has(s)).map(s => rows.get(s)).join('\n') + '\n');
+    if (!shard) continue;
+    const src = name === 'v5-1' ? 'src/one.test.ts' : 'src/two.test.ts';
+    const log = tap([{ name: src, source: 'apps/server/' + src }]), counts = parseTap(log).counts;
+    const summary = { event: 'test:summary', counts: {
+      tests: counts.tests, suites: counts.suites, passed: counts.pass, failed: counts.fail, cancelled: counts.cancelled, skipped: counts.skipped, todo: counts.todo, topLevel: counts.topLevel,
+    } };
+    const attr = [{ event: 'test:pass', file: '/work/head/apps/server/' + src, name: src, type: 'test' }, summary, summary].map(e => JSON.stringify(e)).join('\n') + '\n';
+    for (const [f, bytes] of Object.entries({ 'V5-all-files.txt': 'src/one.test.ts\nsrc/two.test.ts\n', 'V5-shard-files.txt': src + '\n', 'V5-server-full.log': log, 'V5-server-full-files.jsonl': attr })) writeFileSync(file(`groups/${name}/${f}`), bytes);
+    logs.push(log); attrs.push(attr);
+  }
+  writeFileSync(file('suite/V5-server-full.log'), logs.join('')); writeFileSync(file('suite/V5-server-full-files.jsonl'), attrs.join(''));
+  writeFileSync(file('suite/V0-assets.log'), '');
+  const raw = { ...original, suiteCompleted: false, fanout: { groups: Object.fromEntries(Object.entries(plans).map(([name, [only, shard]]) => [name, { only, shard, suiteExit: 0 }])), problems: ['s', 'v5-1', 'v5-2'].map(g => `group ${g}: file collision V0-assets.log`) } };
+  writeFileSync(file('RUN-METADATA.json'), JSON.stringify(raw));
+  const read = () => readSuiteRun(dir, { sourceSha: ref, suiteTree: suiteTree(repo.dir, ref), node: '22' }, manifest(), repo.dir);
+  return { repo, dir, ref, file, load, raw, read, edit: (p, fn) => writeFileSync(file(p), fn(readFileSync(file(p), 'utf8'))),
+    json: (p, fn) => writeFileSync(file(p), JSON.stringify(fn(load(p)))) };
+}
+test('known informational collisions recover only from full retained execution, preserving raw false and assertion failures', t => {
+  const f = collisionFixture(t), before = readFileSync(f.file('RUN-METADATA.json'));
+  const r = f.read(); assert.deepEqual(r.errors, []); assert.equal(r.metadata.suiteCompleted, false);
+  assert.equal(r.collectionRecovery.rawSuiteCompleted, false); assert.equal(r.collectionRecovery.serverFiles, 2);
+  assert.equal(r.evidence[f.file('groups/v5-1/V5-server-full.log')], shaOf(readFileSync(f.file('groups/v5-1/V5-server-full.log'))));
+  assert.deepEqual(readFileSync(f.file('RUN-METADATA.json')), before);
+  writeFileSync(f.file('suite/V3-bundle.log'), tap([{ name: 'real baseline budget failure', status: 'fail' }]));
+  for (const p of ['suite/SUMMARY.tsv', 'groups/a/SUMMARY.tsv']) f.edit(p, s => s.replace('V3-bundle\t0', 'V3-bundle\t1'));
+  const failed = f.read(); assert.deepEqual(failed.errors, []); assert.equal(failed.steps['V3-bundle'].tests[0].status, 'fail');
+  assert.equal(compareRuns(failed, failed, manifest()).status, 'blocked');
+  const refused = cacheAdd(f.dir, { root: f.repo.dir, cacheDir: f.file('unused-cache') });
+  assert.equal(refused.stored, false); assert.match(refused.reason, /baseline failure has no quarantine: real baseline budget failure/);
+});
+test('collection recovery fails closed on missing, altered or incomplete retained evidence', async t => {
+  const cases = {
+    'missing group': f => renameSync(f.file('groups/s'), f.file('retained-s')),
+    'extra group': f => mkdirSync(f.file('groups/extra')),
+    'other collision': f => f.json('RUN-METADATA.json', m => { m.fanout.problems[0] = 'group s: file collision V3-walk.log'; return m; }),
+    'extra collision': f => f.json('RUN-METADATA.json', m => { m.fanout.problems.push(m.fanout.problems[0]); return m; }),
+    'wrong group plan': f => f.json('RUN-METADATA.json', m => { m.fanout.groups.s.only = 'V3-walk'; return m; }),
+    'incomplete group': f => f.json('groups/s/RUN-METADATA.json', m => ({ ...m, suiteCompleted: false })),
+    'failed group': f => f.json('groups/s/RUN-METADATA.json', m => ({ ...m, suiteExit: 1 })),
+    'group runtime': f => f.json('groups/s/RUN-METADATA.json', m => ({ ...m, nodeVersion: 'v22.99.0' })),
+    'group source': f => f.json('groups/s/RUN-METADATA.json', m => ({ ...m, sourceSha: 'a'.repeat(40) })),
+    'group archive': f => f.json('groups/s/RUN-METADATA.json', m => ({ ...m, harnessArchiveSha256: 'a'.repeat(64) })),
+    'bounded group': f => f.json('groups/s/RUN-METADATA.json', m => ({ ...m, serverFiles: ['src/one.test.ts'] })),
+    'scoped group': f => f.json('groups/s/RUN-METADATA.json', m => ({ ...m, only: ['V3-walk'] })),
+    'missing summary': f => renameSync(f.file('groups/a/SUMMARY.tsv'), f.file('retained-summary')),
+    'missing group row': f => f.edit('groups/a/SUMMARY.tsv', s => s.replace(/^V3-bundle.*\n/m, '')),
+    'duplicate group row': f => f.edit('groups/a/SUMMARY.tsv', s => s + 'V3-bundle\t0\t1\t/out/suite/V3-bundle.log\n'),
+    'root elapsed mismatch': f => f.edit('suite/SUMMARY.tsv', s => s.replace('V1-types\t0\t1', 'V1-types\t0\t2')),
+    'root exit mismatch': f => f.edit('suite/SUMMARY.tsv', s => s.replace('V1-types\t0', 'V1-types\t1')),
+    'V8 duplicate': f => f.edit('suite/SUMMARY.tsv', s => s + 'V8-history-boot\tSKIP\t0\t-\n'),
+    'truncated inventory': f => f.edit('groups/v5-1/V5-all-files.txt', () => 'src/one.test.ts\n'),
+    'duplicate shard': f => f.edit('groups/v5-2/V5-shard-files.txt', () => 'src/one.test.ts\n'),
+    'merged log differs': f => f.edit('suite/V5-server-full.log', s => s + '\n'),
+    'invalid UTF-8 cannot collapse bytes': f => writeFileSync(f.file('suite/V5-server-full.log'), Buffer.from([0xff])),
+    'merged attribution differs': f => f.edit('suite/V5-server-full-files.jsonl', s => s + '\n'),
+    'shard exits cannot mask one another': f => {
+      const p = 'groups/v5-1/V5-server-full.log';
+      writeFileSync(f.file(p), tap([{ name: 'src/one.test.ts', source: 'apps/server/src/one.test.ts', status: 'fail' }]));
+      f.edit('groups/v5-1/V5-server-full-files.jsonl', s => s.replaceAll('"event":"test:pass"', '"event":"test:fail"').replaceAll('"passed":1', '"passed":0').replaceAll('"failed":0', '"failed":1'));
+      f.edit('groups/v5-2/SUMMARY.tsv', s => s.replace('V5-server-full\t0', 'V5-server-full\t1'));
+      f.edit('suite/SUMMARY.tsv', s => s.replace('V5-server-full\t0', 'V5-server-full\t1'));
+      for (const suffix of ['.log', '-files.jsonl']) writeFileSync(f.file(`suite/V5-server-full${suffix}`), [1, 2].map(n => readFileSync(f.file(`groups/v5-${n}/V5-server-full${suffix}`), 'utf8')).join(''));
+    },
+    'missing assets diagnostic': f => renameSync(f.file('suite/V0-assets.log'), f.file('retained-assets')),
+    'symlink diagnostic': f => { renameSync(f.file('suite/V0-assets.log'), f.file('retained-assets')); symlinkSync(f.file('retained-assets'), f.file('suite/V0-assets.log')); },
+    'truncated TAP': f => f.edit('suite/V3-walk.log', s => s.replace(/# duration_ms.*\n/, '')),
+    'missing scenario inventory': f => renameSync(f.file('suite/V6-party-cases.json'), f.file('retained-cases')),
+    'scoped run': f => f.json('RUN-METADATA.json', m => ({ ...m, only: REQUIRED_STEPS })),
+    'forged harness archive': f => f.json('RUN-METADATA.json', m => ({ ...m, harnessArchiveSha256: 'a'.repeat(64) })),
+    'unsupported collector': f => {
+      const ref = f.repo.commit('tools/test-harness/modal_suite.py', '# unsupported collector\n');
+      for (const p of ['RUN-METADATA.json', ...['a', 's', 'v5-1', 'v5-2'].map(g => `groups/${g}/RUN-METADATA.json`)])
+        f.json(p, m => ({ ...m, harnessRef: ref, harnessTree: gitIn(f.repo.dir, 'rev-parse', `${ref}:tools/test-harness`),
+          harnessArchiveSha256: shaOf(execFileSync('git', ['-C', f.repo.dir, 'archive', '--format=tar.gz', ref, 'tools/test-harness'])) }));
+    },
+  };
+  for (const [name, mutate] of Object.entries(cases)) await t.test(name, t => {
+    const f = collisionFixture(t); mutate(f); const r = f.read(); assert.ok(r.errors.length, name);
+    if (name === 'unsupported collector') assert.match(r.errors.join('\n'), /unsupported collector/);
+    if (name === 'shard exits cannot mask one another') assert.match(r.errors.join('\n'), /v5-1: exit\/assertion mismatch/);
+  });
+});
+
+test('solo baseline imports reuse only the verified executed suite, retain driver attribution and block runtime changes without reruns', async t => {
+  const repo = gateRepo(t), imported = join(repo.dir, '.lane/import'), base = repo.base;
+  await fakeModal([])(imported, base, base, '22', repo.dir);
+  repo.commit('tools/test-harness/release-gate.mjs', '// driver-only change\n');
+  const head = gitIn(repo.dir, 'rev-parse', 'HEAD'), calls = [], out = join(repo.dir, '.lane/import-gate');
+  const args = [head, '--baseline', base, '--baseline-results', imported, '--no-cache'];
+  const result = await gate(repo, [...args, '--out', out], fakeModal(calls));
+  assert.equal(result.rc, 0, receiptOf(out).blockers.join('\n')); assert.deepEqual(calls, [head]); assert.equal(receiptOf(out).baseline.driverTestsChanged, true);
+  const mismatch = join(repo.dir, '.lane/runtime'); calls.length = 0;
+  await gate(repo, [...args, '--out', mismatch], fakeModal(calls, () => 'v22.99.0'));
+  assert.equal(receiptOf(mismatch).status, 'blocked'); assert.deepEqual(calls, [head]);
+  repo.commit('tools/test-harness/one-validation.sh', '# changed execution\n');
+  const changed = join(repo.dir, '.lane/changed');
+  await gate(repo, [gitIn(repo.dir, 'rev-parse', 'HEAD'), ...args.slice(1), '--out', changed], fakeModal([]));
+  assert.match(receiptOf(changed).blockers.join('\n'), /suiteTree/);
+});
 
 test('baseline reuse: a miss runs main once and caches it; the next gate on the same harness tree runs only the candidate', async t => {
   const repo = gateRepo(t), tmp = dirname(repo.dir), cache = mkdtempSync(join(tmp, 'sim-gate-cache-')); t.after(() => retireFixture(cache));
