@@ -44,3 +44,6 @@
 - { name: "history:imported", color: "d4c5f9", description: "Imported from the pre-public development history" }
 - { name: "no-changelog", color: "eeeeee", description: "Nothing user-facing; no changes/ fragment needed" }
 - { name: "dependencies", color: "0366d6", description: "Dependency updates" }
+
+# epic (the other epic:* labels predate this file and are left alone; see the note at the top)
+- { name: "epic:scalability", color: "fef2c0", description: "Server scalability / reliability epic" }
