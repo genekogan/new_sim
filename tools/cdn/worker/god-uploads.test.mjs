@@ -233,17 +233,17 @@ test('CORS is per request across miss, R2, cached old responses, HEAD, OPTIONS, 
   const cached = cache.map.get(url(PATH));
   cached.headers.set('access-control-allow-origin', 'https://sim.eden.art');
   cached.headers.set('timing-allow-origin', 'https://sim.eden.art');
-  for (const origin of ['https://souls.game', 'https://sim.eden.art', 'https://souls.game.evil.example', 'null', '']) {
+  for (const origin of ['https://soul.game', 'https://souls.game', 'https://sim.eden.art', 'https://souls.game.evil.example', 'https://soul.game.evil.example', 'null', '']) {
     for (const init of [{}, { method: 'HEAD' }, { method: 'OPTIONS' }, { headers: { 'if-none-match': `"${SHA}"` } }]) {
       const r = await call(PATH, { ...init, headers: { ...init.headers, origin } });
-      const allowed = ['https://souls.game', 'https://sim.eden.art'].includes(origin) ? origin : null;
+      const allowed = ['https://soul.game', 'https://souls.game', 'https://sim.eden.art'].includes(origin) ? origin : null;
       assert.equal(r.headers.get('access-control-allow-origin'), allowed);
       assert.equal(r.headers.get('timing-allow-origin'), allowed);
       assert.match(r.headers.get('vary'), /Origin/);
     }
     const refused = await call('/w/bad', { headers: { origin } });
     assert.equal(refused.status, 400);
-    assert.equal(refused.headers.get('access-control-allow-origin'), ['https://souls.game', 'https://sim.eden.art'].includes(origin) ? origin : null);
+    assert.equal(refused.headers.get('access-control-allow-origin'), ['https://soul.game', 'https://souls.game', 'https://sim.eden.art'].includes(origin) ? origin : null);
   }
   cache.map.clear();
   assert.equal((await call(PATH, { headers: { origin: 'https://souls.game' } })).headers.get('access-control-allow-origin'), 'https://souls.game');

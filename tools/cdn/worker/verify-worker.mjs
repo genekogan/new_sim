@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url)), root = resolve(here, '../../..');
 const args = process.argv.slice(2), opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : d; };
 const sha = (b) => createHash('sha256').update(b).digest('hex');
-const APPS = ['https://sim.eden.art', 'https://souls.game'];
+const APPS = ['https://sim.eden.art', 'https://souls.game', 'https://soul.game'];
 
 /** A minimal valid GLB: one triangle, random vertices (a fresh sha every run), about 1 m tall. */
 export function triangleGlb() {

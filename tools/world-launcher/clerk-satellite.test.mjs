@@ -21,8 +21,8 @@ test('primary return allowlist retains SDK sync, queries and pairing fragment, r
     assert.equal(primaryReturnTarget('', '#/?sign_in_force_redirect_url='+encodeURIComponent(value), domain), null);
   }
 });
-async function runPage({ session = null, hash = '', search = '', currentOrigin = 'https://primary.example.test', fail = false } = {}) {
-  const page = primarySignInPage(auth, search), calls = [], root = { textContent: '' };
+async function runPage({ session = null, hash = '', search = '', currentOrigin = 'https://primary.example.test', fail = false, pageAuth = auth } = {}) {
+  const page = primarySignInPage(pageAuth, search), calls = [], root = { textContent: '' };
   // This is our generated fixture, not an HTML sanitizer: extract its one inline bootstrap exactly.
   const start = page.html.indexOf('<script>') + '<script>'.length;
   const script = page.html.slice(start, page.html.lastIndexOf('</script>'));
@@ -48,4 +48,25 @@ test('primary bridge escapes untrusted-looking attribute bytes rather than makin
   const page = primarySignInPage({ ...auth, clerkIssuer: 'https://clerk.example.test" onload="bad' }, '');
   assert.ok(page.html.includes('&quot; onload=&quot;bad'));
   assert.equal(page.html.includes('src="https://clerk.example.test" onload='), false);
+});
+
+test('explicit legacy satellite returns normalize to canonical without opening other origins', async () => {
+  const legacy = 'old.example.test';
+  const config = satelliteSettings(domain, signInUrl, origin, legacy);
+  assert.deepEqual(config.legacyDomains, [legacy]);
+  for (const bad of ['', '*', 'https://old.example.test', 'old.example.test/path', 'primary.example.test', domain, 'old.example.test,']) assert.throws(() => satelliteSettings(domain, signInUrl, origin, bad));
+  const old = `https://${legacy}/w/eden/?__clerk_synced=false#godpair/ABCD-EFGH`;
+  const canonical = origin+'/w/eden/?__clerk_synced=false#godpair/ABCD-EFGH';
+  assert.equal(satelliteReturnUrl(old, domain), null);
+  assert.equal(satelliteReturnUrl(old, domain, [legacy]), canonical);
+  for (const bad of ['https://old.example.test.evil.test/', 'https://user@old.example.test/', 'http://old.example.test/', 'https://old.example.test:444/']) assert.equal(satelliteReturnUrl(bad, domain, [legacy]), null);
+  for (const input of [old, canonical]) for (let repeat = 0; repeat < 2; repeat++) {
+    const pageAuth = { ...auth, clerkSatellite: config };
+    const signedOut = await runPage({ pageAuth, search: '?redirect_url='+encodeURIComponent(input) });
+    assert.deepEqual(signedOut.calls[0][1].allowedRedirectOrigins, [origin, 'https://'+legacy]);
+    assert.equal(signedOut.calls[1][1].forceRedirectUrl, canonical);
+    const signedIn = await runPage({ pageAuth, hash: '#/?redirect_url='+encodeURIComponent(input), session: {} });
+    assert.deepEqual(signedIn.calls[1], ['replace', canonical]);
+    assert.deepEqual((await runPage({pageAuth,hash:'#/?redirect_url=https://evil.test/'})).calls, []);
+  }
 });

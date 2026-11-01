@@ -61,3 +61,26 @@ trip. Keep live proof explicitly unverified until this browser journey succeeds.
 
 References: [Clerk satellite domains](https://clerk.com/docs/guides/dashboard/dns-domains/satellite-domains) and
 [Clerk CSP](https://clerk.com/docs/guides/secure/best-practices/csp-headers).
+
+## Moving the canonical satellite
+
+Keep the same issuer, publishable key and account registry. For a move from souls.game to soul.game, set
+`--public-origin https://soul.game --clerk-satellite soul.game --clerk-legacy-satellites souls.game` and retain
+`--clerk-sign-in-url https://sim.eden.art/sign-in`. The legacy list is explicit (at most four hostnames), rejects
+URLs, wildcard hosts, the primary and the canonical hostname. The primary bridge allows both exact origins,
+then normalizes a permitted legacy return to the canonical domain while retaining its path, query and fragment.
+Old Clerk satellites need not remain active for these normalized return links. Existing in-flight Clerk SDK
+synchronization still requires real browser verification; synthetic sessions do not establish provider behavior.
+
+A public-only environment file can override `CLERK_AUTHORIZED_PARTIES` with
+`https://sim.eden.art,https://souls.game,https://soul.game`. Load that file with a systemd drop-in's additional
+`EnvironmentFile=` after the existing production settings file; do not clear the existing directive. Restart the
+keeper when changing its environment/arguments. The launcher validates 1–8 exact HTTPS origins and passes only
+this public override into its authentication subprocess, creator verifier and both world command types.
+Explicit process environment takes precedence over Node's existing `--env-file`. With no override, that file's
+behavior is unchanged. The application CLI continues reading issuer/key from the existing auth file by path;
+there is no need to inspect, copy or modify that file. Arbitrary parent variables are never inherited.
+
+Configure the new satellite DNS/certificate and the primary redirect settings before activation. Keep old API,
+WebSocket, token, god and asset routes directly proxied to the same authority; redirect only browser pages.
+Existing auth-bearing requests must never depend on a cross-origin HTTP redirect retaining Authorization.
