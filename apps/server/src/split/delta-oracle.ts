@@ -204,5 +204,5 @@ createServer(async (req, res) => {
     else if (p === '/reset') {tap.samples.length = 0; tickCost.length = 0; for (const k of Object.keys(PROF)) delete PROF[k]; profTicks = tap.cost.ticks; stats.postCpuMs.length = 0; v = {ok: true};}
     else {res.statusCode = 404; v = {error: 'unknown'};}
     res.end(J(v));
-  } catch (e) {res.statusCode = 500; res.end(J({error: (e as Error).stack}));}
+  } catch (e) {res.statusCode = 500; log(`control: ${(e as Error).stack}`); res.end(J({error: (e as Error).message}));}   // the stack goes to the log, not the socket
 }).listen(CONTROL, '127.0.0.1', () => log(`control on ${CONTROL}`));
