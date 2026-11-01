@@ -8,6 +8,7 @@ The code is the authority. When a doc and the code disagree, the code wins: fix 
 |---|---|
 | run Sim locally | [development](development.md) |
 | understand how it fits together | [architecture](architecture.md), then the [glossary](glossary.md) |
+| reason about contracts, performance or where a feature plugs in | [component and data-flow map](architecture/map.md) |
 | change the server API or protocol | [API](architecture/api.md), [protocol](architecture/protocol.md), [contracts](architecture/contracts.md) |
 | work on Souls or the Soul client | [Souls at the edge](architecture/souls.md) |
 | work on god mode | [god mode](architecture/godmode.md), [safety](architecture/safety.md) |
@@ -24,7 +25,7 @@ The code is the authority. When a doc and the code disagree, the code wins: fix 
 ## Contents
 
 - [architecture.md](architecture.md): system overview
-  - [architecture/](architecture/): [api](architecture/api.md), [protocol](architecture/protocol.md),
+  - [architecture/](architecture/): [map](architecture/map.md), [api](architecture/api.md), [protocol](architecture/protocol.md),
     [engine contract](architecture/engine-contract.md), [brain](architecture/brain.md), [data](architecture/data.md),
     [worlds](architecture/worlds.md), [souls](architecture/souls.md), [god mode](architecture/godmode.md),
     [contracts](architecture/contracts.md), [safety](architecture/safety.md)
