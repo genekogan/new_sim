@@ -53,8 +53,8 @@ export async function archiveWorld({ registry, pool, dataDir }, slug, by, reason
   const dest = join(archiveRoot(dataDir), id); mkdirSync(dest, { recursive: true });
   const { port: _p, ...entry } = w;
   writeJson(join(dest, 'archived.json'), { schema: ARCHIVE_SCHEMA, id, slug, entry, at: new Date(at).toISOString(), by, ...(reason ? { reason: String(reason).slice(0, 200) } : {}) });
-  registry.remove(slug);
   const src = registry.worldDir(slug);
+  registry.remove(slug);
   if (existsSync(src)) renameSync(src, join(dest, 'world'));
   audit(dataDir, { op: 'archive', slug, id, by, ...(reason ? { reason: String(reason).slice(0, 200) } : {}) });
   return { id, slug, archive: dest };
@@ -66,8 +66,8 @@ export function restoreWorld({ registry, dataDir }, id, by) {
   const dest = join(archiveRoot(dataDir), id), recFile = join(dest, 'archived.json');
   let rec; try { rec = JSON.parse(readFileSync(recFile, 'utf8')); } catch { return [404, { ok: false, code: 'not-found', message: `no archive ${id}` }]; }
   if (rec.restoredAt) return [409, { ok: false, code: 'restored', message: `${id} was already restored at ${rec.restoredAt}` }];
-  if (registry.get(rec.slug)) return [409, { ok: false, code: 'exists', message: `a world ${rec.slug} is registered; archive or rename it first` }];
-  const data = join(dest, 'world'), target = registry.worldDir(rec.slug);
+  if (registry.slugs().has(rec.slug) || (rec.entry.aliases ?? []).some((s) => registry.slugs().has(s))) return [409, { ok: false, code: 'exists', message: `a world ${rec.slug} is registered; archive or rename it first` }];
+  const data = join(dest, 'world'), target = registry.worldDir(rec.slug, rec.entry);
   if (existsSync(data)) {
     if (existsSync(target)) return [409, { ok: false, code: 'occupied', message: `${target} exists; move it aside first` }];
     mkdirSync(join(registry.dataDir, 'worlds'), { recursive: true });
