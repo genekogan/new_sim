@@ -1,14 +1,14 @@
 # Capacity bench — metrics (FROZEN v1, 2026-10-31, before the first run)
 
-Frozen before any number was taken (LESSONS-20261026 §2). A change to a definition below is a new version (v2), and
-v1 and v2 numbers are never put in one table. Pass bars: `team/TRANCHE-SERVER-RELIABILITY-20261031.md` §2 (copied in
-`REPORT.md` beside each result). Contract the numbers refer to: `docs/sim/LOAD-CONTRACT.md`.
+Frozen before any number was taken (docs/process/lessons.md). A change to a definition below is a new version (v2), and
+v1 and v2 numbers are never put in one table. Pass bars are copied into the
+`REPORT.md` beside each result. Contract the numbers refer to: [`docs/architecture/load.md`](../../../docs/architecture/load.md).
 
 ## Run shape (every arm, every repeat)
 
 One fresh world process per (arm, repeat): the fixture copied into an empty `DATA_DIR`, `BRAIN_MODE=fake`,
 `MIND_DRIVER=edge`, `DEV_AUTH=1`, `NODE_OPTIONS=--max-old-space-size=<heapMb>` (default 768, the production value on
-main `da5269cd0`), the launcher's malloc env, `--inspect` on a loopback port (heap reads only). Phases, wall-clock:
+main `cdd3eece3`), the launcher's malloc env, `--inspect` on a loopback port (heap reads only). Phases, wall-clock:
 
 | Phase | Length | What runs |
 |---|---|---|
@@ -66,7 +66,7 @@ Two repeats of every arm; results are reported as the range of the two (min–ma
 # v2 — Stage B (lane B-soak, 2026-10-31; `--load stageb`, frozen before the first eden2 number)
 
 A new version, so v1 and v2 numbers are never in one table (the report's eden2 "before" column is v1, labelled so).
-Target (tranche `TRANCHE-STAGE-B-20261031.md`): **N = 100: tick service ≥ 90 %, reads ≤ 300 ms p99**. Through the
+Target (Stage B tranche): **N = 100: tick service ≥ 90 %, reads ≤ 300 ms p99**. Through the
 launcher only (`--via-launcher`: its proxy, ceilings and read routing are in the path).
 
 ## Run shape (changes from v1)

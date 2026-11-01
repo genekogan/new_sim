@@ -43,7 +43,7 @@ Verified source facts:
   agreement keeps the v1 stone garden. The errand trigger is the first 10-second
   all-three overlap in one pool garden, and its proof names `gardenRef`.
   Scorer evidence and the disturbance dispatcher/runner must declare
-  `fixtureVersion: 2`. Version 1 is git `3ad3c223d`; runs sealed under it keep
+  `fixtureVersion: 2`. Version 1 is git `94d5d6eda`; runs sealed under it keep
   their v1 scores. Tests: `garden-pool-v2.test.mjs`.
 - Mars template operations move Chiba and its furnishings after initial placement.
   The final presenter box is [-14.412,-18.447]; the old cast's [-15.9,-20.6] is stale.
@@ -54,7 +54,7 @@ Verified source facts:
 Preflight and per-run requirements:
 
 - The 2026-10-29 scoped in-memory witness in `native-fixtures.test.mjs` and
-  `<team>/scratch/continuity-20261029/fixtures/holdout-native-1793312212796-64536.json`
+  the holdout record `holdout-native-1793312212796-64536.json` (kept outside the repo)
   covers garden routes, Pavilion separation, both candidate endpoints, four
   audience positions and actual violin performance using accelerated native
   ticks and synthetic bodies. It establishes physical feasibility only, not
@@ -62,7 +62,7 @@ Preflight and per-run requirements:
   connected-native r3 report records named route/hold/owner-delivery feasibility
   positives, but overall body coverage is UNKNOWN: initial gaps 2694/2651/2675 ms
   exceed the unchanged 2-second bound. See
-  `<team>/scratch/continuity-20261029/garden-native-readiness-r3/REPORT.md`.
+  the garden native-readiness r3 report (kept outside the repo).
   Full readiness is not established. The native performer posture is `busy`; its
   explicit current activity and instrument must establish playing, rather than
   the open receipt intent.
@@ -144,7 +144,7 @@ transcripts were read in authoring this proposal. A general fix after a holdout
 failure requires a newly declared evaluation; the failed trial remains reported.
 
 Scratch provenance and regeneration: run the already-authored
-`<team>/scratch/continuity-20261029/fixtures/build-manifests.py` only
+`build-manifests.py` (kept outside the repo) only
 when intentionally creating a new declared proposal. It filters template ops and
 writes slices/manifests; it performs no world requests, actions or inference.
 Native discovery JSON in that directory came from the existing credential-opaque
@@ -153,7 +153,7 @@ printed or copied. That source-discovery collection performed no native actions;
 later model-free native fixture actions and comparison runs are separate evidence.
 
 Prospective revision `2026-10-29-precomparison-2` supersedes the strict proposal
-at Git `6960c41f6`. The JSON transport remains schema `/1`; fixture revision
+at Git `c5c1a6359`. The JSON transport remains schema `/1`; fixture revision
 metadata is included in scorer output. Existing development reports, especially
 Eden duo 3 and Mars four 1, retain their original findings. These corrections do
 not retroactively turn any old run into acceptance evidence. No comparison had
@@ -203,7 +203,7 @@ and original outcomes.
   is not a passed frozen setup.
 
 Prospective revision `2026-10-29-precomparison-3` separately tightens the reading
-appointment clock after revision 2 (Git `23d97248f`). Early arrival and reading
+appointment clock after revision 2 (Git `212a28545`). Early arrival and reading
 remain permitted, but the required shared 30 real seconds must occur at or after
 the declared meeting and no later than the existing cutoff. For a straddling
 hold, only its postmeeting portion counts, starting with the first native sample
@@ -293,7 +293,7 @@ before use. Model-free adapter tests establish argv/lifecycle behavior, not actu
 Codex storage or sidebar absence. A separate CLI 0.163.0 READY probe and complete
 active/archived cwd-filtered stateDB inventory verified its exact ephemeral
 thread absent from the native sidebar projection; see
-`<team>/scratch/continuity-20261029/ephemeral-cli-sidebar-proof/followup-state-db-verification.json`.
+the follow-up state-db verification record (kept outside the repo).
 That is scoped metadata evidence, not rollout/filesystem absence or a guarantee
 for another version or run. Per-run verification remains separate. Requested
 model/effort and the full task/deadline remain unchanged; actual model/effort need their normal host

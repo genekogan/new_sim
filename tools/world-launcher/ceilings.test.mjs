@@ -30,9 +30,9 @@ test('ceilings: address rate, listen per Soul / account / address, account rate,
   assert.equal(c.check(soul('c', '3.3.3.3', 'GET'), 'w2', '/v1/edge/receipts/x', true).refuse.body.code, 'client.rate');
   ok(c.check(soul('c', '3.3.3.3', 'GET'), 'w2', '/v1/edge/receipts/x', false));   // not behind the proxy: no address limit
   t += 10_000;
-  const l1 = c.check(soul('d', '4.4.4.1', 'GET'), 'w3', '/v1/edge/inbox/listen', true), l2 = c.check(soul('d', '4.4.4.2', 'GET'), 'w3', '/v1/edge/inbox/listen', true);
-  assert.equal(c.check(soul('d', '4.4.4.3', 'GET'), 'w3', '/v1/edge/inbox/listen', true).refuse.body.code, 'soul.busy');
-  l1.release(); ok(c.check(soul('d', '4.4.4.3', 'GET'), 'w3', '/v1/edge/inbox/listen', true)); l2.release();
+  const l1 = c.check(soul('d', '203.0.113.1', 'GET'), 'w3', '/v1/edge/inbox/listen', true), l2 = c.check(soul('d', '203.0.113.2', 'GET'), 'w3', '/v1/edge/inbox/listen', true);
+  assert.equal(c.check(soul('d', '203.0.113.3', 'GET'), 'w3', '/v1/edge/inbox/listen', true).refuse.body.code, 'soul.busy');
+  l1.release(); ok(c.check(soul('d', '203.0.113.3', 'GET'), 'w3', '/v1/edge/inbox/listen', true)); l2.release();
   // one account's Souls share its listen and rate ceilings once the world names the account
   const souls = ['e1', 'e2', 'e3', 'e4', 'e5'].map((x) => soul(x, `5.5.5.${x}`, 'GET'));
   for (const s of souls) c.learn(c.soulOf(s), 'acct-1');

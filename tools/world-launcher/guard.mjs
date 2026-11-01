@@ -1,4 +1,4 @@
-// The launcher's guard over its world processes (lane L1, server-reliability tranche; docs/sim/LOAD-CONTRACT.md §4):
+// The launcher's guard over its world processes (lane L1, server-reliability tranche; docs/architecture/load.md §4):
 // the numbers it judges by, the world's live.json heartbeat, restart backoff. Pure helpers; children.mjs acts on them.
 import { readFileSync } from 'node:fs';
 

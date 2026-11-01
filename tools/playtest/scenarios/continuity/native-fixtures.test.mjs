@@ -24,7 +24,7 @@ test('sealed Eden holdout paths and bandstand crowd/performance have bounded nat
   if(w){proof.finalTick=w.host.engine.world.tick;proof.nativeViolations=structuredClone(w.host.engine.runtime.violations);proof.paidCost=w.db.paidCost();w.close();}
   proof.endedAt=new Date().toISOString();
   const requested=process.env.CONTINUITY_NATIVE_FIXTURE_PROOF_DIR;
-  if(requested){const out=resolve(requested),allowed='<team>/scratch/continuity-20261029/fixtures';assert.ok(out===allowed||out.startsWith(allowed+'/'),'export only to explicitly authorized fixture proof directory');mkdirSync(out,{recursive:true});const file=join(out,`holdout-native-${Date.now()}-${process.pid}.json`);writeFileSync(file,JSON.stringify(proof,null,2)+'\n');t.diagnostic('native fixture proof: '+file);}
+  if(requested){const out=resolve(requested),allowed=resolve('.local/playtest/continuity-fixtures');assert.ok(out===allowed||out.startsWith(allowed+'/'),'export only to explicitly authorized fixture proof directory');mkdirSync(out,{recursive:true});const file=join(out,`holdout-native-${Date.now()}-${process.pid}.json`);writeFileSync(file,JSON.stringify(proof,null,2)+'\n');t.diagnostic('native fixture proof: '+file);}
  });
  w=await bootEden(message=>proof.boot.push(message));w.brain.quiesce();
  const tick=async(n=20)=>{for(let i=0;i<n;i++){w.host.tickOnce();if(i%20===0){await setImmediate();w.host.drainInputs();}}};

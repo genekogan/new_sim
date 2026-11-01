@@ -3,8 +3,8 @@
   "version": 1,
   "status": "precomparison-proposal; numeric thresholds not previously accepted or passed",
   "provenance": {
-    "acceptedIntent": "<team>/PREFLIGHT-SOUL-CONTINUITY-20261029.md",
-    "audit": "<team>/AUDIT-SOUL-CONTINUITY-20261029.md",
+    "acceptedIntent": "PREFLIGHT-SOUL-CONTINUITY-20261029.md (private record, kept outside the repo)",
+    "audit": "AUDIT-SOUL-CONTINUITY-20261029.md (private record, kept outside the repo)",
     "latencyTargetsInAudit": "provisional 2s receive / 5s host delivery / 15s visible response",
     "commonResponseRevision": "precomparison common-response/2: native latency independent of nullable client stages; prior reports unchanged",
     "additionalNumericValues": "fixture-author proposal on 2026-10-29; seal before comparison and retain all failed trials"

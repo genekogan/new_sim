@@ -405,7 +405,7 @@ test('god queue: commands typed while away wait in order; tickets move pending -
 });
 
 test('god presence: a command handed over reads working even when the clock moves between the seen stamp and the delivery', t => {
-  // R5 gate (run-3910d6152): the agent middleware stamps last_seen_at, then delivers; a millisecond boundary between the two
+  // R5 gate (run-fd2b22dec): the agent middleware stamps last_seen_at, then delivers; a millisecond boundary between the two
   // left last_seen_at < delivered_at, so the owner saw 'listening' (and 'away' after the 75 s lease) for a held command.
   const db = new Db(':memory:'); t.after(() => db.close());
   let now = 1000; const inbox = new AgentInbox(db, 'w1', () => now++), g = {scope: 'god', owner: 'alice'};

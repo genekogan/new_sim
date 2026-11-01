@@ -205,7 +205,7 @@ test('schema error notification is forwarded for the owned thread without ending
 // email and workspace account id are canaries that must never leave the host.
 const caller={'features.shell_tool':false,web_search:'disabled'};
 const chatgpt={account:{type:'chatgpt',email:'canary@example.invalid',planType:'pro'},requiresOpenaiAuth:true,workspaceRouting:{chatgptAccountId:'acct-canary',backendOrigin:'https://chatgpt.com',accountRoutingOverride:'NO_CONSTRAINT'}};
-// Mirrors laptop1's effective config/read: built-in chatgpt_base_url default, null others.
+// Mirrors a developer machine's effective config/read: built-in chatgpt_base_url default, null others.
 const effective={model_provider:null,profile:null,openai_base_url:null,chatgpt_base_url:'https://chatgpt.com/backend-api/',profiles:{}};
 function selection(t,{account=chatgpt,settings={config:effective},provider,recorded=SOUL_PROVIDER_ID,options={}}={}){
  return protocol(t,options,(m,respond,refuse)=>{

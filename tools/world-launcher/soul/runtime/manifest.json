@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "nodeMinimum": "22.20.0",
   "host": "codex app-server (experimental)",
-  "source": "146fd8b24f9dc2a46615a1fca64d2e7f3d01fd73",
+  "source": "f9da909ba96de2457cb0b0930137e5759541452f",
   "esbuild": "0.28.1",
   "artifacts": [
     {

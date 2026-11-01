@@ -1,7 +1,7 @@
 // Stage B (lane B-delta, from the L9 spike): the per-tick WorldDelta v1, built on the tick thread right after a tick
 // (world.ts `splitTap`, fed the tick's own paths/changes: the same arrays the viewer Batch accumulates) and kept in a ring
 // so a consumer (the read worker) that fell behind resumes from its seq, or is told to re-snapshot. Contract:
-// docs/sim/LOAD-CONTRACT.md §6. Types and the consumer side: split/read-model.ts. WorldInit: split/world-init.ts.
+// docs/architecture/load.md §6. Types and the consumer side: split/read-model.ts. WorldInit: split/world-init.ts.
 // Read-only over the engine and the ledger: it never writes world state, so the engine stays bit-for-bit the same.
 // Nothing here scans the world per tick: bodies are the tracked set (Soul/native humans, carriers, and entities the tick
 // reported), comms objects come from L8's table.changes(since), receipts from the ledger's receipt listener.

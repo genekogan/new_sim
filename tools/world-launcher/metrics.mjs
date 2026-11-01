@@ -1,4 +1,4 @@
-// Prometheus metrics for the launcher and its worlds (lane L7, 2026-10-31; names: docs/sim/LOAD-CONTRACT.md §5).
+// Prometheus metrics for the launcher and its worlds (lane L7, 2026-10-31; names: docs/architecture/load.md §5).
 // Served at GET /__sim/metrics to direct loopback requests only (Grafana Alloy on the box scrapes it; never public).
 // No dependency: the text exposition format (version 0.0.4) is written here, so a scrape costs one pass over the worlds
 // and the small `live.json` each world's watchdog thread writes every 2 s (LOAD-CONTRACT §4). A world whose main thread is

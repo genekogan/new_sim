@@ -46,7 +46,7 @@ test('v2 declares a sealed five-garden pool and leaves every other frozen value 
 });
 
 test('v1 is reproducible: removing the v2 keys restores the exact prior fixture bytes',t=>{
- const base='3ad3c223d6a749f7dcdc6e8164f5be7afccc341a';let prior;
+ const base='94d5d6edad66944491db5fb1ffce8fdbc6fb512c';let prior;
  try{prior=execFileSync('git',['show',base+':tools/playtest/scenarios/continuity/fixtures.json'],{cwd:new URL('.',import.meta.url),encoding:'utf8',stdio:['ignore','pipe','ignore']});}catch{t.skip('v1 commit not in this clone');return;}
  assert.deepEqual(v1Fixtures(),JSON.parse(prior));
  const old=JSON.parse(prior);for(const [i,s]of old.scenarios.entries())if(s.id!=='eden-walk-three')assert.deepEqual(fixtures.scenarios[i],s,'other scenarios unchanged: '+s.id);

@@ -17,7 +17,7 @@ import {createManagedRestartObserver,inspectRestartProcess,baselineAutomaticRest
 
 export const CONTINUITY_ARMS=['existing-headless-seat','managed-continuity-runtime'];
 export const R400_ARTIFACTS=Object.freeze({
- revision:'da5269cd089a98627d231e72e739245598ed2a93',
+ revision:'cdd3eece39aa99173cfcf36a967779af3eab1341',
  'eden.mjs':'35d327c94841402474b3fd8e587bd6472f696243ff551a590164cea201d774eb',
  'skill.md':'39427d64d27cd98e156bb75b43b47f1b96a19db4012b3f280c9cf1c568f6f0d8',
 });

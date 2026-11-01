@@ -3,12 +3,12 @@
 Prepared for coordinator-owned isolated-world confirmation. Five static native
 use-checks and all 24 occupied seating orders with reverse exits pass with the
 prospective `occupied-link-routing/1` policy. The earlier policy-off failure is
-preserved in `failed-proof.json`; it is not erased by the repaired run. The release owner also verified the original semantic commands in the isolated
+preserved in the private proof records (kept outside the repo); it is not erased by the repaired run. The release owner also verified the original semantic commands in the isolated
 Mars server: presenter and all four original tier slots were simultaneously
 seated. Visual support/aisle review and production application remain pending.
 The initial verification script incorrectly compared an entity ID with a slot
-ID; its raw output is retained alongside the corrected native slot proof at
-`team/scratch/continuity-20261029/multi-mars/repaired-semantic-seating-corrected.json`.
+ID; its raw output is retained alongside the corrected native slot proof in the
+private records kept outside the repo.
 
 This repairs the actual named cushion placements in the shipped, fully rotated
 Mars two layout. It does not select replacement seats, reinterpret released
@@ -53,7 +53,7 @@ From the repository root, outside an active playtest window:
 ```sh
 node worlds/patches/mars-chiba-seating-20261029/build.mjs
 node --test worlds/patches/mars-chiba-seating-20261029/patch.test.mjs
-CHIBA_PROOF_OUT=worlds/patches/mars-chiba-seating-20261029/proof.json node --test worlds/patches/mars-chiba-seating-20261029/native.test.mjs
+CHIBA_PROOF_OUT=.local/chiba-seating/proof.json node --test worlds/patches/mars-chiba-seating-20261029/native.test.mjs
 ```
 
 The builder adds one final move batch to `worlds/templates/mars-two.json`, without
@@ -71,9 +71,9 @@ at 900 engine ticks (45 simulated seconds). `CHIBA_ALL_ORDERS=1` extends this to
 all 24 seating orders with reverse exits; use only if the focused run is cheap.
 These are geometry regressions, not continuity A/B trials or soak acceptance.
 
-`proof.json` records the critical order; `proof-all-orders.json` records all 24
-orders (96 physical arrivals and 96 reverse exits), five use-check verdicts,
-source-code hashes and exact clearance measurements. Every arrival/exit passed
+The proof records (`proof.json` for the critical order and `proof-all-orders.json` for all 24
+orders, both kept outside the repo; `CHIBA_PROOF_OUT` writes a fresh one) hold (96 physical arrivals and 96 reverse exits), five use-check verdicts,
+source-code hashes and exact clearance measurements for those orders. Every arrival/exit passed
 the predeclared 900-tick bound. Kernel regression tests separately retain the
 policy-off wait, supported alternate-route recovery, six-attempt cap, snapshot
 continuation, historical-policy absence and no mid-flight replanning.

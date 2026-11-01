@@ -1,8 +1,8 @@
 // Stage B (lane B-delta, from the L9 spike): the replicated read model of one world. Pure: no host, no engine, no db,
 // only the plain data in WorldInit / WorldDelta (split/world-init.ts, split/delta.ts), so it runs in a worker.
 //   Replica   = every replicated table, built from one WorldInit and kept current by applying WorldDeltas in order
-//               (docs/sim/LOAD-CONTRACT.md §6 "WorldDelta v1"; the oracle in split/delta-oracle.ts checks it against main).
-//   ReadModel = the spike's declared SUBSET of `here` and `capabilities` over a Replica (docs/sim/STAGE-B-SPLIT.md §3),
+//               (docs/architecture/load.md §6 "WorldDelta v1"; the oracle in split/delta-oracle.ts checks it against main).
+//   ReadModel = the spike's declared SUBSET of `here` and `capabilities` over a Replica (docs/architecture/split.md §3),
 //               kept so the read worker can serve it until B-facade's MenuWorld runs the real read code.
 import type {MenuDelta, MenuInit} from './menu-world.ts';
 import {clearSight, dist2, round1, type Solid} from '../edge/perception/geometry.ts';

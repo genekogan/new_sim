@@ -63,7 +63,7 @@ export function launcherFlood({ limits = {}, now = Date.now, log = (l) => consol
 // Per address only behind the reverse proxy (x-forwarded-for, which Caddy sets itself); this machine is never limited by
 // address. Caddy, not the launcher, accepts the connections, so "connections per address" is counted as the address's
 // requests in flight to world APIs and its WebSockets.
-// Re-derived 2026-10-31 (Gene, 13:40Z, team/scratch/ship/CEILINGS-DECISION-20261031.md: "I want real scalability
+// Re-derived 2026-10-31 (maintainer decision, 13:40Z: "I want real scalability
 // solutions, not limits"): a floor an order of magnitude above legitimate use — 6 Souls at home are 20–30 requests per
 // 10 s and ~110 heavy per minute; the first numbers were set before Stage A was measured and sat at that edge. The world
 // budget is a stop-gap until shedding is load-driven (the world's green/amber/red/black, LOAD-CONTRACT §1).

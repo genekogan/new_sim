@@ -83,7 +83,7 @@ async function runCase(t,clock){
   }
   assert.deepEqual(w.host.engine.runtime.violations,[]);assert.equal(w.db.paidCost(),0);p.checks.invariantsAndNoPaidModel={status:'pass'};p.status='pass';
  }catch(error){p.status='fail';p.failure={name:error.name,code:error.code??null,message:error.message};throw error;}
- finally{close();p.finishedAt=Date.now();const requested=process.env.CONTINUITY_NATIVE_FIXTURE_PROOF_DIR;if(requested){const out=resolve(requested),allowed='<team>/scratch/continuity-20261029/fixtures';assert(out.startsWith(allowed+'/'));mkdirSync(out,{recursive:true});const file=join(out,`bandstand-static-${clock}-${p.startedAt}-${process.pid}.json`);writeFileSync(file,JSON.stringify(p,null,2)+'\n',{flag:'wx',mode:0o600});t.diagnostic('native static-greeter proof: '+file);}}
+ finally{close();p.finishedAt=Date.now();const requested=process.env.CONTINUITY_NATIVE_FIXTURE_PROOF_DIR;if(requested){const out=resolve(requested),allowed=resolve('.local/playtest/continuity-fixtures');assert(out.startsWith(allowed+'/'));mkdirSync(out,{recursive:true});const file=join(out,`bandstand-static-${clock}-${p.startedAt}-${process.pid}.json`);writeFileSync(file,JSON.stringify(p,null,2)+'\n',{flag:'wx',mode:0o600});t.diagnostic('native static-greeter proof: '+file);}}
 }
 
 test('prospective static bench greeter: six native bodies, occupied approach paths and exact recipient',{timeout:180000},t=>runCase(t,'accelerated-native-ticks'));

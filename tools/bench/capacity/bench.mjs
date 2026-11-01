@@ -50,7 +50,7 @@ if (VIA && SLICE) throw new Error('--via-launcher with --slice is not built yet 
 const LOAD = opt('load', 'v1'), RW_MODES = opt('read-worker', '').split(',').filter(Boolean), RW_N = Number(opt('read-workers', 1)), CLI_SOULS = Number(opt('cli-souls', 3));
 const VIEWERS = Number(opt('viewers', 6)), BUDGET = ((b) => (b === 'default' ? '' : b))(opt('world-budget-rps', LOAD === 'stageb' ? '200' : '')), ORACLE_RATE = Number(opt('oracle-rate', 0.01)), JOIN_PAR = Number(opt('join-concurrency', LOAD === 'stageb' ? 4 : 1)), CPUS = opt('cpus', '');
 // r3 (2026-10-31): the active windows start only once the world has been green for GREEN_HOLD_S (Souls connected and listening,
-// no commands), at most GREEN_GATE_S after the join; eden2 6a4171dbb ran its windows inside the join storm's red tail
+// no commands), at most GREEN_GATE_S after the join; eden2 5fed735da ran its windows inside the join storm's red tail
 const GREEN_GATE_S = Number(opt('green-gate-s', LOAD === 'stageb' ? 300 : 0)), GREEN_HOLD_S = Number(opt('green-hold-s', 20));
 if (!['v1', 'stageb'].includes(LOAD)) throw new Error('--load v1|stageb');
 if ((RW_MODES.length || LOAD === 'stageb' || CPUS) && !VIA) throw new Error('--load stageb, --read-worker and --cpus run through the launcher: add --via-launcher');
@@ -423,7 +423,7 @@ async function launcherReadMetrics() {   // sim_world_read_routed_total / _fallb
   try { const t = await (await fetch(`http://127.0.0.1:${PORT}/__sim/metrics`, { signal: AbortSignal.timeout(5000) })).text(), sum = (name) => t.split('\n').filter((l) => l.startsWith(name)).reduce((s, l) => s + (Number(l.trim().split(/\s+/).at(-1)) || 0), 0);
     return { routed: sum('sim_world_read_routed_total'), fallback: sum('sim_world_read_fallback_total') }; } catch { return null; }
 }
-// B-facade's HTTP cross-thread compare (team/scratch/srv/b-facade/w2.mjs): main's own `here` on the world's port, then the
+// B-facade's HTTP cross-thread compare (a harness script kept outside the repo): main's own `here` on the world's port, then the
 // worker's on its port, same Soul, a few ms apart; field-compared when both answer at the same tick and the worker computed
 // its answer itself (x-sim-read-cpu-ms). `here` is the one read a mode-2 worker computes over HTTP; it forwards the rest to main.
 function diffFields(a, b, path = '', out = [], max = 50) {   // = apps/server/src/split/read-oracle.ts diffFields

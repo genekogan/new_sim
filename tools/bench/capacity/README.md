@@ -14,16 +14,16 @@ uses ports 5151–5152; it never touches eden3, the `mars` user, production worl
 compact copy, made once, read-only to the bench).
 
 1. **Source**: a checkout of the commit under test at `/srv/sim-bench/src` (`git -C /srv/sim-bench/src checkout <sha>`
-   then `pnpm install --frozen-lockfile`). The baseline is main `da5269cd0`. The bench files are read from this
+   then `pnpm install --frozen-lockfile`). The baseline is main `cdd3eece3`. The bench files are read from this
    lane's branch; copy `tools/bench/capacity/` into `/srv/sim-bench/bench/` if the commit under test predates them.
 2. **Fixture** (compact copy only, never a whole DB copy):
    `python3 /srv/sim-bench/compact-copy.py <eden-2026 live sim.db> /srv/sim-bench/fixtures/eden-2026.db`
-   (`compact-copy.py` = `team/ops/compact-copy.py`, copied over once; it opens the source read-only in one transaction).
+   (`compact-copy.py` = a private ops script, copied over once; it opens the source read-only in one transaction).
    Note the world key and world id of the live Eden 2026 world (the bench reads the id from the fixture if not given).
 3. **Run** (as root, so `systemd-run --scope --uid` can place only the world in the slice; the driver runs outside it):
 
 ```bash
-cd /srv/sim-bench/src && node /srv/sim-bench/bench/bench.mjs --root /srv/sim-bench/src --fixture /srv/sim-bench/fixtures/eden-2026.db --world-key eden-2026 --out /srv/sim-bench/runs/baseline-da5269cd0 --host-label eden2-slice --world-user simworlds --slice "systemd-run --quiet --scope -p AllowedCPUs=6-7 -p MemoryMax=4G --uid=simworlds --gid=simworlds" --heap-mb 768 --repeats 2 > /srv/sim-bench/runs/baseline-da5269cd0.log 2>&1
+cd /srv/sim-bench/src && node /srv/sim-bench/bench/bench.mjs --root /srv/sim-bench/src --fixture /srv/sim-bench/fixtures/eden-2026.db --world-key eden-2026 --out /srv/sim-bench/runs/baseline-cdd3eece3 --host-label eden2-slice --world-user simworlds --slice "systemd-run --quiet --scope -p AllowedCPUs=6-7 -p MemoryMax=4G --uid=simworlds --gid=simworlds" --heap-mb 768 --repeats 2 > /srv/sim-bench/runs/baseline-cdd3eece3.log 2>&1
 ```
 
    The world's command and env come from the checkout's own `tools/world-launcher/children.mjs` `defaultCommand` +
@@ -34,7 +34,7 @@ cd /srv/sim-bench/src && node /srv/sim-bench/bench/bench.mjs --root /srv/sim-ben
    About 2 h for six arms × two repeats (boot + join + 60 s warm-up + 30 s idle + 2 × 120 s per run). Background it
    (`nohup … &`); judge by `receipt.json`, never by the shell's exit code.
 4. **After**: copy `REPORT.md` + `receipt.json` (not `commands.jsonl`, not `souls/`) back to
-   `team/scratch/srv/clients/eden2-<sha>/`; delete the fixture (`/srv/sim-bench/fixtures/eden-2026.db`) — that delete
+   `.local/bench/clients/eden2-<sha>/`; delete the fixture (`/srv/sim-bench/fixtures/eden-2026.db`) — that delete
    is on the bench's own scratch file, not a production artefact. The per-run data copies are moved to
    `~/.Trash/eden-cleanup-20261020/` by the bench itself.
 
@@ -44,7 +44,7 @@ processes, ~2 GB RSS, outside the slice.
 ## Laptop (smoke; INDICATIVE, never passes or fails)
 
 ```bash
-node tools/bench/capacity/bench.mjs --root "$PWD" --fixture genesis:eden-2026 --out <team>/scratch/srv/clients/local-<sha> [--short]
+node tools/bench/capacity/bench.mjs --root "$PWD" --fixture genesis:eden-2026 --out .local/bench/clients/local-<sha> [--short]
 ```
 
 `genesis:<template>` boots a fresh world from `worlds/templates/<template>.json` (no history, no real Souls), so it is
@@ -83,14 +83,14 @@ node tools/bench/capacity/bench.mjs --root "$PWD" --fixture <compact copy> --wor
 node bench.mjs --root /srv/sim-bench/src-<sha> --fixture /srv/sim-bench/fixtures/eden-2026.db --world-key eden-2026 --via-launcher --port 5151 --child-range 5152-5159 --heap-mb 2048 --host-label eden2-slice --world-user simworlds --cpus 6-7 --load stageb --read-worker off,on --arms n6,n12,n24,n50,n100 --repeats 2 --out <dir>
 ```
 
-The exact eden2 recipe for a run is in the B-soak lane status file (`team/lanes/srv-b-soak.md`).
+The exact eden2 recipe for a run is `eden2/run-stageb.sh` (`run-stageb-f.sh` for part F).
 
 ## Recorded baseline (2026-10-31, before the server-reliability fixes)
 
 Fixture: the compact Eden 2026 copy, sha256 `d0921000a7ef…`, heap cap 768 MB unless noted; two repeats per arm, shown
-as ranges. Reports: `team/scratch/srv/clients/{eden2-da5269cd0,local-fixture-da5269cd0,vl-pair/*}/REPORT.md`.
+as ranges. The per-run reports were kept outside the repo.
 
-**eden2 slice (gates; main da5269cd0, Soul CLI 2.4.0, CPUs 6–7, 4 GB):** every arm FAILS and every arm wedges.
+**eden2 slice (gates; main cdd3eece3, Soul CLI 2.4.0, CPUs 6–7, 4 GB):** every arm FAILS and every arm wedges.
 
 | arm | tick service (bar) | healthz p99 ms (bar) | act / read p99 s (bar) | heap % cap (bar) | longest healthz gap s | other |
 |---|---|---|---|---|---|---|
@@ -107,7 +107,7 @@ Marginal cost (M8): 0.021 CPU-s/s idle and 0.024 active per added Soul over an i
 **Laptop, direct (indicative; M3 Max, whole host):** same shape, later: n1/n6 do not wedge (gaps ≤ 27 s), n12 and up
 wedge (25–34 s), hostile 114–122 s; healthz p99 5000 ms in every arm; tick service 0.72–0.78 at n1, 0.07–0.16 at n12.
 
-**Laptop, through the launcher (indicative; heap 2048 MB; main da5269cd0 + CLI 2.4.0 against R1 f6a903983 + CLI 2.5.0,
+**Laptop, through the launcher (indicative; heap 2048 MB; main cdd3eece3 + CLI 2.4.0 against R1 07892deaf + CLI 2.5.0,
 paired, two repeats each):**
 
 | arm | quantity | main | R1 |

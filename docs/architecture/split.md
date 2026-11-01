@@ -1,8 +1,8 @@
 # Stage B spike — can the Soul read path leave the tick thread? (lane L9, 2026-10-31)
 
-Branch `lane/srv-split-20261031` off main `da5269cd0`. Prototype only (`apps/server/src/split/**`); no production path
-changes. Plan: `team/PLAN-SCALE-20261031.md` §2 Stage B; design `team/scratch/server-reliability-20261031/scalability-design.md`
-§2.6. Line numbers are anchors at `da5269cd0` unless a lane branch is named.
+Branch `lane/srv-split-20261031` off main `cdd3eece3`. Prototype only (`apps/server/src/split/**`); no production path
+changes. The scalability plan and design notes it answers were kept outside the repo. Line numbers are anchors at
+`cdd3eece3` unless a lane branch is named.
 
 ## 1. The read path's engine dependencies
 
@@ -101,7 +101,7 @@ type WorldDelta = {
 
 **Measured** (live fixture copy `eden-2026.db`, real `main.ts`, `SOUL_LIFECYCLE=1`, all 7 of the fixture's Souls,
 6 of them scripted to keep walking; laptop, CPU = `threadCpuUsage` of the tick thread; run
-`team/scratch/srv/split/run1`):
+receipt `run1`, kept outside the repo):
 
 | Part | CPU on tick thread | Bytes |
 |---|---|---|
@@ -114,7 +114,7 @@ type WorldDelta = {
 
 The body stream costs about 0.1 % of a tick. All of the measured cost is the object diff, and that is because
 `comms.objects.all()` on main re-reads the whole table (11,584 rows, ~26 ms). With L8's in-memory table
-(`lane/srv-objects-20261031` 979c0a28a) and a change feed from its writes, this term goes to ~0. **The object table
+(`lane/srv-objects-20261031` 8c694923e) and a change feed from its writes, this term goes to ~0. **The object table
 must emit deltas.** Scanning it to diff is the one thing that does not scale.
 
 ## 3. Read-model worker (`split/read-model.ts`, `split/read-worker.ts`)
@@ -133,7 +133,7 @@ answer by the oracle):
   (60 m). These are the menu rows that are pure (a).
 
 **Measured** (oracle = the main thread computes `hereFrame` and `capabilities` for every Soul, then asks the worker
-at the same tick and compares JSON; busy = `team/scratch/srv/split/busy.mjs`: the tick thread is busy-looped for
+at the same tick and compares JSON; busy = a small harness script kept outside the repo: the tick thread is busy-looped for
 2 s while a client asks the worker directly):
 
 | | Result |
@@ -142,7 +142,7 @@ at the same tick and compares JSON; busy = `team/scratch/srv/split/busy.mjs`: th
 | Oracle, 6 Souls converged on one place (`field`, run2) | **7/7 identical**, with 3–5 Souls in `near`, 16–30 things and 7–15 subset offers each (two passes: 14/14) |
 | Worker answer CPU, `here` subset | 1.7–9 ms warm (13.5 ms max on the first pass) |
 | Worker answer CPU, `capabilities` subset | 0.4–2.2 ms |
-| Main thread, the full `hereFrame` for the same Souls (for scale; it includes the whole `binds()` menu of 8,961–9,609 offers) | 214–745 ms, and **11–22 s** for one Soul standing among many objects (`kindOf` calls `objects.all()` once per nearby object, here.ts 241; L3's 2b4f6e1aa fixes this on its branch) |
+| Main thread, the full `hereFrame` for the same Souls (for scale; it includes the whole `binds()` menu of 8,961–9,609 offers) | 214–745 ms, and **11–22 s** for one Soul standing among many objects (`kindOf` calls `objects.all()` once per nearby object, here.ts 241; L3's c987693eb fixes this on its branch) |
 | **Busy-loop 2 s** on the tick thread, run1 (twice) | the worker gave 692 and 548 answers; wall **p50 1.8 ms, p99 8.6–9.6 ms, max 11.0–13.3 ms** (bar ≤ 20 ms); the tick stood still (1–2 distinct ticks seen); the world's own `/healthz` took 1.9–2.1 s |
 | Busy-loop 2 s, run2 (converged) | 878 answers, wall **p50 1.2 ms, p99 5.3 ms, max 7.3 ms**; `/healthz` 2.1 s |
 
@@ -202,10 +202,10 @@ gets the same `route.unreachable` refusal as today. The walk/hang-out offers alr
 
 | Lane | Do now | Why |
 |---|---|---|
-| **L3 menus** (`lane/srv-menus`) | Keep the versioned menu cache (172c1040a) and the static-version keys (49fb59a0e). **Add no new `host.engine.*` reach in read code.** New reads go through one narrow interface, the way `activities.ts` reads only `activityWorld()` (ledger.ts 1414). Keep the static per-cell layer separate from the per-Soul overlay. Let `act` take a bound plan (cap id + steps) without calling `binds()` again (ledger.ts 877). | That interface *is* Stage B's `MenuWorld`. Every new reach-through is a row to port. |
-| **L4 spatial** (`lane/srv-spatial`) | Make `staticEpochV1()` (0d7ba8e91) the one replication key. Keep clearance/standable/clear-spots/connectivity pure functions of (static scene at an epoch, body positions), constructible outside the engine runtime. Keep nav-trust (86ea2f127) per walker on main. | The worker builds its own spatial service from the same scene. Hidden runtime state in those queries would force the lockstep fallback. |
-| **L8 objects** (`lane/srv-objects`) | Have the in-memory object table (979c0a28a) **emit row deltas from its write path**, versioned by the canonical state sig (d7ab03db6). | Diffing 11,584 rows costs 26 ms a scan on main. It is the only measured term that does not scale. |
-| **L5 boot** (`lane/srv-boot`) | Keep the snapshot view cache (e41994bd3: one entity copy per world state) and expose it as the worker's WorldInit source. Keep `stateHash()` replay equality a tested property. | Worker (re)init must not be a second whole-world clone. Lockstep is the fallback. |
+| **L3 menus** (`lane/srv-menus`) | Keep the versioned menu cache (172c1040a) and the static-version keys (775bcec88). **Add no new `host.engine.*` reach in read code.** New reads go through one narrow interface, the way `activities.ts` reads only `activityWorld()` (ledger.ts 1414). Keep the static per-cell layer separate from the per-Soul overlay. Let `act` take a bound plan (cap id + steps) without calling `binds()` again (ledger.ts 877). | That interface *is* Stage B's `MenuWorld`. Every new reach-through is a row to port. |
+| **L4 spatial** (`lane/srv-spatial`) | Make `staticEpochV1()` (fa1521510) the one replication key. Keep clearance/standable/clear-spots/connectivity pure functions of (static scene at an epoch, body positions), constructible outside the engine runtime. Keep nav-trust (12678f8b0) per walker on main. | The worker builds its own spatial service from the same scene. Hidden runtime state in those queries would force the lockstep fallback. |
+| **L8 objects** (`lane/srv-objects`) | Have the in-memory object table (8c694923e) **emit row deltas from its write path**, versioned by the canonical state sig (e2f919677). | Diffing 11,584 rows costs 26 ms a scan on main. It is the only measured term that does not scale. |
+| **L5 boot** (`lane/srv-boot`) | Keep the snapshot view cache (1dd4f5c4e: one entity copy per world state) and expose it as the worker's WorldInit source. Keep `stateHash()` replay equality a tested property. | Worker (re)init must not be a second whole-world clone. Lockstep is the fallback. |
 | **L2 load** (`lane/srv-load`) | Keep `Admission` jobs independent of the HTTP socket (key, route, deadline, `closed()` callback), so a job can arrive over a MessagePort. Keep `classify()` as the routing table for "C2 to the read port". | §4.1–4.2. |
 | knowledge (`around`) | `K.find()` + `invalidateBodies()` in a GET (around.ts 24–25) must become an intent. | A read worker cannot write. |
 
@@ -227,4 +227,4 @@ gets the same `route.unreachable` refusal as today. The walk/hang-out offers alr
 - `apps/server/src/split/delta.ts`: `DeltaTap` (init, per-tick delta, cost counters).
 - `apps/server/src/split/read-worker.ts`: the worker (port + own HTTP).
 - `apps/server/src/split/preload.ts`: harness only (`--import`), oracle, busy-loop, walkers.
-- Harness and receipts: `team/scratch/srv/split/` (`run-world.sh`, `busy.mjs`, `oracle-run.sh`, `run1/`, `run2/`).
+- Harness and receipts (`run-world.sh`, `busy.mjs`, `oracle-run.sh`, `run1/`, `run2/`) were kept outside the repo.

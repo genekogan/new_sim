@@ -1,7 +1,7 @@
 // Harness check H-a (server-reliability tranche, L6): a playtest's verdicts are about the product only if the world was
 // ticking at its nominal rate while the Souls played. From /healthz at provision and at close: tick service =
 // ticks run / ticks due (20 per wall-clock s, TICK_MS 50; a dilated clock, clockRate < 1, is the starvation itself). Below 0.8 the run is marked infrastructure-invalid:
-// a starved host, not a product result (LESSONS-20261026 §1).
+// a starved host, not a product result (docs/process/lessons.md).
 export const H_A_MIN_SERVICE = 0.8;
 export const NOMINAL_TICKS_PER_S = 20;
 

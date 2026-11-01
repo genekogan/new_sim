@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {setImmediate} from 'node:timers/promises';
 import {Db} from './db.ts';import {WorldHost} from './world.ts';import {marsFactory,GREEN_FIELD_WORLD} from '@sim/engine-mars';
 // The release gate compares tests by title: this keeps the 403 title, now also covering the occupied-link routing and
-// concurrent link egress policies (continuity, e8ccc05a3 / 27ed28a30) and a restart from the pre-activation snapshot.
+// concurrent link egress policies (continuity, 3f99ee356 / a126b2101) and a restart from the pre-activation snapshot.
 test('prospective courtesy/fixture/rest policies preserve exact head/hash after snapshot and genesis restart',async()=>{
  const db=new Db(':memory:'),factory=await marsFactory(GREEN_FIELD_WORLD),hosts:WorldHost[]=[];
  async function install(host:WorldHost){for(const work of [()=>host.enableQuietLandingCourtesyV1(),()=>host.enableGroundFixtureGoalsV1(),()=>host.enableHumanRestNeedsV1(),()=>host.enableOccupiedLinkRoutingV1(),()=>host.enableConcurrentLinkEgressV1()]){const p=work();host.drainInputs();await p;await setImmediate();}}

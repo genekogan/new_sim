@@ -7,12 +7,12 @@
     "eden-2026": {
       "template": "worlds/templates/eden-2026.json",
       "sha256": "85465ccfab04681fb697ae289faf4e82083c096ebd05b3227b70625d8deee00f",
-      "sliceEvidence": "<team>/scratch/continuity-20261029/fixtures/eden-2026-slices.json"
+      "sliceEvidence": "eden-2026-slices.json (private record, kept outside the repo)"
     },
     "mars-two": {
       "template": "worlds/templates/mars-two.json",
       "sha256": "73601d6d0a05f4566071ecb362a61fc1542aaf6b18b497a9ac18059ca276e7c8",
-      "sliceEvidence": "<team>/scratch/continuity-20261029/fixtures/mars-two-slices.json",
+      "sliceEvidence": "mars-two-slices.json (private record, kept outside the repo)",
       "originalSha256": "f8e589f1b9c1fc508073cf0a23d254d8387b4676836bbfe928625629fc0a2f24",
       "repair": "worlds/patches/mars-chiba-seating-20261029/layout.json; original filtered slices predate the appended seating repair. Fresh per-arm binding and geometry hash remain mandatory."
     }
@@ -1202,7 +1202,7 @@
       "fixtureStatus": "blocked-before-comparison",
       "fixtureVersion": 2,
       "gardenRule": "garden-pool-v2",
-      "fixtureVersionNote": "Declared 2026-10-31 by Gene/root after garden-holdout-r3-baseline-1 (diagnosis garden-discoverability-diagnosis/diagnosis.json): the frozen instruction names no garden, native `explore garden` returns five gardens, and v1 bound the garden visit, its receipt and the independent-errand trigger to place-eden-stone-garden only. v2 seals the five-garden pool below and binds those checks to the agreed / co-visited pool garden, mirroring the endpoint rule. Instruction text, timings, thresholds, overlap durations, separation distance, every other criterion and the endpoint pool are unchanged. Callers must declare fixtureVersion 2 (scorer evidence.fixtureVersion; disturbance dispatcher fixtureVersion). Version 1 is this file at git 3ad3c223d; runs sealed under v1 keep their v1 scores.",
+      "fixtureVersionNote": "Declared 2026-10-31 by Gene/root after garden-holdout-r3-baseline-1 (diagnosis garden-discoverability-diagnosis/diagnosis.json): the frozen instruction names no garden, native `explore garden` returns five gardens, and v1 bound the garden visit, its receipt and the independent-errand trigger to place-eden-stone-garden only. v2 seals the five-garden pool below and binds those checks to the agreed / co-visited pool garden, mirroring the endpoint rule. Instruction text, timings, thresholds, overlap durations, separation distance, every other criterion and the endpoint pool are unchanged. Callers must declare fixtureVersion 2 (scorer evidence.fixtureVersion; disturbance dispatcher fixtureVersion). Version 1 is this file at git 94d5d6eda; runs sealed under v1 keep their v1 scores.",
       "timeDomain": "real UTC; T0 set after all setup receipts and initial poses pass",
       "soulIds": "bind fresh per run; never publish or reuse probe Soul IDs",
       "agentInformation": "matrix instructions plus the declared initial owner supplements; no oracle entity IDs/coordinates or other agent state in model prompts",
@@ -2316,7 +2316,7 @@
   ],
   "proposalRevision": "2026-10-29-precomparison-4",
   "supersedes": {
-    "git": "6960c41f6",
+    "git": "c5c1a6359",
     "policy": "Prospective precomparison corrections only. Preserve existing development reports and original strict scorer in Git; never relabel old runs as acceptance."
   },
   "previousProposal": {

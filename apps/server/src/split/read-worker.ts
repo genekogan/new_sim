@@ -2,7 +2,7 @@
 // It holds a ReadModel fed by WorldInit/WorldDelta from the tick thread over its parentPort and owns a loopback HTTP
 // listener (workerData.port; 0 = the OS picks), so a Soul read never needs the tick thread to be free.
 //
-// What it answers itself (mode 1, until B-facade lands: the spike's subset, docs/sim/STAGE-B-SPLIT.md §3):
+// What it answers itself (mode 1, until B-facade lands: the spike's subset, docs/architecture/split.md §3):
 //   GET /v1/edge/here and GET /v1/edge/capabilities with no query, for a Soul it knows, answered `subset: true`;
 //   GET /healthz and /healthz/read: this worker's own health (gen, lag, tick), O(1).
 // Everything else (a C1 sent here by mistake, any other read, a query it does not serve, an unknown token) goes to the

@@ -16,7 +16,7 @@ const BARS = {
 
 // METRICS.md v2 (Stage B): worker off vs on side by side, the Stage B target, the recorded eden2 "before" (main, v1 load)
 const SB_TARGET = { tick: 0.9, readP99Ms: 300 };
-const BEFORE_EDEN2 = {   // README "Recorded baseline", eden2 slice, main da5269cd0, METRICS v1 load (CLI spawn-to-exit read p99): not the same load
+const BEFORE_EDEN2 = {   // README "Recorded baseline", eden2 slice, main cdd3eece3, METRICS v1 load (CLI spawn-to-exit read p99): not the same load
   n6: { tick: '0.05–0.06', read: '43.8 s', healthz: '5000' }, n12: { tick: '0.04–0.08', read: '57.5 s', healthz: '5000' }, n24: { tick: '0.07–0.11', read: '59.8 s', healthz: '5000' },
   incident: { tick: '0.07–0.12', read: '59.5 s', healthz: '5000' }, hostile: { tick: '0.02', read: '—', healthz: '5000' },
 };
@@ -53,7 +53,7 @@ function stageB(L, receipt, by) {
   const ex = Object.values(by).flat().flatMap((r) => r.stageb?.headline?.oracle?.examples ?? []).slice(0, 3);
   if (ex.length) L.push('Oracle differences (first fields): ' + ex.map((d) => d.map((x) => `\`${x.path}\` main ${x.live} / worker ${x.replica}`).join('; ')).join(' · '), '');
   L.push(`### Stage B target (tranche: N = 100 tick service ≥ ${SB_TARGET.tick}, reads ≤ ${SB_TARGET.readP99Ms} ms p99)${h.indicative ? ' — INDICATIVE host: shown, not judged' : ''}`, '');
-  L.push('| arm | worker | tick service | read p99 ms | timeouts | verdict | eden2 before (main da5269cd0, v1 load): tick · read p99 · healthz p99 |', '|---|---|---|---|---|---|---|');
+  L.push('| arm | worker | tick service | read p99 ms | timeouts | verdict | eden2 before (main cdd3eece3, v1 load): tick · read p99 · healthz p99 |', '|---|---|---|---|---|---|---|');
   for (const key of receipt.arms) {
     const rs = by[key] ?? [], base = key.split('@')[0], b = BEFORE_EDEN2[base];
     const t = worst(H(rs, 'tickService'), false), p = worst(sbh(rs, 'rawReadP99Ms'), true), to = worst(sbh(rs, 'timeouts'), true);
@@ -123,7 +123,7 @@ export function report(receipt, results) {
   }
 
   L.push('## Pass table (tranche §2)', '');
-  if (h.indicative) L.push('Not judged: laptop/other host. Only an eden2 cgroup slice run gates (LESSONS-20261026 §1).', '');
+  if (h.indicative) L.push('Not judged: laptop/other host. Only an eden2 cgroup slice run gates (docs/process/lessons.md).', '');
   else {
     L.push('| arm | tick service | healthz p99 | act/read p99 | heap | wedge | verdict |', '|---|---|---|---|---|---|---|');
     for (const arm of receipt.arms) {

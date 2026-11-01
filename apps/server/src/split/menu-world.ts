@@ -3,7 +3,7 @@
 // on main a `LiveMenuWorld` over the engine (each read delegates to the engine method itself: behaviour is
 // byte-identical), in a read worker a `ReplicaMenuWorld` over the replicated plain state (B-delta's read model), the
 // engine's own spatial service rebuilt from the static scene (B-spatial's SpatialReplica) and main's admission verdicts
-// (the feasibility table). Inventory and classes: team/lanes/srv-b-facade.md "Item 1"; docs/sim/STAGE-B-SPLIT.md §1.2.
+// (the feasibility table). Inventory and classes: docs/architecture/split.md §1.2.
 //
 // The read code reaches it through `menuWorldOf(host)` (one LiveMenuWorld per engine, unless a worker registered a
 // replica for its read-only host with `setMenuWorld`): dependency injection without threading a parameter through

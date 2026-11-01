@@ -94,7 +94,7 @@ test('a refused native sleep-stop preview immediately restores the full registry
  t.mock.method(f.brain,'midContext',(...args:Parameters<Brain['midContext']>)=>{const before=checks,ctx=original(...args);calls.push({deferred:args[2]===true,options:ctx.options,checks:checks-before});return ctx;});
  const at=`${f.host.engine.world.tick}|${f.host.seq}`;await f.brain.evaluate(m,'new-intent-v2');f.host.drainInputs();
  // The oracle read comes after the fallback: menuWorldOf's LiveFeasibility caches verdicts per (tick, log seq), so reading it
- // first would serve the fallback's checks from that cache and the engine-level count below would be 0 (gate 7fab7232c).
+ // first would serve the fallback's checks from that cache and the engine-level count below would be 0 (gate 7caf912a7).
  assert.equal(`${f.host.engine.world.tick}|${f.host.seq}`,at,'the refused preview changed neither tick nor log seq');const expected=original(m,'new-intent-v2').options;
  assert.equal(calls[0]?.deferred,true);assert.deepEqual(calls[0]?.options,[]);assert.equal(calls[1]?.deferred,false);assert.deepEqual(calls[1].options,expected);assert.ok(calls[1].checks>0,'the fallback actually runs native feasibility checks even when the sleeping body cannot use any option');assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-sleep-stop-v1').length,0);assert.equal(f.pose()?.standingFraction,0);assert.equal(f.db.paidCost(),0);assert.deepEqual(f.host.engine.runtime.violations,[]);
 });

@@ -2,6 +2,60 @@
 
 User-facing changes to Sim, newest first. Each release is compiled from `changes/` fragments.
 
+## 4.05 (2026-10-31)
+
+### Performance
+
+- A world's request budget is calibrated to its own measured tick, so a busy world keeps ticking at full rate and Souls' reads are answered in the time that is left.
+- Word acts (say, converse) are built from focused menus and cost about a third less.
+- Several Souls joining at once no longer stall the world: one birth is in flight at a time and a join never blocks the tick.
+- Under load the launcher sheds by the world's level (slow-down hints at amber, held long-polls, refusals only at red), and only impolite request bursts collect strikes.
+
+### Fixes
+
+- The god inbox shows a command as "working" the moment the agent takes it, instead of "listening".
+- Soul CLI 2.5.2–2.5.3: refusals and slow-downs reach the person in words (`slowed`), and `create` waits for a world that is still admitting.
+
+## 4.04.1 (2026-10-31)
+
+### Fixes
+
+- The Soul runtime (r16) resets its reconnect backoff when a healthy event stream closes, so a Soul reconnects at once.
+
+## 4.04 (2026-10-31)
+
+### Features
+
+- Soul continuity: a Soul's agent gathers attention before it decides and wakes on a deadline, so appointments and long conversations carry on across pauses (Soul runtime r15, Soul CLI 2.7.0).
+
+### Fixes
+
+- Item-source spots (shelves, tables) are chosen ignoring the people standing at them.
+
+## 4.03 (2026-10-31)
+
+### Performance
+
+- Souls' reads (here, around, observe, capabilities) can be answered by a read worker off the tick thread, so a crowded world keeps ticking.
+- Paged capability listings, a versioned menu cache and a replicated object table cut the cost of a Soul's reads.
+
+### Fixes
+
+- 4.02.1–4.02.3: god routes are exempt from Soul ceilings, public pages are never queued behind Soul reads, and the Soul ceilings sit an order of magnitude above ordinary use, so six Souls from one home are no longer refused.
+
+## 4.02 (2026-10-31)
+
+### Performance
+
+- Worlds admit requests by measured load: one heavy request in flight per Soul, listener ceilings per Soul and account, long polls held rather than refused, and clear `Retry-After` answers when the world is busy.
+
+## 4.01 (2026-10-31)
+
+### Performance
+
+- Each world runs under its own heap cap, and the launcher restarts a world that stops responding.
+- Soul CLI 2.5.0 honours the world's `Retry-After` and load hints: it waits politely, retries only reads, and never repeats a write.
+
 ## 4.0 (2026-10-29)
 
 ### Features

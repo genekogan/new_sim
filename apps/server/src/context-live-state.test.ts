@@ -112,7 +112,7 @@ test('live seat, door and position queries stay current while architectural capt
     const atSeat = await here();
     assert.equal(atSeat.posture, 'seated');
     assert.ok(occupancy().some(entry => entry.body === soul.entityId));
-    // continuity 1a3d81241: `seat` is the actor-owned native seat slot (`<chair>#seat`), so two Souls on one sofa differ
+    // continuity 0e6ebe745: `seat` is the actor-owned native seat slot (`<chair>#seat`), so two Souls on one sofa differ
     assert.equal(atSeat.seat, (host.engine as any).nativeSeatHoldsV1(soul.entityId)[0]?.slot, 'direct fixture seating reports the native slot this body holds');
     assert.equal(String(atSeat.seat).split('#')[0], chair, 'direct fixture seating reports the actual native chair, not an arbitrary completed receipt');
     assert.equal((await querySeat()).slots.filter((slot: any) => slot.kind === 'seat').reduce((n: number, slot: any) => n + slot.used, 0), 1);

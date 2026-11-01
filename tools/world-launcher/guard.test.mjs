@@ -1,7 +1,7 @@
 // node --test tools/world-launcher/guard.test.mjs (lane L1, server-reliability tranche; fake worlds on 5101-5103, a launcher on 5110 + 5107-5108)
 // The guard over world processes (LOAD-CONTRACT §4), with its numbers scaled down: a wedged world is restarted, a slow
 // boot that keeps moving lives, a stuck boot is killed, a flapping world is held until resumed, exit 75 restarts at once.
-// Real-time runs of (a) and (b) with the production numbers: team/scratch/srv/launcher/guard-realtime.mjs (numbers in the lane file).
+// Real-time runs of (a) and (b) with the production numbers: a separate real-time harness kept outside the repo.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
