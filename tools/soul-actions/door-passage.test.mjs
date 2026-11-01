@@ -18,7 +18,7 @@ test('door passage: by hand on the way, close behind, contention, obstruction, r
  const absent=await here(ana);
  const distant=Array.from({length:100},(_,i)=>({op:'place',def:'core/door@2',name:`distant-door-${i}`,p:[100+i%10*2,100+Math.floor(i/10)*2]}));ok(god.act({ops:distant}));await tick(45);const far=await here(ana);
  assert.ok(!JSON.stringify(far).includes('distant-door-'),'no distant door in here');
- // the walled yard: door at (0,3) facing south (yaw pi, as the Gene-approved door revision), bench inside, lamp outside
+ // the walled yard: door at (0,3) facing south (yaw pi, as the approved door revision), bench inside, lamp outside
  const z=3,yard=(name,x,w=.6)=>({op:'place',def:'core/garden-wall@1',name,shape:{path:[[x-w,z],[x-4,z],[x-4,z+6],[x+4,z+6],[x+4,z],[x+w,z]]}});
  ok(god.act({ops:[yard('yard-walls',0),{op:'place',def:'core/door@2',name:'door',p:[0,z],r:Math.PI},{op:'place',def:'core/bench@1',name:'inside-bench',p:[1.5,z+4]},{op:'place',def:'core/bench@1',name:'inside-seat',p:[-2,z+4.5]},{op:'place',def:'core/floor-lamp@2',name:'outside-lamp',p:[2.5,z-4]},{op:'place',def:'core/floor-lamp@2',name:'outside-post',p:[-2.5,z-3.5]},
   yard('store-walls',12),{op:'place',def:'core/door@2',name:'store-door',p:[12,z],r:Math.PI,state:{locked:true}},{op:'place',def:'core/bench@1',name:'store-bench',p:[12,z+4]},
