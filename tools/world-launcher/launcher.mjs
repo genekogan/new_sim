@@ -931,7 +931,7 @@ export async function openLauncher(cfg = {}) {
         await toWorld(req, res, world, url); return;
       }
       if (req.method === 'GET' || req.method === 'HEAD') {
-        if (path === '/' || path === '/index.html') { if (serveFile(res, join(webDir, 'index.html'), 'no-cache')) return; res.writeHead(500, { 'content-type': 'text/plain' }).end('The web app is not built: pnpm --filter @sim/web build'); return; }
+        if (path === '/' || path === '/index.html' || path === '/old' || path === '/old/') { if (serveFile(res, join(webDir, 'index.html'), 'no-cache')) return; res.writeHead(500, { 'content-type': 'text/plain' }).end('The web app is not built: pnpm --filter @sim/web build'); return; }
         // #388: the public changelog page, static HTML made from CHANGELOG.md by the web build (no script, no runtime fetch)
         if ((path === '/changelog' || path === '/changelog/') && serveFile(res, join(webDir, 'changelog.html'), 'no-cache', req)) return;
         // lane P4: the installable-app manifest beside the world list (apps/web/src/pwa-manifest.ts)

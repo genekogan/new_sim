@@ -14,3 +14,9 @@ await test('launcher build under /worlds: same rules below the base, nothing out
  assert.equal(pageRoute('/worlds/w/eden-2026/','/worlds','#join'),'world');
  for(const p of ['/worlds/nope','/worlds/foo/bar','/worldsx','/w/eden/'])assert.equal(pageRoute(p,'/worlds',''),'missing',p);
 });
+
+test('legacy home is explicit and stays separate from the launcher list',()=>{
+ for(const path of ['/old','/old/'])assert.equal(pageRoute(path,'',''),'legacy');
+ assert.equal(pageRoute('/old-world','',''),'missing');
+ assert.equal(pageRoute('/old','/worlds',''),'missing');
+});
