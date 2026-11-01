@@ -71,7 +71,9 @@ and package tests, typecheck and the web build, the `apps/web` unit suite (`V4-w
 tests (`V3-launcher-unit`) and the `tools/edge-skill` / `tools/client-eval` tests (`V3-client-cli`). The browser
 walks and the full gate stay with the release. `launcher.test.mjs` takes its 25 ports from
 `LAUNCHER_TEST_PORT_BASE=<port>` so it can run beside other local processes; other launcher test files still use their
-own fixed ports (`op.test.mjs` takes `OP_TEST_PORT`). The `proof-check` bot keeps one comment
+own fixed ports (`op.test.mjs` takes `OP_TEST_PORT`). Server discovery includes every nested `.test.ts` under
+`apps/server/src`; two deterministic shards plus the dedicated latency job cover that inventory exactly once.
+The `proof-check` bot keeps one comment
 up to date with the tier, the proof that tier needs, and which acceptance boxes have evidence. The `claude-review`
 workflow reviews every push, including whether the evidence supports each acceptance claim. `@claude` answers
 follow-ups, and the author answers each comment with a fix or a reason. The maintainer reviews T3 and above and
