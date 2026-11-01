@@ -11,6 +11,8 @@ import { shapeFaceMeshes } from './faces.ts'; // XP8 hook
 import { kitClassSurface, kitSurfaceAttribute, kitSurfaceSuffix } from './kit-surfaces.ts'; // Y1 / XP7 hook
 
 const cache = new Map<string, THREE.Object3D>();
+/** Entry 33: hand-operated things this viewer has drawn out (on false), so a fire catches only when it was seen lit by hand. */
+const wasOut = new Map<string, boolean>();
 
 /** Geometry for one primitive, centred where its kind is naturally centred; caller transforms. */
 function primitive(sh: KitShape, round: number, v: number): THREE.BufferGeometry {
@@ -214,6 +216,9 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     }
     root.add(pivot);
   }
+  // Soul Actions entry 32: a lock's moving parts (bolt, thumb-turn, key) ride on the door leaf, so they swing with it
+  const leafPivot = root.children.find((o) => o.userData.role === 'door');
+  if (leafPivot) for (const o of [...root.children]) if (o.userData.role === 'bolt' || o.userData.role === 'thumb' || o.userData.role === 'key') { leafPivot.attach(o); o.userData.restPos = o.position.toArray(); if (o.userData.role === 'key') o.visible = false; }
   root.userData.gait = args.gait;
   if (smoke.length) root.userData.edenSmokeSources = smokeSources(smoke);
   for (const sheet of fallingWaterSheets(discs)) root.add(sheet); // W2: tiered fountains overflow
@@ -239,7 +244,11 @@ registerMesh({
     if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {}, flameHint: flameHint(ctx.def), plant: isPlantDef(ctx.def), smokeFx: !ctx.def.components.route && !ctx.def.tags.includes('moving') }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
-    if (ctx.params.condition !== 'construction') mountFlames(obj, ctx.entity.id); // W2: flame parts burn (fx/flames.ts); not on a building site
+    // W2: flame parts burn (fx/flames.ts); not on a building site. A fire lit by hand catches (entry 22); entry 33: only
+    // when this viewer saw it out before (a fire already burning when a viewer arrives burns at full); a torch smokes.
+    const hand = ctx.def.tags.includes('hand-operated'), lit = ctx.entity.state?.on === true, catchUp = hand && lit && wasOut.get(ctx.entity.id) === true;
+    if (hand) wasOut.set(ctx.entity.id, !lit);
+    if (ctx.params.condition !== 'construction') mountFlames(obj, ctx.entity.id, catchUp, ctx.def.tags.includes('torch'));
     return obj;
   },
   instanceKey(ctx) { const a = parseKitArgs(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },

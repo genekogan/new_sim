@@ -1,5 +1,6 @@
 # Binary files allowed in the tree (small own-work: PWA icons, a procedural loop, test fixtures).
 # Media is pulled from the CDN (pnpm assets:pull), never committed. Adding a line here is a reviewed change.
+apps/web/pwa/icon-32.png
 apps/web/pwa/icon-180.png
 apps/web/pwa/icon-192.png
 apps/web/pwa/icon-512.png

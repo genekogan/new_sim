@@ -37,7 +37,7 @@ function placeIndex(list: GodPlace[]) {
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const SHORE = 3;                   // m: a water's bank, round it
 const LANDMARK_MIN = 1.5;          // a named point thing at least this wide (m) standing on its own is a landmark
-const NOT_LANDMARKS = /^(sign|signpost|notice-board|lamp-post|lantern|flagpole|bollard|bin|wheelie-bin|mailbox|hydrant|crate|barrel|sack|flower-pot|poster|banner|picture-frame|screen|chalkboard|power-line)$/;
+const NOT_LANDMARKS = /^(sign|signpost|notice-board|lamp-post|lantern|flagpole|bollard|bin|wheelie-bin|mailbox|hydrant|crate|barrel|sack|flower-pot|poster|banner|picture-frame|screen|chalkboard|power-line|poster-wall|wanted-board)$/;   // entry 38: boards stay things, as notice-board does
 const WORDS = ['no', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 const shortDef = (def: StoredDef) => def.name.replace(/^core-/, '').replace(/^ew-/, '').replace(/-pack$/, '');
 const article = (w: string) => (/^[aeiou]/.test(w) ? `an ${w}` : `a ${w}`);
@@ -309,7 +309,7 @@ export class GodPlaces {
       if (++n % 48 === 0) yield;
       if (t.kind !== 'thing' || t.level !== 0 || firstByRef.has(t.ref)) continue;
       const e = m.entities.get(t.id); if (!e || e.in.parent !== 'world') continue;
-      const def = m.resolvedDef(e.def); if (!def || NOT_LANDMARKS.test(shortDef(def))) continue;
+      const def = m.resolvedDef(e.def); if (!def || def.tags.includes('local-fixture') || NOT_LANDMARKS.test(shortDef(def))) continue;
       const c = def.components as Record<string, unknown>; if (c.carryable || c.seat || c.item) continue;
       let w = 0; try { const b = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).box, s = m.worldPose(e).s; w = Math.max(b[0], b[2]) * s; } catch { continue; }
       if (w < LANDMARK_MIN || outer.some((o) => inBoxPoly(t.at[0], t.at[1], o.box, o.p.polygon))) continue;

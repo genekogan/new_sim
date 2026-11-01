@@ -279,3 +279,9 @@ homepage and each world every 100 ms, holds one viewer socket per world, and rep
 longest error run, the slowest request and each socket's downtime. `--posts` adds a POST per world, which catches a
 connection closed under a request. Run it through a reverse proxy with production-like transport settings to see
 what a visitor would.
+
+## Root-only world deployments
+
+Set `SIM_WORLDS_BASE=/` for a root web build and run the launcher with `--base /`. Existing `/worlds` releases remain
+supported. Follow [world URL migration](operations/world-urls.md) to preserve world identities and paired agents when
+changing public slugs. The combined legacy/prefixed `ship.sh` defaults are not a root-only host runsheet.

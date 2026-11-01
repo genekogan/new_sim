@@ -42,7 +42,7 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
   const model = ud.rig?.model ?? ud.model ?? boundModel;
   const routed = !!c.route && !!model && routeStep(obj, entity, def, model, t, base);
   if (ud.rig) creatureStep(obj, ud.rig, entity, t, base);
-  if (isBoat(def)) { boatStep(obj, entity, def, model, t, base, phase, routed); if (c.light || c.lights) glowStep(obj, entity, def, model, t); return; }
+  if (isBoat(def)) { boatStep(obj, entity, def, model, t, base, phase, routed); if (c.light || c.lights) syncLightGlow(obj, entity, def, model, t); return; }
   // VOCAB-MECH: a spinning part stops when its actuator is off (power on:false, play playing:false)
   if (c.spin && entity.state?.on !== false && entity.state?.playing !== false) {
     const ang = (t * (c.spin.rpm / 60)) * Math.PI * 2;
@@ -53,7 +53,7 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
   if (c.swing) swingStep(obj, entity, c.swing.parts, t);
   if (c.sway) { obj.rotation.z = Math.sin(t * (Math.PI * 2) / c.sway.period + phase) * c.sway.amount * 0.3; obj.rotation.x = Math.cos(t * (Math.PI * 2) / (c.sway.period * 1.3) + phase) * c.sway.amount * 0.2; }
   if (c.hover) obj.position.y = (c.route ? obj.position.y : base.y + c.hover.height) + Math.sin(t * (Math.PI * 2) / c.hover.period + phase) * c.hover.bob;
-  if (c.light || c.lights) glowStep(obj, entity, def, model, t);
+  if (c.light || c.lights) syncLightGlow(obj, entity, def, model, t);
 }
 
 /** E2: where a part hung from a turning wheel is: its hanger point (rest offset from the hub, in the wheel's plane) turned
@@ -499,7 +499,7 @@ function boatStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldMo
 }
 
 /** Lamps glow at dusk and night; `state.on: false` darkens this one (its own material copy). */
-function glowStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel | null, t: number) {
+export function syncLightGlow(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel | null, t: number) {
   const ud = obj.userData as { glow?: THREE.Mesh[] };
   if (!ud.glow) {
     ud.glow = []; obj.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && (m as { emissive?: THREE.Color }).emissive && m.emissive.getHex() !== 0 && m.emissiveIntensity > 0) { const own = m.clone(); (c as THREE.Mesh).material = own; ud.glow!.push(c as THREE.Mesh);

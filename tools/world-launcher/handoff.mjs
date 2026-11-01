@@ -1,3 +1,4 @@
+import { worldIdOf } from './registry.mjs';
 // Co-builders and handoff (lane WORLDOPS, backlog P3), entirely in the launcher:
 //  - the owner invites a co-builder (one-time link); the invited person signs in and accepts;
 //  - a co-builder pairs their own agent (agent asks, the co-builder approves in their browser) and gets a god token
@@ -60,8 +61,8 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
     closing.add(w.slug);
     try {
       await pool.stop(w.slug); pool.kids.delete(w.slug);
-      setWorldOwner(db(w.slug), `${w.slug}-1`, a.account);
-      const revoked = dropGodTokens(db(w.slug), `${w.slug}-1`);
+      setWorldOwner(db(w.slug), worldIdOf(w), a.account);
+      const revoked = dropGodTokens(db(w.slug), worldIdOf(w));
       registry.update(w.slug, { offers: [], cobuilders: [], godName: null, god: true, owner: a.account });
       audit(dataDir, { op: 'transfer', slug: w.slug, from, to: a.account, by: a.account, tokensRevoked: revoked });
       log(`${w.slug}: handed from ${from} to ${a.account} (${revoked} god tokens revoked)`);
@@ -93,7 +94,7 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
       if (!p || p.expires < Date.now()) return [404, { ok: false, code: 'expired' }];
       if (!p.token) return [200, { ok: true, approved: false }];
       pairs.delete(k);
-      return [200, { ok: true, approved: true, token: p.token, world: `${w.slug}-1` }];
+      return [200, { ok: true, approved: true, token: p.token, world: worldIdOf(w) }];
     }
     if (sub === 'cobuild/pair/approve' && method === 'POST') {
       const p = pairs.get(typeof body?.code === 'string' ? body.code : '');
@@ -101,8 +102,8 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
       const a = await person(w, authorization);
       if (!a || !(w.cobuilders ?? []).some((c) => c.account === a.account)) return [403, { ok: false, code: 'forbidden', message: "only a co-builder of this world approves their own agent here (the owner uses the world's own pairing)" }];
       if (p.token) return [409, { ok: false, code: 'used' }];
-      p.token = `god_${w.slug}-1_${code(24)}`; // the shape the world itself mints (newGodToken)
-      addGodToken(db(w.slug), `${w.slug}-1`, p.token, `cobuilder:${a.account}:${p.agent}`);
+      p.token = `god_${worldIdOf(w)}_${code(24)}`; // the shape the world itself mints (newGodToken)
+      addGodToken(db(w.slug), worldIdOf(w), p.token, `cobuilder:${a.account}:${p.agent}`);
       audit(dataDir, { op: 'cobuilder-pair', slug: w.slug, by: a.account, agent: p.agent });
       return [200, { ok: true, agent: p.agent }];
     }
@@ -133,7 +134,7 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
     if (sub === 'cobuilders/remove') {
       const acct = typeof body?.account === 'string' ? body.account : '';
       if (!(w.cobuilders ?? []).some((c) => c.account === acct)) return [404, { ok: false, code: 'not-found', message: 'no such co-builder' }];
-      const revoked = dropGodTokens(db(w.slug), `${w.slug}-1`, `cobuilder:${acct}:`);
+      const revoked = dropGodTokens(db(w.slug), worldIdOf(w), `cobuilder:${acct}:`);
       registry.update(w.slug, { cobuilders: w.cobuilders.filter((c) => c.account !== acct) });
       audit(dataDir, { op: 'cobuilder-remove', slug: w.slug, by: a.account, account: acct, tokensRevoked: revoked });
       return [200, { ok: true, account: acct, tokensRevoked: revoked }];

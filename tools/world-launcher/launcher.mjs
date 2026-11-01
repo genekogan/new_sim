@@ -94,8 +94,9 @@ import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:z
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, cachedTemplates, readWorkersOf, slugFor, worldHeapMb } from './registry.mjs';
+import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, cachedTemplates, readWorkersOf, slugFor, worldHeapMb, worldIdOf } from './registry.mjs';
 import { ChildPool, compileCacheDir, defaultCommand, forkCommand } from './children.mjs';
+import { canonicalRequest } from './world-urls.mjs';
 import { legacyWorldFor, redirectSwitch } from './redirects.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
@@ -273,7 +274,7 @@ export async function openLauncher(cfg = {}) {
   async function actorOf(w, authorization) {
     const tok = /^Bearer\s+(god_\S+)$/i.exec(authorization ?? '')?.[1];
     if (tok) {
-      const label = tokenLabel(join(registry.worldDir(w.slug), 'sim.db'), `${w.slug}-1`, tok);
+      const label = tokenLabel(join(registry.worldDir(w.slug), 'sim.db'), worldIdOf(w), tok);
       if (label === null) return null;
       const co = /^cobuilder:([^:]+):/.exec(label);
       return co ? { account: co[1], via: 'token', cobuilder: true } : { account: safeOwner(w.slug), via: 'token' };
@@ -391,7 +392,7 @@ export async function openLauncher(cfg = {}) {
     const file = join(registry.worldDir(slug), 'sim.db');
     if (!existsSync(file)) return null;
     const db = new DatabaseSync(file, { readOnly: true });
-    try { const r = db.prepare('SELECT body FROM world_meta_v1 WHERE world_id=?').get(`${slug}-1`); return r ? JSON.parse(r.body).owner ?? null : null; }
+    try { const r = db.prepare('SELECT body FROM world_meta_v1 WHERE world_id=?').get(worldIdOf(registry.get(slug))); return r ? JSON.parse(r.body).owner ?? null : null; }
     finally { db.close(); }
   }
   /** Under Clerk: is this an account of the shared registry (account id only; nothing else is read)? */
@@ -749,9 +750,16 @@ export async function openLauncher(cfg = {}) {
     const sock = req.socket; sock.simBusy = (sock.simBusy ?? 0) + 1; res.once('close', () => { sock.simBusy--; });
     if (closed) res.shouldKeepAlive = false;   // stopping: answered, then this connection ends (see close())
     if (retiredTo) { forward(req, res); return; }
+    let url; try { url = new URL(req.url ?? '/', origin); } catch { json(res, 400, { ok: false, code: 'bad-url' }); return; }
+    const canonical = canonicalRequest(url.pathname, B, registry);
+    if (canonical && canonical !== url.pathname) {
+      if ((req.method === 'GET' || req.method === 'HEAD') && (canonical === `${B}/` || canonical === `${B}/index.html` || /^.*\/w\/[a-z][a-z0-9-]*\/?$/.test(canonical))) {
+        res.writeHead(308, { location: (canonical === `${B}/index.html` ? `${B}/` : canonical.replace(/\/?$/, '/')) + url.search }).end(); return;
+      }
+      url.pathname = canonical; req.url = url.pathname + url.search;
+    }
     // while the next launcher is being prepared, creations and operator changes wait: they run here if it fails, there if not
     if (gate && req.method === 'POST' && (req.url ?? '').startsWith(`${B}/__sim/`)) { await gate.p; if (retiredTo) { forward(req, res); return; } }
-    let url; try { url = new URL(req.url ?? '/', origin); } catch { json(res, 400, { ok: false, code: 'bad-url' }); return; }
     // Under --base everything of ours is <base>/…; `path` is the part after the base. Outside the base only the
     // public static files a world page also asks for at the root (/modular, /mars-assets, …) are answered, the way
     // the other release on the origin answers them in production; the rest is not ours.
@@ -960,6 +968,9 @@ export async function openLauncher(cfg = {}) {
   server.on('upgrade', async (req, socket, head) => {
     socket.simUpgraded = true;
     if (retiredTo) { pipeUpgrade(req, socket, head, port); return; }
+    const raw = req.url ?? '', q = raw.indexOf('?'), pathname = q < 0 ? raw : raw.slice(0, q);
+    const canonical = canonicalRequest(pathname, B, registry);
+    if (canonical) req.url = canonical + (q < 0 ? '' : raw.slice(q));
     const u = req.url ?? '', rel = !B ? u : u.startsWith(`${B}/`) ? u.slice(B.length) : '';
     const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
     const w = slug && !closing.has(slug) && registry.get(slug);

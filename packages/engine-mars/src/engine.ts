@@ -153,7 +153,7 @@ export const BODY_VERBS: VerbInfo[] = [
   {verb:'activity_readiness_v1',description:'My bounded voluntary standing wait for one host and venue; only a matching owned classroom may hand over this wait.',inputSchema:{type:'object',properties:{host:{type:'string'},venue:{type:'string'},activity:{const:'classroom'},seconds:{type:'number',minimum:20,maximum:300}},required:['host','venue','activity','seconds'],additionalProperties:false}},
   {verb:'control_classroom_v1',description:'Apply an owned host control to its actual classroom without replacing its body programme; accepted control is not completed cleanup.',inputSchema:{type:'object',properties:{session:{type:'string',maxLength:80},kind:{enum:['cancel','advance']}},required:['session','kind'],additionalProperties:false}},
   { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
-  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']}, pace: {enum:['shuffle']} }, required: ['to'] } },
+  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']}, pace: {enum:['shuffle','together']} }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
   { verb: 'stand', description: 'Stand up, leaving a seat or a place in a gathering.', inputSchema: { type: 'object', properties: {} } },
   { verb: 'rest', description: 'Stay as you are (seated if sitting) for a number of seconds.', inputSchema: { type: 'object', properties: { seconds: num, seatedAt:str } } },
@@ -167,6 +167,8 @@ const BODY = new Set(BODY_VERBS.map((v) => v.verb));
 /** Offered only by an engine whose rules include disassembly/1 (never by the legacy body language). */
 export const UNBUILD_VERB: VerbInfo = { verb: 'unbuild_lookout', description: 'Choose one finite camp disassembly job, the build in reverse: stairs takes the treads and flight down; deck lifts the sheets and joists off and carries them back to their piles; frame holds the uprights, takes the beams out and lowers the uprights; stage carries the rack parts back to the rack pile. Phases come down latest first (stairs, deck, frame, stage). Use the exact unprefixed verb unbuild_lookout, target:null, approach:[], and a single during step with phase. Refused while anyone is on the lookout. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stairs','deck','frame','stage']}},required:['phase']} };
 const NEEDS_BODY = new Set(['walk_to', 'sit', 'gather', 'converse', 'ambient_wander']);
+/** Entry 35: two walking hand in hand stroll (m/s): slower than a walk alone, so the follower keeps beside the leader. */
+const HAND_IN_HAND_SPEED = 1.0;
 /** Mars's meal scenario as a world: the same proving ground, furnished and with its cast of four already there. */
 export const MEAL_WORLD: MarsWorldConfig = { scene: 'meal', arrival: [-6, -12], arrivalPlace: 'lawn', reference: [-6, -10.5], grounds: { id: 'grounds', name: 'the grounds' } };
 
@@ -253,6 +255,7 @@ export class MarsEngine implements Engine {
     if(this.cfg.occupiedLinkRoutingV1===true)this.rt.services.occupiedLinkRoutingV1=true;
     if(this.cfg.concurrentLinkEgressV1===true)this.rt.services.concurrentLinkEgressV1=true;
     if(this.cfg.shoreDepartV1===true)this.rt.services.shoreDepartV1=true;
+    this.rt.services.doorPassersV1=this.doorPassersV1;
     if(rt.world.authoredBoundariesV1)immutableAuthoredBoundaryFact(rt.world.authoredBoundariesV1);
     this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { for(const step of p.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))throw Error('snapshot.unknown-spread-wait-policy');this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
@@ -280,7 +283,7 @@ export class MarsEngine implements Engine {
   get world(): WorldState { return this.rt.world as WorldState; }
   private get ents(): Record<string, any> { return this.rt.world.entities; }
   describeVerbs(): VerbInfo[] {
-    return [...BODY_VERBS, ...(this.cfg.disassemblyV1?[UNBUILD_VERB]:[]), ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
+    return [...BODY_VERBS, ...(this.cfg.disassemblyV1?[UNBUILD_VERB]:[]), ...this.m.describeVerbs(this.registry).filter(v=>v.verb!=='hand_actuator_v1').map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** Pay the recorder's cold copy/text preparation before HTTP opens, without finishing or replacing a take.
    * Discard the result: every real cut still calls finalStateOf against the then-current live world. */
@@ -304,6 +307,7 @@ export class MarsEngine implements Engine {
     if(this.cfg.occupiedLinkRoutingV1===true)this.rt.services.occupiedLinkRoutingV1=true;
     if(this.cfg.concurrentLinkEgressV1===true)this.rt.services.concurrentLinkEgressV1=true;
     if(this.cfg.shoreDepartV1===true)this.rt.services.shoreDepartV1=true;
+    this.rt.services.doorPassersV1=this.doorPassersV1;
     // Reader wrappers finish restoring public policies after construction.
     // Discard only their empty initial recorder before the first new frame.
     if(!this.readerRecordingDepth&&this.renderBaseKey!==this.renderContextKeyV1()){this.finishRecorder();this.startRecorder();}
@@ -320,6 +324,7 @@ export class MarsEngine implements Engine {
     const table: EntityTable = reuse ? checkedTable(cached!) : listTable(this.ents);
     this.tableCacheV1 = null;
     this.m.stepCarriers(this.rt, table);   // carrier/1: rides move their seated riders first (no carriers: no effect)
+    this.m.stepHandHolds(this.rt);         // entry 35: hands let go finish, a broken pair lets go (no holds: no effect)
     this.rt.step(table);
     const pass: EntityTable | null = (this.rt as any).passTable ?? null;
     const still = !!pass && pass.entities === this.ents && (this.rt as any).live.size === 0 && !this.quiet && this.programs.size === 0 && this.leaving.length === 0;
@@ -762,17 +767,17 @@ export class MarsEngine implements Engine {
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
         const gaitIssue = this.gaitIssue(me, a); if (gaitIssue) return gaitIssue;
-        let g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
+        let g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step),a.regionOutside) : this.goalNear(me, a.doorQueueV1 ? this.doorQueueGoalV1(p, a) : a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
         if (a.free === FREE_GOAL_V1) { const f = this.freeGoalV1(me, g, a.freeWithin); if (!f) return []; g = f; }
         const movement = this.movementVerb(me,g.x,g.z);
         if (a.gait && a.gait !== 'walk' && movement !== 'walk_to') return {code:'gait.dry-ground-required',message:'This shore or water route does not support jogging or running; return to dry ground first.'};
         // LINK BODY: a zombie's shuffle (pace 'shuffle'): half the body's walking speed, dry ground at both ends only
-        const shuffle = a.pace === 'shuffle';
+        const shuffle = a.pace === 'shuffle', together = a.pace === 'together';
         if (shuffle && (movement !== 'walk_to' || a.gait || !this.dryGroundAtV1(g.x, g.z))) return {code:'shuffle.dry-ground-required',message:'A shuffle stays on dry ground.'};
-        const ops: Op[] = [{ verb: movement, params: { actor: me, x: g.x, z: g.z, level:g.level, ...(a.gait && a.gait !== 'walk' ? {gait:a.gait} : {}), ...(shuffle ? {speed: r3(0.5 * bodyProfile(this.ents[me]).speed)} : {}), ...(this.cfg.nativeArrivalWitnessV1&&movement==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' || shuffle ? { soft: true } : {}) }];
-        if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
+        const ops: Op[] = [{ verb: movement, params: { actor: me, x: g.x, z: g.z, level:g.level, ...(a.gait && a.gait !== 'walk' ? {gait:a.gait} : {}), ...(shuffle ? {speed: r3(0.5 * bodyProfile(this.ents[me]).speed)} : {}), ...(together ? {speed: HAND_IN_HAND_SPEED} : {}), ...(this.cfg.nativeArrivalWitnessV1&&movement==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' || shuffle ? { soft: true } : {}) }];
+        if (typeof a.to === 'string' && this.ents[a.to] && !together) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
       case 'rest': return typeof a.seatedAt==='string'&&!this.seatedAt(me,a.seatedAt)?{code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'}:[{ wait: secs(a.seconds, 60) }];
@@ -912,7 +917,9 @@ export class MarsEngine implements Engine {
     const pots = program.steps.filter(s => ['mars:serve','mars:shared_food_break'].includes(s.verb)).map(s => s.params.pot);
     if (this.cfg.scene === 'eden-camp' && pots.length && [...this.programs.values()].some(p => p.actor !== program.actor && p.steps.some(s => ['mars:serve','mars:shared_food_break'].includes(s.verb) && pots.includes(s.params.pot)))) return {code:'food.service-in-use',message:'Someone is already using this pot and its serving space'};
     for (const step of program.steps) if (step.verb.startsWith('mars:')) {
-      const busy = this.jointIssue(step.params, program.actor,step.verb==='mars:classroom_session'); if (busy) return busy;
+      // entry 35: a hand hold names the other body only to find its hand; it never borrows it (consent is the ledger's);
+      // entry 41: a hand-over likewise (each body runs its own half)
+      const busy = step.verb === 'mars:hand_hold_v1' || step.verb === 'mars:hand_over_v1' ? null : this.jointIssue(step.params, program.actor,step.verb==='mars:classroom_session'); if (busy) return busy;
       if (step.verb === 'mars:serve') {
         const pot = this.ents[String(step.params.pot)];
         if (!pot?.contents || pot.contents.fraction < 0.25 || pot.foodPreparation?.complete === false) return {code: 'food.unavailable', message: 'there is no completed serving left in the pot'};
@@ -2132,6 +2139,81 @@ export class MarsEngine implements Engine {
         const res=spatial.route(this.rt.world,HUMAN_PROFILE_V1,start,{level,p:q},{proveUnreachable:true});
         if(res.ok)return {to:q,goal:[t[0],t[1]],short:Math.round(hypot(q[0]-t[0],q[1]-t[1])*10)/10,level};}}
     return null;
+  }
+  /** Soul Actions entry 31 (door passage): the programmes walking through `door` (an `open` passage hand step, then the
+   * walk through, then the `close` one) and where each is in it. Read by hand-actuator.ts (who is following, who is passing). */
+  readonly doorPassersV1=(door:string)=>{
+    // In programme start order (the Map keeps insertion order): an earlier passage on the same side goes first.
+    // Entry 32: a passage may turn the lock before it opens (`unlock`); `opening` covers both hand steps.
+    const out:{actor:string;phase:'approach'|'opening'|'through'|'closing';from:number}[]=[];
+    for(const p of this.programs.values()){
+      const pass=(s:{verb:string;params?:Record<string,unknown>}|undefined)=>s?.verb==='mars:hand_actuator_v1'&&s.params?.target===door?s.params?.passage as {mode?:string;from?:number}|undefined:undefined;
+      const open=p.steps.findIndex(s=>pass(s)?.mode==='open');if(open<0)continue;
+      const first=p.steps.findIndex(s=>!!pass(s)),close=p.steps.findIndex((s,j)=>j>open&&pass(s)?.mode==='close'),i=p.index;
+      const phase=i===first-1?'approach':i>=first&&i<=open?'opening':i>open&&(close<0||i<close)?'through':i===close?'closing':null;
+      if(phase)out.push({actor:p.actor,phase,from:Number(pass(p.steps[open])!.from)});}
+    return out;
+  };
+  /** Soul Actions entry 32: the goal of a passage's staging walk, chosen when the walk begins. The first passage on this side
+   * of this door gets the staging spot (`to`); a later one still approaching or opening behind it gets a queue spot about a
+   * metre back (out of the doorway lane and the swing), so two Souls never walk into each other at one waiting spot. */
+  private doorQueueGoalV1(p:Prog,a:Record<string,unknown>):unknown{
+    const q=a.doorQueueV1 as {door:string;from:number;queue:[number,number][]}|undefined;if(!q||!Array.isArray(q.queue))return a.to;
+    let ahead=0;
+    for(const o of this.programs.values()){if(o.id===p.id)break;if(o.actor===p.actor)continue;
+      const passer=this.doorPassersV1(q.door).find(x=>x.actor===o.actor);if(passer&&passer.from===q.from&&(passer.phase==='approach'||passer.phase==='opening'))ahead++;}
+    if(!ahead)return a.to;
+    // the nearest free queue spot to where this Soul comes from (a follower from the hinge side waits there, never crossing
+    // the leader's way to the staging spot); a spot another body already stands on is taken
+    const me=this.ents[p.actor]?.pose.p,taken=(q2:[number,number])=>listEntities(this.ents).some((o:any)=>!!o.human&&o.id!==p.actor&&hypot(o.pose.p[0]-q2[0],o.pose.p[2]-q2[1])<.7);
+    // the first row (latch side, hinge side) before the row behind it; nearest first within a row
+    const d=(x:[number,number])=>me?hypot(x[0]-me[0],x[1]-me[2]):0,spots=q.queue.map((x,i)=>({x,row:i>>1})).sort((a2,b2)=>a2.row-b2.row||d(a2.x)-d(b2.x)).map(e=>e.x);
+    for(const spot of spots)if(!taken(spot)&&!this.plan(this.movementVerb(p.actor,spot[0],spot[1]),{actor:p.actor,x:spot[0],z:spot[1],level:this.ents[p.actor]?.human?.level??0}))return spot;
+    return a.to;
+  }
+  /** Soul Actions entry 31 (pure): the closed doors walling this body off from its plan's first walk_to destination. Null
+   * when a walk reaches it (or it names nothing). Doors are the walk graph's closed-gap solids (`<door>#door:<opening>`,
+   * god engine-bridge) bordering the region the failed route exhausted; nearest to the way there first, at most `max`. */
+  closedDoorsOnWalkV1(actor:string,steps:{verb:string;params?:Record<string,unknown>}[],max=4):{goal:[number,number];doors:string[];goalDoors:()=>string[]}|null{
+    const step=steps.find(s=>s.verb==='walk_to'),e=this.ents[actor];if(!step||!e?.human||(e.human.level??0)!==0)return null;
+    const t=this.pointOf(step.params?.to);if(!t)return null;
+    const start=this.godWalkoutStartV1(actor);if(!start)return null;
+    const goal=this.nearestStandableV1([t[0],t[1]],actor,HUMAN_RADIUS+.05,8);if(!goal)return null;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const r=spatial.route(this.rt.world,HUMAN_PROFILE_V1,start,{level:0,p:goal},{nameObstacles:id=>id.includes('#door:')});
+    if(r.ok||r.diagnostic.code!=='route.unreachable')return null;
+    const pos=(id:string)=>{const o=spatial.scene.obstacles.find(x=>x.id.startsWith(id+'#door:'));return o?o.obb.c:null;};
+    const along=(c:[number,number])=>hypot(c[0]-start.p[0],c[1]-start.p[1])+hypot(c[0]-goal[0],c[1]-goal[1]);
+    const named=(d:{subjects?:string[]})=>[...new Set((d.subjects??[]).filter(s=>s.includes('#door:')).map(s=>s.split('#')[0]))].map(id=>({id,c:pos(id)})).filter((x):x is {id:string;c:[number,number]}=>!!x.c)
+      .sort((a,b)=>along(a.c)-along(b.c)).slice(0,max).map(x=>x.id);
+    const ids=named(r.diagnostic);
+    // asked only when no door on this side opens the way: the doors walling the destination's own side (the same search
+    // from the destination, which floods that side once), so a locked door there refuses instead of a closest approach
+    const goalDoors=()=>{const back=spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:0,p:goal},{level:0,p:start.p},{nameObstacles:id=>id.includes('#door:')});return back.ok?[]:named(back.diagnostic);};
+    return {goal,doors:ids,goalDoors};
+  }
+  /** Soul Actions entry 31 (pure): does a walk from `from` (level 0) reach this plan's first walk_to destination, a
+   * standing point at its standoff as the walk itself would choose (goalNear's turns), with the world as it is now? */
+  walkFromReachesV1(actor:string,from:[number,number],steps:{verb:string;params?:Record<string,unknown>}[]):boolean{
+    const step=steps.find(s=>s.verb==='walk_to'),e=this.ents[actor];if(!step||!e?.human)return false;
+    const to=step.params?.to,t=this.pointOf(to);if(!t)return false;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const g=spatial.levelAt(0,from);if(!g)return false;
+    const off=Math.max(typeof step.params?.standoff==='number'?step.params.standoff:0,typeof to==='string'&&!!this.ents[to]?.9:0),base=Math.atan2(from[1]-t[1],from[0]-t[0]);
+    if(hypot(from[0]-t[0],from[1]-t[1])<=off+.4)return true;
+    for(const turn of [0,.6,-.6,1.2,-1.2,1.9,-1.9,Math.PI]){
+      const q:[number,number]=off===0?(this.nearestStandableV1([t[0],t[1]],actor,HUMAN_RADIUS+.05,8)??[t[0],t[1]]):[r3(t[0]+Math.cos(base+turn)*off),r3(t[1]+Math.sin(base+turn)*off)];
+      if(spatial.route(this.rt.world,bodyProfile(e),{level:0,p:from},{level:0,p:q},{proveUnreachable:true}).ok)return true;
+      if(off===0)return false;
+    }
+    return false;
+  }
+  /** Soul Actions entry 32: the god model's lock state of a door, read by a passage's thumb-turn step (hand-actuator.ts). */
+  installDoorLockedV1(read:(id:string)=>boolean|null){this.rt.services.doorLockedV1=read;}
+  /** Soul Actions entry 32 (pure): does a walk on the ground reach `to` from `from` with the world as it is now (shut doors
+   * block their gaps)? Who hears a knock: a body the knocked door shuts in, on the other side. */
+  reachesV1(from:[number,number],to:[number,number]):boolean{
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    return spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:0,p:from},{level:0,p:to},{proveUnreachable:true}).ok;
   }
   /** `people` false: ignore bodies standing there (a static spot, e.g. an item source's, that must not depend on who stands where). */
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80,withPeople=true):[number,number]|null{

@@ -55,7 +55,7 @@ try {
       const u = new URL(r.url()); if (!ASSET.test(u.pathname)) return;
       const cdn = u.host === 'assets.eden.art';
       const listed = cdn || !!manifestAsset(manifest, r.url(), page.url() || url), h = r.headers();
-      const upload = cdn ? /^\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\./.exec(u.pathname)?.[1] : !listed ? /^\/worlds\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\.glb$/.exec(u.pathname)?.[1] : undefined;
+      const upload = cdn ? /^\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\./.exec(u.pathname)?.[1] : !listed ? /^(?:\/worlds)?\/w\/[a-z][a-z0-9-]{0,31}\/assets\/([0-9a-f]{64})\.glb$/.exec(u.pathname)?.[1] : undefined;
       reqs.push({ host: u.host, path: u.pathname + u.search, status: r.status(), encoding: h['content-encoding'] ?? null, listed, ...(upload ? { upload, worker: h['x-eden-cdn'] ?? null } : {}) });
     });
     const navigationStatus = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }).then(r => r?.status() ?? null).catch((e) => { errors.push('goto ' + e.message.slice(0, 120)); return null; });
