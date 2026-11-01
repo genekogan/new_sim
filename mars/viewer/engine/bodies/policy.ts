@@ -96,6 +96,13 @@ export const FLOATER_POLICY: Readonly<Record<string, VerbPolicy>> = {
   hold_items: HANDS('keeping items at the hands'),
   prepare_food: HANDS('scooping with a held spoon'),
   stow_items: HANDS('putting held items away'),
+  // Soul Actions: hand contact with world things (entries 1-44)
+  hand_actuator_v1: HANDS('working a switch, door, drawer, board or rope by hand'),
+  let_go_v1: HANDS('letting an idle gesture go before a reach'),
+  watering_can_v1: HANDS('carrying, filling and tilting a can by its handle'),
+  cup_v1: HANDS('holding, drinking from and rinsing a mug'),
+  hand_over_v1: HANDS('handing a held thing to another body'),
+  hand_hold_v1: HANDS('holding another body\'s hand'),
   setup_room: HANDS('moving a chair and a table'),
   shared_food_break: HANDS('taking utensils, serving and eating'),
   tidy_table: HANDS('moving loose items between slots'),

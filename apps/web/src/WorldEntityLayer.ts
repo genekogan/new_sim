@@ -1,3 +1,5 @@
+import {handActuatorFrame,knockContacts,opPoint,HAND_REACH_SECONDS,LOCK_TURN_SECONDS,type HandActuatorMotion} from '../../../mars/viewer/engine/social/hand-actuator.ts';
+import {lockPose} from './gen-mesh/vocab-look.ts';
 // The entity world's picture (spec <eden4>/28 §8): terrain baked from the
 // same ground recipe the server uses, water, a horizon ring, and one mesh per
 // placed entity drawn from its def. Diffs arrive over the hub as
@@ -8,12 +10,21 @@ import { godFeature, isFlagDef } from './god-ui/features.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
-import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { WorldModel, CAN_OPENING, CAN_ROSE, CUP_RIM, KETTLE_OPENING, KETTLE_SPOUT, KETTLE_SPOUT_ANGLE, KETTLE_SWITCH, SPOUT_SPEED, cupSteam, spoutSpeed, isKettleDef, isTeaCupDef, kettleHeat, spoutRun, containerInside, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
-import { animate, hasMotion } from './gen-mesh/motion.ts';
+import { animate, hasMotion, syncLightGlow } from './gen-mesh/motion.ts';
+import { hasFlames } from './fx/flames.ts';
+import {lightDiffAhead} from './light-diff-clock.ts';
+import {wateringDiffAhead} from './watering-diff-clock.ts';
+import {defLights} from './WorldNightLights.ts';
+import {pourJets, spoutJets, waterJets} from './fx/water-jets.ts';
+import {setSteam, steam} from './fx/steam.ts';
+import {isGrowingDef, plantGroup, plantLookOf, posePlants, type PlantGroup, type PlantLook} from './fx/plant-growth.ts';
+import {itemDiffAhead} from './item-diff-clock.ts';
+import {beginOpeningMotion,stepOpeningMotion,type OpeningMotion} from './opening-motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
 import { mottleSector } from './gen-mesh/terrain-mottle.ts';
@@ -52,7 +63,7 @@ function frozenMatrixWorld(this: THREE.Object3D) { /* nothing: thawed before any
 const _box = new THREE.Box3(), _projScreen = new THREE.Matrix4();
 
 type Figure = { holder: THREE.Object3D; wrists: [THREE.Object3D, THREE.Object3D]; knuckles: [THREE.Object3D | null, THREE.Object3D | null] } | { missingAt: number };
-type Drawn = { interior?: { key: number; host: Drawn | null; slot: string }; inst?: string; settled?: boolean; frozen?: THREE.Object3D[]; thaw?: boolean; noFreeze?: boolean; sphere?: THREE.Sphere; offscreen?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number; glowOnly: boolean } };
+type Drawn = { opening?: OpeningMotion; interior?: { key: number; host: Drawn | null; slot: string }; inst?: string; settled?: boolean; frozen?: THREE.Object3D[]; thaw?: boolean; noFreeze?: boolean; sphere?: THREE.Sphere; offscreen?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number; glowOnly: boolean } };
 
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
@@ -98,6 +109,115 @@ export class WorldEntityLayer {
   readonly sites: WorldBuildSites;
   /** W4: old Eden's tall grass, tufts and wildflowers, drawn around the camera from the ground recipe. */
   readonly cover = new GroundCover(() => (this.active ? this.model : null), coverSetting(), () => this.seq);
+  /** Recorded contact drives the leaf on the same depicted tick as the body,
+   * including reach, swing and release. No wall-clock tween during native operation. */
+  private tugged=new Set<THREE.Object3D>();
+  drawHandActuators(entities:Record<string,{state:Record<string,unknown>}>,tick:number,dt:number){
+    // M01: no per-frame array; leaf parts found once per drawn object; an unchanged angle (the release and
+    // idle hand-off) leaves the leaf and its matrices alone. The angle is still the depicted tick's.
+    const peeled=new Set<THREE.Object3D>();
+    this.movingBoxes.clear();this.movingAt=this.now;
+    for(const rope of this.tugged)rope.rotation.x=0;this.tugged.clear();
+    for(const id in entities){
+      const m=entities[id].state.handActuator as HandActuatorMotion|undefined;
+      // Soul Actions entry 38: a poster being taken down is drawn in the hands (humans.ts) from the moment the peel starts;
+      // the wall's own copy of it is hidden until the wall redraws without it at the depicted commit
+      if(m?.stroke?.kind==='unposter'&&m.abortedAt===undefined&&(tick-m.startTick)*dt>=HAND_REACH_SECONDS){const d=this.drawn.get(m.target);if(d){let best:THREE.Object3D|null=null,bd=.12;d.obj.traverse(o=>{if(!o.name.startsWith('poster-slot-'))return;const p=o.getWorldPosition(new THREE.Vector3()),dd=Math.hypot(p.x-m.at[0],p.y-m.at[1],p.z-m.at[2]);if(dd<bd){bd=dd;best=o;}});if(best){(best as THREE.Object3D).visible=false;peeled.add(best);}}continue;}
+      // Entry 10: a bell pull's rope swings with the hand's tug, on the depicted tick
+      if(m?.tug){const rope=this.drawn.get(m.target)?.obj.getObjectByName('role:rope');if(rope){rope.rotation.x=-handActuatorFrame(m,(tick-m.startTick)*dt).tug*m.tug.angle;this.tugged.add(rope);}continue;}
+      if(!m?.opening&&!m?.slide)continue;
+      this.movingBoxes.add(m.target);
+      const d=this.drawn.get(m.target);if(!d)continue;
+      const sec=(tick-m.startTick)*dt,f=handActuatorFrame(m,sec);
+      // entry 42: what is kept in a drawer rides with it (its places are where the drawer is pulled out to), and it is
+      // seen while the drawer or door moves; at rest a shut container hides it (interiorVisible).
+      // Before M01's early `continue`s (a drawer's slide, an unchanged leaf angle), so every moving container is covered.
+      for(const [id,box] of this.keptIn){
+        if(box!==m.target)continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
+        if(k.frozen)this.thaw(k);
+        if(m.slide){const off=f.pos-m.slide.travel;k.obj.position.set(k.to.p.x+m.slide.dir[0]*off,k.to.p.y,k.to.p.z+m.slide.dir[1]*off);k.settled=false;}
+        this.showKept(id,k,true);
+      }
+      if(m.slide){
+        // a drawer (entry 24) slides by the recorded travel, in its own units
+        const target=this.model?.entities.get(m.target),scale=target?this.model!.worldPose(target).s||1:1;
+        if(d.frozen)this.thaw(d);d.opening=undefined;
+        d.obj.traverse(o=>{if(o.userData.role==='drawer'&&typeof o.userData.restZ==='number')o.position.z=o.userData.restZ+f.pos/scale;});d.obj.updateMatrixWorld(true);
+        continue;
+      }
+      const angle=f.angle;
+      // Soul Actions entry 32: the lock under the hand (bolt, thumb-turn, key) and its sounds, on the same depicted tick
+      if(m.op||m.passage?.relock){this.drawLock(d,m,f);this.contactSounds(id,m,sec,f.commitAt);}
+      let leaf=this.leaves.get(d.obj);
+      if(leaf&&leaf.angle===angle&&!d.opening&&!d.motion)continue;
+      if(!leaf){leaf={parts:[],angle};d.obj.traverse(o=>{if(o.userData.role==='door')leaf!.parts.push(o);});this.leaves.set(d.obj,leaf);}
+      if(d.frozen)this.thaw(d);d.opening=undefined;leaf.angle=angle;
+      for(const o of leaf.parts)o.rotation.y=angle;d.obj.updateMatrixWorld(true);
+      this.stats.leafWrites++;
+    }
+    // entry 42: this runs after update(), which saw last frame's moving containers: a drawer whose hand just let go shows
+    // what is in it where it is now (shut: hidden; open: at its place), never one frame back at the open place
+    for(const [id,box] of this.keptIn){
+      // a recorded item (take track) is drawn where its native twin is: a hand is taking it out or has just put it in
+      if(this.movingBoxes.has(box)||this.overrides.has(id))continue;const k=this.drawn.get(id);if(!k||k.removing)continue;
+      const open=this.model?.entities.get(box)?.state?.open===true;
+      if(!open){if(k.inst?k.shown!==false:k.obj.visible)this.showKept(id,k,false);}
+      else if(k.obj.position.distanceToSquared(k.to.p)>1e-8&&k.settled){k.obj.position.copy(k.to.p);this.showKept(id,k,true);}
+    }
+    for(const o of this.peeled)if(!peeled.has(o))o.visible=true;
+    this.peeled=peeled;
+  }
+  private peeled=new Set<THREE.Object3D>();
+  private readonly leaves=new WeakMap<THREE.Object3D,{parts:THREE.Object3D[];angle:number}>();
+  private readonly lockParts=new WeakMap<THREE.Object3D,{o:THREE.Object3D;role:string}[]>();
+  /** Entry 32: a lock turning under a hand. Until the turn's end the world still has the old state, so the drawn lock
+   *  turns from it; at the end the state lands (the diff waits for the depicted tick) and the rebuilt door agrees. */
+  private drawLock(d:Drawn,m:HandActuatorMotion,f:ReturnType<typeof handActuatorFrame>){
+    let parts=this.lockParts.get(d.obj);
+    if(!parts){const found:{o:THREE.Object3D;role:string}[]=[];d.obj.traverse(o=>{const r=o.userData.role;if(r==='bolt'||r==='thumb'||r==='key')found.push({o,role:r});});parts=found;this.lockParts.set(d.obj,parts);}
+    if(!parts.length)return;
+    const locked=this.model?.entities.get(m.target)?.state?.locked===true;let k:number|null=null,key=false;
+    if(m.op==='lock'||m.op==='unlock'){
+      // nothing to turn when the world already has it so (a walk's thumb-turn on a door somebody else unlocked)
+      if(!f.contact&&(m.op==='unlock')!==locked)return;
+      k=m.op==='lock'?f.turn:1-f.turn;key=m.opening?.side===1&&f.weight>.5;
+    }else if(m.passage?.relock&&m.passage.mode==='close'&&f.contact)k=1;
+    if(k===null)return;
+    if(d.frozen)this.thaw(d);
+    for(const p of parts)lockPose(p.o,p.role,k,key);
+    d.obj.updateMatrixWorld(true);
+  }
+  private readonly soundClock=new Map<string,number>();
+  /** Entry 32: the knock of each rap, the click of a lock and the latch, when the depicted time crosses that contact. */
+  private contactSounds(id:string,m:HandActuatorMotion,sec:number,commitAt:number){
+    const o=m.opening;if(!o||m.abortedAt!==undefined)return;
+    const at=(op:'lock'|'unlock'|'knock')=>opPoint(o,op,0) as [number,number,number];
+    const due:[ 'knock'|'click'|'latch',number,[number,number,number]][]=m.op==='knock'?knockContacts().map(t=>['knock',t,at('knock')]):m.op?[['click',HAND_REACH_SECONDS+LOCK_TURN_SECONDS*.85,at(m.op)]]:m.passage?.relock&&m.passage.mode==='close'?[['latch',commitAt,at('lock')]]:[];
+    if(!due.length)return;
+    const key=id+':'+(m.actionId??m.startTick),prev=this.soundClock.get(key);this.soundClock.set(key,sec);if(this.soundClock.size>64)this.soundClock.delete(this.soundClock.keys().next().value!);
+    if(prev===undefined||sec<=prev)return;   // first sight of a motion never plays a backlog
+    const sound=(window as unknown as {__edenSound?:{contact?:(k:string,a:[number,number,number])=>void}}).__edenSound;
+    for(const [kind,t,p] of due)if(prev<t&&sec>=t&&sec-t<.3)sound?.contact?.(kind,p);
+  }
+  /** Entry 38: redraw every drawn thing whose def has this tag (posters age by the world day shown). */
+  redrawTagged(tag:string){const m=this.model;if(!m)return;for(const id of [...this.drawn.keys()]){   // a copy: draw() deletes and re-adds the key (a live Map iterator would visit it again, forever)
+    const e=m.entities.get(id),def=e&&m.resolvedDef(e.def);if(e&&def?.tags.includes(tag))this.draw(e,false,true);}}
+  /** Does this placed thing publish a lamp pool or a lighthouse beam (world-env's scan)? */
+  private lit(id:string){const e=this.model?.entities.get(id),def=e&&this.model!.resolvedDef(e.def);return !!def&&(defLights(def.components).length>0||!!def.tags?.includes('lighthouse'));}
+  /** M01: bumped only by a diff that can change a lamp pool (world-env's immediate repaint); other diffs keep its 2 Hz gate. */
+  lightSeq = 0;
+  /** Entry 42: show or hide a stored thing where its drawn object is now (instanced or not). */
+  private showKept(id:string,k:Drawn,shown:boolean){
+    if(k.inst){this.instancer.set(k.inst,id,k.obj.position,k.obj.rotation.y,shown?k.obj.scale.x:0,[k.obj.rotation.x,k.obj.rotation.z]);k.shown=shown;}
+    else{k.obj.visible=shown;k.obj.updateMatrixWorld(true);}
+  }
+  /** Entry 42: things kept inside a container (item id → container id), and the containers whose drawer or door a hand
+   *  is moving this frame. Only stored things, never a scan of the world. */
+  private keptIn=new Map<string,string>();
+  private movingBoxes=new Set<string>();
+  private movingAt=-Infinity;
+  /** Entry 42, for proofs: whether a stored thing is drawn now and where. */
+  keptView(id:string){const d=this.drawn.get(id);return d?{box:this.keptIn.get(id)??null,visible:d.inst?(d.shown??true):d.obj.visible,inst:!!d.inst,p:d.obj.position.toArray()}:null;}
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
@@ -108,6 +228,16 @@ export class WorldEntityLayer {
   private hiddenBase = new WeakSet<THREE.Object3D>();
   /** Viewer B7: things a body carries (entity parent = a body entity) by body id; they ride that figure's animated hand. */
   private held = new Map<string, string>();
+  /** Entry 34: taps whose stream is drawn (a can held under one catches it short); growing planters, the look each was
+   *  last drawn with and the eases in progress; the rose shower of each can being poured. */
+  private tapJets = new Map<string, THREE.Points>();
+  private growing = new Set<string>();
+  private plantShown = new Map<string, PlantLook>();
+  private plantTweens = new Map<string, { from: PlantLook; to: PlantLook; t0: number; dur: number }>();
+  private pours = new Map<string, THREE.Points>();
+  /** Entry 43: steam over kettles and cups of tea (world space, placed each frame); the depicted tick their heat is read at. */
+  private steamers = new Map<string, { pts: THREE.Points; kind: 'kettle' | 'cup'; lamp?: THREE.Mesh }>();
+  private depictedTick = Infinity;
   private figures = new Map<string, Figure>();
   private now = 0;
   private readonly api: (p: string) => string;
@@ -124,6 +254,7 @@ export class WorldEntityLayer {
 
   private signal: AbortSignal | null = null;
   private lastSeqCheck = 0;
+  private bufferedSeq = -1; // received stream head, including native effects awaiting depiction
   private resyncing = false;
   /** Full resync: refetch the snapshot and redraw everything (no easing). Used after a missed diff. */
   async resync() {
@@ -250,13 +381,16 @@ export class WorldEntityLayer {
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
-  readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
-  applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
+  readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, leafWrites: 0, lastError: null as string | null };
+  applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[], depictedTick=Infinity) {
+    this.depictedTick = depictedTick;
     if (this.immutable || !this.model || this.building || this.filling) return;
+    for(const m of msgs)if(m.kind==='world-diff'&&typeof m.seq==='number')this.bufferedSeq=Math.max(this.bufferedSeq,m.seq);
     for (const m of msgs) {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
       if (m.kind !== 'world-diff' || typeof m.seq !== 'number' || m.seq <= this.seq) continue;
+      if (lightDiffAhead(this.model,m,depictedTick)||wateringDiffAhead(this.model,m,depictedTick)||itemDiffAhead(this.model,m,depictedTick)) return;
       this.stats.edgeSeen++;
       if (m.seq > this.seq + 1) { void this.resync(); return; }  // a gap: something was missed; take the whole picture again
       try { this.applyDiff(m as unknown as DiffMsg); this.stats.applied++; } catch (e) { this.stats.lastError = String(e); this.seq = m.seq; }
@@ -270,6 +404,7 @@ export class WorldEntityLayer {
     this.stairContacts.invalidateDiff(d);
     {
       const contextChanged=!!d.ground||!!d.diff.world||d.diff.defs.length>0||d.diff.removes.some(id=>contextStamp(this.model!.entities.get(id)))||d.diff.upserts.some(e=>contextStamp(e)!==contextStamp(this.model!.entities.get(e.id)));
+      let lit=!!d.ground||!!d.diff.world||d.diff.defs.length>0||!!d.defs?.length||d.diff.removes.some(id=>this.lit(id))||d.diff.upserts.some(e=>this.lit(e.id));
       this.seq = d.seq;
       const held = this.sites.heldRemovals(d, this.model);
       this.sites.apply(d);
@@ -278,6 +413,9 @@ export class WorldEntityLayer {
       for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id, held.has(id) ? SITE_REFINEMENT.removalDelaySeconds : 0); }
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
       for (const e of d.diff.upserts) { const def = this.model.resolvedDef(e.def); if (def?.layer === 'solid') { try { this.model.index(e.id, this.model.footprint(e, def)); } catch { /* best effort */ } } }
+      // a moved parent carries its lamps (their pools move with it)
+      if (!lit) lit = d.diff.upserts.some(e => this.model!.subtree(e.id).some(id => this.lit(id)));
+      if (lit) this.lightSeq++;
       if ((d.diff as { constants?: WorldModel['constants'] }).constants) this.model.constants = (d.diff as { constants?: WorldModel['constants'] }).constants!;   // GOD-ENV: the world grew
       if (d.ground) { const grew = JSON.stringify(d.ground.extent) !== JSON.stringify(this.model.ground().extent); this.model.terrain = sameBase(this.model.ground(), d.ground) ? this.model.terrain.retile(d.ground, d.diff.tiles) : new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); if (grew) this.buildHorizon(); }
       if (d.diff.world) { const before = JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null); this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state']; if (JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null) !== before) this.rebuildTerrain(); }
@@ -297,6 +435,40 @@ export class WorldEntityLayer {
   private overrides = new Map<string, THREE.Vector3>();
   /** BALLOON-BODY: the native twin's yaw (Core convention: rotation.y = -yaw), so the drawn cabin's door is Core's door. */
   private overrideYaw = new Map<string, number>();
+  private recordedItems = new Set<string>();
+  private missingItemAt = new Map<string,number>();
+  private lightMoves = new Set<string>();
+  /** Only active/settling portable emitters, never a per-frame search of the world. */
+  *movingLights() {
+    for (const id of this.lightMoves) {
+      const d=this.drawn.get(id);
+      if(!d) { this.lightMoves.delete(id); continue; }
+      if(d.settled&&!this.held.has(id)&&!this.recordedItems.has(id))this.lightMoves.delete(id);
+      yield id; // one last final-position update when settling finishes
+    }
+  }
+  lightObject(id:string) { return this.drawn.get(id)?.obj; }
+  /** Authoritative small-item poses share the figure's take clock, including
+   * approach/grasp/release. Live world diffs may arrive ahead of that clock. */
+  itemPoses(entities:Record<string,{p:readonly number[];yaw:number}>) {
+    const seen=new Set<string>();
+    for(const [id,pose]of Object.entries(entities)) {
+      const e=this.model?.entities.get(id);
+      if(!e||!this.model?.resolvedDef(e.def)?.tags.includes('recorded-item'))continue;
+      seen.add(id);this.recordedItems.add(id);
+      this.missingItemAt.delete(id);
+      const p=this.overrides.get(id)??new THREE.Vector3();p.set(pose.p[0],pose.p[1],pose.p[2]);this.overrides.set(id,p);this.overrideYaw.set(id,pose.yaw);
+      if(this.model.resolvedDef(e.def)?.components.light||this.model.resolvedDef(e.def)?.components.lights)this.lightMoves.add(id);
+    }
+    for(const id of this.recordedItems)if(!seen.has(id)) {
+      const d=this.drawn.get(id),last=this.overrides.get(id);
+      if(d&&last&&d.to.p.distanceToSquared(last)>.0001){
+        const since=this.missingItemAt.get(id)??this.now;this.missingItemAt.set(id,since);
+        if(this.now-since<1000)continue; // short write-back grace; a later owner move must never freeze the old pose forever
+      }
+      this.recordedItems.delete(id);this.missingItemAt.delete(id);this.overrides.delete(id);this.overrideYaw.delete(id);if(d)d.settled=false;
+    }
+  }
   /** Names of world-level god things with a native ride twin: the god's balloons (def carrier + tag balloon). */
   rideNames(): string[] {
     if (!this.model) return [];
@@ -325,6 +497,29 @@ export class WorldEntityLayer {
     if (yaw === undefined) this.overrideYaw.delete(e.id); else this.overrideYaw.set(e.id, yaw);
   }
 
+  private transported = new Set<string>();
+  /** The recorded native load owns its airborne pose, not the slower world-edit
+   * stream. Only active human grips and their settling loads are visited. */
+  transportPoses(entities: Record<string, {p: readonly number[]; yaw: number; state: Record<string, unknown>}>, bodies: readonly string[]) {
+    const held = new Set<string>();
+    for (const body of bodies) {
+      const grip = entities[body]?.state.grip as {entity?: string} | undefined;
+      const contact = entities[body]?.state.carryContactV1 as {item?: string} | undefined;
+      const id = grip?.entity ?? contact?.item, e = id && this.model?.entities.get(id);
+      if (e && this.model?.resolvedDef(e.def)?.tags.includes('upright-carry')) { held.add(e.id); this.transported.add(e.id); }
+    }
+    for (const id of this.transported) {
+      const e = entities[id], d = this.drawn.get(id);
+      if (!e || !d) { this.transported.delete(id); this.overrides.delete(id); this.overrideYaw.delete(id); continue; }
+      const p = e.p;
+      if (!held.has(id) && d.to.p.distanceToSquared(new THREE.Vector3(p[0], p[1], p[2])) < .0001) {
+        this.transported.delete(id); this.overrides.delete(id); this.overrideYaw.delete(id); d.settled = false; continue;
+      }
+      const pose = this.overrides.get(id) ?? new THREE.Vector3();
+      pose.set(p[0], p[1], p[2]); this.overrides.set(id, pose); this.overrideYaw.set(id, e.yaw);
+    }
+  }
+
   update(dt: number, nowMs: number, baseGround?: THREE.Object3D) {
     this.now = nowMs;
     if (!this.active) return;
@@ -337,7 +532,7 @@ export class WorldEntityLayer {
     if (!this.immutable && nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
       this.lastSeqCheck = nowMs;
       // G8: a changed moderation veto also takes the whole (server-filtered) picture again
-      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number; builds?: number; moderation?: { version?: unknown; hidden?: unknown } } | null) => { if (!this.signal?.aborted && j) { if (noteModeration(j.moderation) || j.seq !== this.seq) void this.resync(); else this.sites.checkRevision(j.builds); } }).catch(() => {});
+      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number; builds?: number; moderation?: { version?: unknown; hidden?: unknown } } | null) => { if (!this.signal?.aborted && j) { if (noteModeration(j.moderation) || j.seq > Math.max(this.seq,this.bufferedSeq)) void this.resync(); else this.sites.checkRevision(j.builds); } }).catch(() => {});
     }
     // the entity terrain is the only ground: hide the native backdrop and the native floor planes (a flat
     // plane at y ≈ 0 would cover every pond, river and cut below it)
@@ -346,8 +541,20 @@ export class WorldEntityLayer {
     const frame = ++this.frame;
     // P1 phones: frozen things skip the matrix walk on the promise that what they hang from does not move; if it ever does, thaw all
     if (this.freezeSettled && !this.thingsGroup.matrixWorld.equals(this.frozenUnder)) { this.frozenUnder.copy(this.thingsGroup.matrixWorld); for (const d of this.drawn.values()) if (d.frozen) this.thaw(d); }
+    // Entry 34: taps run to their basin unless a held can catches the stream this frame (below); growth and wilt ease
+    for (const jets of this.tapJets.values()) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = jets.userData.dropDefault;
+    this.stepSteam();
+    for (const [id, tw] of this.plantTweens) {
+      const d = this.drawn.get(id), grp = d?.obj.getObjectByName('plant growth') as PlantGroup | undefined;
+      if (!d || !grp) { this.plantTweens.delete(id); continue; }
+      if (d.frozen) this.thaw(d);
+      const k = easeInOut((nowMs - tw.t0) / tw.dur), look = { g: tw.from.g + (tw.to.g - tw.from.g) * k, w: tw.from.w + (tw.to.w - tw.from.w) * k, m: tw.from.m + (tw.to.m - tw.from.m) * k };
+      posePlants(grp, look); setPatch(d.obj, look.m); d.obj.updateMatrixWorld(true); this.plantShown.set(id, look);
+      if (k >= 1) this.plantTweens.delete(id);
+    }
     let k = 0;
     for (const [id, d] of this.drawn) {
+      if (d.opening && !stepOpeningMotion(d.opening,nowMs)) d.opening=undefined;
       k++;
       if (d.thaw) this.thaw(d);
       // P1: a settled, still thing (eased in, no motion, not ridden or held) keeps its pose: only its interior visibility
@@ -364,14 +571,19 @@ export class WorldEntityLayer {
       if (d.frozen) this.thaw(d);
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
-      const ride = this.overrides.get(id); if (ride) { d.obj.position.copy(ride); const yaw = this.overrideYaw.get(id); if (yaw !== undefined) d.obj.rotation.y = -yaw; }
+      // entry 44: a mug being drunk from or rinsed follows the drawn hand (its figure's cup pose), not the recorded item pose:
+      // the engine's mug is the same timeline resolved on a 1.75 m body, the drawn one on this rig's own lips
+      const cupHand = !d.removing && this.held.has(id) && !d.obj.userData.handleGrip && this.cupHeld(id, d);
+      const ride = cupHand ? undefined : this.overrides.get(id); if (ride) { d.obj.position.copy(ride); const yaw = this.overrideYaw.get(id); if (yaw !== undefined) d.obj.rotation.y = -yaw; }
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
       const shown = this.interiorVisible(id, d);
-      const inHand = !d.removing && this.held.has(id) && this.handPoint(this.held.get(id)!, d.obj.position);
+      const inHand = cupHand || (!ride && !d.removing && this.held.has(id) && (d.obj.userData.handleGrip ? this.handleHeld(id, d) : this.handPoint(this.held.get(id)!, d.obj.position)));
+      if (!inHand || !d.obj.userData.cupShown) this.cupWater(id, null);
+      if (!inHand && this.pours.has(id)) this.pours.get(id)!.visible = false;
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
-        if (inHand || ride || !d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
+        if (inHand || ride || !d.settled || shown !== (d.shown ?? true) || d.obj.userData.cupShown !== undefined) { if (d.obj.userData.cupShown === false) d.obj.userData.cupShown = undefined; this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
         continue;
       }
       d.obj.visible = shown;
@@ -391,6 +603,132 @@ export class WorldEntityLayer {
    *  The figure is the native people view's rig, found in the scene by its name (= the body's engine id). False when the
    *  body has no figure here (no takes yet, or a stand-in): then the thing stays at the body entity's carry slot. */
   private handPoint(body: string, out: THREE.Vector3): boolean {
+    const f = this.figureOf(body); if (!f) return false;
+    f.holder.updateWorldMatrix(true, true);
+    const palm = (k: 0 | 1, v: THREE.Vector3) => { f.wrists[k].getWorldPosition(v); const kn = f.knuckles[k]; if (kn) v.lerp(kn.getWorldPosition(_v3), 0.5); return v; };
+    palm(0, _pl); palm(1, _pr);
+    if (Math.abs(_pl.y - _pr.y) < 0.06) out.copy(_pl).lerp(_pr, 0.5); else out.copy(_pl.y > _pr.y ? _pl : _pr);
+    return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
+  }
+  /** Entry 44: a mug being drunk from or rinsed is drawn where its holder's figure says (humans.ts `cupPose`: the cup
+   *  timeline's pose moved with the drawn palm), tilted; the tap's stream ends in it, rinse water shows in it and runs out
+   *  of its rim into the basin. What is drawn is published on the mug (`cupDebug`) for proofs. */
+  private cupHeld(id: string, d: Drawn): boolean {
+    const f = this.figureOf(this.held.get(id)!), cp = f?.holder.userData.cupPose as { item: string; base: THREE.Vector3; q: THREE.Quaternion; water: number; outflow: number; tilt: number; atLips: boolean; lips: number[]; rimNear: number[]; palm: number[]; target: number[]; grip: number } | undefined;
+    if (!f || !cp || cp.item !== id) { if (d.obj.userData.cupShown) { d.obj.userData.cupShown = false; d.obj.quaternion.setFromAxisAngle(_yAxis, d.obj.rotation.y); } return false; }
+    d.obj.userData.cupShown = true;
+    d.obj.position.copy(cp.base); d.obj.quaternion.copy(cp.q);
+    const s = d.obj.scale.x, up = _vs.set(0, 1, 0).applyQuaternion(cp.q);
+    // the water's surface in the mug (horizontal, at its level up the axis), and the opening a tap's stream falls into
+    const level = CUP_RIM.floor + (CUP_RIM.full - CUP_RIM.floor) * cp.water, surface = _v3.copy(cp.base).addScaledVector(up, level * s);
+    for (const jets of this.tapJets.values()) {
+      const n = jets.getWorldPosition(_vn);
+      if (Math.hypot(surface.x - n.x, surface.z - n.z) < 0.08 && surface.y < n.y - 0.01) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = (n.y - surface.y) / Math.max(0.01, jets.parent?.getWorldScale(_vr).y ?? 1);
+    }
+    this.cupWater(id, cp.water > 0.02 && cp.tilt > -0.6 ? { at: surface, r: (CUP_RIM.r - 0.002) * s * Math.max(0.5, up.y) } : null);
+    // the rinse water leaving the lowest point of the rim, falling into the basin under it
+    let pour = this.pours.get(id), rim: number[] | null = null, drop = 0;
+    if (cp.outflow > 0.003) {
+      let low = Infinity; const p = new THREE.Vector3();
+      for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; p.set(Math.cos(a) * CUP_RIM.r * s, CUP_RIM.h * s, Math.sin(a) * CUP_RIM.r * s).applyQuaternion(cp.q).add(cp.base); if (p.y < low) { low = p.y; rim = p.toArray(); } }
+      let floor = rim![1] - 0.3; for (const jets of this.tapJets.values()) { const n = jets.getWorldPosition(_vn); if (Math.hypot(rim![0] - n.x, rim![2] - n.z) < 0.4) floor = n.y - Number(jets.userData.dropDefault ?? 0.3) * (jets.parent?.getWorldScale(_vr).y ?? 1); }
+      drop = Math.max(0.03, rim![1] - floor);
+      const dir = _vo.set(up.x, 0, up.z); if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0); dir.normalize();
+      if (!pour) { pour = spoutJets(SPOUT_SPEED); this.thingsGroup.add(pour); this.pours.set(id, pour); }
+      const u = (pour.material as THREE.ShaderMaterial).uniforms;
+      pour.position.set(rim![0], rim![1], rim![2]); pour.rotation.set(0, Math.atan2(-dir.z, dir.x), 0); pour.visible = true;
+      u.uFlow.value = cp.outflow; u.uDir.value = -0.9; u.uDrop.value = drop;
+    } else if (pour) pour.visible = false;
+    d.obj.userData.cupDebug = { base: cp.base.toArray().map((v) => +v.toFixed(4)), up: up.toArray().map((v) => +v.toFixed(4)), tilt: +cp.tilt.toFixed(4), atLips: cp.atLips, lips: cp.lips.map((v) => +v.toFixed(4)), rimNear: cp.rimNear.map((v) => +v.toFixed(4)), palm: cp.palm.map((v) => +v.toFixed(4)), target: cp.target.map((v) => +v.toFixed(4)), grip: +cp.grip.toFixed(3), water: +cp.water.toFixed(3), surface: surface.toArray().map((v) => +v.toFixed(4)), outflow: +cp.outflow.toFixed(3), rim: rim?.map((v) => +v.toFixed(4)) ?? null, drop: +drop.toFixed(3) };
+    return true;
+  }
+  private cupWaters = new Map<string, THREE.Mesh>();
+  private cupWater(id: string, w: { at: THREE.Vector3; r: number } | null) {
+    let m = this.cupWaters.get(id);
+    if (!w) { if (m) m.visible = false; return; }
+    if (!m) { m = new THREE.Mesh(new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#bfe3f2', transparent: true, opacity: 0.75, roughness: 0.15, metalness: 0 })); m.name = 'rinse water'; m.renderOrder = 2; this.thingsGroup.add(m); this.cupWaters.set(id, m); }
+    m.position.copy(w.at); m.scale.setScalar(w.r); m.visible = true;
+  }
+  /** Entry 34: a thing held by its handle (a watering can) hangs from the right palm by its grip, turned with the body and
+   *  tipped by the recorded pour (the figure's `wateringTilt`); its rose showers while the figure says the water flows. */
+  private handleHeld(id: string, d: Drawn): boolean {
+    const f = this.figureOf(this.held.get(id)!); if (!f) return false;
+    f.holder.updateWorldMatrix(true, true);
+    const s = d.obj.scale.x, grip = d.obj.userData.handleGrip as number[], tilt = Number(f.holder.userData.wateringTilt ?? 0), flow = Number(f.holder.userData.wateringFlow ?? 0);
+    f.wrists[1].getWorldPosition(_pr); const kn = f.knuckles[1]; if (kn) _pr.lerp(kn.getWorldPosition(_v3), 0.5);
+    // entry 43: a kettle also turns about the grip toward the cup it pours into (engine yaw: + is to the body's right)
+    const turn = Number(f.holder.userData.wateringYaw ?? 0), vessel = d.obj.userData.vessel as { opening: number[]; outlet: number[]; angle: number; pour: 'spout' } | undefined;
+    f.holder.getWorldQuaternion(_qh); if (turn) _qh.multiply(_qy.setFromAxisAngle(_yAxis, -turn)); _qh.multiply(_qt.setFromAxisAngle(_zAxis, -tilt));
+    d.obj.quaternion.copy(_qh);
+    d.obj.position.copy(_pr).sub(_v3.set(grip[0], grip[1], grip[2]).multiplyScalar(s).applyQuaternion(_qh));
+    // a tap's stream ends in the can's filler opening when the opening is under the nozzle
+    const op = vessel?.opening ?? CAN_OPENING, opening = _vo.set(op[0], op[1] + 0.008, op[2]).multiplyScalar(s).applyQuaternion(_qh).add(d.obj.position);
+    for (const jets of this.tapJets.values()) {
+      const n = jets.getWorldPosition(_vn);
+      if (Math.hypot(opening.x - n.x, opening.z - n.z) < 0.16 && opening.y < n.y - 0.02) (jets.material as THREE.ShaderMaterial).uniforms.uDrop.value = (n.y - opening.y) / Math.max(0.01, jets.parent?.getWorldScale(_v3).y ?? 1);
+    }
+    let pour = this.pours.get(id);
+    if (vessel) { this.spoutPour(id, d, vessel, flow, tilt, s); return true; }
+    if (flow > 0.003) {
+      if (!pour) { pour = pourJets(); this.thingsGroup.add(pour); this.pours.set(id, pour); }
+      const rose = _vr.set(CAN_ROSE[0], CAN_ROSE[1], CAN_ROSE[2]).multiplyScalar(s).applyQuaternion(_qh).add(d.obj.position);
+      const u = (pour.material as THREE.ShaderMaterial).uniforms, yaw = _eu.setFromQuaternion(f.holder.getWorldQuaternion(_qy), 'YXZ').y;
+      // the spout leaves the can 43° above its base line; tipped by `tilt`; the shower falls to the soil under the rose
+      pour.position.copy(this.thingsGroup.worldToLocal(rose.clone())); pour.rotation.set(0, yaw, 0); pour.visible = true;
+      u.uFlow.value = flow; u.uDir.value = 0.75 - tilt; u.uDrop.value = Math.max(0.05, rose.y - this.soilUnder(rose));
+    } else if (pour) pour.visible = false;
+    return true;
+  }
+  /** Entry 43: a kettle's pour. The stream leaves the drawn spout tip along the spout (tipped by the recorded tilt) at
+   *  SPOUT_SPEED and falls to the tea's surface in the cup under it (rising as the cup fills); what the stream does is
+   *  published on the kettle (`pourDebug`) for proofs: tip, landing, the cup and its rim distance. */
+  private spoutPour(id: string, d: Drawn, vessel: { outlet: number[]; angle: number }, flow: number, tilt: number, s: number) {
+    const q = d.obj.quaternion, o = vessel.outlet, tip = _vr.set(o[0], o[1], o[2]).multiplyScalar(s).applyQuaternion(q).add(d.obj.position);
+    const fwd = _vn.set(1, 0, 0).applyQuaternion(q); fwd.y = 0; if (fwd.lengthSq() < 1e-9) fwd.set(1, 0, 0); fwd.normalize();
+    const el = vessel.angle - tilt;
+    // the cup under the stream: the nearest drawn cup of tea within 0.15 m of where a 7 cm fall would land
+    const guess = spoutRun(el, 0.07);
+    let cup: string | null = null, best = 0.15, surface = tip.y - 0.5;
+    for (const [cid, st] of this.steamers) { if (st.kind !== 'cup') continue; const c = this.drawn.get(cid); if (!c) continue; const p = c.obj.position, r = Math.hypot(p.x - (tip.x + fwd.x * guess), p.z - (tip.z + fwd.z * guess)); if (r < best && p.y < tip.y) { best = r; cup = cid; const tea = Number(this.model?.entities.get(cid)?.state?.tea ?? 0); surface = p.y + (0.014 + (CUP_RIM.full - 0.014) * Math.max(0, Math.min(1, tea))) * c.obj.scale.x; } }
+    const drop = Math.max(0.02, tip.y - surface), run = spoutRun(el, drop, spoutSpeed(flow)), land = [tip.x + fwd.x * run, surface, tip.z + fwd.z * run];
+    const c = cup ? this.drawn.get(cup)!.obj.position : null;
+    d.obj.userData.pourDebug = { flow: +flow.toFixed(3), tilt: +tilt.toFixed(4), tip: tip.toArray().map((v) => +v.toFixed(4)), land: land.map((v) => +v.toFixed(4)), cup, rim: c ? +Math.hypot(land[0] - c.x, land[2] - c.z).toFixed(4) : null, drop: +drop.toFixed(3) };
+    let pour = this.pours.get(id);
+    if (flow > 0.003) {
+      if (!pour) { pour = spoutJets(SPOUT_SPEED); this.thingsGroup.add(pour); this.pours.set(id, pour); }
+      const u = (pour.material as THREE.ShaderMaterial).uniforms;
+      pour.position.copy(tip); pour.rotation.set(0, Math.atan2(-fwd.z, fwd.x), 0); pour.visible = true;
+      u.uFlow.value = flow; u.uDir.value = el; u.uDrop.value = drop;
+    } else if (pour) pour.visible = false;
+  }
+  /** Entry 43: each kettle's and cup's steam from its state at the depicted tick (one uniform each); hidden when cold. */
+  private stepSteam() {
+    if (!this.steamers.size || !this.model) return;
+    for (const [id, st] of this.steamers) {
+      const d = this.drawn.get(id), e = this.model.entities.get(id);
+      if (!d || !e || d.removing || !d.obj.visible) { setSteam(st.pts, 0); if (st.lamp) st.lamp.visible = false; continue; }
+      const s = d.obj.scale.x, q = d.obj.quaternion;
+      if (st.kind === 'kettle') {
+        const k = kettleHeat(e.state, this.depictedTick), o = KETTLE_SPOUT;
+        st.pts.position.set(o[0], o[1], o[2]).multiplyScalar(s).applyQuaternion(q).add(d.obj.position);
+        const jet = _vs.set(Math.cos(KETTLE_SPOUT_ANGLE), Math.sin(KETTLE_SPOUT_ANGLE), 0).applyQuaternion(q).multiplyScalar(0.3 + 0.5 * k.steam);
+        setSteam(st.pts, k.steam, jet);
+        if (st.lamp) { st.lamp.visible = k.on; if (k.on) st.lamp.position.set(KETTLE_SWITCH[0] - 0.01, KETTLE_SWITCH[1] + 0.008, KETTLE_SWITCH[2]).multiplyScalar(s).applyQuaternion(q).add(d.obj.position); }
+        d.obj.userData.kettleHeat = { phase: k.phase, steam: +k.steam.toFixed(3), tick: this.depictedTick };
+      } else {
+        const v = cupSteam(e.state, this.depictedTick);
+        st.pts.position.set(0, CUP_RIM.h * s, 0).add(d.obj.position);
+        setSteam(st.pts, v, _vs.set(0, 0.02, 0));
+      }
+    }
+  }
+  /** The top of the soil under a point: a growing planter's within reach, else the ground under the drawn body. */
+  private soilUnder(p: THREE.Vector3): number {
+    let best = Infinity, y = p.y - 0.6;
+    for (const id of this.growing) { const d = this.drawn.get(id); if (!d) continue; const q = d.obj.position, r = Math.hypot(q.x - p.x, q.z - p.z); if (r < 0.75 && r < best) { best = r; y = q.y + 0.372 * d.obj.scale.x; } }
+    return y;
+  }
+  private figureOf(body: string): { holder: THREE.Object3D; wrists: [THREE.Object3D, THREE.Object3D]; knuckles: (THREE.Object3D | null)[] } | null {
     let f = this.figures.get(body);
     if (f && 'holder' in f && !attached(f.holder)) f = undefined;
     if (!f || ('missingAt' in f && this.now - f.missingAt > 1000)) {
@@ -404,12 +742,7 @@ export class WorldEntityLayer {
       });
       this.figures.set(body, found); f = found;
     }
-    if (!('holder' in f)) return false;
-    f.holder.updateWorldMatrix(true, true);
-    const palm = (k: 0 | 1, v: THREE.Vector3) => { f.wrists[k].getWorldPosition(v); const kn = f.knuckles[k]; if (kn) v.lerp(kn.getWorldPosition(_v3), 0.5); return v; };
-    palm(0, _pl); palm(1, _pr);
-    if (Math.abs(_pl.y - _pr.y) < 0.06) out.copy(_pl).lerp(_pr, 0.5); else out.copy(_pl.y > _pr.y ? _pl : _pr);
-    return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
+    return 'holder' in f ? f as never : null;
   }
 
   private frame = 0;
@@ -479,6 +812,8 @@ export class WorldEntityLayer {
   /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
   private interiorVisible(id: string, d: Drawn): boolean {
     if (!this.model) return true;
+    // entry 42: a thing kept in a shut drawer or locker is not seen, unless a hand is opening or closing it right now
+    const box = this.keptIn.get(id); if (box && !(this.movingBoxes.has(box) && this.now - this.movingAt < 200) && this.model.entities.get(box)?.state?.open !== true) return false;
     // P1: which building (if any) holds a thing, and on which slot, is found once per world revision (seq + drawn count),
     // not by walking the parent chain of all ~4,800 things every frame; kept on the thing itself (no lookup per frame)
     const key = this.seq * 1_048_576 + this.drawn.size;
@@ -563,7 +898,8 @@ export class WorldEntityLayer {
     for (const m of this.sectors.values()) { m.geometry.dispose(); }
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);
-    this.drawn.clear();
+    this.drawn.clear();this.tugged.clear();
+    this.recordedItems.clear();this.missingItemAt.clear();this.lightMoves.clear();this.keptIn.clear();this.movingBoxes.clear();
     for (const m of this.materials.values()) m.dispose();
     this.materials.clear();
     this.waterGroup.clear(); this.terrainGroup.clear(); this.thingsGroup.clear();
@@ -724,15 +1060,21 @@ export class WorldEntityLayer {
   private draw(e: Entity, ease: boolean, force = false) {
     const m = this.model!; const def = m.resolvedDef(e.def);
     if (!def) return;
+    if(def.components.carryable&&(def.components.light||def.components.lights))this.lightMoves.add(e.id);
     if (def.tags.includes('horizon')) this.horizonBy.add(e.id); else this.horizonBy.delete(e.id);
     const parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     if (parent && m.resolvedDef(parent.def)?.components.body) this.held.set(e.id, parent.id); else this.held.delete(e.id);
+    if (parent && containerInside(m.resolvedDef(parent.def))?.slots.some((s) => s.id === e.in.slot)) this.keptIn.set(e.id, parent.id); else this.keptIn.delete(e.id);
     const existing = this.drawn.get(e.id);
     const defHash = def.hash + ':' + JSON.stringify(e.params ?? {}) + ':' + JSON.stringify(e.state ?? {}) + ':' + JSON.stringify(e.shape ?? null) + ':' + JSON.stringify(e.r ?? 0);
     const builder = meshFor(def);
     const isWorld = !!builder?.world;
     const wp = m.worldPose(e);
     const target = isWorld ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(wp.x, wp.y, wp.z);
+    // Soul Actions entry 33: a fire or neon sign lit by hand in place is redrawn at once (no 2.5 s edit ease, during which
+    // nothing animates), so its catch or strike plays from the contact
+    const inPlace = !!existing && !existing.removing && existing.to.p.distanceTo(target) < 1e-6 && existing.to.s === wp.s && def.tags.includes('hand-operated') && (def.tags.includes('neon') || hasFlames(def));
+    if (inPlace) ease = false;
     const refinement = ease && !isWorld ? this.sites.refinement(e, m) : null;
     if (existing && existing.defHash === defHash && !existing.removing && !force) {
       if (isWorld) return;
@@ -743,6 +1085,31 @@ export class WorldEntityLayer {
     }
     let built = this.build(e, def);
     if (!built) { if (existing) this.undraw(e.id); return; }
+    // Soul Actions: moving water (sprinkler fan, tap stream, shower) while the thing is on; GPU points, never instanced
+    { const jets = waterJets(def as never, e.state, e.params ?? {}); if (jets) { built.add(jets); delete built.userData.instanceKey; }
+      if (jets?.userData.waterJet === 'stream') this.tapJets.set(e.id, jets as THREE.Points); else this.tapJets.delete(e.id); }
+    // Entry 34: a growing planter's plants, eased from how they were last drawn to what the state now asks for; a can
+    // carried by its handle (a `carry` slot) is posed from the hand every frame, so never instanced
+    if (isGrowingDef(def as never)) {
+      const look = plantLookOf(e.state, def as never), shown = this.plantShown.get(e.id) ?? look;
+      built.add(plantGroup(seedOf(e.id), shown)); delete built.userData.instanceKey; setPatch(built, shown.m); this.growing.add(e.id);
+      if (!sameLook(shown, look)) this.plantTweens.set(e.id, { from: shown, to: look, t0: this.now, dur: lookSeconds(shown, look) * 1000 }); else this.plantTweens.delete(e.id);
+      this.plantShown.set(e.id, shown);
+    }
+    { const grip = (def as unknown as { slots?: { kind: string; p: number[] }[] }).slots?.find((x) => x.kind === 'carry'); if (grip) { built.userData.handleGrip = [...grip.p]; delete built.userData.instanceKey; } }
+    // Entry 43: a kettle is filled through its lid and pours from its spout (a can: its filler and its rose); kettles and
+    // cups of tea steam (a plume placed each frame from their state and the depicted tick)
+    if (isKettleDef(def as never)) built.userData.vessel = { opening: KETTLE_OPENING, outlet: KETTLE_SPOUT, angle: KETTLE_SPOUT_ANGLE, pour: 'spout' };
+    if (isKettleDef(def as never) || isTeaCupDef(def as never)) {
+      delete built.userData.instanceKey;
+      if (!this.steamers.has(e.id)) { const kind = isKettleDef(def as never) ? 'kettle' : 'cup', pts = steam(kind); this.thingsGroup.add(pts);
+        let lamp: THREE.Mesh | undefined; if (kind === 'kettle') { lamp = new THREE.Mesh(new THREE.SphereGeometry(0.0055, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff7a2a })); lamp.name = 'kettle switch lamp'; lamp.visible = false; this.thingsGroup.add(lamp); }
+        this.steamers.set(e.id, { pts, kind, lamp }); }
+    }
+    // State is visible on this frame, including during the generic edit easing.
+    // Waiting for animate()'s settled transform left an OFF bulb glowing for 2.5 s.
+    if (def.components.light || def.components.lights) syncLightGlow(built,e,def,m,this.now/1000);
+    const opening=existing&&def.tags.includes('hand-operated')?beginOpeningMotion(built,existing.obj,this.now):undefined;
     if (existing) { if (existing.inst) this.instancer.remove(existing.inst, e.id); else { this.thingsGroup.remove(existing.obj); disposeObject(existing.obj); } this.drawn.delete(e.id); }
     // a rainbow thing is weather: hidden until the atmosphere shows it after rain (its own meshes, never instanced)
     const rainbow = isRainbowDef(def); if (rainbow) holdRainbow(built);
@@ -757,10 +1124,15 @@ export class WorldEntityLayer {
     const to = { p: target, s: isWorld ? 1 : wp.s };
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
     const mdef = rideMotionDef(def);  // BALLOON-BODY: a ride balloon does not hover; Core's vehicle owns its motion
-    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(mdef) ? { motion: { entity: e, def: mdef, yaw: wp.yaw, glowOnly: glowOnly(mdef) } } : {}) });
+    this.drawn.set(e.id, { ...(opening ? {opening} : {}), ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(mdef) ? { motion: { entity: e, def: mdef, yaw: wp.yaw, glowOnly: glowOnly(mdef) } } : {}) });
+    // entry 42: a thing kept in a shut container is hidden from its first frame (a resync can draw before the next update)
+    if (this.keptIn.has(e.id)) { const k = this.drawn.get(e.id)!, v = this.interiorVisible(e.id, k); if (k.inst) k.shown = v; else k.obj.visible = v; }
   }
   private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id);
+    this.tapJets.delete(id); this.growing.delete(id); this.plantShown.delete(id); this.plantTweens.delete(id);
+    { const pour = this.pours.get(id); if (pour) { pour.removeFromParent(); (pour.material as THREE.Material).dispose(); this.pours.delete(id); } }
+    { const st = this.steamers.get(id); if (st) { st.pts.removeFromParent(); (st.pts.material as THREE.Material).dispose(); st.lamp?.removeFromParent(); this.steamers.delete(id); } } this.keptIn.delete(id);
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now + delaySeconds * 1000; d.dur = EASE_OUT_S;
   }
@@ -906,6 +1278,18 @@ function nextTask(priority: 'background' | 'user-visible' = 'background'): Promi
 /** A cached snapshot (the server's snapshot cache or an edge copy, lanes W1/O2) says how old it is: its `now` is moved on by that. */
 function ageNow(snap: { now?: number }, r: Response) { const age = Number(r.headers.get('age')) || 0; if (age > 0 && typeof snap.now === 'number') snap.now += age * 1000; }
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
+// Entry 34 scratch: held-by-handle pose, tap catch, rose shower
+const _qh = new THREE.Quaternion(), _qt = new THREE.Quaternion(), _qy = new THREE.Quaternion(), _zAxis = new THREE.Vector3(0, 0, 1), _yAxis = new THREE.Vector3(0, 1, 0), _vs = new THREE.Vector3(), _vo = new THREE.Vector3(), _vn = new THREE.Vector3(), _vr = new THREE.Vector3(), _eu = new THREE.Euler();
+const easeInOut = (k: number) => { const x = Math.max(0, Math.min(1, k)); return x * x * (3 - 2 * x); };
+/** A planter's seed for its plants' layout (stable per entity). */
+const seedOf = (id: string) => { let h = 2166136261; for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619); return h; };
+const sameLook = (a: PlantLook, b: PlantLook) => Math.abs(a.g - b.g) < 1e-3 && Math.abs(a.w - b.w) < 1e-3 && Math.abs(a.m - b.m) < 1e-3;
+/** A stage or a wilt change eases over 2.4 s; the soil darkening while water is poured over 0.9 s. */
+const lookSeconds = (a: PlantLook, b: PlantLook) => (Math.abs(a.g - b.g) > 1e-3 || Math.abs(a.w - b.w) > 1e-3 ? 2.4 : 0.9);
+/** The damp patch (role fill) of a planter spread for moisture `m`. */
+function setPatch(root: THREE.Object3D, m: number) {
+  root.traverse((o) => { if (o.userData.role === 'fill') { const k = Math.max(0.001, Math.min(1, m)); o.scale.set(k, 1, k); o.visible = m > 0.02; } });
+}
 /** Still in a scene graph (a re-created figure leaves its old holder detached). */
 function attached(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; for (let i = 0; p && i < 64; i++) { if (p.type === 'Scene') return true; p = p.parent; } return false; }
 /** Lane PERF2: two grounds differ only in landforms, waters or extent (what a world diff's tile list covers), so baked

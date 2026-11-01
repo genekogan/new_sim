@@ -52,7 +52,9 @@ export function waterActions(def: StoredDef): Action[] {
   const role = waterRole(def), w = wordOf(def);
   const mk = (name: string, label: string, field: string) => ({ name, label, roles: 'anyone', reach: 'touch', params: {}, when: [], then: [{ op: 'set', field, value: 0 }], water: true }) as unknown as Action;
   if (role === 'source' && !def.actions.some((a) => a.name === 'draw-water')) return [mk('draw-water', `Fill the watering can you are holding from the ${w}`, 'level')];
-  if (role === 'plant' && !def.actions.some((a) => a.name === 'water')) return [mk('water', `Water the ${w} with the watering can you are holding`, 'moisture')];
+  // entry 34: a growing planter is watered with a can fetched from its hook (watering.ts), not only one already held
+  const growing = (def.state as Record<string, { type?: string }>).growth?.type === 'number';
+  if (role === 'plant' && !def.actions.some((a) => a.name === 'water')) return [mk('water', growing ? `Water the plants and flowers in the ${w} with the watering can` : `Water the ${w} with the watering can you are holding`, 'moisture')];
   return [];
 }
 export const isWaterAction = (a: Action | undefined) => !!(a as { water?: boolean } | undefined)?.water;

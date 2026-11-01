@@ -91,34 +91,42 @@ const kindOf = (c: FlameCluster): FireKind => (c.r < 0.05 ? 'candle' : c.r < 0.2
 export const flameStats = { mounted: 0, near: 0, enabled: true };
 let phone: boolean | null = null;
 
-type Mounted = { fire: Fire; standIns: THREE.Object3D[]; kind: FireKind; level: 0 | 1 | 2 | -1 };
+type Mounted = { fire: Fire; standIns: THREE.Object3D[]; kind: FireKind; level: 0 | 1 | 2 | -1; id: string; strength: number };
 const live = new Set<Mounted>();
 function show(f: Mounted, level: 0 | 1 | 2) { f.fire.setDetail(level); for (const s of f.standIns) s.visible = level === 0; }
 registerFx('fire', {
   set(on) { flameStats.enabled = on; for (const f of live) show(f, on && f.level > 0 ? f.level as 1 | 2 : 0); },
-  stats() { return { ...flameStats }; },
+  /** `burning`: the fires drawn near the camera now, with their catch strength (entry 33 proofs). */
+  stats() { return { ...flameStats, burning: [...live].filter((f) => f.level > 0).map((f) => ({ id: f.id, kind: f.kind, strength: +f.strength.toFixed(3) })) }; },
 });
-/** Mount a fire on every flame cluster under `obj`; returns false when there is none. */
-export function mountFlames(obj: THREE.Object3D, id: string): boolean {
+/** Mount a fire on every flame cluster under `obj`; returns false when there is none. `catchUp`: a fire a Soul just lit
+ *  by hand (a hand-operated def is rebuilt at the contact) catches and grows to full over IGNITE seconds. */
+const IGNITE = 1.6;
+export function mountFlames(obj: THREE.Object3D, id: string, catchUp = false, wisp = false): boolean {
   const fires: Mounted[] = [];
   obj.traverse((pivot) => {
     const clusters = pivot.userData?.flames as FlameCluster[] | undefined; if (!clusters?.length) return;
     const standIns = pivot.children.filter((c) => (c as THREE.Mesh).isMesh);
     for (const m of standIns) m.onBeforeRender = noteCamera;
     clusters.forEach((c, i) => {
-      const kind = kindOf(c), fire = createFire(seedOf(`${id}#${i}`), c.r * 1.05, kind, c.h * 1.05);
+      const kind = kindOf(c), fire = createFire(seedOf(`${id}#${i}`), c.r * 1.05, kind, c.h * 1.05, wisp && kind === 'torch');
       fire.group.position.set(c.p[0], c.p[1], c.p[2]);
       fire.group.children[0].onBeforeRender = noteCamera;
       pivot.add(fire.group);
-      const f: Mounted = { fire, standIns, kind, level: -1 }; fires.push(f); live.add(f);
+      const f: Mounted = { fire, standIns, kind, level: -1, id, strength: catchUp ? 0.12 : 1 }; fires.push(f); live.add(f);
     });
   });
   if (!fires.length) return false;
   flameStats.mounted += fires.length;
   const at = new THREE.Vector3();
+  // the layer ticks a rebuilt thing only after its edit ease-in, so the catch-up starts small here and is timed from the
+  // mount (epoch seconds, the clock `t` below is on), not from the first tick
+  const t0 = Date.now() / 1000;
+  if (catchUp) for (const f of fires) { f.fire.update(0, 0.12); for (const s of f.standIns) s.visible = false; }
   obj.userData.fx = (t: number) => {
     phone ??= (globalThis as { __simQuality?: { tier?: string } }).__simQuality?.tier === 'phone';
     const time = reduced?.matches ? 7.3 : t;
+    const k = catchUp && !reduced?.matches ? Math.min(1, Math.max(0, (t - t0) / IGNITE)) : 1, strength = 0.12 + 0.88 * k * k * (3 - 2 * k);
     for (const f of fires) {
       at.setFromMatrixPosition(f.fire.group.matrixWorld);
       const d = at.distanceTo(cam), [r1, r2] = REACH[f.kind];
@@ -128,7 +136,8 @@ export function mountFlames(obj: THREE.Object3D, id: string): boolean {
         if (f.level > 0) flameStats.near--; if (level > 0) flameStats.near++;
         f.level = level; show(f, level);
       }
-      if (level > 0) f.fire.update(time, 1);
+      if (level > 0) f.fire.update(time, strength);
+      f.strength = strength;
     }
   };
   obj.addEventListener('removed', function gone() {

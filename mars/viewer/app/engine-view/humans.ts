@@ -1,3 +1,10 @@
+import {actuatorHand,handActuatorFrame,posterLocal,strokeWork,twoHanded,HAND_REACH_SECONDS,HAND_RELEASE_SECONDS,type HandActuatorMotion} from '../../engine/social/hand-actuator.ts';
+import {insidePoint,itemPoseOf,ITEM_RECOVERY_SECONDS,type ItemPoseView} from '../../engine/items/presentation.ts';
+import {wateringFrame,transferWeight,TRANSFER_HANDOFF,type HandTransfer,type WateringMotion} from '../../engine/items/watering.ts';
+import { posterTexture, sheetGeometry, sheetLift as sheetLiftAt, tapeStrips, rollMesh, PAPERS } from './poster-sheet.ts';
+import type {LetGoV1} from '../../engine/items/let-go.ts';
+import {cupFrame,cupPose,cupYawAt,MUG,type CupMotion,type CupMarks} from '../../engine/items/cup.ts';
+import {BODY_MODEL as ENGINE_BODY} from '../../engine/body/model.ts';
 // Engine humans → animated rigs. Renderers only read world state (guide):
 // after every fixed tick we snapshot pose + derive clip state; frames
 // interpolate between the last two ticks, so visuals are a deterministic
@@ -56,7 +63,11 @@ import type {ShoreContactV1} from '../../../../packages/engine-contract/src/shor
 import type { DepictionBeat } from './station-depiction.ts';
 import { sleepGoal, sleepHands, sleepHeadPitch, sleepRestWeight, sleepHeadRestLift } from './sleep.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
-import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
+import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, SING_LET_GO, activityFrame, gameArmBlend, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
+import { accompanistOf } from './piano-score.ts';
+import { handGameActive, handGameGestureClock, handGameSuppress, poseHandGames, type HandGameDiag } from './hand-games.ts';
+import type { HandHoldState } from '../../engine/social/hand-hold.ts';
+import type { RpsState } from '../../engine/social/rps.ts';
 import {recordedGame,type RecordedGame} from './recorded-games.ts';
 import {runningGaitAt} from './running-gait.ts';
 import {PLAY_MOTION, playSeatAt, rideSeat} from './play-motion.ts';
@@ -72,6 +83,31 @@ type View = {
   cur: Snap;
   speed: number;
   activity: string;
+  handActuator?:HandActuatorMotion;
+  handActuatorTime?:number;
+  itemPose?:ItemPoseView;
+  /** entry 43: render time an opted-in put let go of its item (gestures come back only after the arm has). */
+  itemReleasedAt?:number;
+  /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
+  watering?:WateringMotion;
+  wateringTime?:number;
+  /** Soul Actions 43: the last let-go before a reach (let-go.ts), on the take clock. */
+  letGo?:LetGoV1;
+  letGoTime?:number;
+  /** Soul Actions 44: a mug drunk from or rinsed (cup.ts), on the take clock. */
+  cup?:CupMotion;
+  cupTime?:number;
+  /** Soul Actions 44: the idle hand-off last frame, and the weight a let-go fades its gesture out from. */
+  idleLast?:number;
+  letGoFrom?:{tick:number;from:number};
+  /** Soul Actions 44: the walk age last frame (a smaller one is a new walk), and the gesture level shown when it started. */
+  walkKey?:number;
+  handoffAtWalk?:number;
+  /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
+  transfer?:HandTransfer;
+  transferTime?:number;
+  /** Entry 38: the actuator that just ended, while its idle handoff is still fading in. */
+  lastHandActuator?:HandActuatorMotion;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -86,6 +122,7 @@ type View = {
   grip?: string;
   /** Grip slot on that part (engine/construction: lift-far, foot-l/r, hold-N, lift-end/edge/corner-*, lift-station, handup-*). */
   gripSlot?: string;
+  carryWeight?: number;
   /** Rack-structure link stood on (engine human.on; readout). */
   on?: string;
   /** Pose on the rack structure (frame-gait.ts): climbing a frame, standing on its bracing, walking a beam. */
@@ -132,13 +169,31 @@ type View = {
   /** todo (leisure): the dock bicycle under a cycling body, metres ridden (turns the cranks), when it last cycled (s). */
   bike?: THREE.Group; ridden?: number; bikeAt?: number;
   prop?: { kind: PropKind; obj: THREE.Object3D };
+  /** Soul Actions entry 38: the poster in the hands while it goes up or comes down (sheet on the wall, roll between the palms). */
+  sheet?: { key: string; group: THREE.Group; flat: THREE.Mesh; roll: THREE.Mesh; tapes: THREE.Mesh[] };
   /** Library clip layer (clip-library.ts): seconds since `activity` began (undefined: before the record), the activity
    *  and base before it (crossfade), the paired-gesture partner and where it is, metres walked, speaking now. */
   since?: number;
   prevAct?: string;
   prevBase?: string;
+  restAge?: number;
+  restFrom?: number;
+  /** Idle variety weight drawn at the last render (Idle_Neutral + variant; diagnostics only). */
+  variety?: number;
+  /** Entry 36: the idle-variety onset level when the body last stood idle (a singer's gesture fades out from it). */
+  singOnset?: number;
+  /** Seconds since the current walk began (its weight left 0), and the rest clock then; undefined: not walking / long ago. */
+  walkAge?: number;
+  restAgeAtWalk?: number;
   partner?: string;
   partnerP?: THREE.Vector3;
+  /** entry 35 (hand-games.ts): holding hands / an offered hand, and a rock-paper-scissors count; the tick drawn and the
+   *  hand partner's drawn root. */
+  handHold?: HandHoldState;
+  rps?: RpsState;
+  hgTick?: number;
+  hgDt?: number;
+  holdP?: THREE.Vector3;
   dist: number;
   speaking?: boolean;
   /** Library actions playing at the last render (stopped when no longer wanted). */
@@ -164,6 +219,8 @@ export type Diag = {
   /** Prone layer (prone.ts): rise coordinate, torso pitch and body turn (rad), rendered yaw, layer weight; what the
    *  engine published at the latest tick (its body turn angleDelta(pose.yaw, proneYaw), phaseK; null: not published). */
   prone: (ProneState & { engTurn: number | null; phaseK: number | null }) | null;
+  /** entry 35: the hand-game layer drawn this frame (hold / offer / rps), its weight, the shaped hand's finger curls. */
+  handGame?: HandGameDiag;
 };
 /** Where an arm's target came from: engine hand points, a grip slot, or private frame/balance/ground-sleep contacts. */
 type Source = 'hands' | 'grip' | 'frame' | 'sleep' | 'expression' | 'water' | null;
@@ -187,6 +244,7 @@ export type SampledHuman = {
   activity?: string;
   grip?: string;
   gripSlot?: string;
+  carryWeight?: number;
   /** Engine hand points (take field `hands`): arms, posture and held items follow them as in the lab. */
   hands?: Hands;
   /** Activity an eat / serve overlay is layered on (take field `baseActivity`; 'sit' = seated). */
@@ -197,6 +255,27 @@ export type SampledHuman = {
    *  within the engine phase — the prone layer's body turn and exact rise mid-phase (else each phase's end pose). */
   proneYaw?: number;
   phaseK?: number;
+  handActuator?:HandActuatorMotion;
+  handActuatorTime?:number;
+  itemPose?:ItemPoseView;
+  /** Soul Actions 34: a watering-can stage (fill / pour), on the take clock. */
+  watering?:WateringMotion;
+  wateringTime?:number;
+  /** Soul Actions 43: the last let-go before a reach (let-go.ts), on the take clock. */
+  letGo?:LetGoV1;
+  letGoTime?:number;
+  /** Soul Actions 44: a mug drunk from or rinsed (cup.ts), on the take clock. */
+  cup?:CupMotion;
+  cupTime?:number;
+  /** Soul Actions 44: the idle hand-off last frame, and the weight a let-go fades its gesture out from. */
+  idleLast?:number;
+  letGoFrom?:{tick:number;from:number};
+  /** Soul Actions 44: the walk age last frame (a smaller one is a new walk), and the gesture level shown when it started. */
+  walkKey?:number;
+  handoffAtWalk?:number;
+  /** Soul Actions 34: a handle-held item taken or put by hand (take_item / put_item), on the take clock. */
+  transfer?:HandTransfer;
+  transferTime?:number;
   sleepPose?: NonNullable<Entity['human']>['sleepPose'];
   shore?: ShoreContactV1;
   shoreTime?: number;
@@ -210,11 +289,21 @@ export type SampledHuman = {
   speed?: number;
   /** together/1: the other body of a paired gesture (hug, handshake, high-five, give/take, dance together). */
   partner?: string;
+  /** entry 35: take fields handHold / rps, and the absolute take tick (fractional) and tick length they are read at. */
+  handHold?: HandHoldState;
+  rps?: RpsState;
+  handGameTick?: number;
+  handGameDt?: number;
   /** Seconds since `activity` began in this take, and the activity / base before it (library clip crossfades and
    *  one-shots); absent when the activity began before the take. */
   activityAge?: number;
   prevActivity?: string;
   prevBaseActivity?: string;
+  restAge?: number;
+  /** Seconds since the current walk began (the Walk weight left 0; absent: not walking, or longer than a gesture fade). */
+  walkAge?: number;
+  /** The rest clock (restAge) when that walk began; absent: unknown. */
+  restAgeAtWalk?: number;
 };
 export type { Hands };
 /** A gripped part's pose over the last two ticks (hand points follow the interpolated part). */
@@ -229,6 +318,8 @@ const SEAT_DEFAULT = 0.45; // m, when the seat fixture is unknown (take replay)
 const SEAT_MATCH = 0.8; // m, body point to nearest seat point (covers the sit-down / stand-up approach line)
 const SEATED = new Set(['sit', 'sit-down', 'stand-up']);
 const OVERLAYS = new Set(['eat', 'serve', 'drink', ...ACTIVITY_OVERLAYS]);
+/** Soul Actions 44: the lips from the rig's head bone, in the body frame of a 1.75 m body (scaled by height). */
+const CUP_LIPS = { fwd: 0.1, up: 0.02 } as const;
 const RUN_SPEED = 2.3; // m/s: faster than any walk
 const INTERACT = new Set(['browse', 'post-letter', 'give', 'take', 'hand-over']);
 const PELVIS = 0.09; // m from the hip joints down to the sitting surface (thigh/buttock thickness)
@@ -279,10 +370,65 @@ const baseOf = (act: string, base?: string) => { if (act === 'cycle') return 'si
 /** Sitting on the ground (sit-ground, or an overlay layered on it): the seat is the grass. */
 const onGround = (act: string, base?: string) => act === 'sit-ground' || (base === 'sit-ground' && OVERLAYS.has(act));
 /** Idle variety: now and then (about 6 s in every 25, per person) the Idle_Neutral clip blends in. */
+const IDLE_VARIETY_ONSET = 1.2;
+/** An idle gesture playing when a reach or a walk starts fades out over this long (s) instead of being cut. */
+export const GESTURE_FADE = 1.4;
+/** Track names (three-sanitised bone names) of the arms and hands: shoulders to fingertips. */
+const ARM_TRACK = /^(Shoulder|UpperArm|LowerArm|Wrist|Thumb|Index|Middle|Ring|Pinky)/;
+/** An idle gesture (Idle_Neutral, fold arms, look around) is drawn on the arms, neck and head only; the body, hips and
+ *  legs keep the Idle clip. The gesture clips stand in their own stance (fold arms / look around: feet 0.41 m apart, the
+ *  other foot forward from Idle's 0.34 m stagger; Idle_Neutral: feet together), so every gesture fade in or out slid
+ *  both feet 0.2–0.4 m across the ground and crossed them (entry 39, take 3: at the tap she reached while her feet slid
+ *  from one split stance to the other). Their torso turn belongs to that stance too (25° off the legs without it). */
+const GESTURE_TRACK = /^(Neck|Head|Shoulder|UpperArm|LowerArm|Wrist|Thumb|Index|Middle|Ring|Pinky)/;
+/** Per rig, the upper-body (GESTURE_TRACK) copy of an idle gesture clip. */
+function gestureAction(rig: Rig, name: string): THREE.AnimationAction | null {
+  const key = name + '#gesture';
+  let a = rig.lib.get(key);
+  if (a === undefined) {
+    const c = THREE.AnimationClip.findByName(rig.template.gltf.animations, name), tracks = c?.tracks.filter((t) => GESTURE_TRACK.test(t.name)) ?? [];
+    a = c && tracks.length ? rig.mixer.clipAction(new THREE.AnimationClip(key, c.duration, tracks)) : null;
+    rig.lib.set(key, a);
+  }
+  return a;
+}
+/** Per rig, the Idle clip without the gesture tracks: it carries the gesture's share of the body and legs, so their
+ *  weights still sum to one (the mixer fills a bone's missing share with its bind pose). */
+function idleBodyAction(rig: Rig): THREE.AnimationAction {
+  const key = '#idle-body';
+  let a = rig.lib.get(key);
+  if (!a) {
+    const c = rig.idle.getClip();
+    a = rig.mixer.clipAction(new THREE.AnimationClip(key, c.duration, c.tracks.filter((t) => !GESTURE_TRACK.test(t.name))));
+    rig.lib.set(key, a);
+  }
+  return a;
+}
+/** Per rig, an arms-only copy of a template clip (the gesture fades on the arms while the legs stride). */
+function armsAction(rig: Rig, name: string): THREE.AnimationAction | null {
+  const key = name + '#arms';
+  let a = rig.lib.get(key);
+  if (a === undefined) {
+    const c = THREE.AnimationClip.findByName(rig.template.gltf.animations, name), tracks = c?.tracks.filter((t) => ARM_TRACK.test(t.name)) ?? [];
+    a = c && tracks.length ? rig.mixer.clipAction(new THREE.AnimationClip(key, c.duration, tracks)) : null;
+    rig.lib.set(key, a);
+  }
+  return a;
+}
+// 'operate' (a hand actuator) is standing too: an idle gesture fades out over its reach and back in after the release.
+// entry 35: a rock-paper-scissors count is standing still too (the onset clock runs on; the hand game fades gestures itself)
+export const REST_ACTS = new Set(['idle', 'reach', 'operate', 'rps']);
+/** Activities in which the body covers ground on its feet (walk.ts: `ex.gait ?? 'walk'`, wading). Idle variety fades out
+ *  with the Walk weight's ease at a walk start; the onset clock restarts only from a full stride (take-replay restAge). */
+export const GAIT_ACTS = new Set(['walk', 'wade', 'jog', 'run']);
+/** Walk weight of a full stride (walk-ease.ts WALK_FULL; the live path's eased walkW). */
+const WALK_FULL_LIVE = 0.98;
 function neutralWeight(id: string, t: number) { const ph = (hashId(id) % 997) / 997, u = ((t / 25 + ph) % 1) * 25; return u < 1 ? smooth(u) : u < 6 ? 1 : u < 7 ? 1 - smooth(u - 6) : 0; }
 const handList = (h: Hands): Vec3[] => [h.left, h.right].filter((q): q is Vec3 => !!q);
 const copyHands = (h?: Hands): Hands => ({ ...(h?.left ? { left: [...h.left] as Vec3 } : {}), ...(h?.right ? { right: [...h.right] as Vec3 } : {}) });
 
+/** Entry 42: clip time advanced under a fade-out of length f, r s in: ∫0^r (1 − smoothstep(u/f)) du (f/2 once the fade is over). */
+const heldClip = (r: number, f: number) => { const x = Math.min(1, Math.max(0, r / f)); return Math.max(0, Math.min(r, f)) - f * (x * x * x - x * x * x * x / 2); };
 export class HumanViews {
   readonly group = new THREE.Group();
   private stationBeat:DepictionBeat|null=null;
@@ -295,6 +441,10 @@ export class HumanViews {
   private bodyTemplates:ReadonlyMap<string,Template>=new Map();
   setBodyTemplates(templates:ReadonlyMap<string,Template>){this.bodyTemplates=templates;}
   private parts = new Map<string, Part>();
+  private fixtureHandling = new Map<string, import('../../engine/world/catalog.ts').Handling>();
+  setFixtureHandling(handling: Record<string, import('../../engine/world/catalog.ts').Handling>) {
+    this.fixtureHandling = new Map(Object.entries(handling));
+  }
   private flights: Flight[] = [];
   private readingActors = new Set<string>();
   private climbs: { id: string; path: [number, number, number][] }[] = [];
@@ -421,6 +571,10 @@ export class HumanViews {
       v.shore = undefined;
       v.shoreTime = undefined;
       v.waterTransition = undefined;
+      if(v.handActuator&&!e.human?.handActuator)v.lastHandActuator=v.handActuator;else if(e.human?.handActuator)v.lastHandActuator=undefined;
+      v.handActuator=e.human?.handActuator;v.handActuatorTime=world.tick*DT;v.watering=e.human?.wateringV1;v.wateringTime=world.tick*DT;v.letGo=e.human?.letGoV1;v.letGoTime=world.tick*DT;v.cup=e.human?.cupV1;v.cupTime=world.tick*DT;v.transfer=e.human?.handTransferV1;v.transferTime=world.tick*DT;
+      v.itemPose=itemPoseOf(e.human?.itemTransferV1,e.human?.heldItemsV1,world.tick,DT);
+      v.handHold=e.human?.handHold;v.rps=e.human?.rps;v.hgTick=world.tick;v.hgDt=DT;{const q=v.handHold?world.entities[v.handHold.with]:undefined;v.holdP=q?new THREE.Vector3(...q.pose.p):undefined;}
       v.sleepPose = e.human?.sleepPose;
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
@@ -446,6 +600,12 @@ export class HumanViews {
       }
       const sitting = (base === 'sit' || base === 'sit-down') && !walking;
       const walkW = clamp01(c.walkW + (walking ? BLEND : -BLEND));
+      // idle-variety onset clock: restarts from a full stride or anything other than standing; a walk start (weight still
+      // easing in) or a short nudge does not restart it, so a gesture fades out with the walk's own blend
+      if (GAIT_ACTS.has(act)) { if (v.walkAge === undefined) { v.walkAge = 0; v.restAgeAtWalk = v.restAge; } else v.walkAge += DT; }
+      else v.walkAge = v.restAgeAtWalk = undefined;
+      const moving = GAIT_ACTS.has(act) && walkW >= WALK_FULL_LIVE;
+      v.restAge = moving || (!REST_ACTS.has(act) && !GAIT_ACTS.has(act)) ? 0 : v.restAge === undefined ? undefined : v.restAge + DT;
       // on a beam: short steps — the stride at half the Walk weight is about half the clip's, so the cadence doubles
       const rate = walking ? Math.max(0.35, v.speed / v.rig.template.walkSpeed) * (act === 'beam-walk' ? BEAM_CADENCE : 1) : 1;
       const dur = v.rig.walk.getClip().duration;
@@ -495,7 +655,8 @@ export class HumanViews {
     const ts: Target[] = [];
     const hands = e.human?.hands;
     if (hands && (hands.left || hands.right)) {
-      if (hands.left) ts.push(toBody(hands.left[0], hands.left[1], hands.left[2], -1));
+      // Soul Actions 34: the free hand on a tap's valve (chest height) asks nothing of the body; only the can hand leans it
+      if (hands.left && !e.human?.wateringV1) ts.push(toBody(hands.left[0], hands.left[1], hands.left[2], -1));
       if (hands.right) ts.push(toBody(hands.right[0], hands.right[1], hands.right[2], 1));
     } else if (v.grip && v.gripSlot !== STATION_SLOT) {
       const part = world.entities[v.grip];
@@ -503,16 +664,55 @@ export class HumanViews {
         for (const side of [-1, 1]) {
           const sh = new THREE.Vector3(o[0] + c * (d.sh.f) - s * side * d.shHalf, o[1] + d.pivotH + d.sh.up, o[2] + s * d.sh.f + c * side * d.shHalf);
           const out = new THREE.Vector3();
-          const r = slotPoint(part, v.gripSlot ?? '', sh, o[1], out);
+          const r = slotPoint(part, v.gripSlot ?? '', sh, o[1], out, this.fixtureHandling.get(part.def));
           if (r === false) continue;
           if (r === undefined && !boxNearest(part, sh, out)) continue;
           ts.push(toBody(out.x, out.y, out.z, side));
         }
       }
     }
-    const pz = solvePosture(d, ts, styleFor(v.activity, walking));
+    if(v.itemPose?.transfer&&!v.handActuator){
+      // Opted-in item transfer: one posture toward the fixed grasp / placement point, on the reach hump; standing
+      // before and after it. Solving against the moving hand hopped between grid minima and popped at its ends.
+      const r=v.itemPose.posture;
+      if(!r)return NEUTRAL;
+      // entry 43: 'lean' (hips, little knee): a shorter body set a mug on a 0.75 m table in a 0.26 m squat with 'hips'
+      const q=solvePosture(d,[toBody(r.target[0],r.target[1],r.target[2],r.hand==='left'?-1:1)],'lean');
+      return {drop:q.drop*r.k,bend:q.bend*r.k,rise:q.rise*r.k,kneel:q.kneel*r.k};
+    }
+    // Entry 43: a handle-held vessel's fill or pour leans toward its one fixed hold point (under the tap, over the cup),
+    // eased with the hand on the stage's own clock ('hips', as 34's per-frame solve: 'lean' squatted 0.16 m under a
+    // 1.33 m hold close to the chest). A hold well above the hips (a kettle over a cup) is a standing hold: at most a small
+    // lean ('walk': ≤ 25°, ≤ 8 cm); 'hips' squatted a taller body 12 cm to keep the kettle hand off its chest (take 5).
+    // Solved per frame against the moving hand it hopped between grid minima:
+    // a 0.26 m one-frame dip as the kettle hand passed 1.2 m on its way up to a pour.
+    // Soul Actions 44: a mug at the lips or under a tap asks nothing of the body while drinking (it is brought to the
+    // mouth, the mouth is not brought to it); under a tap the body leans a little toward the hold, on the frame's own ease
+    // ('stand', entry 33's reach at or above the hips: under 'walk' the knees bent and the hips went back at the basin)
+    if(v.cup&&!walking){const m=v.cup,c=cupFrame(m,(v.cupTime??0)-m.startTick*DT);if(m.stage==='drink'||!m.hold)return NEUTRAL;
+      const k=(c.a==='hold'?1-c.k:0)+(c.b==='hold'?c.k:0),t=toBody(m.hold[0],m.hold[1]+MUG.wrapUp,m.hold[2],m.hand==='left'?-1:1),q=solvePosture(d,[t],'stand');
+      return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
+    if(v.watering&&!v.handActuator&&!walking){const m=v.watering,k=wateringFrame(m,(v.wateringTime??0)-m.startTick*DT).right,t=toBody(m.hold[0],m.hold[1],m.hold[2],1),q=solvePosture(d,[t],t.up>d.hipH+0.15?'walk':'hips');return {drop:q.drop*k,bend:q.bend*k,rise:q.rise*k,kneel:q.kneel*k};}
+    // A hand actuator whose hand points are all at or above the hip joints is a standing reach: lean, never dip.
+    // Entry 40: doors too (a door's knob at 1.04 m is above every rig's hips). Entry 31's close from the push side stands 3 cm
+    // farther from the leaf for wall clearance; under `knees` that 0.63 m push dipped the hips 0.17 m (0.086 before 31).
+    // A latch below the hips keeps its small bend (`knees`).
+    const style = styleFor(v.activity, walking), standing = style === 'knees' && !!v.handActuator && ts.length > 0 && ts.every((t) => t.up >= d.hipH);
+    // entry 43: taking or putting a handle-held thing (a kettle) leans like the vessel stages: 'hips' flickered its hips 4 cm
+    const pz = solvePosture(d, ts, v.transfer && v.transfer.endTick === undefined && v.activity === 'reach' && !walking ? 'lean' : standing ? 'stand' : style);
+    // A low latch may need a small bend as well as a hand reach. Ease the whole
+    // solved posture on the same timeline so the torso cannot pop in/out.
+    if(v.handActuator){const k=handActuatorFrame(v.handActuator,(v.handActuatorTime??0)-v.handActuator.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
+    // entry 43: a take's or put's posture rises over its reach and settles over the hand's way back (a hump, as 29's item
+    // reach): at the put's full arm weight from its first frame the free arm swung 0.099 m in one sample as the bend
+    // switched on; and once a take has ended the hand hangs at its carry point and asks nothing of the body (held at full
+    // weight, a full kettle at the side kept a body 8 cm down, standing and walking, until the next put popped it up)
+    if(v.transfer){const ts=(v.transferTime??0)-v.transfer.startTick*DT,r=v.transfer.reach,k=v.transfer.endTick!==undefined&&v.transfer.mode==='take'?0:ts<r?smooth(ts/r):1-smooth((ts-r)/r);for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
+
     // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
-    return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
+    const weight = v.carryWeight;
+    const blended = weight === undefined ? pz : {drop:pz.drop*weight, bend:pz.bend*weight, rise:pz.rise*weight, kneel:pz.kneel*weight};
+    return v.frame?.kind === 'stance' ? { ...blended, kneel: 0, rise: 0 } : blended;
   }
 
   /**
@@ -596,6 +796,9 @@ export class HumanViews {
       if(!f.bodyModel)this.syncAppearance(v,f.publicSoulKey);
       const walkDur = v.rig.walk.getClip().duration, idleDur = v.rig.idle.getClip().duration;
       v.activity = act;
+      if(v.handActuator&&!f.handActuator)v.lastHandActuator=v.handActuator;else if(f.handActuator)v.lastHandActuator=undefined;
+      v.handActuator=f.handActuator;v.handActuatorTime=f.handActuatorTime;v.watering=f.watering;v.wateringTime=f.wateringTime;v.letGo=f.letGo;v.letGoTime=f.letGoTime;v.cup=f.cup;v.cupTime=f.cupTime;v.transfer=f.transfer;v.transferTime=f.transferTime;
+      v.itemPose=f.itemPose;
       v.sleepPose = f.sleepPose;
       v.shore = f.shore;
       v.shoreTime = f.shoreTime;
@@ -603,9 +806,10 @@ export class HumanViews {
       v.base = base;
       v.grip = f.grip;
       v.gripSlot = f.gripSlot;
+      v.carryWeight = f.carryWeight;
       v.on = f.on;
       v.frame = frameCtx(f.on, act, (id) => parts[id], this.climbs);
-      v.seat = act==='cycle'?BIKE_SADDLE:base==='sit'&&!f.on&&!f.grip&&!f.hands?.left&&!f.hands?.right&&typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:SEAT_DEFAULT;
+      v.seat = act==='cycle'?BIKE_SADDLE:SEATED.has(base)&&!f.on&&!f.grip&&!f.hands?.left&&!f.hands?.right&&typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:SEAT_DEFAULT;
       v.bench = LYING.has(act)||act==='bench-press'?(typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:0):0;
       v.groundSeat = onGround(act, f.baseActivity);
       if (v.groundSeat) v.seat = GROUND_SEAT;
@@ -614,17 +818,23 @@ export class HumanViews {
       v.running = act === 'jog' || act === 'run' || (typeof f.speed === 'number' && f.speed > RUN_SPEED);
       v.speed = typeof f.speed === 'number' ? f.speed : 0;
       v.since = f.activityAge;
+      if (f.restAge !== undefined) v.restFrom = t - f.restAge;
+      else if (!REST_ACTS.has(act) && !GAIT_ACTS.has(act)) v.restFrom = t;
+      v.restAge = v.restFrom !== undefined && t >= v.restFrom ? t - v.restFrom : undefined;
+      v.walkAge = f.walkAge;
+      v.restAgeAtWalk = f.restAgeAtWalk;
       v.prevAct = f.prevActivity;
       v.prevBase = f.prevActivity === undefined ? undefined : baseOf(f.prevActivity, f.prevBaseActivity);
       v.partner = f.partner;
       v.partnerP = undefined;
+      v.handHold = f.handHold; v.rps = f.rps; v.hgTick = f.handGameTick; v.hgDt = f.handGameDt; v.holdP = undefined;
       v.dist = f.walkDist;
       const water=!!waterMotionAt(f.id,act,f.shoreTime??t,f.shore)&&!f.hands?.left&&!f.hands?.right&&!f.grip&&!f.on;
       const transition=f.waterTransition,targetWeight=transition?.weight??1,priorWater=transition?.origins.reduce((sum,x)=>sum+(x.pose?x.weight:0),0)??0;
       const free=!f.hands?.left&&!f.hands?.right&&!f.grip&&!f.on;
       const waterWeight=free?clamp01((water?targetWeight:0)+(1-targetWeight)*priorWater):0;
       const walk = SEATED.has(base) ? 0 : f.walk * (1-waterWeight);
-      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose } } as unknown as Entity;
+      const e = { id: f.id, def: 'human', kind: 'human', pose: { p: f.p, yaw: f.yaw }, human: { activity: act, level: 0, hands: f.hands, proneYaw: f.proneYaw, phaseK: f.phaseK, sleepPose: f.sleepPose, wateringV1: f.watering } } as unknown as Entity;
       const snap: Snap = {
         p: [...f.p],
         yaw: f.yaw,
@@ -652,6 +862,8 @@ export class HumanViews {
         this.views.delete(id);
       }
     for (const f of frame) { const v = this.views.get(f.id); if (v?.partner) { const q = frame.find((g) => g.id === v.partner); v.partnerP = q ? new THREE.Vector3(...q.p) : undefined; } }
+    // entry 35: the hand partner's drawn root (both bodies draw their joined hands to one point between them)
+    for (const f of frame) { const v = this.views.get(f.id); if (v?.handHold) { const q = frame.find((g) => g.id === v.handHold!.with); v.holdP = q ? new THREE.Vector3(...q.p) : undefined; } }
     this.parts.clear(); // random access: no tick history, so prev = cur
     this.trackParts((id) => parts[id]);
   }
@@ -660,8 +872,12 @@ export class HumanViews {
    * Apply interpolated pose/animation. alpha ∈ [0,1] = fraction of the next tick elapsed.
    * `reach`: nearest point of a gripped part (components.ts) for grips without a known slot.
    */
+  /** Entry 36: who plays the piano or the drums now (a singer sings along with the nearest), rebuilt each render. */
+  private players: { id: string; p: readonly number[]; kind: 'piano' | 'drums' }[] = [];
   render(alpha: number, reach?: Reach) {
     PLAY_MOTION.value.set(0, 0, 0, 0); // empty playground seats hang at rest; riders set theirs below
+    this.players.length = 0;
+    for (const [id, v] of this.views) if (v.activity === 'play-piano' || (v.activity === 'play-music' && v.instrument === 'drums')) this.players.push({ id, p: v.cur.p, kind: v.activity === 'play-piano' ? 'piano' : 'drums' });
     for (const v of this.views.values()) this.pose(v, alpha, reach);
     // the dock shows one bicycle fewer for each one out under a rider (decorative-motion 'dock-bike')
     let out = 0; for (const v of this.views.values()) if (v.bike?.visible) out++; PLAY_MOTION.value.w = out;
@@ -687,7 +903,11 @@ export class HumanViews {
     const w = (a.walkW + (b.walkW - a.walkW) * alpha) * (fp?.kind === 'beam' ? BEAM_WALK_W : 1) * (lib.still ? 0 : 1);
     const { walk, idle, mixer, extra } = v.rig;
     const wt = b.walkT >= a.walkT ? a.walkT + (b.walkT - a.walkT) * alpha : b.walkT;
-    walk.time = wt;
+    const opening=v.handActuator?.opening;
+    const slide=v.handActuator?.slide;
+    // pulling a door toward you or a drawer out, the body steps backwards
+    const backwards=(opening&&opening.side*(opening.to-opening.from)<0)||(!!slide&&slide.to>slide.from);
+    walk.time=backwards?(walk.getClip().duration-wt%walk.getClip().duration)%walk.getClip().duration:wt;
     idle.time = b.idleT;
     // Body activity layer (activity-poses.ts): free hands only (engine hand points / grips win), never on a frame or prone.
     const tSec = lerp(a.expressionT, b.expressionT, alpha);
@@ -697,8 +917,12 @@ export class HumanViews {
     // a library clip that does the whole body replaces the procedural frame; overlays (hands) stay on top of it
     const clipBody = !!lib.cur && CLIP_BODY.has(v.activity) && lib.cur.pick.body !== 'seat' && !(lib.cur.pick.body === 'ground-seat' && v.activity !== 'sit-ground');
     const pairPhase = v.partner && v.partner < h.name ? v.partner : h.name; // partners move in step
+    // entry 36: a singer sings along with the nearest player (her head and breath follow the sung notes); just after her
+    // singing ends, the singing frame eases out (the hand lets go of the mic) instead of snapping to the base posture
+    const letGo = v.activity !== 'sing' && v.prevAct === 'sing' && (v.since ?? 9) < SING_LET_GO && !GAIT_ACTS.has(v.activity);
     const act: ActivityFrame | null = freeBody && !engineHands && w < 0.5 && !waveClip && !interactClip && !clipBody && !lib.sleep
-      ? activityFrame(v.activity, v.base, tSec, pairPhase, { groundSeat: v.groundSeat, since: v.since, gap: v.partnerP ? Math.hypot(v.partnerP.x - h.position.x, v.partnerP.z - h.position.z) : undefined,instrument:v.instrument,game:v.game,gameTick:v.gameTick,gameDt:v.gameDt,actorId:h.name }) : null;
+      ? letGo ? activityFrame('sing', 'idle', tSec, pairPhase, { since: 9, released: v.since, accompanist: null })
+      : activityFrame(v.activity, v.base, tSec, pairPhase, { groundSeat: v.groundSeat, since: v.since, gap: v.partnerP ? Math.hypot(v.partnerP.x - h.position.x, v.partnerP.z - h.position.z) : undefined,instrument:v.instrument,game:v.game,gameTick:v.gameTick,gameDt:v.gameDt,actorId:h.name, ...(v.activity === 'sing' ? { accompanist: accompanistOf(v.cur.p, this.players) } : {}) }) : null;
     h.rotation.z = 0; h.rotation.x = 0;
     let lieFloor = h.position.y;
     if (act?.lying) {
@@ -720,10 +944,87 @@ export class HumanViews {
     const libShare = lib.cur || lib.prev ? 1 - w : 0;
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
-    const idleFree = v.activity === 'idle' && b.sitW === 0 && !engineHands && freeBody && !lib.cur;
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, tSec) : 0;
-    const variant = idleFree ? idleVariant(h.name, tSec) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
-    const variantW = variantA ? (1 - w - neutralW) * variant!.w : 0;
+    // A hand actuator's reach out of an idle gesture (hand at the hair, folded arms): the gesture fades out over the reach
+    // while the arm travels from it to the target. It was cut on the first actuator frame (engine hands, idleBlend 0): the
+    // hand dropped from the hair to the hip in one frame, 0.747 m per 50 ms (entry 33, neon switch-off).
+    const reachS = v.handActuator ? (v.handActuatorTime ?? tSec) - v.handActuator.startTick * DT : 0;
+    const handoff = v.handActuator ? handActuatorFrame(v.handActuator, reachS) : null;
+    // Over GESTURE_FADE, not the 0.65 s reach: folded arms opening in 0.65 s still swung the free hand 0.13 m per 50 ms (0.084 over 1.2 s).
+    const transferS = v.transfer ? (v.transferTime ?? tSec) - v.transfer.startTick * DT : -1;
+    // Soul Actions 34: an idle gesture fades out the same way over a hand-held item's reach (take_item / put_item)
+    const reachFade = v.handActuator && v.handActuator.abortedAt === undefined && reachS >= 0 && reachS < GESTURE_FADE ? 1 - smooth(reachS / GESTURE_FADE)
+      : v.transfer && transferS >= 0 && transferS < GESTURE_FADE ? 1 - smooth(transferS / GESTURE_FADE) : 0;
+    // Idle variety also plays on into a walk start (scaled by 1 − walk weight, so it fades out with the walk's ease).
+    // An opted-in item transfer (lantern, bowl) keeps its own clock (presentation.ts): idle variety plays on through its
+    // turn and fades out over a pick-up from the reach start, as a hand actuator's does; 0 while an item is held.
+    const itemReach = !!v.itemPose && v.activity === 'reach';
+    // Entry 36: likewise a singer's reach for the mic out of an idle gesture that had begun while she turned to it: the
+    // gesture fades out over GESTURE_FADE from the singing's start, at the onset level it had then (it was cut: 0.175 m
+    // per 50 ms in take 3), while the arm eases onto the mic
+    const singFade = v.activity === 'sing' && v.singOnset !== undefined && (v.since ?? 9) < GESTURE_FADE ? 1 - smooth((v.since ?? 9) / GESTURE_FADE) : 0;
+    // entry 35: a hand game holds idle gestures off, fading them out from its start and back in after it (no pop at a
+    // join, a count's start or a release); rps keeps the variety layer for that fade
+    const hgOff = handGameSuppress(v), gT = handGameGestureClock(v, tSec);
+    // Entry 4: carry reach/release converges to the same idle clip underneath the IK.
+    // Otherwise an idle variation (e.g. hands on hips) appears in one frame at release end.
+    const carryIdle = v.carryWeight !== undefined, idleShare = carryIdle ? 1 - v.carryWeight! : 1;
+    // Entry 7 (frisbee clear-v1): the arms lower out of the game on its own recorded clock; idle variety fades in under them
+    const gameBlend = v.game?.flightPolicy === 'clear-v1' ? gameArmBlend(v.game, v.gameTick ?? 0, v.gameDt ?? .05) : 1;
+    const gameShare = v.activity === 'idle' || v.game?.flightPolicy !== 'clear-v1' ? 1 : 1 - gameBlend;
+    const idleFree = (v.activity === 'idle' || gameBlend < 1 || carryIdle || itemReach || GAIT_ACTS.has(v.activity) || ((v.activity === 'operate' || v.activity === 'reach') && reachFade > 0) || singFade > 0 || (v.activity === 'rps' && hgOff < 1)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.idleBlend ?? 0) > 0) && (freeBody || carryIdle) && !lib.cur;
+    // Entry 43 (entry 41's M04 finding): a let-go before a reach fades the gesture out on its own clock; the reach after
+    // it then fades none of its own (its gesture is already gone), and the act's own return of the idle (after the arm is
+    // down) still applies. A reach with no let-go keeps the fade over the reach. A put of a handle-held item starts
+    // holding it (no gesture): its reach never lets one in (34's fade let folded arms in at full weight as the put began).
+    const lg = v.letGo, lgS = lg ? (v.letGoTime ?? tSec) - lg.startTick * DT : Infinity;
+    const driverStart = Math.max(v.handActuator?.startTick ?? -Infinity, v.transfer?.startTick ?? -Infinity, v.watering?.startTick ?? -Infinity, v.cup?.startTick ?? -Infinity, v.itemPose?.start ?? -Infinity);
+    // the let-go is the newest record: fading out over it, then off for a second (the reach is about to start); a reach
+    // that never comes lets the idle back in over TRANSFER_HANDOFF. A reach begun within that second after it is `letGone`.
+    const letGoing = !!lg && lg.startTick >= driverStart, letGone = !!lg && !letGoing && (driverStart - lg.startTick) * DT <= lg.seconds + 1;
+    // entry 44: a let-go fades the gesture out from the weight it had when the let-go began, not from full weight: right
+    // after a kettle was put down its gesture was still fading back in (0.03), and a let-go for the next pick-up switched it
+    // on at 0.99 in one frame (the free arm swung behind the back) before fading it out
+    if (letGoing && v.letGoFrom?.tick !== lg!.startTick) v.letGoFrom = {tick: lg!.startTick, from: lgS < 0.25 && v.idleLast !== undefined ? v.idleLast : 1};
+    const letIdle = !letGoing ? 1 : lgS < lg!.seconds ? (v.letGoFrom?.from ?? 1) * (1 - smooth(lgS / lg!.seconds)) : smooth((lgS - lg!.seconds - 1) / TRANSFER_HANDOFF);
+    const fadeOut = letGone ? 0 : v.transfer?.mode === 'put' && transferS >= 0 && !handoff ? 0 : reachFade;
+    // entry 43 (entry 41's M04 finding): after an opted-in put the arm goes back over the recovery first, then idle
+    // gestures fade in over TRANSFER_HANDOFF (29 blended both over the same 1.2 s: folded arms swept in as the arm fell)
+    if (v.itemPose?.releasedFor !== undefined) v.itemReleasedAt = tSec - v.itemPose.releasedFor;
+    const relS = v.itemReleasedAt === undefined ? Infinity : tSec - v.itemReleasedAt;
+    const putReturn = relS < ITEM_RECOVERY_SECONDS + TRANSFER_HANDOFF ? smooth((relS - ITEM_RECOVERY_SECONDS) / TRANSFER_HANDOFF) : 1;
+    if (relS >= ITEM_RECOVERY_SECONDS + TRANSFER_HANDOFF) v.itemReleasedAt = undefined;
+    // Entry 38: an actuator that hands the body over soon after its arm is down (a board stroke and its step back) keeps
+    // the idle handoff fading in after it ends, instead of switching idle variety on at full weight (a 0.31 m palm jump, take 5)
+    const after = !handoff && v.lastHandActuator ? handActuatorFrame(v.lastHandActuator, (v.handActuatorTime ?? tSec) - v.lastHandActuator.startTick * DT).idleBlend : 1;
+    if (after >= 1) v.lastHandActuator = undefined;
+    const idleHandoff = Math.min(putReturn, letGoing ? letIdle : v.itemPose ? (letGone && v.itemPose.take ? 0 : v.itemPose.idleBlend) : (handoff ? (reachS < 0 ? 1 : Math.max(handoff.idleBlend, fadeOut)) : v.transfer?.endTick !== undefined ? smooth(((v.transferTime ?? tSec) - v.transfer.endTick * DT) / TRANSFER_HANDOFF) : v.transfer && transferS >= 0 ? fadeOut : singFade > 0 ? singFade : after));
+    v.idleLast = idleHandoff;
+    // Idle variety (Idle_Neutral, fold arms, look around) fades in from when the body came to rest: switched on at full
+    // weight it raised or crossed the arms in one frame whenever a walk ended inside a person's variety window
+    // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
+    const restOnset = singFade > 0 ? v.singOnset! : v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
+    if (v.activity === 'idle') v.singOnset = restOnset; else if (v.activity !== 'sing') v.singOnset = undefined;
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, gT) * idleHandoff * restOnset * (1 - hgOff) * idleShare * gameShare : 0;
+    const variant = idleFree ? idleVariant(h.name, gT) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
+    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset * (1 - hgOff) * idleShare * gameShare : 0;
+    v.variety = neutralW + variantW;
+    // A walk starting out of an idle gesture: the legs take the walk's own ease (WALK_EASE, 0.55 s), but folded arms opening
+    // that fast swung a hand 0.28 m per 50 ms. On the arms alone (arms-only copies of the gesture clips) the gesture fades
+    // over GESTURE_FADE from the walk start: its share of the arm pose is (full-body share + A) / (1 + A) after the mixer
+    // normalises, so A is chosen to make that share the gesture level at the walk start × the fade.
+    let armsN = 0, armsV = 0;
+    const gv = idleVariant(h.name, tSec);
+    if ((v.activity === 'idle' || GAIT_ACTS.has(v.activity)) && v.walkAge !== undefined && v.walkAge < GESTURE_FADE && b.sitW === 0 && !engineHands && freeBody && !lib.cur) {
+      const g = 1 - smooth(v.walkAge / GESTURE_FADE), on = v.restAgeAtWalk === undefined ? 1 : smooth(Math.min(1, v.restAgeAtWalk / IDLE_VARIETY_ONSET));
+      const n0 = extra.idleNeutral ? neutralWeight(h.name, tSec) * on : 0, v0 = gv && libAction(v.rig, gv.clip) ? (1 - n0) * gv.w * on : 0;
+      // entry 44: the gesture level at the walk start is what was shown then: a gesture let go before setting off (let-go,
+      // then the walk) is not put back on the arms (folded arms reappeared at full weight in one frame as she set off)
+      if (v.walkKey === undefined || v.walkAge < v.walkKey - 0.05) v.handoffAtWalk = v.walkAge < 0.25 ? v.idleLast ?? 1 : 1;
+      v.walkKey = v.walkAge;
+      // Entry 38: and never above the idle handoff of an actuator that just ended (a board stroke handing over to its step back)
+      const want = (n0 + v0) * g * Math.min(idleHandoff, v.handoffAtWalk ?? 1), have = neutralW + variantW;
+      if (want > have + 1e-4 && hgOff < 1e-4) { const k = Math.min(20, (want - have) / Math.max(1e-3, 1 - want)) / (n0 + v0); armsN = n0 * k; armsV = v0 * k; }
+    }
     const libOn = new Set<THREE.AnimationAction>();
     const libAt = (act: THREE.AnimationAction | null, weight: number, time: number) => {
       if (!act || weight <= 1e-4) return;
@@ -733,7 +1034,15 @@ export class HumanViews {
     };
     if (lib.cur) libAt(lib.cur.act, curW, lib.cur.time);
     if (lib.prev) libAt(lib.prev.act, prevW, lib.prev.time);
-    if (variantA) libAt(variantA, variantW, tSec + (hashId(h.name) % 7));
+    // entry 42 (take 6): a gesture fading out under a hand actuator's reach also slows its own clip to a stop over the fade:
+    // a look-around raising the hand kept moving it at its own speed while the arm reached for a drawer knob (0.095 m per 50 ms
+    // together). Clip time = the reach start + ∫(1 − fade) — the same pose and speed at the reach start, at rest by its end.
+    const slowed = reachFade > 0 ? heldClip(reachS, GESTURE_FADE) - reachS : 0;   // (weight 0 once the fade is over: back on the clock unseen)
+    if (variantA) libAt(gestureAction(v.rig, variant!.clip), variantW, variantTime(variant!.clip, h.name, gT + slowed));
+    if (neutralW > 0) libAt(gestureAction(v.rig, 'Idle_Neutral'), neutralW, gT);
+    if (neutralW + variantW > 1e-4) libAt(idleBodyAction(v.rig), neutralW + variantW, b.idleT);
+    if (armsN > 0) libAt(armsAction(v.rig, 'Idle_Neutral'), armsN, tSec);
+    if (armsV > 0 && gv) libAt(armsAction(v.rig, gv.clip), armsV, variantTime(gv.clip, h.name, tSec + slowed));
     if (jog) { const sp = jog.getClip().name === 'Sprint_Loop' ? v.rig.template.sprintSpeed : v.rig.template.jogSpeed; libAt(jog, runW, sp ? v.dist / sp : tSec); }
     for (const x of v.libOn) if (!libOn.has(x)) x.stop();
     v.libOn = libOn;
@@ -746,7 +1055,7 @@ export class HumanViews {
     clipAt('run', jog ? 0 : runW, v.dist/(v.rig.template.runSpeed ?? 2.5));
     clipAt('wave', waveW, tSec);
     clipAt('interact', interactW, tSec);
-    clipAt('idleNeutral', neutralW, tSec);
+    clipAt('idleNeutral', 0, tSec); // drawn as a gesture (arms, neck, head) above
     walk.setEffectiveWeight(w - runW);
     idle.setEffectiveWeight(Math.max(0, 1 - w - waveW - interactW - neutralW - variantW - curW - prevW));
     // The mixer only writes a bone when its clip value changed since the last apply, so undo last
@@ -769,14 +1078,15 @@ export class HumanViews {
     const expression = !lib.cur && w < .05 && sitW === 0 && warmW === 0 && !v.grip && !v.on && !gait && !fp && proneW === 0 && pz.kneel === 0 && pz.bend < .1
       ? expressionAt(h.name,v.activity,lerp(a.expressionT,b.expressionT,alpha),hands,this.stationBeat) : null;
     const water=!lib.water&&!hasHands&&!gripping&&!v.grip&&!v.on&&!gait&&!fp&&proneW===0&&sitW===0&&warmW===0&&!posed?waterMotionAt(h.name,v.activity,v.shoreTime??lerp(a.expressionT,b.expressionT,alpha),v.shore):null;
-    const gaze = v.gaze ? v.gaze.prev + (v.gaze.cur - v.gaze.prev) * alpha : 0;
+    const gaze = v.gaze && !v.cup ? v.gaze.prev + (v.gaze.cur - v.gaze.prev) * alpha : 0;
     const waterOrigins=!lib.water&&!hasHands&&!gripping&&!v.grip&&!v.on&&!gait&&!fp&&proneW===0&&sitW===0&&warmW===0&&!posed&&v.waterTransition&&v.waterTransition.weight<1?v.waterTransition.origins:[];
     const waterFrom=waterOrigins.some(x=>x.pose!==null);
     // a carried item (engine human.prop) shows in the hand whenever it is set; an activity's own prop while it runs
     const wantProp = !hasHands && !gripping && proneW === 0 ? propFor(act || clipBody || lib.cur ? v.activity : '', v.propWanted,v.instrument) : null;
     if (v.prop && v.prop.kind !== wantProp) v.prop.obj.visible = false;
     const footFit = !water && !waterFrom && !lib.water && sitW <= 0 && !gait && !fp?.feet && !posed && !runFallback && !gripping && !hasHands && ['idle', 'walk', 'run', 'jog'].includes(v.activity);
-    if (!(footFit || runFallback || waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp)) return;
+    const handGame = handGameActive(v) && freeBody && sitW === 0 && !hasHands && !gripping;
+    if (!(footFit || runFallback || waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp || handGame)) return;
     for (const s of v.saved) { s.p.copy(s.o.position); s.q.copy(s.o.quaternion); }
     v.layered = true;
     _fwd.set(Math.cos(yaw), 0, Math.sin(yaw)); // engine yaw 0 faces +x; holder.rotation.y = -yaw
@@ -874,6 +1184,7 @@ export class HumanViews {
     if(water?.kind==='surface-swim')surfaceSwimBody(v,water);
     if(water?.floating)waterLegs(v,water);
     // arms
+    h.userData.wateringTilt=0;h.userData.wateringFlow=0;h.userData.wateringYaw=0;h.userData.cupPose=undefined;
     const targets: (THREE.Vector3 | null)[] = v.arms.map(() => null);
     let source: Source = null;
     if (hasHands) {
@@ -881,7 +1192,25 @@ export class HumanViews {
       v.arms.forEach((arm, i) => {
         const q = armSide(v, i) === 'left' ? hands.left : hands.right;
         if (q) targets[i] = new THREE.Vector3(q[0], q[1], q[2]);
+        // an empty-handed item pick-up: from the drawn palm to the fixed grasp point on the reach clock (presentation.ts `goal`)
+        const g = v.itemPose?.goal;
+        if (g && q && armSide(v, i) === g.hand) {
+          h.updateMatrixWorld(true); const from = palm(arm, V());
+          // entry 42: into a container the goal takes the engine's arc over the lip (same control points, from the drawn palm)
+          if (g.via) { const q = insidePoint([from.x, from.y, from.z], g.via, g.p, g.k); targets[i]!.set(q[0], q[1], q[2]); }
+          else targets[i]!.set(g.p[0], g.p[1], g.p[2]).sub(from).multiplyScalar(g.k).add(from);
+        }
       });
+      // Soul Actions 44: the mug hand goes where the cup timeline puts the mug, resolved with this rig's own lips (its head
+      // bone), its carry point and the tap's hold; the engine's hand point is the same pose on a 1.75 m body
+      const cm=v.cup,cs=cm?(v.cupTime!==undefined?v.cupTime+(tSec-b.expressionT):tSec)-cm.startTick*DT:0,cf=cm?cupFrame(cm,cs):null;
+      let cupPlan:{arm:number;pose:ReturnType<typeof cupPose>;marks:CupMarks}|null=null;
+      if(cm&&cf){const arm=v.arms.findIndex((_,i)=>armSide(v,i)===cm.hand);if(arm>=0){h.updateMatrixWorld(true);
+        const head=v.spine?.head?.getWorldPosition(V()),side=cm.hand==='left'?-1:1,sc=1;
+        const lips=head?V().copy(head).addScaledVector(_fwd,CUP_LIPS.fwd*sc).addScaledVector(UP,CUP_LIPS.up*sc):V().copy(h.position).addScaledVector(_fwd,0.085).addScaledVector(UP,1.545*sc);
+        const C=ENGINE_BODY.carryHand,carry=V().copy(h.position).addScaledVector(_fwd,C.fwd).addScaledVector(_right,side*C.side).addScaledVector(UP,C.up);
+        const marks:CupMarks={o:[h.position.x,h.position.y,h.position.z],f:[_fwd.x,0,_fwd.z],r:[_right.x,0,_right.z],lips:[lips.x,lips.y,lips.z],carry:[carry.x,carry.y,carry.z],hold:cm.hold,side};
+        const pose=cupPose(cf,marks);cupPlan={arm,pose,marks};targets[arm]=new THREE.Vector3(...pose.palm);}}
       // A hand on the engine's mouth landmark (items/body.ts: 0.15 m ahead of the body axis at 1.58 m,
       // −0.45 seated) would cover the rig's face (its lips are ~7 cm further back and 3 cm lower): the
       // palm stops below and in front of the mouth and the spoon reaches the lips (components.ts).
@@ -910,13 +1239,42 @@ export class HumanViews {
         const f = (t.x - h.position.x) * Math.cos(engineYaw) + (t.z - h.position.z) * Math.sin(engineYaw);
         return f < LIP ? out.add(UP) : out.add(_fwd).addScaledVector(UP, -0.2);
       } } : expression?.kind === 'planted-dance' ? {girdle:0,pole:arm=>V().copy(_right).multiplyScalar(-arm.side*(.35+expression.elbowLift)).addScaledVector(UP,-.5+expression.elbowLift).addScaledVector(_fwd,.15)} : undefined;
+      // Blend the actual arm bones to/from the existing idle/walk clip; lowering a
+      // Cartesian hand target alone leaves the elbow/shoulder snapping at release.
+      const actW=v.handActuator?handActuatorFrame(v.handActuator,(v.handActuatorTime??tSec)-v.handActuator.startTick*DT).weight:undefined;
+      const weight=v.itemPose?.weight??actW??1;
+      // entry 42: carrying in one hand while the free hand works a drawer or door: that hand takes the actuator's clock,
+      // the carrying hand the item's (one weight for both popped the free arm onto the knob in one frame)
+      const actSide=v.itemPose&&v.handActuator&&actW!==undefined?actuatorHand(v.handActuator.opening,v.handActuator.hand):undefined;
+      // Soul Actions 34: the can hand stays on the can; the free hand blends in to the valve and back out to the clip
+      // between take frames: the frame's own time plus how far the render is past it (the hands interpolate the same way)
+      const wf=v.watering?wateringFrame(v.watering,(v.wateringTime!==undefined?v.wateringTime+(tSec-b.expressionT):tSec)-v.watering.startTick*DT):null;
+      // a handle-held item's reach blends that arm in from (and its release back out to) the clip's own pose
+      const tw=v.transfer?transferWeight(v.transfer,(v.transferTime!==undefined?v.transferTime+(tSec-b.expressionT):tSec)-v.transfer.startTick*DT).weight:null;
+      // entry 43: a handle-held transfer's record stays on the body after it ends (its idle handoff reads it), but a later
+      // driver of that arm owns it: a hand actuator begun since (a kettle's switch), or a presented item (a mug in hand).
+      // Before, the ended record's weight (0) kept the arm on the clip: the switch was pressed by a hand at the hip.
+      const transferOwns=tw!==null&&!v.itemPose&&!(v.handActuator&&v.handActuator.startTick>=v.transfer!.startTick);
+      const armW=(i:number)=>cf&&cm?(armSide(v,i)===cm.hand?1:cm.stage==='wash'?cf.left:weight):wf?(armSide(v,i)==='left'?wf.left:1):transferOwns&&armSide(v,i)===v.transfer!.hand?tw!:actSide&&armSide(v,i)===actSide?actW!:weight;
+      h.userData.wateringTilt=wf?.tilt??0;h.userData.wateringFlow=wf?.flow??0;h.userData.wateringYaw=wf?.yaw??0;
+      const armBase=v.arms.some((_,i)=>armW(i)<1)?v.arms.flatMap((arm,i)=>[...(arm.shoulder?[arm.shoulder]:[]),arm.upper,arm.lower,arm.hand].map(o=>({o,w:armW(i)}))).map(({o,w})=>({o,w,q:o.quaternion.clone(),p:o.position.clone()})):[];
       const k = reachTo(v, targets, pz.rise > 0, BODY_MODEL.maxExtension, undefined, pa);
       v.arms.forEach((arm, i) => {
         if (!targets[i] && sitW > 0 && !seatClip) handOnThigh(v, i, sitW);
       });
-      if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k);
+      // an opted-in item reach bends up to ~60° in 1 s: let the free arm hang from the first degree of bend,
+      // not swing down between 30° and 63° in a fifth of a second; an idle gesture still fading out (folded arms at a
+      // pick-up) keeps the free arm until it has gone: hung at the bend's rate, it dropped 0.11 m per 50 ms
+      if (sitW <= 0) dangle(v, proneW > 0 ? Math.max(pz.bend * (1 - proneW), pr!.bend * proneW) : pz.bend, k, v.itemPose?.posture ? 0 : DANGLE_FROM, v.itemPose?.posture ? 1 - clamp01(v.variety ?? 0) : 1);
       v.arms.forEach((arm, i) => flat[i] > 0 && k[i] > 0 && flatHand(v, arm, targets[i]!, h.position.y, flat[i] * k[i], pa!.pole(arm, targets[i]!)));
-      closeHands(v, k.map((c, i) => expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i])));
+      for(const b of armBase){b.o.quaternion.slerp(b.q,1-b.w);b.o.position.lerp(b.p,1-b.w);}if(armBase.length)h.updateMatrixWorld(true);
+      // the drawn mug sits in the drawn hand: the planned pose moved by where the palm actually got to (an arm short of its
+      // target carries the mug short with it, never leaves the hand off the mug)
+      if(cupPlan&&cf&&cm){const pm=palm(v.arms[cupPlan.arm],V()),p=cupPlan.pose,dx=pm.x-p.palm[0],dy=pm.y-p.palm[1],dz=pm.z-p.palm[2];
+        const base=new THREE.Vector3(p.base[0]+dx,p.base[1]+dy,p.base[2]+dz),axis=new THREE.Vector3(...p.axis);
+        const q=new THREE.Quaternion().setFromUnitVectors(UP,axis).multiply(new THREE.Quaternion().setFromAxisAngle(UP,-cupYawAt(cm,cs)));
+        h.userData.cupPose={item:cm.item,base,q,water:cf.water,outflow:cf.outflow,tilt:cf.tilt,atLips:cf.atLips,lips:cupPlan.marks.lips,rimNear:[p.rimNear[0]+dx,p.rimNear[1]+dy,p.rimNear[2]+dz],palm:[pm.x,pm.y,pm.z],target:p.palm,grip:cf.grip};}
+      closeHands(v, k.map((c, i) => armW(i)*(expression?.kind === 'planted-dance' ? 0 : c * (1 - flat[i]))));
     } else if (v.sleepPose && pr && v.dims && proneW > 0) {
       // Free contact expression is private to the current rig, never authoritative hands/grips.
       source = 'sleep';
@@ -937,32 +1295,38 @@ export class HumanViews {
       const grip = v.grip!, slot = v.gripSlot ?? '', floor = h.position.y;
       const q = part && lerpPose(part.prev, part.cur, alpha);
       const find = (from: THREE.Vector3, out: THREE.Vector3) => {
-        const r = part ? slotPoint({ def: part.def, pose: q! } as Entity, slot, from, floor, out) : undefined;
+        const r = part ? slotPoint({ def: part.def, pose: q! } as Entity, slot, from, floor, out, this.fixtureHandling.get(part.def)) : undefined;
         return r ?? (reach ? reach(grip, from, out) : false);
       };
       v.arms.forEach((arm, i) => {
         arm.upper.getWorldPosition(_s);
         const t = V();
-        if (find(_s, t)) targets[i] = t;
+        if (find(_s, t)) targets[i] = v.carryWeight === undefined ? t : palm(arm,V()).lerp(t,v.carryWeight);
       });
       const k = reachTo(v, targets, pz.rise > 0, v.activity === 'carry' ? 0.88 : BODY_MODEL.maxExtension, find);
       if (sitW <= 0) dangle(v, pz.bend, k);
-      closeHands(v, k);
+      closeHands(v, v.carryWeight === undefined ? k : k.map(x => x * v.carryWeight!));
     } else if (act?.hands) {
       // body activity: each hand to a goal relative to its own shoulder (forward, outward, up), reach-honest IK;
       // an arm without a goal keeps the base posture (hand on thigh seated, hanging standing)
       source = 'expression';
       const floor = (act.lying ? (act.lying.face === 'back' ? lieFloor : h.position.y - 0.1) : h.position.y - act.hop) + 0.06;
       v.arms.forEach((arm, i) => {
-        const left = armSide(v, i) === 'left', q = act.hands![left ? 0 : 1];
-        if (!q) { if (sitW > 0 && !seatClip) handOnThigh(v, i, sitW); return; }
+        const left = armSide(v, i) === 'left', q = act.hands![left ? 0 : 1], r = act.rootHands?.[left ? 0 : 1], wgt = act.handW?.[left ? 0 : 1] ?? 1;
+        if (!q && !r) { if (sitW > 0 && !seatClip) handOnThigh(v, i, sitW); return; }
+        const weight=act.handWeights?.[left?0:1]??1;
+        const saved=weight<1?[arm.upper,arm.lower,arm.hand].map(o=>({o,p:o.position.clone(),q:o.quaternion.clone()})):[];
         arm.upper.getWorldPosition(_s);
-        const t = V().copy(_s).addScaledVector(_fwd, q[0]).addScaledVector(_right, (left ? -1 : 1) * q[1]).addScaledVector(UP, q[2]);
+        // entry 36: a goal on a fixed thing (the mic's grip) is placed from the body root at its own height above the floor
+        const t = r ? V().copy(h.position).addScaledVector(_fwd, r[0]).addScaledVector(_right, (left ? -1 : 1) * r[1]).addScaledVector(UP, r[2])
+          : V().copy(_s).addScaledVector(_fwd, q![0]).addScaledVector(_right, (left ? -1 : 1) * q![1]).addScaledVector(UP, q![2]);
         if (t.y < floor) t.y = floor;
+        if (wgt <= 0) return;
         targets[i] = t;
-        armTo(arm, t, 1, 0.98, h, V().copy(_right).multiplyScalar(left ? -0.6 : 0.6).addScaledVector(UP, -0.5).addScaledVector(_fwd, -0.2));
+        armTo(arm, t, wgt, 0.98, h, V().copy(_right).multiplyScalar(left ? -0.6 : 0.6).addScaledVector(UP, -0.5).addScaledVector(_fwd, -0.2));
+        for(const b of saved){b.o.position.lerpVectors(b.p,b.o.position,weight);b.o.quaternion.slerpQuaternions(b.q,b.o.quaternion.clone(),weight);}
       });
-      closeHands(v, targets.map((t) => (t ? 0.6 : 0)));
+      closeHands(v, v.arms.map((_, i) => !targets[i] ? 0 : (act.curl ? act.curl[armSide(v, i) === 'left' ? 0 : 1] : 0.6) * (act.handWeights?.[armSide(v, i) === 'left' ? 0 : 1] ?? 1)));
     } else if (runFallback && !gait && !fp && !posed && proneW===0 && sitW===0) {
       source='expression';v.arms.forEach((arm,i)=>{const f=runFallback.hands[arm.side>0?0:1];targets[i]=arm.upper.getWorldPosition(V()).addScaledVector(_fwd,f.forward).addScaledVector(_right,-arm.side*.06).addScaledVector(UP,f.up);});reachTo(v,targets,false);closeHands(v,targets.map(()=>.45));
     } else if (sitW > 0 && !seatClip) v.arms.forEach((_, i) => handOnThigh(v, i, sitW));
@@ -986,6 +1350,8 @@ export class HumanViews {
       });
       reachTo(v,targets,false);closeHands(v,targets.map(()=>0));
     } else dangle(v, pz.bend, []);
+    // entry 35: hand games over whatever the arms do now (holding hands, an offered hand, a rock-paper-scissors count)
+    const hgDiag = handGame ? poseHandGames(v, v.arms, (i) => armSide(v, i), h, _fwd, _right, h.position.y, v.spine?.head) : null;
     if (warmW > 0 && v.fire && !gripping && !hasHands) warmHands(v, warmW, h.position);
     if (v.sleepPose && pr && v.spine?.head && !lib.sleep) {
       turn(v.spine.head, _right, sleepHeadPitch(pr));
@@ -1019,6 +1385,7 @@ export class HumanViews {
       // placeProp wrote a world matrix: express it in the holder's frame (the prop is the holder's child)
       v.prop.obj.matrix.premultiply(_inv.copy(h.matrixWorld).invert());
     }
+    heldSheet(v, h, tSec);
     if (v.spine?.head && Math.abs(gaze) > 1e-5) {
       const head = v.spine.head;
       const axis = new THREE.Vector3(0, 1, 0).applyQuaternion(head.parent!.getWorldQuaternion(new THREE.Quaternion()).invert());
@@ -1048,6 +1415,7 @@ export class HumanViews {
     v.diag = diagOf(v, gait?.g ?? null, gait?.f.id ?? '', pz, targets, source, fp, proneW > 0 ? pr : null);
     if(expression)v.diag.expression=expression;
     if(water)v.diag.water=water;
+    if(hgDiag)v.diag.handGame=hgDiag;
   }
 
   /**
@@ -1195,8 +1563,10 @@ export class HumanViews {
   }
 
   /** Per-person pose readout of the last render (lab hook `bones()`). */
+  /** Entry 26: the instrument a body plays now (from its take frame), for the sound layer. */
+  instrumentOf(id: string): string | undefined { return this.views.get(id)?.instrument; }
   bones(id?: string) {
-    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number; template: string; body: Record<string, number>; armFit: { k: number; before: number }[]; on: string | null; goal: Posture; dims: Dims | null }> = {};
+    const out: Record<string, Diag & { activity: string; base: string; ankleH: number; armLen: number; walkW: number; variety: number; template: string; body: Record<string, number>; armFit: { k: number; before: number }[]; on: string | null; goal: Posture; dims: Dims | null }> = {};
     for (const [k, v] of this.views) {
       if (id && k !== id) continue;
       if (!v.diag) {
@@ -1206,7 +1576,7 @@ export class HumanViews {
       const d = v.dims, r4 = (x: number) => +x.toFixed(4);
       // standing rig measurements (Idle, t = 0): the body model's numbers as this rig has them
       const body = d ? { shoulderH: r4(d.pivotH + d.sh.up), armLen: r4(d.armLen), hipH: r4(d.hipH), thigh: r4(d.thigh), shin: r4(d.shin), kneelHip: r4(d.hipH - kneelDrop(d)), shoulderHalf: r4(d.shHalf) } : ({} as Record<string, number>);
-      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: r4(d?.ankleH ?? 0), armLen: r4(d?.armLen ?? 0), walkW: +v.cur.walkW.toFixed(3), template: v.rig.template.name, body, armFit: v.rig.template.arms, on: v.on ?? null, goal: v.cur.pose, dims: d ?? null };
+      out[k] = { ...v.diag, activity: v.activity, base: v.base, ankleH: r4(d?.ankleH ?? 0), armLen: r4(d?.armLen ?? 0), walkW: +v.cur.walkW.toFixed(3), variety: +(v.variety ?? 0).toFixed(3), template: v.rig.template.name, body, armFit: v.rig.template.arms, on: v.on ?? null, goal: v.cur.pose, dims: d ?? null };
     }
     return out;
   }
@@ -1250,6 +1620,12 @@ export class HumanViews {
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 type LibOne = { pick: LibraryPick; act: THREE.AnimationAction; clip: string; time: number };
 type LibPlan = { cur: LibOne | null; prev: LibOne | null; fade: number; sleep: boolean; still: boolean; water: boolean };
+/** Playback rate of an idle variant clip. Idle_LookAround_Loop at the library's speed drops a hand from the head to the
+ *  hip at up to 0.19 m per 50 ms (0.164–0.172 on 1.72 m bodies; entry 33, take 08: 0.158 m per 50 ms 1.2 s after a torch put-out; take 02:
+ *  0.164), faster than any hand reach or release (≤ 0.15); at 0.7 it peaks at ≤ 0.14 on 1.65–1.85 m bodies (idle-gesture-speed.test.ts). */
+const VARIANT_RATE: Readonly<Record<string, number>> = { Idle_LookAround_Loop: 0.7 };
+/** Clip time of a person's idle variant at depicted seconds t (a per-person offset, at the clip's rate). */
+export const variantTime = (clip: string, id: string, t: number) => (t + (hashId(id) % 7)) * (VARIANT_RATE[clip] ?? 1);
 /** Idle variety from the library: about 9 s in every 37 s (per person, offset from Idle_Neutral) a person looks around
  *  or folds their arms. */
 function idleVariant(id: string, t: number): { clip: string; w: number } | null {
@@ -1284,6 +1660,72 @@ function lerpHands(a: Hands, b: Hands, t: number): Hands {
 }
 
 const V = () => new THREE.Vector3();
+/** Soul Actions entry 38: the poster in a Soul's hands, from the recorded hand-actuator timeline (posterLocal) and the drawn
+ *  palms. Putting up: a roll held between the palms is raised to the slot, its top edge pressed to the wall, and the sheet
+ *  unrolls downward under the sliding palms; tape goes on the bottom corners, then the top. Taking down: the tape comes off,
+ *  the sheet rolls up from the top under the palms and the roll is lifted away. The flat part is the same bent sheet the
+ *  wall draws (poster-sheet.ts), 1.5 mm proud of it, so the handoff at the commit is invisible. */
+const _sheetM = new THREE.Matrix4(), _sheetQ = new THREE.Quaternion(), _rollAxis = new THREE.Vector3(), _rollY = new THREE.Vector3(0, 1, 0);
+function heldSheet(v: View, h: THREE.Object3D, tSec: number) {
+  const m = v.handActuator, s = m?.stroke;
+  if (!m || !s || !twoHanded(s) || !s.sheet || !v.arms.length) { if (v.sheet) { h.remove(v.sheet.group); v.sheet.flat.geometry.dispose(); v.sheet = undefined; } return; }
+  const key = `${m.startTick}:${m.target}:${s.kind}`, el = (v.handActuatorTime ?? tSec) - m.startTick * DT, u = (el - HAND_REACH_SECONDS) / s.seconds, W = s.width, H = s.height, age = s.sheet.age ?? 0;
+  if (!v.sheet || v.sheet.key !== key) {
+    if (v.sheet) { h.remove(v.sheet.group); v.sheet.flat.geometry.dispose(); }
+    const group = new THREE.Group(); group.name = 'held poster'; group.matrixAutoUpdate = false;
+    const map = posterTexture(s.sheet.title, s.sheet.detail, s.sheet.name ?? '', s.sheet.paper, age);
+    const flat = new THREE.Mesh(sheetGeometry(W, H, 1, age), new THREE.MeshStandardMaterial({ map: map ?? undefined, color: map ? '#ffffff' : PAPERS[s.sheet.paper % PAPERS.length].paper, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }));
+    const wall = new THREE.Group(); wall.name = 'held poster wall frame'; wall.add(flat);
+    const tapes = tapeStrips(W, H, s.sheet.title + (s.sheet.name ?? '')); for (const t of tapes) wall.add(t);
+    const roll = rollMesh(s.sheet.paper); roll.matrixAutoUpdate = false;
+    group.add(wall, roll); h.add(group); v.sheet = { key, group, flat, roll, tapes };
+  }
+  const sh = v.sheet, wall = sh.group.children[0] as THREE.Group;
+  // the wall frame: at the slot centre, turned to the wall (engine yaw is Three's rotation.y), 1.5 mm proud of the wall poster
+  _sheetM.makeRotationY(s.yaw).setPosition(m.at[0], m.at[1], m.at[2]); _sheetM.multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.0015));
+  sh.group.matrix.copy(_inv.copy(h.matrixWorld).invert()).multiply(_sheetM); sh.group.matrixWorldNeedsUpdate = true;
+  const local = posterLocal(s, Math.max(0, Math.min(1, u)), m.at);
+  const w = strokeWork(s, u);   // the work's own progress (negative while the lead brings the hands up to the chest)
+  const yH = local.y;   // the palms' height on the sheet (face-local)
+  // how much of the sheet lies flat on the wall: [from, to] in v (0 = bottom edge, 1 = top edge)
+  let from = 1, to = 1, rolled = 1;
+  if (s.kind === 'poster') {
+    if (w >= .45) { from = 0; rolled = 0; } else if (w > .09) { from = Math.max(0, Math.min(1, (yH - .006 + H / 2) / H)); rolled = from; } else { from = 1; rolled = 1; }
+  } else {
+    if (w < .15) { from = 0; to = 1; rolled = 0; } else if (w < .55) { from = 0; to = Math.max(0, Math.min(1, (yH + .006 + H / 2) / H)); rolled = 1 - to; } else { from = 0; to = 0; rolled = 1; }
+  }
+  const flatOn = to - from > .002;
+  sh.flat.visible = flatOn; if (flatOn) sheetGeometryRange(sh.flat.geometry as THREE.BufferGeometry, W, H, from, to, age);
+  // tape: putting up, bottom corners at u .50, top at .83 (the presses in posterLocal); taking down, top comes off at .12, bottom at .55
+  const tapeOn = (i: number) => s.kind === 'poster' ? (i >= 2 ? w >= .5 : w >= .83) : (i >= 2 ? w < .55 : w < .12);
+  sh.tapes.forEach((t, i) => { t.visible = tapeOn(i) && !(i === 3 && age >= 1.8); });
+  // the roll: between the drawn palms, a paper tube as long as the sheet is wide; its radius follows how much is rolled
+  const L = palmSide(v, 'left'), R = palmSide(v, 'right');
+  const showRoll = rolled > .01 && !!L && !!R;
+  if (!showRoll) { sh.roll.visible = false; return; }
+  const f = handActuatorFrame(m, el), releaseAt = HAND_REACH_SECONDS + s.seconds;
+  // appearing in the hands as they rise (putting up) and put away as they lower (taking down)
+  const grow = s.kind === 'poster' ? smooth(clamp01(el / .35)) : 1 - smooth(clamp01((el - releaseAt - (s.release ?? HAND_RELEASE_SECONDS) * .35) / ((s.release ?? HAND_RELEASE_SECONDS) * .65)));
+  if (grow <= .01 || (s.kind === 'poster' && f.weight <= 1e-3 && el > HAND_REACH_SECONDS)) { sh.roll.visible = false; return; }
+  const r = (.006 + .022 * Math.sqrt(rolled)) * grow, len = W * grow;
+  const mid = V().addVectors(L!, R!).multiplyScalar(.5);
+  // the tube sits between the palms, toward the wall (the palms hold its ends from the room side)
+  const out = V().set(Math.sin(s.yaw), 0, Math.cos(s.yaw)); mid.addScaledVector(out, -Math.min(.012, r * .4));
+  _rollAxis.subVectors(R!, L!); if (_rollAxis.lengthSq() < 1e-6) _rollAxis.set(Math.cos(s.yaw), 0, -Math.sin(s.yaw)); _rollAxis.normalize();
+  _sheetQ.setFromUnitVectors(_rollY, _rollAxis);
+  const world = new THREE.Matrix4().compose(mid, _sheetQ, V().set(r, len, r));
+  sh.roll.matrix.copy(_inv.copy(sh.group.matrixWorld.copy(h.matrixWorld).multiply(sh.group.matrix)).invert()).multiply(world); sh.roll.matrixWorldNeedsUpdate = true; sh.roll.visible = true;
+  void wall;
+}
+function palmSide(v: View, side: 'left' | 'right') { const i = v.arms.findIndex((_, k) => armSide(v, k) === side); return i >= 0 ? palm(v.arms[i], V()) : null; }
+/** sheetGeometry over a v range [from, to] (taking down rolls from the top, so the flat part is the bottom). */
+function sheetGeometryRange(g: THREE.BufferGeometry, w: number, h: number, from: number, to: number, age: number) {
+  sheetGeometry(w, h, from, age, g);
+  if (to >= 1) return;
+  const pos = g.getAttribute('position') as THREE.BufferAttribute, uv = g.getAttribute('uv') as THREE.BufferAttribute;
+  for (let k = 0; k < pos.count; k++) { const v0 = uv.getY(k), v = from + (v0 - from) / Math.max(1e-6, 1 - from) * (to - from), y = (v - .5) * h, x = pos.getX(k); uv.setY(k, v); pos.setXYZ(k, x, y, sheetLiftAt(x, y, w, h, age)); }
+  pos.needsUpdate = true; uv.needsUpdate = true; g.computeVertexNormals(); g.computeBoundingSphere();
+}
 const _s = V(), _fwd = V(), _right = V(), _ax = V(), _hip = V(), _knee = V(), _tmp = V(), _c = V();
 const _goals: THREE.Vector3[] = [V(), V()];
 const _qh = new THREE.Quaternion(), _qf = new THREE.Quaternion(), _qt = new THREE.Quaternion();
@@ -1941,8 +2383,9 @@ function reachTo(v: View, targets: (THREE.Vector3 | null)[], overhead: boolean, 
  * down from the shoulder, a little forward — instead of keeping the clip's arm pose, which would
  * point backwards on a torso pitched 80°. Only arms with no contact at all, from ~30° of bend.
  */
-function dangle(v: View, bend: number, contacts: number[]) {
-  const b = smooth((bend - 0.5) / 0.6); // from ~30° of bend, fully by ~63°
+const DANGLE_FROM = 0.5, DANGLE_FULL = 1.1;
+function dangle(v: View, bend: number, contacts: number[], from = DANGLE_FROM, keep = 1) {
+  const b = smooth((bend - from) / (DANGLE_FULL - from)) * keep; // from ~30° of bend, fully by ~63°
   if (b <= 0) return;
   v.arms.forEach((arm, i) => {
     if ((contacts[i] ?? 0) > 0) return; // touching (even partly): the reach IK owns the arm
@@ -2036,9 +2479,9 @@ const _m = new THREE.Matrix4(), _mi = new THREE.Matrix4(), _qb = new THREE.Quate
  * - `lift-station`: false (a station hand, no contact; the arms hang).
  * undefined = not a slot we know (the caller falls back to the part's nearest point).
  */
-function slotPoint(e: Entity, slot: string, from: THREE.Vector3, floor: number, out: THREE.Vector3): boolean | undefined {
+function slotPoint(e: Entity, slot: string, from: THREE.Vector3, floor: number, out: THREE.Vector3, handling?: import('../../engine/world/catalog.ts').Handling): boolean | undefined {
   if (slot === STATION_SLOT) return false;
-  const grips = CATALOG[e.def]?.capabilities?.fixtureCarry?.handling.grips;
+  const grips = (handling ?? CATALOG[e.def]?.capabilities?.fixtureCarry?.handling)?.grips;
   const authored = grips && Object.values(grips).flat().find((g) => g.id === slot);
   if (authored) {
     const span = authored.span ?? [0, 0, 0];
