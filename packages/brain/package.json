@@ -12,7 +12,7 @@
   "dependencies": {
     "@sim/engine-contract": "workspace:*",
     "@sim/protocol": "workspace:*",
-    "zod": "^4.6.5",
+    "zod": "^4.6.7",
     "@sim/kernel": "workspace:*"
   },
   "devDependencies": {
