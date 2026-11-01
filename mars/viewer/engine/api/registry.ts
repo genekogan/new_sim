@@ -52,9 +52,10 @@ import type { SpatialScene } from '../spatial/types.ts';
 import type { WorldState } from '../world/types.ts';
 
 /** Changing any verb's semantics, DT or an invariant is a rules-version change (plans bound under another version go stale). */
-// `ha/1`: Soul Actions hand actuators (entry 1 on). Abbreviated like main's later suffixes (eg, cp, l, ss): composed rules
-// versions are capped at 200 characters in the engine contracts, and an Eden commons world is at 189 without it.
-export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/31+bodies/1+ha/1`;
+// Soul Actions (entries 1-44) adds verbs (hand_actuator_v1, let_go_v1, watering_can_v1, cup_v1, hand_over_v1, hand_hold_v1)
+// and keeps this version unchanged: main's composed versions already reach the engine contracts' 200-character cap, and
+// eden-commons worlds restore and replay only on their exact recorded version, so a new suffix would refuse live worlds.
+export const ENGINE_RULES_VERSION = `mars-engine/1+${ASSEMBLY_RULES}+activities/31+bodies/1`;
 
 export const ENGINE_ACTIONS: ActionDef[] = [walkTo, handActuator, handHold as ActionDef, carry, ...FIXTURE_ACTIONS, ...CONSTRUCTION_ACTIONS, ...SOCIAL_ACTIONS, ...ITEM_ACTIONS, ...VEHICLE_ACTIONS, ...FORKLIFT_ACTIONS, ...SOLAR_ACTIONS, ...PAINT_ACTIONS, ...FRAMING_ACTIONS, ...OBJECT_ACTIONS, ...CLASSROOM_ACTIONS, ...WORKSTATION_ACTIONS, ...READING_ACTIONS, ...CHESS_ACTIONS, ...PREPARATION_ACTIONS, ...STOW_ACTIONS, ...ROOM_SETUP_ACTIONS, ...SHARED_FOOD_ACTIONS, ...PURPOSEFUL_ROUTINE_ACTIONS, ...GATHERING_CONTINUATION_ACTIONS, ...PAIRED_WALK_ACTIONS, ...COMPUTER_MUSIC_ACTIONS, ...SLEEP_ACTIONS, gardenCare, ...MUSIC_GATHERING_ACTIONS, ...LIVING_INTENTION_ACTIONS, ...OPEN_JAM_ACTIONS, ...DRAWING_ACTIONS, ...GROUP_WARMUP_ACTIONS, ...ART_SHARING_ACTIONS, ...TABLE_CLEANUP_ACTIONS, ...GALLERY_TOUR_ACTIONS, ...READING_CIRCLE_ACTIONS, ...SEED_PLANTING_ACTIONS, ...ROOM_PREPARATION_ACTIONS, ...COMMUNAL_SUPPER_ACTIONS, ...GARDEN_CIRCUIT_ACTIONS, ...COMPUTER_WORKSHOP_ACTIONS, ...LIBRARY_READING_ACTIONS];
 export const ENGINE_INVARIANTS: Invariant[] = [...DEFAULT_INVARIANTS, ...CARRY_INVARIANTS, uprightsSupported, progressiveSupported, liftHandsInReach, frameAccessOk, ...VEHICLE_INVARIANTS, ...FORKLIFT_INVARIANTS, ...FRAMING_INVARIANTS];

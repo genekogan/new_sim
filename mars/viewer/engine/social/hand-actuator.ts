@@ -5,7 +5,7 @@ import type {ActionDef,Diagnostic,StepResult} from '../actions/types.ts';
 import {DT,type Runtime} from '../runtime/runtime.ts';
 import type {Entity} from '../world/types.ts';
 import type {Spatial} from '../spatial/service.ts';
-import {dcos,dsin,heading,type Vec2,type Vec3} from '../core/math.ts';
+import {dcos,dsin,heading,hypot,type Vec2,type Vec3} from '../core/math.ts';
 import {HUMAN_RADIUS} from '../world/catalog.ts';
 import {clearanceAt} from '../spatial/grid.ts';
 import {makeWay} from '../locomotion/walk.ts';
@@ -52,7 +52,7 @@ export function handSwingSeconds(m:Pick<HandActuatorMotion,'opening'|'stroke'|'s
  const o=m.opening;if(!o)return m.stroke?.seconds??m.tug?.seconds??m.hold??0;
  if(o.bodyPolicy==='door-natural-v2')return Math.max(HAND_SWING_SECONDS,(Math.abs(o.to-o.from)*(o.radius+.42)+.35)*1.5/1.2);
  // Slow a larger opted-in leaf rather than exceeding ordinary walking speed.
- return Math.max(HAND_SWING_SECONDS,Math.abs(o.to-o.from)*Math.hypot(o.radius+(o.side<0?-.5:0),.42)*1.5/1.2);
+ return Math.max(HAND_SWING_SECONDS,Math.abs(o.to-o.from)*hypot(o.radius+(o.side<0?-.5:0),.42)*1.5/1.2);
 }
 export function handActuatorFrame(m:HandActuatorMotion,seconds:number){
  const R=handReachSeconds(m),swing=handSwingSeconds(m),releaseAt=R+swing;
@@ -150,10 +150,10 @@ export function strokePoint(at:Vec3,s:NonNullable<HandActuatorParams['stroke']>,
  if(s.lead)u=strokeWork(s,u);
  const k=Math.max(0,Math.min(1,u)),right:[number,number]=[dcos(s.yaw),-dsin(s.yaw)],out:[number,number]=[dsin(s.yaw),dcos(s.yaw)];
  let x:number,y:number,lift=0;
- if(s.kind==='wipe'){const pass=Math.min(2,Math.floor(k*3)),f=k*3-pass,dir=pass%2?-1:1;x=dir*(f-.5)*s.width;y=s.height*.3*(1-2*k)+.03*Math.sin(f*Math.PI*6);}
+ if(s.kind==='wipe'){const pass=Math.min(2,Math.floor(k*3)),f=k*3-pass,dir=pass%2?-1:1;x=dir*(f-.5)*s.width;y=s.height*.3*(1-2*k)+.03*dsin(f*Math.PI*6);}
  else{const row=Math.min(s.lines-1,Math.floor(k*s.lines)),f=k*s.lines-row,top=s.lines>1?s.height/2:0,step=s.lines>1?s.height/(s.lines-1):0;
   const writing=f<.75,g=writing?f/.75:(f-.75)/.25;
-  x=writing?(g-.5)*s.width:(.5-smooth(g))*s.width;y=top-row*step-(writing?0:step*smooth(g))+(writing?.012*Math.sin(g*Math.PI*14):0);lift=writing?0:.035*Math.sin(g*Math.PI);
+  x=writing?(g-.5)*s.width:(.5-smooth(g))*s.width;y=top-row*step-(writing?0:step*smooth(g))+(writing?.012*dsin(g*Math.PI*14):0);lift=writing?0:.035*dsin(g*Math.PI);
   if(row===s.lines-1&&!writing){x=.5*s.width;y=top-row*step;lift=0;}}
  return [at[0]+right[0]*x+out[0]*lift,at[1]+y,at[2]+right[1]*x+out[1]*lift];
 }
@@ -188,7 +188,7 @@ export const handClearanceStats={obstaclesVisited:0,candidateBuilds:0};
 function nearObstacles(ex:Exec,all:readonly Obstacle[]){
  const was=nearOps.get(ex);if(was?.of===all)return was.near;
  const o=ex.p.opening,centre=o?o.hinge:ex.root,reach=o?o.radius+2:ex.p.stroke?1:ex.p.slide?ex.p.slide.travel+.5:.5,near:Obstacle[]=[];
- for(const b of all){if(b.id===ex.p.target||b.id.startsWith(ex.p.target+'#'))continue;if(Math.hypot(b.obb.c[0]-centre[0],b.obb.c[1]-centre[2])<=reach+Math.hypot(b.obb.half[0],b.obb.half[1])+HUMAN_RADIUS+.1)near.push(b);}
+ for(const b of all){if(b.id===ex.p.target||b.id.startsWith(ex.p.target+'#'))continue;if(hypot(b.obb.c[0]-centre[0],b.obb.c[1]-centre[2])<=reach+hypot(b.obb.half[0],b.obb.half[1])+HUMAN_RADIUS+.1)near.push(b);}
  nearOps.set(ex,{of:all,near});handClearanceStats.candidateBuilds++;return near;
 }
 function blocked(rt:Runtime,ex:Exec,root:Vec3,angle:number):Diagnostic|null{
@@ -201,7 +201,7 @@ function blocked(rt:Runtime,ex:Exec,root:Vec3,angle:number):Diagnostic|null{
   if(o.y1<=root[1]+.15||o.y0>=root[1]+1.75)continue;
   const c=dcos(o.obb.yaw),s=dsin(o.obb.yaw),dx=root[0]-o.obb.c[0],dz=root[2]-o.obb.c[1];
   const x=Math.max(0,Math.abs(dx*c+dz*s)-o.obb.half[0]),z=Math.max(0,Math.abs(-dx*s+dz*c)-o.obb.half[1]);
-  if(Math.hypot(x,z)<HUMAN_RADIUS+.025)return issue('step-blocked',`There is no clear place to step while holding this handle beside ${o.label??o.id}.`,[p.actor,o.id]);
+  if(hypot(x,z)<HUMAN_RADIUS+.025)return issue('step-blocked',`There is no clear place to step while holding this handle beside ${o.label??o.id}.`,[p.actor,o.id]);
  }
  const who=personBlocking(rt,ex,root,angle);
  return who?(who.code==='leaf-blocked'?issue('leaf-blocked','Someone is in the swinging panel’s path.',[p.target,who.id]):issue('person-in-way','Someone is in the operating path.',[p.actor,who.id])):null;
@@ -209,14 +209,14 @@ function blocked(rt:Runtime,ex:Exec,root:Vec3,angle:number):Diagnostic|null{
 /** Distance from a point to the leaf's mid-plane segment at `angle` (hinge to free edge, plus a little). */
 export function leafDistance(o:NonNullable<HandActuatorParams['opening']>,angle:number,x:number,z:number){
  const dx=x-o.hinge[0],dz=z-o.hinge[2],a=o.yaw+angle,c=dcos(a),s=dsin(a),along=Math.max(0,Math.min(o.radius+.12,dx*c-dz*s));
- return Math.hypot(dx-along*c,dz+along*s);
+ return hypot(dx-along*c,dz+along*s);
 }
 /** Another body on this level standing where the operator steps (`root`) or in the leaf's way at `angle`. */
 function personBlocking(rt:Runtime,ex:Exec,root:Vec3,angle:number):{id:string;code:'person-in-way'|'leaf-blocked'}|null{
  const p=ex.p,actor=rt.world.entities[p.actor],o=p.opening;if(!actor?.human)return null;
  for(const e of Object.values(rt.world.entities)){
   if(e.id===p.actor||!e.human||(e.human.level??0)!==(actor.human.level??0))continue;
-  if(Math.hypot(e.pose.p[0]-root[0],e.pose.p[2]-root[2])<2*HUMAN_RADIUS+.04)return {id:e.id,code:'person-in-way'};
+  if(hypot(e.pose.p[0]-root[0],e.pose.p[2]-root[2])<2*HUMAN_RADIUS+.04)return {id:e.id,code:'person-in-way'};
   if(o&&leafDistance(o,angle,e.pose.p[0],e.pose.p[2])<HUMAN_RADIUS+.06)return {id:e.id,code:'leaf-blocked'};
  }
  return null;
@@ -241,10 +241,10 @@ function doorFrame(p:HandActuatorParams){const y=p.opening!.yaw,u:[number,number
  *  or another body walking towards the doorway from the side this Soul came from (within 6 m) to a goal beyond it. */
 function following(rt:Runtime,ex:Exec):string|null{
  const p=ex.p,f=doorFrame(p),[cx,cz]=p.passage!.door;
- for(const q of passers(rt,p.target)){if(q.actor===p.actor||q.phase==='closing')continue;const e=rt.world.entities[q.actor];if(e&&Math.hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<=10)return q.actor;}
+ for(const q of passers(rt,p.target)){if(q.actor===p.actor||q.phase==='closing')continue;const e=rt.world.entities[q.actor];if(e&&hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<=10)return q.actor;}
  const walks=rt.services.walkExecs as Map<string,{actor?:string;goal?:{p:[number,number]}}>|undefined;
  for(const w of walks?.values()??[]){const e=w.actor&&w.actor!==p.actor?rt.world.entities[w.actor]:undefined;if(!e?.human||!w.goal)continue;
-  if(Math.hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<=6&&f.side(e.pose.p[0],e.pose.p[2])===p.passage!.from&&f.side(w.goal.p[0],w.goal.p[1])!==p.passage!.from)return e.id;}
+  if(hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<=6&&f.side(e.pose.p[0],e.pose.p[2])===p.passage!.from&&f.side(w.goal.p[0],w.goal.p[1])!==p.passage!.from)return e.id;}
  return null;
 }
 /** Another Soul now opening, walking through or closing this door, or any body in the doorway itself. A passage queued
@@ -254,7 +254,7 @@ function passing(rt:Runtime,ex:Exec):string|null{
  const hand=handOnDoor(rt,ex);if(hand)return hand;
  const list=passers(rt,p.target),mine=list.findIndex(q=>q.actor===p.actor);
  for(const [i,q] of list.entries())if(q.actor!==p.actor&&q.phase!=='approach'&&!(q.from===p.passage!.from&&mine>=0&&i>mine))return q.actor;
- for(const e of Object.values(rt.world.entities))if(e.id!==p.actor&&e.human&&Math.hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<.75)return e.id;
+ for(const e of Object.values(rt.world.entities))if(e.id!==p.actor&&e.human&&hypot(e.pose.p[0]-cx,e.pose.p[2]-cz)<.75)return e.id;
  return null;
 }
 /** Entry 32: an earlier passage on this Soul's side of the door still approaching or opening: this one is queued behind. */
@@ -290,7 +290,7 @@ function passageStep(rt:Runtime,ex:Exec,dt:number):StepResult|null{
   // the whole swing and the stepping path, closed to open, before the hand goes out
   for(let k=0;k<=8;k++){const ang=o.from+(o.to-o.from)*k/8,pt=actuatorPoint(o,ang),who=personBlocking(rt,ex,pt.root,ang);if(who)return hold(rt,ex,'swing',who.id);}
   const r0=actuatorPoint(o,o.from).root;
-  if(Math.hypot(a.pose.p[0]-r0[0],a.pose.p[2]-r0[2])>.2){if(stepTo(rt,ex,[r0[0],r0[2]]))return {status:'running',phase:'waiting'};return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[p.target])};}
+  if(hypot(a.pose.p[0]-r0[0],a.pose.p[2]-r0[2])>.2){if(stepTo(rt,ex,[r0[0],r0[2]]))return {status:'running',phase:'waiting'};return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[p.target])};}
   ex.began=true;delete ex.held;ex.t=0;ex.root=[...a.pose.p];ex.yaw=a.pose.yaw;ex.motion.startTick=rt.tick;
   rt.mark('hand.passage-begin',{action:ex.id,target:p.target,mode:pass.mode});
   return null;
@@ -318,7 +318,7 @@ function hold(rt:Runtime,ex:Exec,why:'passing'|'swing'|'queue',who:string):StepR
  const waited=(rt.tick-ex.held.since)*DT;
  if(why==='queue'){if(waited>PASSAGE_QUEUE_SECONDS)return {status:'failed',diagnostic:issue('door-busy','Someone ahead at the door did not get through; this walk stopped before it.',[p.target,who])};if(a.human&&!ex.child)a.human.activity='idle';return {status:'running',phase:'waiting'};}
  if(waited>(why==='passing'?PASSAGE_YIELD_SECONDS:PASSAGE_WAIT_SECONDS))return {status:'failed',diagnostic:why==='passing'?issue('door-busy','Someone else kept passing through the door; this walk stopped before it.',[p.target,who]):issue('swing-blocked','Someone is in the door’s swing and did not move aside; nothing was opened.',[p.target,who])};
- if(why==='passing'&&inTheWay(ex,a.pose.p[0],a.pose.p[2])){const q=waitSpot(rt,ex);if(q&&Math.hypot(q[0]-a.pose.p[0],q[1]-a.pose.p[2])>.3&&stepTo(rt,ex,q))return {status:'running',phase:'waiting'};}
+ if(why==='passing'&&inTheWay(ex,a.pose.p[0],a.pose.p[2])){const q=waitSpot(rt,ex);if(q&&hypot(q[0]-a.pose.p[0],q[1]-a.pose.p[2])>.3&&stepTo(rt,ex,q))return {status:'running',phase:'waiting'};}
  if(why==='swing'&&waited>=PASSAGE_ASK_SECONDS&&ex.held.asked!==who){ex.held.asked=who;ask(rt,who,swingCentre(p.opening!));}
  if(a.human&&!ex.child)a.human.activity='idle';
  return {status:'running',phase:'waiting'};
@@ -347,9 +347,9 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   if(ex.p.passage&&ex.p.opening){const r=passageStep(rt,ex,dt);if(r)return r;}
   ex.t+=dt;const f=handActuatorFrame(ex.motion,ex.t),point=ex.p.opening?actuatorPoint(ex.p.opening,f.angle):ex.p.slide?slidePoint(ex.p.slide,f.pos):{hand:ex.p.stroke?strokePoint(ex.p.at,ex.p.stroke,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke.seconds):ex.p.tug?tugPoint(ex.p.at,ex.p.tug,f.tug):ex.p.at,root:ex.root};
   if(ex.p.op&&ex.p.opening){point.hand=opPoint(ex.p.opening,ex.p.op,f.rap);if(f.slide>0){const to=actuatorPoint(ex.p.opening,ex.p.opening.from).hand;point.hand=[point.hand[0]+(to[0]-point.hand[0])*f.slide,point.hand[1]+(to[1]-point.hand[1])*f.slide,point.hand[2]+(to[2]-point.hand[2])*f.slide];}}
-  if(ex.p.opening&&Math.hypot(ex.root[0]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[0],ex.root[2]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
-  if(ex.p.slide&&Math.hypot(ex.root[0]-slidePoint(ex.p.slide,ex.p.slide.from).root[0],ex.root[2]-slidePoint(ex.p.slide,ex.p.slide.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
-  if(ex.p.stroke){const goal=strokeRoot(ex.p.at,ex.p.stroke,ex.root[1]);if(Math.hypot(goal[0]-ex.root[0],goal[2]-ex.root[2])>.5){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-board','Walk up to the board before writing on it.',[ex.p.target])};}
+  if(ex.p.opening&&hypot(ex.root[0]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[0],ex.root[2]-actuatorPoint(ex.p.opening,ex.p.opening.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
+  if(ex.p.slide&&hypot(ex.root[0]-slidePoint(ex.p.slide,ex.p.slide.from).root[0],ex.root[2]-slidePoint(ex.p.slide,ex.p.slide.from).root[2])>.22){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-handle','Walk to the actual handle before operating it.',[ex.p.target])};}
+  if(ex.p.stroke){const goal=strokeRoot(ex.p.at,ex.p.stroke,ex.root[1]);if(hypot(goal[0]-ex.root[0],goal[2]-ex.root[2])>.5){clear(rt,ex);return {status:'failed',diagnostic:issue('not-at-board','Walk up to the board before writing on it.',[ex.p.target])};}
    const k=smooth(Math.min(1,ex.t/HAND_REACH_SECONDS));point.root=[ex.root[0]+(goal[0]-ex.root[0])*k,ex.root[1],ex.root[2]+(goal[2]-ex.root[2])*k];}
   if((ex.p.opening||ex.p.slide)&&ex.t<handReachSeconds(ex.p)){const k=smooth(ex.t/handReachSeconds(ex.p));point.root=[ex.root[0]+(point.root[0]-ex.root[0])*k,ex.root[1]+(point.root[1]-ex.root[1])*k,ex.root[2]+(point.root[2]-ex.root[2])*k];}
   const bad=blocked(rt,ex,point.root,f.angle);if(bad){clear(rt,ex);return {status:'failed',diagnostic:bad};}
@@ -358,7 +358,7 @@ export const handActuator:ActionDef<HandActuatorParams,true,Exec>={
   // Soul Actions entry 33: a switch or valve contact turns the body over the whole reach (a door, drawer or board stroke
   // keeps its 0.4 s), so the reaching hand and the turning torso do not add up to a fast sweep
   a.pose.yaw=ex.yaw+turn*smooth(ex.t/(ex.p.opening||ex.p.slide||ex.p.stroke?.4:handReachSeconds(ex.motion)));
-  const speed=Math.hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
+  const speed=hypot(a.pose.p[0]-before[0],a.pose.p[2]-before[2])/dt;h.activity=speed>.08?'walk':'operate';if(speed>.08)h.speed=speed;else delete h.speed;
   if(f.armDown){freeHand(h,ex.p);h.activity='idle';delete h.speed;}else if(twoHanded(ex.p.stroke)){const two=strokeHands(ex.p.at,ex.p.stroke!,(ex.t-HAND_REACH_SECONDS)/ex.p.stroke!.seconds);h.hands={left:two.left,right:two.right};}else if(ex.p.hand)h.hands={...(h.hands??{}),[ex.p.hand]:[...point.hand]};else h.hands=actuatorHand(ex.p.opening)==='left'?{left:[...point.hand]}:{right:[...point.hand]};h.handActuator=ex.motion;
   // entry 32: a walk's thumb-turn ends with the hand already on the handle: the opening that follows takes it from there
   if(f.done&&ex.p.passage?.mode==='unlock'&&ex.motion.abortedAt===undefined){h.activity='operate';return {status:'completed'};}

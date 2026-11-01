@@ -398,11 +398,13 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
       // Entry 43: an electric kettle. A low rumble and a rising hiss as the element heats (both follow the water's
       // temperature, `kettleTemp`, derived from the switch tick and the depicted tick), then a rolling boil: the rumble
       // swells and bubbles burst at the surface. The click on and off is the one-shot below.
-      const rumble = bed('lowpass', 260, 0.9, 0), hiss = bed('bandpass', 2300, 0.9, 0), roll = bed('bandpass', 700, 0.7, 0);
+      // two voicings (every kind has more than one): variant 1 is a slightly smaller kettle, its rumble and hiss a little higher
+      const hi = variant === 1 ? 1.12 : 1;
+      const rumble = bed('lowpass', 260 * hi, 0.9, 0), hiss = bed('bandpass', 2300 * hi, 0.9, 0), roll = bed('bandpass', 700 * hi, 0.7, 0);
       let bubble = c.currentTime;
       tick = (t, e) => { const temp = Math.max(0, Math.min(1, Number(e.state.kettleTemp) || 0)), boil = e.state.kettlePhase === 'boiling';
         rumble.g.gain.setTargetAtTime(0.15 + 0.55 * temp + (boil ? 0.4 : 0), t, 0.4); hiss.g.gain.setTargetAtTime(0.04 + 0.32 * temp ** 2 + (boil ? 0.12 : 0), t, 0.5);
-        hiss.b.frequency.setTargetAtTime(1600 + 1700 * temp, t, 0.8); roll.g.gain.setTargetAtTime(boil ? 0.45 : temp > 0.75 ? (temp - 0.75) * 1.2 : 0, t, 0.3);
+        hiss.b.frequency.setTargetAtTime((1600 + 1700 * temp) * hi, t, 0.8); roll.g.gain.setTargetAtTime(boil ? 0.45 : temp > 0.75 ? (temp - 0.75) * 1.2 : 0, t, 0.3);
         if (bubble < t - 0.25) bubble = t;
         let guard = 0; while ((boil || temp > 0.7) && bubble < t + 0.3 && guard++ < 24) { burst(c, out, bubble, 0.012 + r() * 0.02, (boil ? 0.35 : 0.12) * (0.5 + r()), 500 + r() * 900, 'bandpass'); bubble += boil ? 0.025 + r() * 0.06 : 0.12 + r() * 0.3; } };
       break; }

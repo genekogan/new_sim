@@ -11,7 +11,7 @@
 import { z } from 'zod';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
-import type { Vec3 } from '../core/math.ts';
+import { datan, datan2, dcos, dsin, hypot, type Vec3 } from '../core/math.ts';
 import { at, bodyFrame, carryHand, sideOf, smooth, type BodyFrame, type Hand } from './body.ts';
 import { followHand } from './model.ts';
 
@@ -56,7 +56,7 @@ export const APPROACH_TILT = 10 * Math.PI / 180, TIP_OUT = 115 * Math.PI / 180;
 /** The rinse: the swirl's radius (m) and turns. */
 const SWIRL_R = 0.012, SWIRL_TURNS = 2;
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+const wrap = (a: number) => datan2(dsin(a), dcos(a));
 const DEG = Math.PI / 180;
 /** The turn (rad, engine yaw) a mug needs so its handle is clear of the palm and of the face: the handle's angle from the
  *  body's forward (+ toward the palm's side) must be within [−130°, 50°]; otherwise it goes to the nearer of 40° / −120°. */
@@ -73,7 +73,7 @@ const r3 = (x: number) => Math.round(x * 1000) / 1000;
 /** The tilt (rad, top toward the face) a sip needs with `tea` (0..1) in the mug: the tea reaches the rim, plus a little. */
 export function sipTilt(tea: number) {
   const h = MUG.floor + (MUG.full - MUG.floor) * clamp01(tea);
-  return Math.max(25 * Math.PI / 180, Math.min(80 * Math.PI / 180, Math.atan((MUG.h - h) / MUG.rIn) + 14 * Math.PI / 180));
+  return Math.max(25 * Math.PI / 180, Math.min(80 * Math.PI / 180, datan((MUG.h - h) / MUG.rIn) + 14 * Math.PI / 180));
 }
 /** The tea left after `k` sips of a drink. */
 export const teaAfter = (m: Pick<CupMotion, 'from' | 'sip'>, k: number) => r3(Math.max(0, (m.from ?? 0) - k * (m.sip ?? 0)));
@@ -160,7 +160,7 @@ export function cupFrame(m: CupMotion, s: number): CupFrame {
   const left = valveBlend(w.on, w.off, s);
   const water = s < w.on + 0.15 ? 0 : s < w.off ? 0.45 * clamp01((s - w.on - 0.15) / (w.off - w.on - 0.15)) : s < w.flow0 ? 0.45 : 0.45 * (1 - clamp01((s - w.flow0) / (w.washed - w.flow0)));
   const outflow = s < w.flow0 || s > w.washed + 0.25 ? 0 : Math.min(smooth((s - w.flow0) / 0.25), 1 - smooth((s - w.washed) / 0.25));
-  const sw = s > w.swirl0 && s < w.swirl0 + C.swirl ? (() => { const u = (s - w.swirl0) / C.swirl, amp = SWIRL_R * Math.sin(Math.PI * u), ph = 2 * Math.PI * SWIRL_TURNS * u; return [amp * Math.sin(ph), amp * (1 - Math.cos(ph)) * 0.5] as [number, number]; })() : [0, 0] as [number, number];
+  const sw = s > w.swirl0 && s < w.swirl0 + C.swirl ? (() => { const u = (s - w.swirl0) / C.swirl, amp = SWIRL_R * dsin(Math.PI * u), ph = 2 * Math.PI * SWIRL_TURNS * u; return [amp * dsin(ph), amp * (1 - dcos(ph)) * 0.5] as [number, number]; })() : [0, 0] as [number, number];
   const base = { left, swirl: sw, water, outflow, sip: 0, atLips: false, done: s >= end, end };
   if (s < C.grip) return { ...still('carry', 0, smooth(s / C.grip)), ...base };
   if (s < C.grip + C.washIn) return { a: 'carry', b: 'hold', k: smooth((s - C.grip) / C.washIn), tilt: 0, grip: 1, ...base };
@@ -198,7 +198,7 @@ function baseOf(key: CupPoseKey, tilt: number, L: CupMarks): Vec3 {
   if (key === 'hold') return L.hold ?? L.carry;
   if (key === 'chest') return add(add(add(L.lips, L.f, CHEST_HOLD.fwd), UP, -CHEST_HOLD.down), L.r, L.side * CHEST_HOLD.side);
   // a = cos t · up − sin t · f (top toward the face); n = −cos t · f − sin t · up (toward the face, across the rim)
-  const c = Math.cos(tilt), s = Math.sin(tilt), a: Vec3 = add([0, c, 0], L.f, -s), n: Vec3 = add([0, -s, 0], L.f, -c);
+  const c = dcos(tilt), s = dsin(tilt), a: Vec3 = add([0, c, 0], L.f, -s), n: Vec3 = add([0, -s, 0], L.f, -c);
   const lip = add(L.lips, L.f, 0.012);
   return add(add(lip, a, -MUG.h), n, -MUG.r);
 }
@@ -208,7 +208,7 @@ export function cupPose(f: Pick<CupFrame, 'a' | 'b' | 'k' | 'tilt' | 'grip' | 's
   let base: Vec3 = [ba[0] + (bb[0] - ba[0]) * f.k, ba[1] + (bb[1] - ba[1]) * f.k, ba[2] + (bb[2] - ba[2]) * f.k];
   if (K > 0) base = [base[0] + (L.carry[0] - base[0]) * K, base[1] + (L.carry[1] - base[1]) * K, base[2] + (L.carry[2] - base[2]) * K];
   base = add(add(base, L.f, f.swirl[0]), L.r, f.swirl[1]);
-  const c = Math.cos(f.tilt), s = Math.sin(f.tilt), axis: Vec3 = add([0, c, 0], L.f, -s), side: Vec3 = [L.r[0] * L.side, L.r[1] * L.side, L.r[2] * L.side];
+  const c = dcos(f.tilt), s = dsin(f.tilt), axis: Vec3 = add([0, c, 0], L.f, -s), side: Vec3 = [L.r[0] * L.side, L.r[1] * L.side, L.r[2] * L.side];
   // a tip-out turns about the palm's side: the base swings so the mug's middle stays where it was
   if (f.tilt < 0) { const mid = add(base, [0, 1, 0], MUG.h / 2); base = add(mid, axis, -MUG.h / 2); }
   // the palm: under the base (as carried) → out to its edge → up its side (two halves of the grip change)
@@ -242,7 +242,7 @@ export const cupAction: ActionDef<CupParams, true, Exec> = {
     if (it?.support?.kind !== 'in-hand' || it.support.by !== p.actor) return { ok: false, diagnostic: issue('not-held', `${p.actor} must hold ${p.item}`, [p.actor, p.item]) };
     if (p.stage === 'drink' && (!p.sips || p.from === undefined || !p.sip)) return { ok: false, diagnostic: issue('sips', 'A drink needs its sips', [p.item]) };
     if (p.stage === 'wash' && (!p.hold || !p.valve || !p.target || !rt.world.entities[p.target])) return { ok: false, diagnostic: issue('tap', 'Washing needs the tap, its valve and the hold under it', [p.item]) };
-    if (p.hold && Math.hypot(p.hold[0] - a.pose.p[0], p.hold[2] - a.pose.p[2]) > 1.1) return { ok: false, diagnostic: issue('too-far', `${p.actor} is not standing at the tap`, [p.actor]) };
+    if (p.hold && hypot(p.hold[0] - a.pose.p[0], p.hold[2] - a.pose.p[2]) > 1.1) return { ok: false, diagnostic: issue('too-far', `${p.actor} is not standing at the tap`, [p.actor]) };
     return { ok: true, program: true };
   },
   start(rt, p, _plan, id) {

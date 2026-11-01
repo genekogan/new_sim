@@ -5,7 +5,7 @@
 //                                                          obstacle when taller than the 0.22 m step)
 //   in-hand { by: <person>, hand: 'left' | 'right' }     — pose = hand point − rot(grip, yaw)
 // Items on tables or in hands have no phase, so spatial/service.ts never rasterises them.
-import { add2, clamp, heading, rot2, sub2, type Vec2, type Vec3 } from '../core/math.ts';
+import { add2, clamp, datan2, dcos, dsin, heading, rot2, sub2, type Vec2, type Vec3 } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import type { Entity, Provenance, WorldState } from '../world/types.ts';
@@ -138,7 +138,7 @@ export function graspPoint(item: Entity): Vec3 {
 }
 /** Item yaw while held: the holder's yaw plus the turn it was handed over with (entry 41; 0 for anything picked up), so a
  *  handed-over item keeps the way it faced instead of spinning half round to its new holder's heading. */
-export const heldYaw = (item: Entity, holder: Entity) => { const t = (item.support as { turn?: number } | undefined)?.turn; return t ? Math.atan2(Math.sin(holder.pose.yaw + t), Math.cos(holder.pose.yaw + t)) : holder.pose.yaw; };
+export const heldYaw = (item: Entity, holder: Entity) => { const t = (item.support as { turn?: number } | undefined)?.turn; return t ? datan2(dsin(holder.pose.yaw + t), dcos(holder.pose.yaw + t)) : holder.pose.yaw; };
 export function followHand(item: Entity, hand: Vec3, yaw: number) {
   item.pose = { p: poseAtHand(item, hand, yaw), yaw };
 }

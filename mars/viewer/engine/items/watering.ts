@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
-import { dcos, dsin, type Vec3 } from '../core/math.ts';
+import { dcos, dsin, hypot, type Vec3 } from '../core/math.ts';
 import { bodyFrame, lerp3, smooth } from './body.ts';
 import { carryPoint, followHand } from './model.ts';
 
@@ -107,7 +107,7 @@ export function wateringFrame(m: WateringMotion, s: number): WateringFrame {
   // entry 43: the free hand comes to the cup with the pouring hand and leaves it as that hand goes back (one ease each)
   const left = m.steady ? right : 0;
   const f0 = m.flowFrom ?? FLOW_FROM, f1 = m.flowFull ?? FLOW_FULL;
-  return { right, left, sweepK: m.sweep ? Math.sin(2 * Math.PI * u) : 0, tilt, flow: smooth((tilt - f0) / (f1 - f0)), yaw: (m.spoutYaw ?? 0) * right, done: s >= end, end };
+  return { right, left, sweepK: m.sweep ? dsin(2 * Math.PI * u) : 0, tilt, flow: smooth((tilt - f0) / (f1 - f0)), yaw: (m.spoutYaw ?? 0) * right, done: s >= end, end };
 }
 
 /** A handle-held item taken or put by hand (take_item / put_item): the reach and the hand back, `reach` s each. */
@@ -147,7 +147,7 @@ export function wateringEvents(m: WateringMotion): WateringEvent[] {
  *  about the lateral axis. World point of a can-local point (x forward, y up, z right of the spout). */
 export function canPoint(grip: Vec3, gripLocal: Vec3, yaw: number, tilt: number, local: Vec3): Vec3 {
   const dx = local[0] - gripLocal[0], dy = local[1] - gripLocal[1], dz = local[2] - gripLocal[2];
-  const c = Math.cos(tilt), s = Math.sin(tilt), fx = dx * c + dy * s, fy = -dx * s + dy * c;
+  const c = dcos(tilt), s = dsin(tilt), fx = dx * c + dy * s, fy = -dx * s + dy * c;
   const cy = dcos(yaw), sy = dsin(yaw);
   return [grip[0] + cy * fx - sy * dz, grip[1] + fy, grip[2] + sy * fx + cy * dz];
 }
@@ -171,7 +171,7 @@ export const watering: ActionDef<WateringParams, true, Exec> = {
     if (it?.support?.kind !== 'in-hand' || it.support.by !== p.actor || it.support.hand !== 'right') return { ok: false, diagnostic: issue('not-held', `${p.actor} must hold ${p.item} in the right hand`, [p.actor, p.item]) };
     if (!rt.world.entities[p.target]) return { ok: false, diagnostic: issue('target', `${p.target} is gone`, [p.target]) };
     if (p.stage === 'fill' && !p.valve) return { ok: false, diagnostic: issue('valve', 'Filling needs the tap valve', [p.target]) };
-    if (Math.hypot(p.hold[0] - a.pose.p[0], p.hold[2] - a.pose.p[2]) > 1.1) return { ok: false, diagnostic: issue('too-far', `${p.actor} is not standing at ${p.target}`, [p.actor, p.target]) };
+    if (hypot(p.hold[0] - a.pose.p[0], p.hold[2] - a.pose.p[2]) > 1.1) return { ok: false, diagnostic: issue('too-far', `${p.actor} is not standing at ${p.target}`, [p.actor, p.target]) };
     return { ok: true, program: true };
   },
   start(rt, p, _plan, id) {
