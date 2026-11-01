@@ -60,7 +60,7 @@ import type {ShoreContactV1} from '../../../../packages/engine-contract/src/shor
 import type { DepictionBeat } from './station-depiction.ts';
 import { sleepGoal, sleepHands, sleepHeadPitch, sleepRestWeight, sleepHeadRestLift } from './sleep.ts';
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
-import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, SING_LET_GO, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
+import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, SING_LET_GO, activityFrame, gameArmBlend, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
 import { accompanistOf } from './piano-score.ts';
 import { handGameActive, handGameGestureClock, handGameSuppress, poseHandGames, type HandGameDiag } from './hand-games.ts';
 import type { HandHoldState } from '../../engine/social/hand-hold.ts';
@@ -916,7 +916,10 @@ export class HumanViews {
     // Entry 4: carry reach/release converges to the same idle clip underneath the IK.
     // Otherwise an idle variation (e.g. hands on hips) appears in one frame at release end.
     const carryIdle = v.carryWeight !== undefined, idleShare = carryIdle ? 1 - v.carryWeight! : 1;
-    const idleFree = (v.activity === 'idle' || carryIdle || itemReach || GAIT_ACTS.has(v.activity) || ((v.activity === 'operate' || v.activity === 'reach') && reachFade > 0) || singFade > 0 || (v.activity === 'rps' && hgOff < 1)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.idleBlend ?? 0) > 0) && (freeBody || carryIdle) && !lib.cur;
+    // Entry 7 (frisbee clear-v1): the arms lower out of the game on its own recorded clock; idle variety fades in under them
+    const gameBlend = v.game?.flightPolicy === 'clear-v1' ? gameArmBlend(v.game, v.gameTick ?? 0, v.gameDt ?? .05) : 1;
+    const gameShare = v.activity === 'idle' || v.game?.flightPolicy !== 'clear-v1' ? 1 : 1 - gameBlend;
+    const idleFree = (v.activity === 'idle' || gameBlend < 1 || carryIdle || itemReach || GAIT_ACTS.has(v.activity) || ((v.activity === 'operate' || v.activity === 'reach') && reachFade > 0) || singFade > 0 || (v.activity === 'rps' && hgOff < 1)) && b.sitW === 0 && (!engineHands || reachFade > 0 || (v.itemPose?.idleBlend ?? 0) > 0) && (freeBody || carryIdle) && !lib.cur;
     // Entry 38: an actuator that hands the body over soon after its arm is down (a board stroke and its step back) keeps
     // the idle handoff fading in after it ends, instead of switching idle variety on at full weight (a 0.31 m palm jump, take 5)
     const after = !handoff && v.lastHandActuator ? handActuatorFrame(v.lastHandActuator, (v.handActuatorTime ?? tSec) - v.lastHandActuator.startTick * DT).idleBlend : 1;
@@ -927,9 +930,9 @@ export class HumanViews {
     // (entry 29's shared idle-onset fix, carried by entry 33: a hand-to-hair flash at each walk stop before a reach).
     const restOnset = singFade > 0 ? v.singOnset! : v.restAge === undefined ? 1 : smooth(Math.min(1, v.restAge / IDLE_VARIETY_ONSET));
     if (v.activity === 'idle') v.singOnset = restOnset; else if (v.activity !== 'sing') v.singOnset = undefined;
-    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, gT) * idleHandoff * restOnset * (1 - hgOff) * idleShare : 0;
+    const neutralW = extra.idleNeutral && idleFree ? (1 - w) * neutralWeight(h.name, gT) * idleHandoff * restOnset * (1 - hgOff) * idleShare * gameShare : 0;
     const variant = idleFree ? idleVariant(h.name, gT) : null, variantA = variant ? libAction(v.rig, variant.clip) : null;
-    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset * (1 - hgOff) * idleShare : 0;
+    const variantW = variantA ? (1 - w - neutralW) * variant!.w * idleHandoff * restOnset * (1 - hgOff) * idleShare * gameShare : 0;
     v.variety = neutralW + variantW;
     // A walk starting out of an idle gesture: the legs take the walk's own ease (WALK_EASE, 0.55 s), but folded arms opening
     // that fast swung a hand 0.28 m per 50 ms. On the arms alone (arms-only copies of the gesture clips) the gesture fades
@@ -1201,6 +1204,8 @@ export class HumanViews {
       v.arms.forEach((arm, i) => {
         const left = armSide(v, i) === 'left', q = act.hands![left ? 0 : 1], r = act.rootHands?.[left ? 0 : 1], wgt = act.handW?.[left ? 0 : 1] ?? 1;
         if (!q && !r) { if (sitW > 0 && !seatClip) handOnThigh(v, i, sitW); return; }
+        const weight=act.handWeights?.[left?0:1]??1;
+        const saved=weight<1?[arm.upper,arm.lower,arm.hand].map(o=>({o,p:o.position.clone(),q:o.quaternion.clone()})):[];
         arm.upper.getWorldPosition(_s);
         // entry 36: a goal on a fixed thing (the mic's grip) is placed from the body root at its own height above the floor
         const t = r ? V().copy(h.position).addScaledVector(_fwd, r[0]).addScaledVector(_right, (left ? -1 : 1) * r[1]).addScaledVector(UP, r[2])
@@ -1209,8 +1214,9 @@ export class HumanViews {
         if (wgt <= 0) return;
         targets[i] = t;
         armTo(arm, t, wgt, 0.98, h, V().copy(_right).multiplyScalar(left ? -0.6 : 0.6).addScaledVector(UP, -0.5).addScaledVector(_fwd, -0.2));
+        for(const b of saved){b.o.position.lerpVectors(b.p,b.o.position,weight);b.o.quaternion.slerpQuaternions(b.q,b.o.quaternion.clone(),weight);}
       });
-      closeHands(v, v.arms.map((_, i) => !targets[i] ? 0 : act.curl ? act.curl[armSide(v, i) === 'left' ? 0 : 1] : 0.6));
+      closeHands(v, v.arms.map((_, i) => !targets[i] ? 0 : (act.curl ? act.curl[armSide(v, i) === 'left' ? 0 : 1] : 0.6) * (act.handWeights?.[armSide(v, i) === 'left' ? 0 : 1] ?? 1)));
     } else if (runFallback && !gait && !fp && !posed && proneW===0 && sitW===0) {
       source='expression';v.arms.forEach((arm,i)=>{const f=runFallback.hands[arm.side>0?0:1];targets[i]=arm.upper.getWorldPosition(V()).addScaledVector(_fwd,f.forward).addScaledVector(_right,-arm.side*.06).addScaledVector(UP,f.up);});reachTo(v,targets,false);closeHands(v,targets.map(()=>.45));
     } else if (sitW > 0 && !seatClip) v.arms.forEach((_, i) => handOnThigh(v, i, sitW));

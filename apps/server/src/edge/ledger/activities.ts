@@ -307,14 +307,14 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   }
   // ---- CN5 choreographed games: each court's free places (its spots, then extra places beside them up to 6 players)
   for (const court of gameCourts(data.nearest ? live.filter(s => !(s.activity in GAME_ACTIVITIES) || ok(s)) : live, w)) {
-    const playing = w.groupSize(court.group), full = playing >= GAME_MAX_PLAYERS;
+    const playing = w.groupSize(court.group), full = playing >= (court.maxPlayers??GAME_MAX_PLAYERS);
     // a new player goes to the end/side with fewer players (a frisbee pair at the two ends, volleyball across the net)
     const used = (side: number) => court.slots.filter(x => x.side === side && w.taken(x.at, x.id)).length, sides = [...new Set(court.slots.map(x => x.side))], least = Math.min(...sides.map(used));
     for (const slot of court.slots) {
       if (w.taken(slot.at, slot.id) || d2(slot.at, w.me) > SPOT_REACH || used(slot.side) > least) continue;
       const def = SPOT_ACTIVITIES[court.activity], id = `${court.activity}:${slot.id}`; if (plans.has(id)) continue;
       add({id, verb: court.activity, label: `${def.label} (${slot.label}${playing ? `; ${playing} playing, join them` : '; a partner joins by taking another place here'})`, available: !full,
-        ...(full ? {blocked: {code: 'game.full', reason: `${GAME_MAX_PLAYERS} are already playing.`}} : {}), target: {id: slot.id, kind: 'spot'}, params: secondsParam(def.seconds)},
+        ...(full ? {blocked: {code: 'game.full', reason: `${court.maxPlayers??GAME_MAX_PLAYERS} are already playing.`}} : {}), target: {id: slot.id, kind: 'spot'}, params: secondsParam(def.seconds)},
       {label: def.label, seconds: true, steps: [...standFirst(w), walk(slot.at), pose(court.activity, def.seconds, {group: court.group, waitSeconds: 120, alone: 'fail', need: 1, ...(slot.faceTo ? {face: slot.faceTo} : {}), game: court.game})]});
     }
   }
@@ -324,7 +324,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
 export type GameSlot = {id: string; spot: Spot; at: V2; faceTo?: V2; label: string;
   /** frisbee ends / volleyball sides (by facing); pétanque has one side. New players go to the side with fewer. */
   side: number};
-export type GameCourt = {activity: string; group: string; game: {kind: 'frisbee' | 'petanque' | 'volleyball'; jack?: V2; net?: [number, number, number, number]}; slots: GameSlot[]};
+export type GameCourt = {activity: string; group: string; game: {kind: 'frisbee' | 'petanque' | 'volleyball'; flightPolicy?:'clear-v1'; jack?: V2; net?: [number, number, number, number]}; slots: GameSlot[];maxPlayers?:number};
 const r2 = (n: number) => Math.round(n * 100) / 100;
 /** CN5: game courts from World's game spots (one court per game and place): the shared group, the jack (pétanque: 7 m out
  *  along the players' facing) or net (volleyball: between the two sides), and up to six places — the spots, then extra places
@@ -337,7 +337,7 @@ export function gameCourts(spots: Spot[], w: Pick<ActivityWorld, 'clearance'>): 
     const sp = [...list].sort((a, b) => a.id.localeCompare(b.id)), activity = sp[0].activity, kind = GAME_ACTIVITIES[activity];
     const dir = (s: Spot): V2 => {const f = s.faceTo ?? [s.at[0], s.at[1] + 1], d = Math.hypot(f[0] - s.at[0], f[1] - s.at[1]) || 1; return [(f[0] - s.at[0]) / d, (f[1] - s.at[1]) / d];};
     const mean = (ps: V2[]): V2 => [ps.reduce((a, p) => a + p[0], 0) / ps.length, ps.reduce((a, p) => a + p[1], 0) / ps.length];
-    let game: GameCourt['game'] = {kind};
+    let game: GameCourt['game'] = kind==='frisbee'?{kind,flightPolicy:'clear-v1'}:{kind};
     if (kind === 'petanque') {const c = mean(sp.map(s => s.at)), d = mean(sp.map(dir)), n = Math.hypot(...d) || 1; game = {kind, jack: [r2(c[0] + d[0] / n * 7), r2(c[1] + d[1] / n * 7)]};}
     if (kind === 'volleyball') {
       // two sides by facing; the net halfway between them, across the line joining them
@@ -350,6 +350,11 @@ export function gameCourts(spots: Spot[], w: Pick<ActivityWorld, 'clearance'>): 
     // first clear point within 6 m; one with none is left out
     const clearAt = (s: Spot): V2 | null => {const d = dir(s); for (let t = 0; t <= 6; t += 0.25) {const p: V2 = [r2(s.at[0] + d[0] * t), r2(s.at[1] + d[1] * t)]; if (w.clearance(p[0], p[1]) >= 0.35) return p;} return null;};
     const slots: GameSlot[] = sp.flatMap(s => {const at = clearAt(s); return at ? [{id: s.id, spot: s, at, ...(s.faceTo ? {faceTo: s.faceTo} : {}), label: s.label ?? s.id, side: sideOf(s)}] : [];});
+    if(kind==='frisbee'&&slots.length===2){
+      const [a,b]=slots,dx=b.at[0]-a.at[0],dz=b.at[1]-a.at[1],d=Math.hypot(dx,dz),centre:V2=[(a.at[0]+b.at[0])/2,(a.at[1]+b.at[1])/2];
+      if(d>=3)for(const sign of [1,-1]){const at:V2=[r2(centre[0]-dz*Math.sqrt(3)/2*sign),r2(centre[1]+dx*Math.sqrt(3)/2*sign)];if(w.clearance(at[0],at[1])<.35)continue;slots.push({id:a.id+'.triangle',spot:a.spot,at,faceTo:centre,label:'triangle corner',side:2});break;}
+      out.push({activity,group:`game-${kind}-${sp[0].id}`.replace(/[^A-Za-z0-9_-]/g,'-').slice(0,80),game,slots,maxPlayers:slots.length});continue;
+    }
     for (let k = 0; slots.length < GAME_MAX_PLAYERS && k < 40; k++) {
       const base = slots.filter(x => !x.id.includes('.p'))[k % Math.max(1, slots.filter(x => !x.id.includes('.p')).length)]; if (!base) break;
       const s = base.spot, d = dir(s), perp: V2 = [-d[1], d[0]], j = Math.floor(k / Math.max(1, slots.filter(x => !x.id.includes('.p')).length));

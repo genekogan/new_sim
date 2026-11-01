@@ -50,6 +50,7 @@ const SH = 1.34, HALF = 0.19;
 export type HandGoal = readonly [number, number, number];
 export type ActivityFrame = {
   /** [left, right]; null = that arm is left to the base posture (dangling / hand on thigh). */
+  handWeights?:[number,number];
   hands: [HandGoal | null, HandGoal | null] | null;
   /** Feet apart (metres each side) and pelvis lift (metres, a hop) for standing cycles. */
   feetOut: number; hop: number;
@@ -93,6 +94,8 @@ function singFrame(f: ActivityFrame, seconds: number, opts: FrameOpts): Activity
   return f;
 }
 
+export function gameArmBlend(g:RecordedGame,tick:number,dt:number):number{const unit=(v:number)=>S(Math.max(0,Math.min(1,v)));return g.releaseTick===undefined?unit((tick-(g.joinedAt??g.since??tick))*dt/1.2):(g.releaseFrom??1)*(1-unit((tick-g.releaseTick)*dt/1.2));}
+
 export function activityFrame(activity: string, base: string, seconds: number, id: string, opts: FrameOpts = {}): ActivityFrame | null {
   const ph = idPhase(id), t = seconds + ph * 7, seated = base === 'sit' || base === 'sit-ground';
   const gap = Math.max(0.3, Math.min(1.6, opts.gap ?? GAP[activity] ?? 0.9)), mid = gap / 2;
@@ -100,8 +103,15 @@ export function activityFrame(activity: string, base: string, seconds: number, i
   const f: ActivityFrame = { hands: null, feetOut: 0, hop: 0, lean: 0, side: 0, lying: null, look: 0 };
   const down = seated ? -0.36 : -0.34;
   if(opts.game&&['play-frisbee','play-petanque','play-volleyball'].includes(activity)){
-    const g=opts.game,tick=opts.gameTick??0,dt=opts.gameDt??.05;
-    f.feetOut=.12;
+    const g=opts.game,shownTick=opts.gameTick??0,tick=g.releaseFrameTick??shownTick,dt=opts.gameDt??.05;
+    f.feetOut=g.flightPolicy==='clear-v1'?.12*gameArmBlend(g,shownTick,dt):.12;
+    if(g.flightPolicy==='clear-v1'&&g.kind==='frisbee'&&g.throwTick!==undefined&&g.landTick!==undefined&&(!g.waiting||g.releaseTick!==undefined)){
+      const unit=(v:number)=>S(Math.max(0,Math.min(1,v))),blend=gameArmBlend(g,shownTick,dt),{forward,height}=gameContact(g.kind),goal=(f:number):HandGoal=>[f,-HALF,height-SH];
+      f.feetOut=.12*blend;f.handWeights=[0,0];
+      if(opts.actorId===g.from){const k=unit(1+(tick-g.throwTick)*dt/.7),after=unit((tick-g.throwTick)*dt/.65),start=g.turn===0?unit((tick-(g.joinedAt??g.since??tick))*dt/.5):1;f.hands=[null,goal(.12+(forward-.12)*k)];f.handWeights=[0,blend*start*(1-after)];}
+      else if(opts.actorId===g.to){const anticipation=unit(1-(g.landTick-tick)*dt/1.4),settle=unit((tick-g.landTick)*dt/.5);f.hands=[goal(.12+(forward-.12)*anticipation),goal(.12+(forward-.12)*anticipation-(forward-.12)*settle)];f.handWeights=[blend*anticipation*(1-settle),blend*anticipation];}
+      return f;
+    }
     if(g.waiting||g.throwTick===undefined||g.landTick===undefined)return f;
     if(opts.actorId===g.from){
       const windup=g.kind==='petanque' ? 1.6 : g.kind==='frisbee' ? .7 : .4;

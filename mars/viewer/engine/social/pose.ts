@@ -12,9 +12,10 @@
 // its `until` stale) is no partner and never seeds a second "shared" window. A guest who arrives after the window visibly
 // closed does the pose alone at once (no wait), marked `late` in its body state and its outputs.
 import { z } from 'zod';
+import {frisbeeLaneIssue,FRISBEE_CLEAR_WINDUP} from './frisbee-clearance.ts';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
-import type { Runtime } from '../runtime/runtime.ts';
-import { dcos, dsin, heading, hypot, type Vec2 } from '../core/math.ts';
+import {DT, type Runtime} from '../runtime/runtime.ts';
+import { dcos, dsin, heading, hypot, wrapAngle, angleDelta, clamp, type Vec2 } from '../core/math.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import { seatFitProblem } from '../bodies/humanoid.ts';
 import type { Spatial } from '../spatial/service.ts';
@@ -57,7 +58,7 @@ export const POSE_INSTRUMENTS = ['drums', 'keyboard', 'guitar', 'bass', 'violin'
 export const GAMES = { frisbee: { period: 3.2, windup: 0.7, flight: 1.5 }, volleyball: { period: 2.6, windup: 0.4, flight: 1.4 }, petanque: { period: 7, windup: 1.6, flight: 1.4 } } as const;
 export type GameKind = keyof typeof GAMES;
 /** Public game state on each player's body (human.game); the viewer draws the disc/ball/boules from it. */
-export type GameState = { kind: GameKind; group: string; players: string[]; waiting?: boolean; since?: number; turn?: number; from?: string; to?: string | null; throwTick?: number; landTick?: number;
+export type GameState = { kind: GameKind; group: string; players: string[]; flightPolicy?: 'clear-v1'; releaseTick?: number; releaseFrameTick?: number; releaseFrom?: number; joinedAt?:number; waiting?: boolean; since?: number; turn?: number; from?: string; to?: string | null; throwTick?: number; landTick?: number;
   /** petanque: the jack, where this turn's boule lands, this end's landed boules, the last end's winner, and this body's ends won. */
   jack?: [number, number]; at?: [number, number]; boules?: { by: string; at: [number, number] }[]; end?: number; lastWinner?: string | null; wins?: number };
 /** together/1: speed of the short step-in to the paired distance (m/s). */
@@ -76,7 +77,7 @@ type Params = { actor: string; activity: string; seconds: number; prop?: string;
    *  (once within arm's reach of them); prospective, set by edge plans, so earlier logs replay unchanged. */
   clear?: boolean;
   /** CN5: the instrument played (play-music) and a choreographed game (grouped). */
-  instrument?: string; game?: { kind: GameKind; jack?: Vec2; net?: [number, number, number, number] };
+  instrument?: string; game?: { kind: GameKind; flightPolicy?: 'clear-v1'; jack?: Vec2; net?: [number, number, number, number] };
   /** CN5: keep the scenery seat height when the pose is done together (grouped). */
   seatTogether?: boolean;
   /** Entry 36 (prospective, set by edge plans for a mic stand): singing along. The pose lasts only while someone plays
@@ -89,11 +90,11 @@ type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw:
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
   phase?: 'waiting' | 'active'; readyAt?: number; waited?: number; until?: number; mobile?: boolean; close?: boolean;
   /** CN5 games: ticks with nobody to play with, the last petanque end seen and the ends this body won. */
-  lonely?: number; end?: number; wins?: number; since?: number;
+  lonely?: number; end?: number; wins?: number; since?: number; joinedAt?:number;
   /** once-v1: this body arrived after its group's window had closed and does the pose alone. */
   late?: boolean;
   /** Entry 36 accompany: seconds since the last check found music (undefined: none heard yet), and whether any was. */
-  quiet?: number; heard?: boolean };
+  quiet?: number; heard?: boolean; gameRelease?: {at:number; frame:number; from:number; diagnostic?:Diagnostic} };
 /** together/1 public body state while a grouped pose runs (the viewer may draw open arms while waiting). */
 export type TogetherState = { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean; pairedPolicy?: 'ready-v1'; readyAt?: number; windowPolicy?: 'once-v1'; late?: true };
 const issue = (code: string, message: string, subjects: string[]): Diagnostic => ({ code: 'pose.' + code, message, subjects });
@@ -153,8 +154,9 @@ export const poseV1: ActionDef<Params, true, Exec> = {
     gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional(),
     instrument: z.enum(POSE_INSTRUMENTS).optional(), seatTogether: z.boolean().optional(), throw: z.enum(RPS_SHAPES).optional(),
     accompany: z.object({ radius: z.number().min(1).max(40), grace: z.number().min(0).max(30) }).strict().optional(),
-    game: z.object({ kind: z.enum(Object.keys(GAMES) as [GameKind, ...GameKind[]]), jack: z.tuple([z.number(), z.number()]).optional(), net: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional() }).strict().optional() }).strict()
+    game: z.object({ kind: z.enum(Object.keys(GAMES) as [GameKind, ...GameKind[]]), flightPolicy:z.literal('clear-v1').optional(), jack: z.tuple([z.number(), z.number()]).optional(), net: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional() }).strict().optional() }).strict()
     .refine(p => !p.pairedPolicy || (!!p.group && p.gap !== undefined && ['hug','high-five','handshake','dance','rps'].includes(p.activity) && !p.game && !p.hold && !p.release), {message:'ready-v1 requires a paired limb gesture with group and gap'})
+    .refine(p=>!p.game?.flightPolicy||p.game.kind==='frisbee',{message:'clear-v1 is only a frisbee policy'})
     .refine((p) => !p.game || (!!p.group && p.activity === 'play-' + p.game.kind), { message: 'a game needs a group and its own play-<game> activity' })
     .refine((p) => (p.activity === 'rps') === (p.throw !== undefined) && (p.activity !== 'rps' || p.pairedPolicy === 'ready-v1'), { message: 'rps needs a throw and the ready-v1 paired policy (and only rps has a throw)' })
     .refine((p) => !p.windowPolicy || (!!p.group && !p.pairedPolicy && !p.game), { message: 'once-v1 is a group activity window (not a paired gesture or a game)' }),
@@ -169,11 +171,13 @@ export const poseV1: ActionDef<Params, true, Exec> = {
   step(rt, ex, dt) {
     const a = rt.world.entities[ex.p.actor], h = a?.human;
     if (!h) return { status: 'failed', diagnostic: issue('not-human', 'the body is gone', [ex.p.actor]) };
+    if(ex.gameRelease)return releaseGameStep(rt,ex,dt);
     if (ex.phase && nudged(rt, ex.p.actor)) {
       if(ex.p.pairedPolicy){if(ex.phase==='active')ex.phase='waiting';delete ex.readyAt;h.together={group:ex.p.group!,phase:ex.phase,mobile:!!ex.mobile,pairedPolicy:ex.p.pairedPolicy,...(ex.until===undefined?{}:{until:ex.until})};if(ex.phase==='waiting'&&ex.until===undefined&&(ex.waited=(ex.waited??0)+1)>Math.round((ex.p.waitSeconds??30)/dt)){restorePaired(rt,ex);return {status:'failed',diagnostic:issue('pair-not-ready','The paired gesture could not settle in time.',[ex.p.actor])};}}
       ex.at = [...a.pose.p]; return { status: 'running', phase: 'settling' }; }
     if (ex.phase) ex.at = [...a.pose.p];   // a grouped pose carries on from wherever a courtesy step left the body
     if (a.pose.p.some((n, i) => Math.abs(n - ex.at[i]) > 1e-6)) { restore(rt, ex); return { status: 'failed', diagnostic: issue('moved', 'The body moved; the activity ended.', [ex.p.actor]) }; }
+    if(ex.p.game?.flightPolicy==='clear-v1'&&ex.p.group){const blocked=frisbeeLaneIssue(rt,ex.p.group,ex.p.actor);if(blocked){if(beginGameRelease(rt,ex,dt,blocked))return releaseGameStep(rt,ex,dt);restore(rt,ex);return {status:'failed',diagnostic:blocked};}}
     if (ex.phase) return together(rt, ex, a, h, dt);
     if (ex.yaw !== null && !held(rt, ex.p.actor)) a.pose.yaw = ex.yaw;  // a body on a native seat keeps the seat's facing
     h.activity = ex.p.activity;
@@ -186,7 +190,7 @@ export const poseV1: ActionDef<Params, true, Exec> = {
     if (ex.t + 1e-9 < ex.p.seconds) return { status: 'running', phase: 'posing' };
     return finish(rt, ex);
   },
-  cancel(rt, ex) { if(ex.p.pairedPolicy)restorePaired(rt,ex);else restore(rt, ex); return { ok: true }; },
+  cancel(rt, ex) { if(ex.gameRelease||beginGameRelease(rt,ex,DT))return {ok:true,deferred:true}; if(ex.p.pairedPolicy)restorePaired(rt,ex);else restore(rt, ex); return { ok: true }; },
   resumable: true,
 };
 
@@ -206,6 +210,20 @@ function accompanied(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['ent
   if (ex.heard && (ex.quiet ?? 0) >= MUSIC_ENDED - 1e-9) { const out = finish(rt, ex); return { ...out, outputs: { ...out.outputs, ended: 'music-stopped' } }; }
   if (!ex.heard && ex.t + 1e-9 >= ex.p.accompany!.grace) { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('no-music', 'Nothing is playing near the microphone to sing along with (a piano or drums), so the singing did not start.', [ex.p.actor]) }; }
   return null;
+}
+
+/** New frisbee policy: stop the flight immediately, lower the frozen arms before releasing reservations. */
+function beginGameRelease(rt:Runtime,ex:Exec,dt:number,diagnostic?:Diagnostic):boolean{
+ const h=rt.world.entities[ex.p.actor]?.human,g=h?.game;
+ if(ex.p.game?.flightPolicy!=='clear-v1'||!h||!g||g.waiting||g.throwTick===undefined)return false;
+ const frame=rt.tick-1,age=Math.max(0,(frame-(g.joinedAt??g.since??frame))*dt)/1.2,x=Math.min(1,age),from=x*x*(3-2*x);
+ ex.gameRelease={at:rt.tick,frame,from,...(diagnostic?{diagnostic}:{})};
+ h.game={...g,waiting:true,releaseTick:rt.tick,releaseFrameTick:frame,releaseFrom:from};delete h.together;
+ return true;
+}
+function releaseGameStep(rt:Runtime,ex:Exec,dt:number){
+ const r=ex.gameRelease!;if((rt.tick-r.at)*dt<1.2)return {status:'running' as const,phase:'lowering-hands'};
+ restore(rt,ex);return r.diagnostic?{status:'failed' as const,diagnostic:r.diagnostic}:{status:'completed' as const,outputs:{seconds:ex.p.seconds,group:ex.p.group}};
 }
 
 /** Completed: the hand item changes (hold/release), then the base posture returns. */
@@ -332,7 +350,9 @@ function pairedReadyV1(rt:Runtime,ex:Exec,a:NonNullable<Runtime['world']['entiti
 /** CN5: a choreographed game turn for this body (state is a pure function of the tick and the active players). */
 function playGame(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entities'][string]>, h: NonNullable<NonNullable<Runtime['world']['entities'][string]>['human']>, others: NonNullable<Runtime['world']['entities'][string]>[], dt: number) {
   const g = ex.p.game!, spec = GAMES[g.kind], tick = rt.tick, ticks = (s: number) => Math.max(1, Math.round(s / dt));
-  if (ex.yaw !== null && !held(rt, ex.p.actor)) a.pose.yaw = ex.yaw;
+  const clearFrisbee=g.kind==='frisbee'&&g.flightPolicy==='clear-v1';
+  if(clearFrisbee&&tick>=ex.until!&&beginGameRelease(rt,ex,dt))return releaseGameStep(rt,ex,dt);
+  if (!clearFrisbee && ex.yaw !== null && !held(rt, ex.p.actor)) a.pose.yaw = ex.yaw;
   h.activity = ex.p.activity; delete h.baseActivity;
   const playing = [a, ...others.filter((o) => o.human!.together?.phase === 'active' && o.human!.together.group === ex.p.group)];
   const roster = playing.map((e) => e.id).sort();
@@ -347,17 +367,19 @@ function playGame(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
   }
   const done = () => tick >= ex.until! ? finish(rt, ex) : { status: 'running' as const, phase: 'together' };
   if (new Set(players).size < 2) {
+    if(clearFrisbee&&beginGameRelease(rt,ex,dt))return releaseGameStep(rt,ex,dt);
     // nobody (left) to play with: wait up to 30 s for someone to join, then the game ends
-    h.game = { kind: g.kind, group: ex.p.group!, players: roster, waiting: true, ...(g.jack ? { jack: g.jack } : {}), ...(ex.wins ? { wins: ex.wins } : {}) };
+    h.game = { kind: g.kind, group: ex.p.group!, players: roster, ...(clearFrisbee?{flightPolicy:'clear-v1' as const}:{}), waiting: true, ...(g.jack ? { jack: g.jack } : {}), ...(ex.wins ? { wins: ex.wins } : {}) };
     if (h.holding) h.prop = h.holding; else delete h.prop;
     if ((ex.lonely = (ex.lonely ?? 0) + 1) > ticks(30)) return finish(rt, ex);
     return done();
   }
   ex.lonely = 0;
+  if(clearFrisbee)ex.joinedAt??=tick;
   // turns count from the game's start: the earliest start any player shows (a joiner takes the running game's)
   const since = Math.min(ex.since ?? tick, ...playing.map((o) => o.human!.game?.since ?? Infinity)); ex.since = since;
-  const P = ticks(spec.period), k = Math.floor((tick - since) / P), n = players.length, from = players[k % n], throwTick = since + k * P + ticks(spec.windup), landTick = throwTick + ticks(spec.flight);
-  const state: GameState = { kind: g.kind, group: ex.p.group!, players: roster, since, turn: k, from, throwTick, landTick };
+  const P = ticks(spec.period), k = Math.floor((tick - since) / P), n = players.length, from = players[k % n], throwTick = since + k * P + ticks(clearFrisbee?FRISBEE_CLEAR_WINDUP:spec.windup), landTick = throwTick + ticks(spec.flight);
+  const state: GameState = { kind: g.kind, group: ex.p.group!, players: roster, ...(clearFrisbee?{flightPolicy:'clear-v1' as const,joinedAt:ex.joinedAt}:{}), since, turn: k, from, throwTick, landTick };
   delete h.prop;
   if (g.kind === 'petanque' && g.jack) {
     // two boules each per end; each end's jack lies a little differently; the nearest boule wins the end
@@ -373,6 +395,7 @@ function playGame(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
   } else {
     const to = players[(k + 1) % n];
     state.to = to;
+    if(clearFrisbee){const target=rt.world.entities[ex.p.actor===from?to:ex.p.actor===to&&tick>=landTick?players[(k+2)%n]:from];if(target&&target.id!==ex.p.actor){const want=heading([target.pose.p[0]-a.pose.p[0],target.pose.p[2]-a.pose.p[2]]);a.pose.yaw=wrapAngle(a.pose.yaw+clamp(angleDelta(a.pose.yaw,want),-Math.PI*dt,Math.PI*dt));}}
     // the frisbee is in the thrower's hand until it flies, then in the catcher's
     if (g.kind === 'frisbee' && ((tick < throwTick && from === ex.p.actor) || (tick >= landTick && to === ex.p.actor))) h.prop = 'frisbee';
   }
