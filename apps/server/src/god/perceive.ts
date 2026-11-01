@@ -17,7 +17,7 @@ import { paintingLine } from '../art/art.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { readOnlyObjectAdvance, refreshOnlyObjectAdvance } from '../edge/comms/objects/framework.ts';
-import type { NearFilter } from '../edge/comms/objects/framework.ts';
+import type { NearFilter, Objects } from '../edge/comms/objects/framework.ts';
 import { canonicalJson, stateDigest } from '../edge/comms/objects/table.ts';
 import { actionsOf, actuatedState, keptShut, kindActions, wrapAct, type Thing } from './actuators.ts';
 import { heldGodThing } from './held.ts';
@@ -456,10 +456,10 @@ export class GodPerceive {
 
   /** Unreachable built-object actuators do not belong in discovery. Keep direct admission's
    * honest refusal and nearby state/permission refusals; do not affect other object kinds. */
-  private wrapCapabilities(o: { capabilities(soul: EdgeSoul): EdgeCapability[]; __godCaps?: boolean }) {
+  private wrapCapabilities(o: Pick<Objects, 'capabilities'> & { __godCaps?: boolean }) {
     if (o.__godCaps) return; o.__godCaps = true;
     const original = o.capabilities.bind(o);
-    o.capabilities = soul => original(soul).filter(cap =>
+    o.capabilities = (...args) => original(...args).filter(cap =>
       !(cap.object && this.desired.has(cap.object) && cap.blocked?.code === 'object.out-of-reach'));
   }
 
