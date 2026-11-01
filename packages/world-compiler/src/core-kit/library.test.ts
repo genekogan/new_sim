@@ -7,6 +7,10 @@ import assert from 'node:assert/strict';
 import { kitArgs, kitPhysics } from '@sim/generators';
 import { CORE_KIT, WorldModel, applyBatch, defSchema, type Refused } from '../index.ts';
 import { FAMILY_KITS } from './index.ts';
+import { readFileSync } from 'node:fs';
+
+// Over-budget kit defs held on purpose, with the measured count and the reason (budget-holds.json, next to this test).
+const HOLDS = JSON.parse(readFileSync(new URL('./budget-holds.json', import.meta.url), 'utf8')).holds as Record<string, { tris: number; why: string }>;
 
 const kit = FAMILY_KITS.filter((d) => d.make.kind === 'gen' && d.make.gen === 'kit/2');
 
@@ -21,8 +25,13 @@ test('family defs parse, are unique, described, tagged, and within the Eden budg
     const tris = kitPhysics(kitArgs.parse((def.make as { args: unknown }).args)).tris;
     // VOCAB-MECH: catalogue types are budgeted by their category (vocab.triBudget)
     const budget = def.category ? triBudget(def.category) : def.tags.includes('creature') ? 600 : def.tags.includes('structure') || def.tags.includes('ride') || def.tags.includes('large') ? 6000 : def.tags.includes('vehicle') ? 1200 : 400;
-    assert.ok(tris <= budget, `${def.name}: ${tris} tris > ${budget}`);
+    const hold = HOLDS[identity];
+    if (hold) {
+      assert.ok(tris > budget, `${identity}: held but within budget (${tris} <= ${budget}); remove its hold`);
+      assert.ok(tris <= hold.tris, `${identity}: ${tris} tris > its recorded hold ${hold.tris}`);
+    } else assert.ok(tris <= budget, `${def.name}: ${tris} tris > ${budget} (fix it, or hold it in budget-holds.json with a reason)`);
   }
+  for (const identity of Object.keys(HOLDS)) assert.ok(identities.has(identity), `${identity}: held but not a kit def; remove its hold`);
   assert.ok(kit.length >= 19, `only ${kit.length} kit defs`);
 });
 

@@ -10,6 +10,8 @@
 import { CATALOG, fireRingRadius, type AssetDef, type SlotDef } from '../../../mars/viewer/engine/world/catalog.ts';
 import type { SurfaceSlotDef } from '../../../mars/viewer/engine/world/catalog-items.ts';
 import { createHash } from 'node:crypto';
+/** Soul Actions 34: a handle-held item (a watering can) is carried with the arm down at the side, clear of the leg. */
+export const HANG_CARRY = { fwd: 0.05, side: 0.3, up: 0.8, reachSeconds: 0.8 };
 
 /** What the adapter reads of a resolved def (a subset of world-compiler's StoredDef + the baked box/slots). */
 export type DefFacts = {
@@ -30,7 +32,8 @@ export type DefFacts = {
 
 /** Components that make a def an engine fixture or item (everything else becomes plain solids/floors/links). */
 export const FIXTURE_COMPONENTS = ['seat', 'bed', 'surface', 'container', 'carryable', 'readable', 'workstation', 'instrument', 'boardGame', 'display'] as const;
-export const isFixtureDef = (d: Pick<DefFacts, 'components'> & Partial<Pick<DefFacts, 'tags' | 'name' | 'ref'>>) => FIXTURE_COMPONENTS.some((k) => !!d.components[k]) || isFireCircleDef(d);
+// Soul Actions 34: a def with a `hang` slot (a can hook) is a fixture things hang on
+export const isFixtureDef = (d: Pick<DefFacts, 'components'> & Partial<Pick<DefFacts, 'tags' | 'name' | 'ref' | 'slots'>>) => FIXTURE_COMPONENTS.some((k) => !!d.components[k]) || isFireCircleDef(d) || !!d.slots?.some((s) => s.kind === 'hang');
 /** A small one-hand item the engine's items verbs (take_item / put_item) can carry. */
 export const isCarryableDef = (d: Pick<DefFacts, 'components'>) => !!d.components.carryable;
 
@@ -116,20 +119,28 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   const [w, h, dd] = d.box;
   const label = (d.description?.replace(/\.$/, '') || d.name.replace(/^core-/, '')).slice(0, 80);
   const color = d.palette ? Object.values(d.palette)[0] : undefined;
+  const upright=!!c.carryable&&d.tags.includes('upright-carry')&&(c.carryable.grips??1)>=2;
   const out: AssetDef = {
-    id, label, category: c.carryable && !o.seen ? 'item' : 'fixture', size: [r4(w), r4(h), r4(dd)],
+    id, label, category: c.carryable && !upright && !o.seen ? 'item' : 'fixture', size: [r4(w), r4(h), r4(dd)],
     massKg: typeof c.carryable?.mass === 'number' ? c.carryable.mass : Math.max(1, Math.round(w * h * dd * 40)),
     ...(color ? { color } : {}),
     dims: { confidence: 'hypothetical', note: `derived from entity-world def ${d.ref} (${d.hash.slice(0, 12)}) by the L9 catalog adapter` },
   };
   if (o.seen) return out;
-  if (c.carryable) {
+  if (upright) {
+    const crew=Math.ceil(c.carryable.grips/2),span=Math.min(.6,w*.8);
+    out.obstacle=true;
+    out.capabilities={fixtureCarry:{upright:true,handling:{carryCrew:[crew,crew],carryPose:'edge',carryHeight:.95,hands:2,grips:{[crew]:Array.from({length:crew},(_,i)=>({id:`grip-${i}`,local:[crew===1?0:(i===0?-w*.25:w*.25),h*.5,i%2===0?dd/2:-dd/2] as [number,number,number],span:[span,0,0] as [number,number,number]}))}}}};
+  } else if (c.carryable) {
     // one hand, palm under the base (catalog-items.ts hand1): the engine's take_item / put_item / serve verbs
     out.handling = { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'hand', local: [0, 0, 0] }] }, carryHeight: 0.95, hands: 1, small: true };
+    // Soul Actions 34: a def with a `carry` slot (a watering can's handle) is held there and hangs from the hand at the side
+    const handle = d.slots.find((s) => s.kind === 'carry');
+    if (handle) out.handling = { ...out.handling, grips: { 1: [{ id: 'handle', local: [r4(handle.p[0]), r4(handle.p[1]), r4(handle.p[2])] }] }, carryHeight: HANG_CARRY.up, hangCarry: HANG_CARRY };
   // B6: a fire's box spans its logs; its stone ring and logs are the entity's own solids, so the box is no obstacle
   // (people stand inside it, round the fire)
   } else if (!isFloatingDef(d) && !isFireCircleDef(d)) out.obstacle = true;
-  const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw), approachPolicy: 'reachable/1' }));
+  const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw), approachPolicy: 'reachable/1', ...(d.tags.includes('front-seat') ? {height:r4(s.height ?? s.p[1])} : {}) }));
   const stands: SlotDef[] = d.slots.filter((s) => s.kind === 'stand').map((s) => ({ id: s.id, kind: 'stand' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw) }));
   // B6: the stone ring is the def's description's size when it says so ("a ring of stones (1.6 m)"), else 1 m
   const ring = Number(/ring of stones \((\d+(?:\.\d+)?) m\)/.exec(d.description ?? '')?.[1] ?? 1);
@@ -137,14 +148,23 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   const berths = berthSlots(d);
   if (seats.length || stands.length || fire.length || berths.length) out.slots = [...seats, ...stands, ...fire, ...berths];
   if (seats.length && crossSeated(d)) out.seatApproach = 'slot';
-  const tops = d.slots.filter((s) => s.kind === 'surface' || s.kind === 'shelf');
+  if (seats.length && d.tags.includes('front-seat')) out.seatApproach = 'front-arc';
+  // Soul Actions entry 42: a hand-operated container's shelf slots are places inside it, one thing each at the slot itself
+  const inside = (c.container as { inside?: { lip: number; face: number; stand: [number, number]; fit: [number, number, number] } } | undefined)?.inside && d.tags.includes('hand-operated') ? (c.container as { inside: { lip: number; face: number; stand: [number, number]; fit: [number, number, number] } }).inside : undefined;
+  const tops = d.slots.filter((s) => s.kind === 'surface' || (s.kind === 'shelf' && !inside));
+  // Soul Actions 34: a hook's `hang` slots are single places, exactly where the def puts them (a can's base when it hangs)
+  const hangs: SurfaceSlotDef[] = d.slots.filter((s) => s.kind === 'hang').map((s) => ({ id: s.id, local: [r4(s.p[0]), r4(s.p[1]), r4(s.p[2])], hang: true }));
   if (tops.length) out.surfaceSlots = tops.flatMap((s) => surfaceLattice(s.id, tops.length === 1 ? w : Math.min(w, 1.2), tops.length === 1 ? dd : Math.min(dd, 0.8), s.height ?? s.p[1] ?? c.surface?.height ?? h, tops.length === 1 ? 0 : s.p[0], tops.length === 1 ? 0 : s.p[2]));
   else if (c.surface) out.surfaceSlots = surfaceLattice('top', w, dd, c.surface.height ?? h);
+  if (hangs.length) out.surfaceSlots = [...(out.surfaceSlots ?? []), ...hangs];
+  const stored = inside ? d.slots.filter((s) => s.kind === 'shelf') : [];
+  if (stored.length) out.surfaceSlots = [...(out.surfaceSlots ?? []), ...stored.map((s) => ({ id: s.id, local: [r4(s.p[0]), r4(s.p[1]), r4(s.p[2])] as [number, number, number], inside: { lip: r4(inside!.lip), face: r4(inside!.face), stand: [r4(inside!.stand[0]), r4(inside!.stand[1])] as [number, number], fit: inside!.fit.map(r4) as [number, number, number] } }))];
   const caps: NonNullable<AssetDef['capabilities']> = {};
+  if (c.carryable && d.tags.includes('recorded-item')) caps.recordedItemPoseV1 = true;
   if (c.readable) caps.readable = { pages: Math.max(1, Math.round(c.readable.pages ?? 4)), maxSeatDistance: 0.65 };
   if (c.display) caps.display = { accepts: 'text', maxChars: 280 };
   if (c.boardGame?.game === 'chess') caps.boardGame = 'chess';
-  if (Object.keys(caps).length) out.capabilities = caps;
+  if (Object.keys(caps).length) out.capabilities = {...out.capabilities,...caps};
   return out;
 }
 

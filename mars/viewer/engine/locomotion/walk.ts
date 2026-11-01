@@ -25,6 +25,7 @@ import { smoothPolyline, type PathSeg } from './spline.ts';
 import { type AgentProfile, MAX_LEVEL_ID } from '../spatial/types.ts';
 import { gapToSleep, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 import { G_WADE } from '../spatial/ground.ts';
+import { followHand, handPartnerOf } from '../social/hand-hold.ts';
 
 const ACCEL = 1.2; // m/s²
 const BRAKE = 2 * ACCEL; // m/s² ordinary deceleration
@@ -197,7 +198,9 @@ const spatial = bodySpatial;
 let stepScope: { entities: Entity[]; discs?: LoadDiscView[] } | null = null;
 /** Pure-performance switches (PLANNING_BUDGET.md §6). Each leaves every result bit-identical; tests turn them off to prove it. */
 export const WALK_PERF = { stepSnapshot: true, lazyLinkDiagnostics: true };
-const entitiesOf = (rt: Runtime): Entity[] => stepScope?.entities ?? entityList(rt);
+/** Entry 35: while a walker steps, the body it walks hand in hand with is beside it by design, not in its way. */
+let handPartner: string | null = null;
+const entitiesOf = (rt: Runtime): Entity[] => stepScope?.entities ?? (handPartner ? entityList(rt).filter((e) => e.id !== handPartner) : entityList(rt));
 /** `Object.values(world.entities)`, same order (both follow OrdinaryOwnPropertyKeys), ~4× cheaper on a dictionary-mode map. */
 function entityList(rt: Runtime): Entity[] {
   const ents = rt.world.entities;
@@ -276,13 +279,14 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
   step(rt, ex, dt) {
     const h = rt.world.entities[ex.actor];
     const x0 = h.pose.p[0], z0 = h.pose.p[2];
-    const outer = stepScope;
-    stepScope = WALK_PERF.stepSnapshot ? { entities: entityList(rt) } : null;
+    const outer = stepScope, outerPartner = handPartner;
+    handPartner = h.human?.handHold ? handPartnerOf(rt, h) : null;
+    stepScope = WALK_PERF.stepSnapshot ? { entities: handPartner ? entityList(rt).filter((e) => e.id !== handPartner) : entityList(rt) } : null;
     let r: StepResult;
     try {
       r = stepWalk(rt, ex, dt);
     } finally {
-      stepScope = outer;
+      stepScope = outer; handPartner = outerPartner;
     }
     r = watchdog(rt, ex, h, r);
     if (r.status === 'completed' || r.status === 'failed') {
@@ -290,6 +294,8 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
       delete h.human!.speed;
     } else h.human!.speed = Math.round((dist2([x0, z0], [h.pose.p[0], h.pose.p[2]]) / dt) * 1000) / 1000;
     if (h.body?.family==='floater' && (h.human!.speed??0)>=WALK_MIN && ['wait','idle'].includes(h.human!.activity)) h.human!.activity='walk';
+    // entry 35: the partner whose hand this walker holds walks beside it, this same tick
+    if (h.human?.handHold) followHand(rt, h, dt);
     return r;
   },
   recoverWait(rt, ex, mover) {

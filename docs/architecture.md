@@ -10,7 +10,7 @@ contracts and hot paths and draws one tick, one Soul action and one god edit end
 [API](architecture/api.md) · [protocol](architecture/protocol.md) ·
 [engine contract](architecture/engine-contract.md) · [data](architecture/data.md) · [worlds](architecture/worlds.md) ·
 [Souls](architecture/souls.md) · [god mode](architecture/godmode.md) · [brain and budget](architecture/brain.md) ·
-[contracts](architecture/contracts.md) · [load](architecture/load.md) · [read-path split](architecture/split.md) · [safety](architecture/safety.md) · [glossary](glossary.md).
+[contracts](architecture/contracts.md) · [load](architecture/load.md) · [read-path split](architecture/split.md) · [Soul Actions](architecture/soul-actions.md) · [safety](architecture/safety.md) · [glossary](glossary.md).
 
 ## Components
 

@@ -101,9 +101,11 @@ test('ordinary observer here carries current completed painting credit, with exi
   await tick(45);
   const crowded = await here(ana);
   assert.equal(crowded.objects.length, 6, 'painting does not expand the six-object budget');
-  assert.equal(crowded.objects.filter(o => o.kind === 'easel').length, 2, 'same-kind budget remains two');
+  // (Soul Actions: built object kinds carry the def revision past v1, e.g. `easel-v2`, so a frozen v1 never gets v2 actions)
+  const easelKind = (k?: string) => k === 'easel' || /^easel-v\d+$/.test(k ?? '');
+  assert.equal(crowded.objects.filter(o => easelKind(o.kind)).length, 2, 'same-kind budget remains two');
   assert.ok(!crowded.objects.some(o => o.id === target), 'a painted easel gets no priority over nearer easels');
-  assert.ok((crowded.more?.easel ?? 0) >= 1, 'omitted painted easel remains counted');
+  assert.ok(Object.entries(crowded.more ?? {}).some(([k, n]) => easelKind(k) && n >= 1), 'omitted painted easel remains counted');
   assert.equal(god.act({ops:['closer-canvas-one', 'closer-canvas-two', 'near-sign-4', 'near-sign-5', 'near-sign-6']
     .map(name => ({op:'remove' as const, id:god.model.get(name)!.id}))}).accepted, true);
   await tick(45);

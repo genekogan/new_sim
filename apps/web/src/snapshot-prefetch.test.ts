@@ -215,3 +215,14 @@ test('entry socket: an #approve link opens no world socket (a full boot opens it
   runEntryWithSocket(loc.pathname, anonymousHello(true), { location: { ...loc, hash: '#soul/s_1' } });
   assert.equal(FakeWS.made.length, 1);
 });
+
+
+test('renamed Eden uses its inline runtime kind for prefetch, while legacy Eden stays unchanged', () => {
+  for (const worldEngine of [true, false]) {
+    const calls: unknown[][] = [];
+    const ctx: Record<string, unknown> = { location: { pathname: '/w/eden/' }, __simConfig: { worldEngine }, fetch: (...a: unknown[]) => { calls.push(a); return Promise.resolve(new Response('{}')); } };
+    ctx.window = ctx; vm.runInNewContext(entryPrefetchScript(''), ctx);
+    assert.equal(calls.length, worldEngine ? 2 : 0);
+    if (worldEngine) assert.equal(calls[0]![0], '/w/eden/v1/world/snapshot?defs=ref&cols=1');
+  }
+});

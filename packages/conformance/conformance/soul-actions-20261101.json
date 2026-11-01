@@ -1,0 +1,367 @@
+{
+  "schema": "catalog-conformance-supplement/1",
+  "note": "2026-11-01 public cutover, Soul Actions 1-44 landing (tranche/soul-actions/landing-1-44 merged after the main sync). Defs the tranche added or revised exceed a gallery triangle or draw budget at K=2: triangles for core-bell@2, core-cup@2, core-drawer-chest@1/@2, core-drinks-fridge@2, core-drum-kit@1, core-kettle@2, core-mic-stand@1 and core-watering-can@2; draws for core-bell@2, core-door@2/@3, core-drinks-fridge@2, core-lockers@2/@3, core-string-lights@2 and core-window@2. Their moving parts (clapper and pull, lid and spout, drawers, door leaf and handle, cymbals and stands, boom and clip, can body and rose, bulbs on a string, fridge door) are separate shapes so the hand contact animates them, which is where the overrun comes from. Lighter meshes are deferred to the Soul Actions follow-ups (F1-F6 are out of this landing's scope); the 127 findings are pinned to the exact revision hashes so the gate stays exact. No budgets, samples or gap checks were relaxed; the rendering-gap list is unchanged (416 gaps, equal to known-20261015.json).",
+  "findings": [
+    {
+      "def": "core-bell@2",
+      "hash": "9395ab75b3079108d2588ef682ed39db0e9f3c0f3616b2ae2a5c180c50b059af",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "470 > 400",
+      "fields": [
+        "defaults",
+        "params.sx.min",
+        "params.sx.max",
+        "params.sy.min",
+        "params.sy.max",
+        "params.sz.min",
+        "params.sz.max",
+        "params.vary.min",
+        "params.vary.max",
+        "params.condition=new",
+        "params.condition=worn",
+        "params.condition=damaged",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-bell@2",
+      "hash": "9395ab75b3079108d2588ef682ed39db0e9f3c0f3616b2ae2a5c180c50b059af",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "614 > 400",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-bell@2",
+      "hash": "9395ab75b3079108d2588ef682ed39db0e9f3c0f3616b2ae2a5c180c50b059af",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "10 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-cup@2",
+      "hash": "ec44321d9fd67b144ba871ed384913393a3172ba5323f75a7475bcb58ee01581",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "1084 > 400",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-cup@2",
+      "hash": "ec44321d9fd67b144ba871ed384913393a3172ba5323f75a7475bcb58ee01581",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "508 > 400",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-door@2",
+      "hash": "d7c481d04d205b3f8e452937b1175d78577e416d8f93abf689fe3fd0171e9f20",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "10 > 4",
+      "fields": [
+        "params.condition=construction",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-door@3",
+      "hash": "69dd2382e7210165ccba842591d75e1b4ffd019fca9b29bc770f9b88eeeafd97",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "5 > 4",
+      "fields": [
+        "defaults",
+        "params.sx.min",
+        "params.sx.max",
+        "params.sy.min",
+        "params.sy.max",
+        "params.sz.min",
+        "params.sz.max",
+        "params.vary.min",
+        "params.vary.max",
+        "params.condition=new",
+        "params.condition=worn",
+        "params.condition=damaged",
+        "params.variant=panel",
+        "params.variant=glazed",
+        "params.variant=plank",
+        "size.scale.min",
+        "size.scale.max",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-door@3",
+      "hash": "69dd2382e7210165ccba842591d75e1b4ffd019fca9b29bc770f9b88eeeafd97",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "13 > 4",
+      "fields": [
+        "params.condition=construction",
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-drawer-chest@1",
+      "hash": "ce89536f7a5f9ac7b6752127fa9e5bc2cc0b0584811a8f51a2997081c92d3c69",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "628 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-drawer-chest@1",
+      "hash": "ce89536f7a5f9ac7b6752127fa9e5bc2cc0b0584811a8f51a2997081c92d3c69",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "628 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-drawer-chest@2",
+      "hash": "49445cc0095472bee4f8500860d9086427b164de2600bf0168871bbe6b2c80fe",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "628 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-drawer-chest@2",
+      "hash": "49445cc0095472bee4f8500860d9086427b164de2600bf0168871bbe6b2c80fe",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "628 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-drinks-fridge@2",
+      "hash": "48e353e1a2ad430829de870d1f318584a04955c1fff659eea3961da5a599dfdd",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "620 > 600",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-drinks-fridge@2",
+      "hash": "48e353e1a2ad430829de870d1f318584a04955c1fff659eea3961da5a599dfdd",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "11 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-drum-kit@1",
+      "hash": "a25e397d0638b0fa83f2c88b2118c310212e469c2a7b60afd32047c1c936cac9",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "872 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-drum-kit@1",
+      "hash": "a25e397d0638b0fa83f2c88b2118c310212e469c2a7b60afd32047c1c936cac9",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "872 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-kettle@2",
+      "hash": "82d7f1086f226ea499aef84e04b6e5bdf929794f878307591549b0d8b69b8fc2",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "700 > 400",
+      "fields": [
+        "defaults",
+        "params.litres.min",
+        "params.litres.max",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-kettle@2",
+      "hash": "82d7f1086f226ea499aef84e04b6e5bdf929794f878307591549b0d8b69b8fc2",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "1044 > 400",
+      "fields": [
+        "defaults",
+        "params.litres.min",
+        "params.litres.max",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-lockers@2",
+      "hash": "398d3cf3e122459f8d6951d850751bf732dfb50b31c4f6779332faf7794aba81",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "10 > 4",
+      "fields": [
+        "params.condition=construction",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-lockers@3",
+      "hash": "a6e4e98f7e0345e160d711b3ad02ae07ac4366eef1d58caec71104ee330f3414",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "10 > 4",
+      "fields": [
+        "params.condition=construction",
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-mic-stand@1",
+      "hash": "18954708da97614dc55ebfb7969c00b148f0f40f33ef5439415439b10b8d7a07",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "668 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-mic-stand@1",
+      "hash": "18954708da97614dc55ebfb7969c00b148f0f40f33ef5439415439b10b8d7a07",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "668 > 600",
+      "fields": [
+        "defaults",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-string-lights@2",
+      "hash": "45055ba32bde0e87b0f93436a11529bec78e2cc42682d8d3a6a236462a7d5f9d",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "15 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-watering-can@2",
+      "hash": "2426bac0db20d021348b3af6050951eb63c46f4bb504ab8a3409d75e4a8e7ada",
+      "stage": "budget",
+      "code": "triangles",
+      "detail": "788 > 400",
+      "fields": [
+        "defaults",
+        "params.litres.min",
+        "params.litres.max",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-watering-can@2",
+      "hash": "2426bac0db20d021348b3af6050951eb63c46f4bb504ab8a3409d75e4a8e7ada",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "1272 > 400",
+      "fields": [
+        "defaults",
+        "params.litres.min",
+        "params.litres.max",
+        "size.scale.min",
+        "size.scale.max",
+        "random[0]",
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-window@2",
+      "hash": "9415044c2bca4b923e7c39a214f55a328b5e107fbe628cfee866c4927a89f634",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "10 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    }
+  ]
+}

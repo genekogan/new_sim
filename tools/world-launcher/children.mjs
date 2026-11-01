@@ -7,7 +7,7 @@ import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
-import { SLUG_RE } from './registry.mjs';
+import { SLUG_RE, worldIdOf } from './registry.mjs';
 import { GUARD, bootMark, jitterMs, liveWedge, readLive } from './guard.mjs';
 const STRIP_HOOK = 'apps/server/src/strip-cache.mjs'; // lane BOOT2 (defaultCommand)
 
@@ -624,7 +624,7 @@ export function defaultCommand(world, port, o) {
     PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, LANG: process.env.LANG,
     // fake minds and no model keys: $0 model spend, always
     ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '', BRAIN_MODE: 'fake',
-    WORLD_KEY: world.slug, WORLD_ID: `${world.slug}-1`, WORLD_NAME: world.name ?? '', ENGINE: 'mars', PORT: String(port), HOST: '127.0.0.1',
+    WORLD_KEY: world.worldKey ?? world.slug, WORLD_ID: worldIdOf(world), WORLD_SLUG: world.slug, WORLD_NAME: world.name ?? '', ENGINE: 'mars', PORT: String(port), HOST: '127.0.0.1',
     DEV_AUTH: clerk ? '0' : '1', SEED_NATIVES: '0', DATA_DIR: world.dataDir, PUBLIC_URL: o.publicOrigin, ENABLE_WORLD_ENGINE: '1',
     WORLD_PATH: `/w/${world.slug}`,
     // The launcher verifies signed-in creators before genesis, then confirms the same principal by claiming.

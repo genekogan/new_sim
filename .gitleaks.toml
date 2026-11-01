@@ -1,7 +1,7 @@
 # gitleaks config for this repository (gitleaks >= 8.25; tested with 8.30.1). Run in CI by .github/workflows/security.yml.
 # Default rules stay on. Custom rules add Sim-issued token shapes and whole-file classes that must never
 # be committed. Allowlists cover only the fixtures the 2026-10-31 audit classified as obviously fake.
-title = "new_sim"
+title = "souls"
 
 [extend]
 useDefault = true
