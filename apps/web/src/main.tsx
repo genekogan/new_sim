@@ -12,6 +12,7 @@ import { createRoot } from 'react-dom/client';
 const PrivyAuth=lazy(()=>import('./PrivyAuth.tsx'));
 import { Shell, type AuthCtx } from './Shell.tsx';
 import './styles.css';
+import type { ClerkSatellite } from './clerk-satellite.ts';
 import {clerkNow,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
 // New worlds (world launcher, world engine): the launcher homepage and its sign-in. Old worlds never reach these.
 // P1 phones: the homepage (LauncherHome) and Clerk are lazy chunks, off a world page's critical path; a world's Clerk
@@ -36,7 +37,7 @@ if(!newWorld)assetBytes.expect(forkInitialAssets((initialAssets as {worlds?:Reco
 declare const __SIM_ARRIVAL_ENABLED__: boolean;
 const arrivalEnabled=typeof __SIM_ARRIVAL_ENABLED__!=='undefined'&&__SIM_ARRIVAL_ENABLED__===true;
 
-type Cfg = { authenticationOrigin?:string; authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
+type Cfg = { clerkSatellite?:ClerkSatellite; authenticationOrigin?:string; authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
 
 
 /** A Clerk world page: the Shell renders at once; ClerkBridge (its own chunk, with clerk-js and Clerk's API calls behind
@@ -55,7 +56,7 @@ function ClerkWorld({cfg,publishableKey}:{cfg:Cfg;publishableKey:string}){
  const takePendingLogin=useCallback(()=>{const p=pending.current;pending.current=false;return p;},[]);
  return <>
   <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled}/>
-  {load&&<Suspense fallback={null}><ClerkBridge publishableKey={publishableKey} issuer={cfg.clerkIssuer} onAuth={setAuth} takePendingLogin={takePendingLogin}/></Suspense>}
+  {load&&<Suspense fallback={null}><ClerkBridge satellite={cfg.clerkSatellite} publishableKey={publishableKey} issuer={cfg.clerkIssuer} onAuth={setAuth} takePendingLogin={takePendingLogin}/></Suspense>}
  </>;
 }
 

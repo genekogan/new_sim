@@ -42,6 +42,8 @@ export const config = {
   authProvider: (env.AUTH_PROVIDER ?? 'privy') as 'clerk'|'privy'|'none',
   clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY ?? '',
   clerkIssuer: env.CLERK_ISSUER_URL ?? '',
+  clerkSatelliteDomain: env.CLERK_SATELLITE_DOMAIN ?? '',
+  clerkSignInUrl: env.CLERK_SIGN_IN_URL ?? '',
   clerkAuthorizedParties: (env.CLERK_AUTHORIZED_PARTIES ?? '').split(',').map(s=>s.trim()).filter(Boolean),
   accountRegistryPath: env.ACCOUNT_REGISTRY_PATH ?? '',
   privyAppId: env.PRIVY_APP_ID ?? '',

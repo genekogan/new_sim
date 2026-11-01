@@ -78,6 +78,7 @@
 // and takes them over one at a time (handover below), so the port never closes and no world has two writers.
 //
 // Local only: binds 127.0.0.1, edge minds (owners' agents think; the world pays for none), no credentials, no tunnels.
+import { satelliteSettings, primarySignInPage } from './clerk-satellite.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Agent, createServer, request } from 'node:http';
@@ -161,7 +162,7 @@ const direct = (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', 
 /**
  * @param {{ port?: number, dataDir?: string, range?: [number, number], root?: string, webDir?: string,
  *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, sleepMs?: number, exitMs?: number, exitForks?: boolean, command?: Function, log?: (s: string) => void,
- *           publicOrigin?: string, devAuth?: boolean, authEnvFile?: string, maxWorlds?: number, maxRunning?: number,
+ *           publicOrigin?: string, devAuth?: boolean, authEnvFile?: string, clerkSatellite?: string, clerkSignInUrl?: string, maxWorlds?: number, maxRunning?: number,
  *           minFreeMb?: number, worldHeapMb?: number, createLimit?: number, base?: string,
  *           soulCli?: string, soulSkill?: string, soulInstructions?: string, maxWorldsPerAccount?: number,
  *           newAccountHours?: number, newAccountWorldLimit?: number, newAccountCreateLimit?: number, newAccountWindowMinutes?: number }} cfg
@@ -188,7 +189,7 @@ export async function openLauncher(cfg = {}) {
   const publicOrigin = (cfg.publicOrigin ?? origin).replace(/\/$/, '');
   const authEnvFile = cfg.authEnvFile ?? process.env.SIM_AUTH_ENV_FILE;
   const prod = { ...productionSettings({ ...cfg, authEnvFile, range }, origin), build: BUILD };
-  const auth = clerkAuth(authEnvFile, dataDir, publicOrigin);
+  const auth = clerkAuth(authEnvFile, dataDir, publicOrigin, cfg);
   const MAX_WORLDS = prod.maxWorlds;
   const behindProxy = publicOrigin !== origin;
   const B = prod.base, wp = (slug) => `${B}/w/${slug}`;
@@ -768,6 +769,12 @@ export async function openLauncher(cfg = {}) {
         if (p) { proxyHttp(req, res, p); return; }
         json(res, 404, { ok: false, code: 'not-found', message: `this server answers under ${B}/` }); return;
       }
+      // Independently proxyable primary sign-in route; never derives trusted settings from request headers.
+      if (path === '/__sim/clerk-sign-in' && (req.method === 'GET' || req.method === 'HEAD')) {
+        const page = primarySignInPage(auth?.public, url.search);
+        if (!page) { json(res, 400, { ok: false, code: 'invalid-sign-in' }); return; }
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex', 'x-frame-options': 'DENY', 'content-security-policy': page.csp }).end(req.method === 'HEAD' ? undefined : page.html); return;
+      }
       if (path === '/__sim/client-errors') {
         // lane ERR: a page's error beacon (anyone; body-capped, per-address and site-wide limits) and the operator's summary
         if (req.method === 'POST') {
@@ -1130,18 +1137,21 @@ export async function openLauncher(cfg = {}) {
 
 /**
  * Clerk mode from an env file, used by path only: a one-shot `node --env-file` child hands back just the public
- * settings (publishable key, issuer) for the homepage. Nothing else in the file is read here or logged.
+ * settings (publishable key, issuer, authorized origins) for validation and the homepage. Nothing else in the file is read here or logged.
  */
-export function clerkAuth(envFile, dataDir, publicOrigin) {
-  if (!envFile) return null;
+export function clerkAuth(envFile, dataDir, publicOrigin, cfg = {}) {
+  const satellite = satelliteSettings(cfg.clerkSatellite, cfg.clerkSignInUrl, publicOrigin);
+  if (!envFile) { if (satellite) throw new Error('launcher: Clerk satellite requires --auth-env'); return null; }
   const file = resolve(envFile);
   if (!existsSync(file)) throw new Error(`launcher: --auth-env file not found: ${file}`);
-  const out = execFileSync(process.execPath, [`--env-file=${file}`, '-e', 'process.stdout.write(JSON.stringify({k:process.env.CLERK_PUBLISHABLE_KEY??"",i:process.env.CLERK_ISSUER_URL??""}))'], { encoding: 'utf8', env: { PATH: process.env.PATH }, timeout: 10_000 });
-  const { k, i } = JSON.parse(out);
-  if (!/^pk_(live|test)_[A-Za-z0-9+/=_-]+$/.test(k) || !/^https:\/\/[^/]+$/.test(i)) throw new Error('launcher: the --auth-env file must set CLERK_PUBLISHABLE_KEY and CLERK_ISSUER_URL (https origin)');
+  const out = execFileSync(process.execPath, [`--env-file=${file}`, '-e', 'process.stdout.write(JSON.stringify({k:process.env.CLERK_PUBLISHABLE_KEY??"",i:process.env.CLERK_ISSUER_URL??"",a:process.env.CLERK_AUTHORIZED_PARTIES??""}))'], { encoding: 'utf8', env: { PATH: process.env.PATH }, timeout: 10_000 });
+  const { k, i, a } = JSON.parse(out);
+  if (satellite && ![publicOrigin, new URL(satellite.signInUrl).origin].every(origin => a.split(',').map(s => s.trim()).includes(origin))) throw new Error('launcher: CLERK_AUTHORIZED_PARTIES must include the satellite and primary sign-in origins');
+  let issuer; try { issuer = new URL(i); } catch {}
+  if (!/^pk_(live|test)_[A-Za-z0-9+/=_-]+$/.test(k) || issuer?.protocol !== 'https:' || issuer.origin !== i || issuer.username || issuer.password || !/^[a-z0-9.-]+$/.test(issuer.hostname)) throw new Error('launcher: the --auth-env file must set CLERK_PUBLISHABLE_KEY and CLERK_ISSUER_URL (https origin)');
   return {
-    child: { envFile: file, registryPath: join(resolve(dataDir), 'accounts.sqlite') },
-    public: { provider: 'clerk', clerkPublishableKey: k, clerkIssuer: i, authenticationOrigin: publicOrigin },
+    child: { envFile: file, registryPath: join(resolve(dataDir), 'accounts.sqlite'), ...(satellite ? { satellite } : {}) },
+    public: { provider: 'clerk', clerkPublishableKey: k, clerkIssuer: i, authenticationOrigin: publicOrigin, ...(satellite ? { clerkSatellite: satellite } : {}) },
   };
 }
 
@@ -1182,7 +1192,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const num = (k) => (flag(k) === undefined ? undefined : Number(flag(k)));
     const l = await openLauncher({ port: num('port'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: num('eager'),
-      publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
+      publicOrigin: flag('public-origin'), clerkSatellite: flag('clerk-satellite'), clerkSignInUrl: flag('clerk-sign-in-url'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
       maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), sleepMs: num('sleep-ms'), exitMs: flag('idle-exit-min') === undefined ? undefined : num('idle-exit-min') * 60_000, createLimit: num('create-limit'),
       maxWorldsPerAccount: num('max-worlds-per-account'), newAccountHours: num('new-account-hours'), newAccountWorldLimit: num('new-account-world-limit'), newAccountCreateLimit: num('new-account-create-limit'), newAccountWindowMinutes: num('new-account-window-minutes'),
       marsWebDir: flag('mars-web'), cobuilders: argv.includes('--cobuilders') ? true : undefined, webDir: flag('web'), base: flag('base'), oldWorldsRoot: argv.includes('--old-worlds-root') ? true : undefined, soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
