@@ -100,6 +100,7 @@ export type HumanState = {
    * phase (lie-down, then each receiver phase), every tick from lie-down to the release; absent otherwise.
    */
   phaseK?: number;
+  carryContactV1?: import('../carry/contact.ts').CarryContact;
   /**
    * Prone receiver only: world yaw of the lying body's axis (S → head, through the grip), from lie-down through
    * kneel-up; `pose.yaw` keeps facing straight out over the edge (the lip PRONE_BACK ahead of `pose.p` along it).

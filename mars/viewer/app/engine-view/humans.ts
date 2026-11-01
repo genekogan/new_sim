@@ -105,6 +105,7 @@ type View = {
   grip?: string;
   /** Grip slot on that part (engine/construction: lift-far, foot-l/r, hold-N, lift-end/edge/corner-*, lift-station, handup-*). */
   gripSlot?: string;
+  carryWeight?: number;
   /** Rack-structure link stood on (engine human.on; readout). */
   on?: string;
   /** Pose on the rack structure (frame-gait.ts): climbing a frame, standing on its bracing, walking a beam. */
@@ -226,6 +227,7 @@ export type SampledHuman = {
   activity?: string;
   grip?: string;
   gripSlot?: string;
+  carryWeight?: number;
   /** Engine hand points (take field `hands`): arms, posture and held items follow them as in the lab. */
   hands?: Hands;
   /** Activity an eat / serve overlay is layered on (take field `baseActivity`; 'sit' = seated). */
@@ -406,6 +408,10 @@ export class HumanViews {
   private bodyTemplates:ReadonlyMap<string,Template>=new Map();
   setBodyTemplates(templates:ReadonlyMap<string,Template>){this.bodyTemplates=templates;}
   private parts = new Map<string, Part>();
+  private fixtureHandling = new Map<string, import('../../engine/world/catalog.ts').Handling>();
+  setFixtureHandling(handling: Record<string, import('../../engine/world/catalog.ts').Handling>) {
+    this.fixtureHandling = new Map(Object.entries(handling));
+  }
   private flights: Flight[] = [];
   private readingActors = new Set<string>();
   private climbs: { id: string; path: [number, number, number][] }[] = [];
@@ -625,7 +631,7 @@ export class HumanViews {
         for (const side of [-1, 1]) {
           const sh = new THREE.Vector3(o[0] + c * (d.sh.f) - s * side * d.shHalf, o[1] + d.pivotH + d.sh.up, o[2] + s * d.sh.f + c * side * d.shHalf);
           const out = new THREE.Vector3();
-          const r = slotPoint(part, v.gripSlot ?? '', sh, o[1], out);
+          const r = slotPoint(part, v.gripSlot ?? '', sh, o[1], out, this.fixtureHandling.get(part.def));
           if (r === false) continue;
           if (r === undefined && !boxNearest(part, sh, out)) continue;
           ts.push(toBody(out.x, out.y, out.z, side));
@@ -652,7 +658,9 @@ export class HumanViews {
     if(v.transfer){const k=transferWeight(v.transfer,(v.transferTime??0)-v.transfer.startTick*DT).weight;for(const key of ['drop','bend','rise','kneel'] as const)pz[key]*=k;}
 
     // on a frame's bracing: crouch / bend on the rod, never kneel or rise onto the toes
-    return v.frame?.kind === 'stance' ? { ...pz, kneel: 0, rise: 0 } : pz;
+    const weight = v.carryWeight;
+    const blended = weight === undefined ? pz : {drop:pz.drop*weight, bend:pz.bend*weight, rise:pz.rise*weight, kneel:pz.kneel*weight};
+    return v.frame?.kind === 'stance' ? { ...blended, kneel: 0, rise: 0 } : blended;
   }
 
   /**
@@ -746,6 +754,7 @@ export class HumanViews {
       v.base = base;
       v.grip = f.grip;
       v.gripSlot = f.gripSlot;
+      v.carryWeight = f.carryWeight;
       v.on = f.on;
       v.frame = frameCtx(f.on, act, (id) => parts[id], this.climbs);
       v.seat = act==='cycle'?BIKE_SADDLE:base==='sit'&&!f.on&&!f.grip&&!f.hands?.left&&!f.hands?.right&&typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:SEAT_DEFAULT;
@@ -1170,17 +1179,17 @@ export class HumanViews {
       const grip = v.grip!, slot = v.gripSlot ?? '', floor = h.position.y;
       const q = part && lerpPose(part.prev, part.cur, alpha);
       const find = (from: THREE.Vector3, out: THREE.Vector3) => {
-        const r = part ? slotPoint({ def: part.def, pose: q! } as Entity, slot, from, floor, out) : undefined;
+        const r = part ? slotPoint({ def: part.def, pose: q! } as Entity, slot, from, floor, out, this.fixtureHandling.get(part.def)) : undefined;
         return r ?? (reach ? reach(grip, from, out) : false);
       };
       v.arms.forEach((arm, i) => {
         arm.upper.getWorldPosition(_s);
         const t = V();
-        if (find(_s, t)) targets[i] = t;
+        if (find(_s, t)) targets[i] = v.carryWeight === undefined ? t : palm(arm,V()).lerp(t,v.carryWeight);
       });
       const k = reachTo(v, targets, pz.rise > 0, v.activity === 'carry' ? 0.88 : BODY_MODEL.maxExtension, find);
       if (sitW <= 0) dangle(v, pz.bend, k);
-      closeHands(v, k);
+      closeHands(v, v.carryWeight === undefined ? k : k.map(x => x * v.carryWeight!));
     } else if (act?.hands) {
       // body activity: each hand to a goal relative to its own shoulder (forward, outward, up), reach-honest IK;
       // an arm without a goal keeps the base posture (hand on thigh seated, hanging standing)
@@ -2351,9 +2360,9 @@ const _m = new THREE.Matrix4(), _mi = new THREE.Matrix4(), _qb = new THREE.Quate
  * - `lift-station`: false (a station hand, no contact; the arms hang).
  * undefined = not a slot we know (the caller falls back to the part's nearest point).
  */
-function slotPoint(e: Entity, slot: string, from: THREE.Vector3, floor: number, out: THREE.Vector3): boolean | undefined {
+function slotPoint(e: Entity, slot: string, from: THREE.Vector3, floor: number, out: THREE.Vector3, handling?: import('../../engine/world/catalog.ts').Handling): boolean | undefined {
   if (slot === STATION_SLOT) return false;
-  const grips = CATALOG[e.def]?.capabilities?.fixtureCarry?.handling.grips;
+  const grips = (handling ?? CATALOG[e.def]?.capabilities?.fixtureCarry?.handling)?.grips;
   const authored = grips && Object.values(grips).flat().find((g) => g.id === slot);
   if (authored) {
     const span = authored.span ?? [0, 0, 0];

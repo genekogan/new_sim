@@ -8,6 +8,8 @@
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
 import { menuWorldOf, type MenuWorld } from '../split/menu-world.ts';
+import {CATALOG} from '../../../../mars/viewer/engine/world/catalog.ts';
+import {MAX_KG_PER_CARRIER} from '../../../../mars/viewer/engine/carry/formation.ts';
 import { deckRaised, railGaps, rasterOf } from '@sim/generators';
 import { applyBatch, obbOverlap, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, buildWorldEditPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
@@ -820,6 +822,7 @@ export class EngineBridge {
     const label = titleOf(e) ?? (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' ');
     const spec: FixtureSpecV1 = { def: asset, kind: a.category === 'item' ? 'item' : 'fixture', label, p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw) };
     if (spec.kind !== 'item') {
+      if(def.components.carryable&&def.tags.includes('upright-carry')&&Math.abs(wp.y)<.01)return {...spec,support:{kind:'ground'}};
       // E2 (2026-10-19): a fixture standing on raised ground (a hillside, an alpine terrace, or the ground floor of a
       // building on its pad up there) is logged as on the ground, so its seats are on level 0 there (the engine otherwise
       // takes the floor level nearest its height: the alpine station's benches got an upper floor elsewhere and no
@@ -1414,7 +1417,10 @@ export class EngineBridge {
   private writeBackNow(id: string) { try { const unit = this.writeBackComponent(id); if (unit) this.applyWriteBackUnit(unit, new Map()); } catch (e) { this.log(`write-back ${id}: ${(e as Error).message}`); } }
   private writeBackComponent(id: string, holders?: Set<string>): WriteBackUnit | undefined {
     const x = this.engine.world.entities[id] as any;
-    if (x?.kind !== 'component' || !x.tags?.includes('entity-world')) return;
+    if (!x?.tags?.includes('entity-world')) return;
+    // Native fixture transport owns the airborne pose. Persist its grounded
+    // result (also after safe cancellation) through the existing item write-back.
+    if (x.kind !== 'component' && !(x.kind === 'fixture' && CATALOG[x.def]?.capabilities?.fixtureCarry && x.support?.kind === 'ground' && x.phase !== 'carried')) return;
     const e = this.model.entities.get(id); if (!e) return;
     const ops: Op[] = []; let body: string | undefined;
     const s = x.support;
@@ -1844,6 +1850,20 @@ export class EngineBridge {
             const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
             caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: sec } } });
             plans.set(id, { label, steps: [...stand, { verb: 'mars:take_slot', params: { owner: x.id, activity } }, { verb: 'rest', params: { seconds: sec } }, { verb: 'stand', params: {} }], seconds: true });
+          }
+        }
+        // Upright loads explicitly opted in by the authored def reuse the native
+        // fixture mover: two hands, native reservations/clearance, no teleport.
+        const handling=(asset as {capabilities?:{fixtureCarry?:{handling:{carryCrew:[number,number];carryHeight:number}}}}).capabilities?.fixtureCarry?.handling;
+        if(handling){
+          const modelEntity=this.model.entities.get(x.id),def=modelEntity&&this.model.resolvedDef(modelEntity.def);
+          if(def?.components.carryable&&def.tags.includes('upright-carry')){
+            const mass=(asset as {massKg?:number}).massKg??0,need=Math.max(handling.carryCrew[0],Math.ceil(mass/MAX_KG_PER_CARRIER));
+            const denied=this.layers.refusal(x.id,soul);
+            const block=denied??(need>1?{code:'carry.crew-too-small',reason:`${name(x.id)} needs ${need} carriers; a solo carry allows at most ${MAX_KG_PER_CARRIER} kg.`}:held||me.human.grip?{code:'carry.hands-full',reason:'Put down what you are holding before using both hands.'}:x.support?.kind!=='ground'||x.phase==='carried'?{code:'carry.in-use',reason:`${name(x.id)} is in use or not resting on the ground.`}:(me.human.level??0)!==0||Math.abs(x.pose.p[1])>.01?{code:'carry.ground-only',reason:'This upright carry starts and finishes on level-zero ground.'}:((asset as {size?:number[]}).size?.[1]??0)>handling.carryHeight*2-.1?{code:'carry.too-tall',reason:`${name(x.id)} cannot clear the ground at this hand height.`}:null);
+            const id=`carry:${x.id}`,label=`Carry ${name(x.id)} upright with both hands, then set it down (to: a place name)`;
+            caps.push({id,verb:'carry',label,target:{id:x.id,kind:'object'},available:!block,...(block?{blocked:block}:{}),params:{to:{type:'string',maxLength:100}}});
+            if(!block)plans.set(id,{label,steps:[...stand,{verb:'mars:move_fixture',params:{fixture:x.id,to:{x:here[0],z:here[1],yaw:x.pose.yaw??0}}}]});
           }
         }
         if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {

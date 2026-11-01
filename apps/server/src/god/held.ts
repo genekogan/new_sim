@@ -26,7 +26,7 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
   const tog = (L as any).together, observe = tog.observe.bind(tog);
   tog.observe = (soul: { entityId: string }) => {
     const o = observe(soul);
-    if (!o.holding) { const x = heldGodThing(ents(), soul.entityId); if (x) o.holding = { id: x.id, kind: 'item', name: name(x.id) }; }
+    if (!o.holding) { const all=ents(),gripped=all[soul.entityId]?.human?.grip?.entity; const x = heldGodThing(all, soul.entityId) ?? (typeof gripped==='string'&&all[gripped]?.tags?.includes('entity-world')?all[gripped]:null); if (x) o.holding = { id: x.id, kind: 'item', name: name(x.id) }; }
     return o;
   };
   // what a put-on / put-down is putting (the god thing in hand when it was asked for)
@@ -75,7 +75,7 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
   const outcomes = (L as any).outcomes, terminal = outcomes.terminal.bind(outcomes);
   outcomes.terminal = (receipt: any, snapshot: any, effects: any = {}) => {
     const [kind, target] = String(receipt.capability ?? '').split(':');
-    if (receipt.phase !== 'completed' || !['pick-up', 'put-on', 'put-down', 'give'].includes(kind) || outcomes.read(receipt.id)) return terminal(receipt, snapshot, effects);
+    if (receipt.phase !== 'completed' || !['pick-up', 'put-on', 'put-down', 'give', 'carry'].includes(kind) || outcomes.read(receipt.id)) return terminal(receipt, snapshot, effects);
     if (kind === 'give' && !putting.has(outcomes.context(receipt.id)?.soulId ?? '')) return terminal(receipt, snapshot, effects);   // an edge item's give
     const ctx = outcomes.context(receipt.id), body = ctx ? h.minds.get(ctx.soulId)?.entityId : undefined;
     if (!body) return terminal(receipt, snapshot, effects);
@@ -84,6 +84,9 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
       const x = heldGodThing(ents(), body);
       if (x && (!h.model.entities.has(target) || x.id === target)) eff = { ...effects, summary: `Picked up ${name(x.id)}; you are holding it.`,
         changed: [...(effects.changed ?? []), { id: x.id, kind: 'item-held', summary: `${name(x.id)} is in your hand.`, source: `item:${x.id}:held` }], detail: { ...(effects.detail ?? {}), holding: { id: x.id, name: name(x.id) } } };
+    } else if(kind==='carry') {
+      const x=ents()[target];
+      if(x?.support?.kind==='ground'&&x.phase!=='carried')eff={...effects,summary:`Carried ${name(target)} upright and set it down on the ground.`,changed:[...(effects.changed??[]),{id:target,kind:'item-placed',summary:`${name(target)} is on the ground at (${x.pose.p[0].toFixed(1)}, ${x.pose.p[2].toFixed(1)}).`,source:`item:${target}:placed`}],detail:{...(effects.detail??{}),placed:{id:target,name:name(target),at:[...x.pose.p]}}};
     } else {
       const id = putting.get(ctx.soulId), x = id ? ents()[id] : undefined;
       if (x && !(x.support?.kind === 'in-hand' && x.support.by === body)) {

@@ -119,14 +119,19 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   const [w, h, dd] = d.box;
   const label = (d.description?.replace(/\.$/, '') || d.name.replace(/^core-/, '')).slice(0, 80);
   const color = d.palette ? Object.values(d.palette)[0] : undefined;
+  const upright=!!c.carryable&&d.tags.includes('upright-carry')&&(c.carryable.grips??1)>=2;
   const out: AssetDef = {
-    id, label, category: c.carryable && !o.seen ? 'item' : 'fixture', size: [r4(w), r4(h), r4(dd)],
+    id, label, category: c.carryable && !upright && !o.seen ? 'item' : 'fixture', size: [r4(w), r4(h), r4(dd)],
     massKg: typeof c.carryable?.mass === 'number' ? c.carryable.mass : Math.max(1, Math.round(w * h * dd * 40)),
     ...(color ? { color } : {}),
     dims: { confidence: 'hypothetical', note: `derived from entity-world def ${d.ref} (${d.hash.slice(0, 12)}) by the L9 catalog adapter` },
   };
   if (o.seen) return out;
-  if (c.carryable) {
+  if (upright) {
+    const crew=Math.ceil(c.carryable.grips/2),span=Math.min(.6,w*.8);
+    out.obstacle=true;
+    out.capabilities={fixtureCarry:{upright:true,handling:{carryCrew:[crew,crew],carryPose:'edge',carryHeight:.95,hands:2,grips:{[crew]:Array.from({length:crew},(_,i)=>({id:`grip-${i}`,local:[crew===1?0:(i===0?-w*.25:w*.25),h*.5,i%2===0?dd/2:-dd/2] as [number,number,number],span:[span,0,0] as [number,number,number]}))}}}};
+  } else if (c.carryable) {
     // one hand, palm under the base (catalog-items.ts hand1): the engine's take_item / put_item / serve verbs
     out.handling = { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'hand', local: [0, 0, 0] }] }, carryHeight: 0.95, hands: 1, small: true };
     // Soul Actions 34: a def with a `carry` slot (a watering can's handle) is held there and hangs from the hand at the side
@@ -154,7 +159,7 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   if (c.readable) caps.readable = { pages: Math.max(1, Math.round(c.readable.pages ?? 4)), maxSeatDistance: 0.65 };
   if (c.display) caps.display = { accepts: 'text', maxChars: 280 };
   if (c.boardGame?.game === 'chess') caps.boardGame = 'chess';
-  if (Object.keys(caps).length) out.capabilities = caps;
+  if (Object.keys(caps).length) out.capabilities = {...out.capabilities,...caps};
   return out;
 }
 

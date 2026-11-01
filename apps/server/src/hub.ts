@@ -48,10 +48,18 @@ export const CLOSE_GRACE_MS = 500;
  *  draw geometry from /v1/scene). On a built world it is ~3 MB of JSON per one-second chunk (Eden 2026), so the live
  *  stream leaves it out; recorded takes (TAKES_PERSIST) and HTTP history keep the full chunk. */
 export function viewerChunk<T>(chunk: T): T {
-  const c = chunk as { take?: { finalState?: Record<string, unknown> } };
+  const c = chunk as { take?: { finalState?: Record<string, unknown>; tracks?: Record<string, unknown>; entities0?: Record<string, {def:string}> } };
   const state = c?.take?.finalState; if (!state || state.entityPhysicsV1 === undefined) return chunk;
   const { entityPhysicsV1: _omit, ...rest } = state;
-  return { ...c, take: { ...c.take, finalState: rest } } as T;
+  const physics = _omit as {assets?: Record<string, import('../../../mars/viewer/engine/world/catalog.ts').AssetDef>};
+  const records = state.entities as Record<string, {def:string}> | undefined;
+  const handling: Record<string, import('../../../mars/viewer/engine/world/catalog.ts').Handling> = {};
+  for (const id of Object.keys(c.take?.tracks ?? {})) {
+    const e = records?.[id] ?? c.take?.entities0?.[id];
+    const h = e && physics.assets?.[e.def]?.capabilities?.fixtureCarry?.handling;
+    if (h) handling[e.def] = h;
+  }
+  return { ...c, take: { ...c.take, finalState: rest, ...(Object.keys(handling).length ? {fixtureCarryHandlingV1: handling} : {}) } } as T;
 }
 /** P2 (E-life): an HTTP take history reply (/v1/takes, /v1/take) as the live stream sends it, without each chunk's static
  *  physics; `full` (the `?physics=1` query) keeps the canonical chunks for tools that replay from them. */

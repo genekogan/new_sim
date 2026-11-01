@@ -53,6 +53,7 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['level', (e) => e.human?.level],
   ['task', (e) => e.human?.task],
   ['grip', (e) => e.human?.grip],
+  ['carryContactV1', e => e.human?.carryContactV1],
   ['phase', (e) => e.phase],
   ['support', (e) => e.support],
   ['reservedBy', (e) => e.reservedBy],
@@ -218,11 +219,14 @@ export class TakeRecorder implements RuntimeObserver {
 
   private readonly itemTracks = new Set<string>(); // finite recording chunk, never an accumulating world history
 
+  private readonly transportTracks = new Set<string>();
+
   private sample() {
     const t = this.rt.tick - this.startTick;
     const ents = this.rt.world.entities;
     // entity-world fixtures/items (world-edit/1, lane L9) are drawn by the viewer's entity layer from the entity
-    // world's own diffs; the take carries only what the engine moves (bodies). Absent in every authored world.
+    // world's own diffs. Explicitly opted-in transport loads need recorded poses too,
+    // so the entity mesh and the gripping hands follow the same native clock.
     // S1 V7b: only those are sorted (by id, as the sorted id list was), from the tick's shared entity list.
     // S1 r2: found again from the last scan while the table holds the same objects under the same keys (stableIndices:
     // an entity's tags never change), so an idle world does not read ~4,500 entities' tags every tick (shared: read-only)
@@ -236,7 +240,15 @@ export class TakeRecorder implements RuntimeObserver {
       const item=ents[id].human?.itemTransferV1?.item;
       if(item&&eligible.has(item))this.itemTracks.add(item);
     }
-    const dynamic = this.itemTracks.size ? [...base, ...[...this.itemTracks].filter(id => !!ents[id])].sort() : base;
+    const transports = stableIndices(ents, 'take transports', list, keys, e => !!e.tags?.includes('entity-world-transport'), idx => new Set(idx.map(i => keys[i]))).derived;
+    if (transports.size) for (const id of base) {
+      // Only bodies' active contacts select load tracks. A hundred unused chairs
+      // add no per-tick pose/field samples or repeated live grip payloads.
+      const h=ents[id].human;
+      for (const load of [h?.grip?.entity,h?.carryContactV1?.item]) if (load && transports.has(load)) this.transportTracks.add(load);
+    }
+    const extra = [...this.itemTracks, ...this.transportTracks].filter(id => !!ents[id]);
+    const dynamic = extra.length ? [...new Set([...base, ...extra])].sort() : base;
     for (const id of dynamic) {
       const e = ents[id];
       const s = quantize(e, t);

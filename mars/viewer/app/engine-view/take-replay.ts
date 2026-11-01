@@ -18,6 +18,7 @@ import type { CameraPose } from '../../engine/camera/shots.ts';
 import type { Vec3 } from '../../engine/core/math.ts';
 import type { Entity, WorldState } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
+import {carryContactWeight, type CarryContact} from '../../engine/carry/contact.ts';
 import { def } from '../../engine/world/catalog.ts';
 import { progressiveContributor } from '../../engine/construction/contributor.ts';
 import {waterTransitions,type WaterTransition} from './water-transition.ts';
@@ -217,6 +218,9 @@ export class TakePeople {
     this.gaits.clear();
     this.strides.clear();
     this.neighbours = this.adjacent(this.history);
+    const physics = this.take.finalState.entityPhysicsV1 as {assets?: Record<string, import('../../engine/world/catalog.ts').AssetDef>} | undefined;
+    const handling = Object.fromEntries(Object.entries(physics?.assets ?? {}).flatMap(([id, asset]) => asset.capabilities?.fixtureCarry ? [[id, asset.capabilities.fixtureCarry.handling]] : []));
+    this.humans.setFixtureHandling({...handling, ...this.take.fixtureCarryHandlingV1});
     this.indexActs();
     this.waterTransition=waterTransitions(this.take);
     this.waterHistoryKey='';
@@ -443,7 +447,9 @@ export class TakePeople {
       const carriedRide = e.activity === 'ride' || e.activity === 'row';
       const speed = w && !carriedRide ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
       const climbing = !!e.activity?.startsWith('climb');
-      const g = st.grip;
+      const contact = e.state.carryContactV1 as CarryContact | undefined;
+      const g = st.grip ?? (contact ? {entity:contact.item,slot:contact.slot} : undefined);
+      const carryWeight = contact ? carryContactWeight(contact, this.take.startTick + frame.tick, dt) : undefined;
       // eased over WALK_EASE (walk-ease.ts): the per-sample speed map snapped stride → stand in one 65 ms sample
       const gs = w && !carriedRide ? this.gaitSteps(id) : null;
       const walk = climbing ? 1 : gs ? walkWeightAt(gs, frame.tick + Math.min(WALK_EASE / dt, Math.max(0, (ahead - t) / dt)), dt) : 0;
@@ -456,12 +462,12 @@ export class TakePeople {
       const seatHeight=this.nativeBoat?.seatHeightFor(frame,id)??(typeof st.seatHeight==='number'&&Number.isFinite(st.seatHeight)?st.seatHeight:undefined);
       const publicSoulKey=(src.human as {soul?:unknown}|undefined)?.soul;
       const game=recordedGame(e.state.game);
-      people.push({itemPose:itemPresentation(e.state.itemTransferV1 as NonNullable<Entity['human']>['itemTransferV1'],e.state.heldItemsV1 as NonNullable<Entity['human']>['heldItemsV1'],this.take.startTick+frame.tick,this.take.dt),...(e.state.handActuator?{handActuator:e.state.handActuator as NonNullable<Entity['human']>['handActuator'],handActuatorTime:(this.take.startTick+frame.tick)*this.take.dt}:{}),...(e.state.handTransferV1?{transfer:e.state.handTransferV1 as NonNullable<Entity['human']>['handTransferV1'],transferTime:(this.take.startTick+frame.tick)*this.take.dt}:{}),...(e.state.wateringV1?{watering:e.state.wateringV1 as NonNullable<Entity['human']>['wateringV1'],wateringTime:(this.take.startTick+frame.tick)*this.take.dt}:{}), ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:body?.params&&typeof body.model==='string'?{bodyModel:body.model}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick, e.activity ?? 'idle', climbing ? 0 : walk), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(e.state.handHold||e.state.rps?{...(e.state.handHold?{handHold:e.state.handHold as HandHoldState}:{}),...(e.state.rps?{rps:e.state.rps as RpsState}:{}),handGameTick:this.take.startTick+frame.tick,handGameDt:this.take.dt}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
+      people.push({itemPose:itemPresentation(e.state.itemTransferV1 as NonNullable<Entity['human']>['itemTransferV1'],e.state.heldItemsV1 as NonNullable<Entity['human']>['heldItemsV1'],this.take.startTick+frame.tick,this.take.dt),...(e.state.handActuator?{handActuator:e.state.handActuator as NonNullable<Entity['human']>['handActuator'],handActuatorTime:(this.take.startTick+frame.tick)*this.take.dt}:{}),...(e.state.handTransferV1?{transfer:e.state.handTransferV1 as NonNullable<Entity['human']>['handTransferV1'],transferTime:(this.take.startTick+frame.tick)*this.take.dt}:{}),...(e.state.wateringV1?{watering:e.state.wateringV1 as NonNullable<Entity['human']>['wateringV1'],wateringTime:(this.take.startTick+frame.tick)*this.take.dt}:{}), ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:body?.params&&typeof body.model==='string'?{bodyModel:body.model}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, carryWeight, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick, e.activity ?? 'idle', climbing ? 0 : walk), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(e.state.handHold||e.state.rps?{...(e.state.handHold?{handHold:e.state.handHold as HandHoldState}:{}),...(e.state.rps?{rps:e.state.rps as RpsState}:{}),handGameTick:this.take.startTick+frame.tick,handGameDt:this.take.dt}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });
     this.comps.render(1);
-    this.fixtures.onTick({ entities: fixtures });
+    this.fixtures.onTick({ entities: Object.fromEntries(Object.entries(fixtures).filter(([, e]) => !e.tags?.includes('entity-world'))) });
     this.fixtures.render(clock);
     this.humans.setStationBeat(stationBeat);
     this.humans.setFrame(people, clock, { ...comps, ...fixtures }); // seats / fires come from the fixtures
