@@ -109,6 +109,15 @@ type WalkProfile=(soul:EdgeSoul,caps:EdgeCapability[],plans:Plans)=>void;
 type ExactWalkProfile=(soul:EdgeSoul,asked:string,caps:EdgeCapability[],plans:Plans)=>boolean;
 type ExactWalkBindings={caps:EdgeCapability[];plans:Plans;tick:number};
 type CapabilityProvider=(soul:EdgeSoul,only?:ReadonlySet<string>,places?:Map<string,string>)=>EdgeCapability[];
+/** warmForServing's account: busy ms in all, wall ms from start to end, its slices before the listing and the longest of
+ *  them, the final listing's ms, and whether it was stopped (shutdown) before the listing. */
+export type ServingWarm = {souls: number; failed: number; ms: number; wallMs: number; slices: number; maxStepMs: number; listingMs: number; stopped: boolean};
+/** A serving warm's slice (ms) between turns of the event loop: well under the 100 ms a visitor's frame notices. */
+const SERVING_SLICE_MS = 40;
+/** How long a rich read waits for a serving warm before building its menu itself (ms). Eden 2026's warm took ~2 s on
+ *  a development machine and ~4 s on the former production host in one go; slices also allow other requests to run. */
+export const SERVING_WAIT_MS = 15_000;
+const nextTurn = () => new Promise<void>(r => setImmediate(r));
 
 export class EdgeLedger implements EdgeLedgerHooks {
   places: PlaceIndex;
@@ -1304,6 +1313,64 @@ export class EdgeLedger implements EdgeLedgerHooks {
       try { this.capabilities({soulId: row.id, entityId: m.entityId, name: m.name, owner: row.owner}); souls++; } catch { failed++; }
     }
     return {souls, failed, ms: Math.round(performance.now() - t0)};
+  }
+  /** Continuity (warm after listen, 2026-10-31): prepareForServing's warm, run once the port is open, so a release
+   *  handover's pause is only stop + open again (release 404 kept Eden 2026's port shut ~4 s longer for it: 8.5 s
+   *  "Reconnecting…"). The caches under the first Soul's listing are built first in slices of about `sliceMs`, with a
+   *  turn of the event loop between (visitors' sockets, healthz and every cheap route answer meanwhile): `pre` (the god
+   *  bridge's servingWarmGen: places, named things, activity spots, walk goals) and the item sources. The listing
+   *  itself then runs once over warm caches (prepareForServing). Until it ends, rich reads wait for it (whenServing)
+   *  instead of building the same caches cold inside one request. A read, like prepareForServing; it never rejects.
+   *  A warm asked for while one runs (a punt rewarm during the boot's) starts when that one ends: two never interleave
+   *  their slices over the same caches, and reads wait for the last. */
+  warmForServing(o: {sliceMs?: number; pre?: (soul: EdgeSoul) => Generator<void, void, void>; stop?: () => boolean; turn?: () => Promise<void>} = {}): Promise<ServingWarm> {
+    const prev = this.servingGate; let gate: Promise<void> | null = null;
+    const run = (async () => { if (prev) await prev; try { return await this.runServingWarm(o); } finally { if (this.servingGate === gate) this.servingGate = null; } })();
+    this.servingGate = gate = run.then(() => {});
+    return run;
+  }
+  /** While a serving warm runs: a promise that settles when it ends, or after `ceilingMs` (then the read builds what it
+   *  needs itself, as without a warm). Null otherwise (nothing to wait for: no extra turn). */
+  whenServing(ceilingMs = SERVING_WAIT_MS): Promise<void> | null {
+    const gate = this.servingGate; if (!gate) return null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    return Promise.race([gate, new Promise<void>(r => { timer = setTimeout(r, ceilingMs); })]).finally(() => clearTimeout(timer));
+  }
+  private servingGate: Promise<void> | null = null;
+  private async runServingWarm({sliceMs = SERVING_SLICE_MS, pre, stop, turn = nextTurn}: {sliceMs?: number; pre?: (soul: EdgeSoul) => Generator<void, void, void>; stop?: () => boolean; turn?: () => Promise<void>}): Promise<ServingWarm> {
+    const t0 = performance.now(), out: ServingWarm = {souls: 0, failed: 0, ms: 0, wallMs: 0, slices: 0, maxStepMs: 0, listingMs: 0, stopped: false};
+    const eng = this.mw as unknown as {readPassV1?: <T>(f: () => T) => T};
+    const drive = async <T>(it: Generator<void, T, void>): Promise<T | undefined> => {
+      let value: T | undefined;
+      for (let done = false; !done;) {
+        if (stop?.()) {out.stopped = true; return undefined;}
+        const s0 = performance.now(), step = () => {do {const r = it.next(); if (r.done) {done = true; value = r.value;}} while (!done && performance.now() - s0 < sliceMs);};
+        try {if (eng.readPassV1) eng.readPassV1(step); else step();}
+        catch (error) {done = true; console.error('[edge] serving warm step failed; the listing builds the rest', error instanceof Error ? error.message : error);}
+        const ms = performance.now() - s0; out.slices++; out.ms += ms; if (ms > out.maxStepMs) out.maxStepMs = ms;
+        await turn();
+      }
+      return value;
+    };
+    try {
+      await turn();   // the turn that opened the port first answers whatever was waiting for it
+      const soul = this.servingSoul();
+      if (soul && pre) await drive(pre(soul));
+      if (soul) await drive(this.together.sourcesWarmGen());
+      if (stop?.()) out.stopped = true;
+      if (!out.stopped) {
+        const w = this.prepareForServing(); out.souls = w.souls; out.failed = w.failed; out.listingMs = w.ms; out.ms += w.ms;
+      }
+    } catch (error) {console.error('[edge] serving warm failed; Souls build their menus on demand', error);}
+    out.ms = Math.round(out.ms); out.maxStepMs = Math.round(out.maxStepMs); out.wallMs = Math.round(performance.now() - t0);
+    return out;
+  }
+  /** The Soul prepareForServing lists first: the first live Soul (creation order) with a body. */
+  private servingSoul(): EdgeSoul | null {
+    for (const row of this.db.liveSouls(this.host.worldId)) {
+      const m = this.host.minds.get(row.id); if (m && this.body(m.entityId)?.human) return {soulId: row.id, entityId: m.entityId, name: m.name, owner: row.owner};
+    }
+    return null;
   }
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
   bodyVerbProblem(soul:EdgeSoul,verb:string){return bodyVerbProblem(this.body(soul.entityId),verb);}

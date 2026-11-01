@@ -2,6 +2,44 @@
 
 User-facing changes to Sim, newest first. Each release is compiled from `changes/` fragments.
 
+## 4.07 (2026-11-01)
+
+### Features
+
+- A public changelog page lists what changed in each release, linked from the bottom of the world list.
+- The site icon is the souls.game orb: browser tab favicon, home-screen and installed-app icons.
+- Worlds can use short root URLs while existing Soul and god agent links keep working after a slug migration.
+- Boards: write on and wipe whiteboards and chalkboards; pinned notes, a sign-up sheet, a poll, posters, and wanted and offered notes with replies.
+- Carrying: two-handed carrying of upright loads and chairs; picking up and setting down lanterns and bowls; handing a carried thing to another Soul, who accepts or declines; putting things into drawers and lockers and taking them out.
+- Doors and openings: doors, windows, cupboards, lockers, fridges, curtains, blinds and drawers opened and closed by hand; doors open on the way while a Soul walks somewhere; knocking, owner-only locks, and a guaranteed way out from inside.
+- Souls use things with their own hands, in plain words: the body walks over, reaches, and the thing changes at the moment of contact. The change persists across restarts and every visitor sees the same motion. See docs/architecture/soul-actions.md.
+- Lights and fire: lamps, string lights and neon signs switched on and off; candles, lanterns, torches and a campfire lit and put out.
+- Music you can hear: a bell pull, piano, drums and duets on one shared clock, singing at a microphone, a jukebox and a radio with stations.
+- Play: frisbee with clear lanes and three-person triangles, noughts and crosses with honest turns, rock-paper-scissors and holding hands by consent.
+- Screens switched on and off by their physical control, keeping their image or video.
+- Tea: fill the kettle, boil it, pour, serve a mug to someone, drink in sips and wash up.
+- Water and garden: taps, an outdoor shower, a sprinkler and a fountain with moving water; a watering can filled at the tap; planters that dry out over the days and grow in stages.
+
+### Fixes
+
+- Uploaded world assets load from the CDN on both Souls and the original Sim site after the domain cutover.
+- The changelog page shows the notes of the release you are using as soon as it ships.
+- Sign-in on a configured satellite site returns through the primary account service while keeping the same account and world ownership.
+- A fresh clone draws people on its first run: `pnpm build` and `pnpm dev` build the Mars viewer assets themselves, and `pnpm dev` serves worlds again.
+- The god inbox no longer shows your agent as listening right after it takes a command it is working on.
+- Souls receive a sign's own words when reading it, and exact walks avoid scanning unrelated objects.
+- Soul vocabulary and hand-interaction planning read through the read-only world facade while hand-contact effects remain on the main tick path.
+- Walks start and stop smoothly; idle gestures fade out before a reach and back in afterwards, instead of popping.
+- A Soul waits out a courtesy step-aside instead of failing its action.
+- Far-away objects add nothing to a Soul's perception or per-tick work; nearby ones add a few compact facts.
+- Frisbee ends stand clear of pond rims and other solids by the throwing margin, so the park's frisbee court plays again.
+
+### Documentation
+
+- A component and data-flow map (docs/architecture/map.md) shows the classes, contracts and hot paths of a Sim world, with diagrams of one tick, one Soul action and one god edit.
+- The quick start now builds the character models, so a fresh clone's local world shows its people, and it points at the right world URL.
+- The repository is now github.com/genekogan/souls (renamed from new_sim); links and the security policy point there.
+
 ## 4.05 (2026-10-31)
 
 ### Performance

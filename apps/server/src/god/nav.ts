@@ -607,6 +607,14 @@ export class GodNav {
     return {pick, here, myLevel, seated, exit};
   }
 
+  /** Continuity (warm after listen): the walk goals this Soul's listing would ask for (room reaches, standing points and
+   *  the fine route tiles under them), one thing per step, so a sliced caller builds them between other requests instead
+   *  of inside one listing. A read: only caches fill (goals here are recomputed by the listing as usual). */
+  *servingWarmGen(soul: EdgeSoul): Generator<void, void, void> {
+    const selected = this.selectedWalks(soul); if (!selected) return;
+    for (const { t } of selected.pick) { yield; this.goal(t, selected.here, soul.entityId); }
+  }
+
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, focus?: MenuFocus | null) {
     const selected=this.selectedWalks(soul);if(!selected)return;
     // srv-act-words (D): a focused words walk keeps only the walks its words can choose (focus.walkKeep, the ledger's test)

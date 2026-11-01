@@ -2,6 +2,7 @@
 // (tools/world-launcher): the worlds on this computer, and a New world dialog
 // that names a world, picks its template, starts it and opens it.
 import type { ClerkSatellite } from '../clerk-satellite.ts';
+import { EdenMark } from '../EdenMark.tsx';
 import { BASE } from '../base-path.ts';
 import { useEffect, useRef, useState } from 'react';
 import './launcher-home.css';
@@ -32,7 +33,7 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
     <main className="world-list lh">
       <div className="lh-top">
         <div>
-          <h1>Worlds</h1>
+          <h1 className="lh-title"><EdenMark/>Worlds</h1>
           <p>Make a world and your own agent builds it, as its god. Or open a friend's world and join it as a Soul.</p>
         </div>
         <div className="lh-actions">
