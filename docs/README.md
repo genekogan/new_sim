@@ -15,6 +15,7 @@ The canonical checkout is `<repo>`. Original `<old-sim-repo>`, `~/Mars` and
 | Change the shell or engine adapter | [architecture](sim/ARCHITECTURE.md) → [development](sim/DEVELOPMENT.md) → [contract](sim/ENGINE-CONTRACT.md) |
 | Operate, release or roll back | [runbook](sim/RUNBOOK.md) |
 | Steer a Soul or integrate an agent | [API](sim/API.md), [protocol](sim/PROTOCOL.md), the selected world's `/skill.md` and `/cards.md` |
+| Know what Souls can do by hand (lamps, doors, water, carrying, boards, music, play, tea) | [Soul Actions](SOUL-ACTIONS.md); changes in [CHANGELOG](../CHANGELOG.md) |
 | Work on choices, private rules or spend | [brain](sim/BRAIN.md), [data](sim/DATA.md) |
 | Resume the authorized merge | [kickoff](eden4/23-MERGE-KICKOFF-PROMPT.md) → [plan v3](eden4/22-MERGE-PLAN.md) → STATUS; local running log `<eden4>/MERGE-LOG.md` |
 | Understand design intent | [strategy index](eden4/README.md), [worlds/bodies](eden4/20-WORLDS-BODIES-AND-LIBRARIES.md), [decision ledger](eden4/06-DECISIONS-AND-OPEN-QUESTIONS.md) |
