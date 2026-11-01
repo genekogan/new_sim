@@ -118,6 +118,8 @@ test('non-Eden shelf reads keep constitution content; actual sign reads keep the
   const sign = await w.done(await w.act(`read:${w.sign}`));
   assert.equal(sign.outcome!.detail.passage, 'These are the sign’s own words.');
   assert.equal((sign.outcome!.detail.sign as {id: string}).id, w.sign);
+  assert.equal((sign.outcome!.detail.sign as {text: string}).text, sign.outcome!.detail.passage);
+  assert.equal(sign.outcome!.detail.book, undefined, 'sign content does not acquire a library book');
   const alias = await w.act('read:here', {seconds: 2, target: 'read.e_forged'});
   assert.equal(w.edge().outcomes.context(alias.id)!.readSpot, `read.${w.chair}`);
   const read = await w.done(alias);
@@ -126,6 +128,7 @@ test('non-Eden shelf reads keep constitution content; actual sign reads keep the
   const explicit = await w.done(await w.act(`read:read.${w.chair}`, {seconds: 2}));
   assert.equal((explicit.outcome!.detail.book as {id: string}).id, 'world-constitution');
   assert.equal((w.f.db.db.prepare('SELECT COUNT(*) n FROM edge_reading_progress_v1').get() as {n: number}).n, 0);
+  assert.deepEqual((await w.http('/v1/edge/receipts/' + sign.id)).receipt.outcome, sign.outcome, 'later shelf reads do not rewrite sign content');
 });
 
 test('generic no-source aliases and historical contexts do not gain catalogue content', async t => {
