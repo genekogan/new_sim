@@ -47,6 +47,7 @@ test('collisions, malformed mappings and forks refuse the whole batch without wr
     assert.throws(() => migrateRegistry(data, map, { apply: true, offline: true }));
     assert.equal(readFileSync(join(data, 'worlds.json'), 'utf8'), bytes); assert.equal(existsSync(join(data, 'worlds.before-reslug.json')), false);
   }
+  const many = fixture(); many.legacyBases = Array.from({ length: 8 }, (_, i) => `/old-${i}`); assert.throws(() => reslugRegistry(many, mappings), /limit/);
   const f = fixture(); f.worlds[0].fork = {}; assert.throws(() => reslugRegistry(f, mappings), /fork/);
   const data = dir(); writeFileSync(join(data, 'worlds.json'), JSON.stringify(fixture())); mkdirSync(join(data, 'worlds', 'eden'), { recursive: true });
   assert.throws(() => migrateRegistry(data, mappings, { apply: true, offline: true }), /directory/);

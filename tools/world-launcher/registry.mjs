@@ -70,7 +70,7 @@ export class Registry {
       const { worlds, legacyBases, ...extra } = j;
       this.extra = extra;
       this.legacyBases = legacyBases ?? [];
-      if (!Array.isArray(this.legacyBases) || this.legacyBases.some((b) => !/^\/[a-z][a-z0-9-]{0,31}$/.test(b))) throw new Error('invalid registry legacyBases');
+      if (!Array.isArray(this.legacyBases) || this.legacyBases.length > 8 || this.legacyBases.some((b) => !/^\/[a-z][a-z0-9-]{0,31}$/.test(b))) throw new Error('invalid registry legacyBases');
       this.worlds = j.worlds.filter((w) => SLUG_RE.test(w?.slug ?? ''));
       const used = new Set(this.worlds.map((w) => w.slug));
       for (const w of this.worlds) {

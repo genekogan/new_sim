@@ -30,6 +30,7 @@ export function reslugRegistry(registry, mappings, legacyBase = '/worlds') {
   const bases = next.legacyBases ?? [];
   if (!Array.isArray(bases) || bases.some((b) => !/^\/[a-z][a-z0-9-]{0,31}$/.test(b)) || bases.length > 8) throw Error('invalid legacy bases');
   next.legacyBases = [...new Set([...bases, legacyBase])];
+  if (next.legacyBases.length > 8) throw Error('legacy base limit reached');
   return next;
 }
 

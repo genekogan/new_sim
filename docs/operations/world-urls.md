@@ -13,7 +13,9 @@ the inline runtime kind, so an entity world named `eden` does not accidentally l
 
 ## Migrate a stopped copy
 
-Stop the target launcher **and all of its children** before applying this command. Use a completed copy or a backup;
+Stop the target launcher **and all of its children** before applying this command. Run the migration as the service
+user that owns the copied registry (for example, `sudo -u simworlds node ...`), not as root: its replacement and backup
+files are intentionally mode 0600 and must remain readable by the launcher. Use a completed copy or a backup;
 do not operate on a running registry. No command below opens account or world databases, or rewrites paired folders.
 The dry run prints only counts. For the launch mappings:
 
