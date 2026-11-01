@@ -52,31 +52,48 @@ export function readWorkersOf(w, env = process.env) {
   return env.SIM_READ_WORKER === '1' ? 1 : 0;
 }
 
+/** Stable database identity and storage name survive a public URL rename. */
+export const worldIdOf = (w) => w.worldId ?? `${w.slug}-1`;
+export const dataSlugOf = (w) => w.dataSlug ?? w.slug;
+
 export class Registry {
   constructor(dataDir) {
     this.dataDir = resolve(dataDir);
     this.file = join(this.dataDir, 'worlds.json');
     mkdirSync(this.dataDir, { recursive: true });
     this.worlds = [];
+    this.legacyBases = [];
+    this.extra = {};
     if (existsSync(this.file)) {
       const j = JSON.parse(readFileSync(this.file, 'utf8'));
       if (!Array.isArray(j.worlds)) throw new Error(`${this.file}: not a worlds registry`);
+      const { worlds, legacyBases, ...extra } = j;
+      this.extra = extra;
+      this.legacyBases = legacyBases ?? [];
+      if (!Array.isArray(this.legacyBases) || this.legacyBases.length > 8 || this.legacyBases.some((b) => !/^\/[a-z][a-z0-9-]{0,31}$/.test(b))) throw new Error('invalid registry legacyBases');
       this.worlds = j.worlds.filter((w) => SLUG_RE.test(w?.slug ?? ''));
+      const used = new Set(this.worlds.map((w) => w.slug));
+      for (const w of this.worlds) {
+        if (!SLUG_RE.test(dataSlugOf(w)) || (w.worldKey !== undefined && !SLUG_RE.test(w.worldKey)) || (w.worldId !== undefined && !/^[a-z][a-z0-9-]{0,63}$/.test(w.worldId))) throw new Error('invalid stable world identity');
+        if (w.aliases !== undefined && (!Array.isArray(w.aliases) || w.aliases.length > 32)) throw new Error('invalid world aliases');
+        for (const alias of w.aliases ?? []) { if (!SLUG_RE.test(alias) || used.has(alias)) throw new Error('world alias collision'); used.add(alias); }
+      }
     }
   }
   get(slug) { return this.worlds.find((w) => w.slug === slug) ?? null; }
-  slugs() { return new Set(this.worlds.map((w) => w.slug)); }
+  resolveSlug(slug) { return this.get(slug)?.slug ?? this.worlds.find((w) => w.aliases?.includes(slug))?.slug ?? null; }
+  slugs() { return new Set(this.worlds.flatMap((w) => [w.slug, ...(w.aliases ?? [])])); }
   add(entry) {
-    if (this.get(entry.slug)) throw new Error(`world ${entry.slug} exists`);
+    if (this.slugs().has(entry.slug)) throw new Error(`world ${entry.slug} exists`);
     this.worlds.push(entry); this.save(); return entry;
   }
   update(slug, patch) { const w = this.get(slug); if (!w) return null; Object.assign(w, patch); this.save(); return w; }
   remove(slug) { this.worlds = this.worlds.filter((w) => w.slug !== slug); this.save(); }
-  worldDir(slug) { return join(this.dataDir, 'worlds', slug); }
+  worldDir(slug, entry = this.get(slug)) { return join(this.dataDir, 'worlds', entry ? dataSlugOf(entry) : slug); }
   save() {
     if (this.frozen) return;   // handing over to a newer launcher (keeper.mjs): it owns the file now
     const tmp = `${this.file}.${process.pid}.tmp`;
-    writeFileSync(tmp, JSON.stringify({ schema: 'world-launcher-registry/1', worlds: this.worlds }, null, 2) + '\n');
+    writeFileSync(tmp, JSON.stringify({ ...this.extra, schema: 'world-launcher-registry/1', worlds: this.worlds, ...(this.legacyBases.length ? { legacyBases: this.legacyBases } : {}) }, null, 2) + '\n');
     renameSync(tmp, this.file);
   }
 }

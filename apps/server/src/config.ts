@@ -6,6 +6,7 @@ const env = process.env;
 const thinkingBudget=worldThinkingBudgetV1(env);
 const worldKey = env.WORLD_KEY ?? 'toy';
 if (!/^[a-z][a-z0-9-]{0,31}$/.test(worldKey)) throw new Error('invalid WORLD_KEY');
+if (env.WORLD_SLUG && !/^[a-z][a-z0-9-]{0,31}$/.test(env.WORLD_SLUG)) throw new Error('invalid WORLD_SLUG');
 /** Worlds with authored content and their own factories; any other key is an entity world (ENABLE_WORLD_ENGINE) on the green field. */
 export const KNOWN_WORLD_KEYS = ['toy', 'mars', 'littlemartians', 'eden'] as const;
 export const config = {
@@ -14,6 +15,8 @@ export const config = {
   archiveTakes: env.ARCHIVE_TAKES === '1' && env.TAKES_PERSIST === '1',
   r2: {account:env.R2_ACCOUNT_ID,bucket:env.R2_BUCKET,endpoint:env.R2_ENDPOINT,access:env.R2_ACCESS_KEY_ID,secret:env.R2_SECRET_ACCESS_KEY,prefix:env.R2_PREFIX??'sim'},
   worldKey,
+  /** Public routing slug; WORLD_KEY remains the engine identity across URL migrations. */
+  worldSlug: env.WORLD_SLUG || undefined as string | undefined,
   /** God mode + entity world (spec eden4/28): on for every non-authored key, or by explicit flag. */
   worldEngine: env.ENABLE_WORLD_ENGINE === '1' || !['toy', 'mars', 'littlemartians', 'eden'].includes(worldKey),
   /** Markdown served at /skill.md (App's agent skill). Unset: edge worlds get a built-in edge stub; central worlds the legacy skill. */
@@ -42,6 +45,8 @@ export const config = {
   authProvider: (env.AUTH_PROVIDER ?? 'privy') as 'clerk'|'privy'|'none',
   clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY ?? '',
   clerkIssuer: env.CLERK_ISSUER_URL ?? '',
+  clerkSatelliteDomain: env.CLERK_SATELLITE_DOMAIN ?? '',
+  clerkSignInUrl: env.CLERK_SIGN_IN_URL ?? '',
   clerkAuthorizedParties: (env.CLERK_AUTHORIZED_PARTIES ?? '').split(',').map(s=>s.trim()).filter(Boolean),
   accountRegistryPath: env.ACCOUNT_REGISTRY_PATH ?? '',
   privyAppId: env.PRIVY_APP_ID ?? '',

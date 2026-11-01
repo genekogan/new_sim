@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { audit } from './worldops.mjs';
 
 /** Product worlds: never test worlds, whatever a flag or list says. */
-export const NEVER_TEST_SLUGS = ['eden-2026', 'godmode-lab', 'my-mars-college-2026-3', 'little-martians-arium', 'eden', 'mars', 'littlemartians'];
+export const NEVER_TEST_SLUGS = ['eden-2026', 'mars-college-2026', 'mars-college-2027', 'mars-2027', 'godmode-lab', 'my-mars-college-2026-3', 'little-martians-arium', 'eden', 'mars', 'littlemartians'];
 export const DENY_SOUL_IDS = ['s_c8520a0a76'];
 export const DENY_SOUL_NAMES = [/kwyjibo/i];
 export const SOUL_VERBS = ['pending', 'approve', 'message', 'inbox', 'delete'];
@@ -32,7 +32,7 @@ export function allowedTestSlugs(dataDir) { const v = readJson(join(dataDir, 'op
 export function notTestWorld(w, dataDir) {
   if (!w) return [404, 'not-found', 'no world by that slug'];
   if (w.fork) return [403, 'op.not-test-world', `${w.slug} is a copy of an old world, never a test world`];
-  if (NEVER_TEST_SLUGS.includes(w.slug)) return [403, 'op.not-test-world', `${w.slug} is a product world, never a test world`];
+  if (NEVER_TEST_SLUGS.includes(w.slug) || NEVER_TEST_SLUGS.includes(w.worldKey)) return [403, 'op.not-test-world', `${w.slug} is a product world, never a test world`];
   if (w.test === true || allowedTestSlugs(dataDir).includes(w.slug)) return null;
   return [403, 'op.not-test-world', `${w.slug} is not flagged test (op.mjs set-test --slug ${w.slug} --test true, or list it in op-test-worlds.json)`];
 }
@@ -73,7 +73,7 @@ export function opSetTest({ body, registry, dataDir, log = () => {} }) {
   const w = registry.get(typeof body?.slug === 'string' ? body.slug : '');
   if (!w) return [404, { ok: false, code: 'not-found', message: 'no world by that slug' }];
   if (typeof body?.test !== 'boolean') return [400, { ok: false, code: 'invalid', message: 'test: true or false' }];
-  if (body.test && (w.fork || NEVER_TEST_SLUGS.includes(w.slug))) return [403, { ok: false, code: 'op.not-test-world', message: `${w.slug} is a product world, never a test world` }];
+  if (body.test && (w.fork || NEVER_TEST_SLUGS.includes(w.slug) || NEVER_TEST_SLUGS.includes(w.worldKey))) return [403, { ok: false, code: 'op.not-test-world', message: `${w.slug} is a product world, never a test world` }];
   registry.update(w.slug, { test: body.test });
   audit(dataDir, { op: 'set-test', slug: w.slug, by: 'operator', test: body.test });
   log(`${w.slug} is ${body.test ? 'a test world' : 'no longer a test world'} (operator)`);

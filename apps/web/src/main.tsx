@@ -12,6 +12,7 @@ import { createRoot } from 'react-dom/client';
 const PrivyAuth=lazy(()=>import('./PrivyAuth.tsx'));
 import { Shell, type AuthCtx } from './Shell.tsx';
 import './styles.css';
+import type { ClerkSatellite } from './clerk-satellite.ts';
 import {clerkNow,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
 // New worlds (world launcher, world engine): the launcher homepage and its sign-in. Old worlds never reach these.
 // P1 phones: the homepage (LauncherHome) and Clerk are lazy chunks, off a world page's critical path; a world's Clerk
@@ -36,7 +37,7 @@ if(!newWorld)assetBytes.expect(forkInitialAssets((initialAssets as {worlds?:Reco
 declare const __SIM_ARRIVAL_ENABLED__: boolean;
 const arrivalEnabled=typeof __SIM_ARRIVAL_ENABLED__!=='undefined'&&__SIM_ARRIVAL_ENABLED__===true;
 
-type Cfg = { authenticationOrigin?:string; authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
+type Cfg = { clerkSatellite?:ClerkSatellite; authenticationOrigin?:string; authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
 
 
 /** A Clerk world page: the Shell renders at once; ClerkBridge (its own chunk, with clerk-js and Clerk's API calls behind
@@ -55,7 +56,7 @@ function ClerkWorld({cfg,publishableKey}:{cfg:Cfg;publishableKey:string}){
  const takePendingLogin=useCallback(()=>{const p=pending.current;pending.current=false;return p;},[]);
  return <>
   <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled}/>
-  {load&&<Suspense fallback={null}><ClerkBridge publishableKey={publishableKey} issuer={cfg.clerkIssuer} onAuth={setAuth} takePendingLogin={takePendingLogin}/></Suspense>}
+  {load&&<Suspense fallback={null}><ClerkBridge satellite={cfg.clerkSatellite} publishableKey={publishableKey} issuer={cfg.clerkIssuer} onAuth={setAuth} takePendingLogin={takePendingLogin}/></Suspense>}
  </>;
 }
 
@@ -108,11 +109,11 @@ function NoPage(){return <main className="world-list"><h1>No page here</h1><p>Th
 function WorldList(){
  const local=singleLocalPreview(location.hostname);
  const [served,setServed]=useState<Set<string>|null>(null);
- // Served by the world launcher (tools/world-launcher; a prefixed build or a local preview): its own homepage with New
- // world. The production root (sim.eden.art/) never probes for it and stays main's (e8) world list.
+ // A launcher manifest owns the homepage at either a root or a prefixed deployment.
+ // A legacy dispatcher without a launcher manifest falls back to the original world cards.
  const [launcher,setLauncher]=useState<LauncherList|null>(null);
  useEffect(()=>{let active=true;void (async()=>{
-  if(BASE||local){try{const r=await fetch(BASE+'/__sim/worlds.json',{signal:AbortSignal.timeout(5000)});const data=r.ok&&r.headers.get('content-type')?.includes('application/json')?await r.json():null;if(data?.contract==='local-worlds/1'&&typeof data.launcher==='string'&&Array.isArray(data.worlds)){if(active)setLauncher(data);return;}}catch{/* not a launcher: the world list below */}}
+  {try{const r=await fetch(BASE+'/__sim/worlds.json',{signal:AbortSignal.timeout(5000)});const data=r.ok&&r.headers.get('content-type')?.includes('application/json')?await r.json():null;if(data?.contract==='local-worlds/1'&&typeof data.launcher==='string'&&Array.isArray(data.worlds)){if(active)setLauncher(data);return;}}catch{/* not a launcher: the world list below */}}
   const worlds=await discoverWorlds(path=>fetch(path,{signal:AbortSignal.timeout(5000)}));if(active)setServed(worlds);
  })();return()=>{active=false;};},[local]);
  if(launcher)return <Suspense fallback={<pre>loading…</pre>}><LauncherRoot list={launcher}/></Suspense>;

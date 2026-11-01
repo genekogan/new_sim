@@ -78,6 +78,7 @@
 // and takes them over one at a time (handover below), so the port never closes and no world has two writers.
 //
 // Local only: binds 127.0.0.1, edge minds (owners' agents think; the world pays for none), no credentials, no tunnels.
+import { satelliteSettings, primarySignInPage } from './clerk-satellite.mjs';
 import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { Agent, createServer, request } from 'node:http';
@@ -94,8 +95,9 @@ import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:z
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, cachedTemplates, readWorkersOf, slugFor, worldHeapMb } from './registry.mjs';
+import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, cachedTemplates, readWorkersOf, slugFor, worldHeapMb, worldIdOf } from './registry.mjs';
 import { ChildPool, compileCacheDir, defaultCommand, forkCommand } from './children.mjs';
+import { canonicalRequest } from './world-urls.mjs';
 import { legacyWorldFor, redirectSwitch } from './redirects.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
@@ -161,7 +163,7 @@ const direct = (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', 
 /**
  * @param {{ port?: number, dataDir?: string, range?: [number, number], root?: string, webDir?: string,
  *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, sleepMs?: number, exitMs?: number, exitForks?: boolean, command?: Function, log?: (s: string) => void,
- *           publicOrigin?: string, devAuth?: boolean, authEnvFile?: string, maxWorlds?: number, maxRunning?: number,
+ *           publicOrigin?: string, devAuth?: boolean, authEnvFile?: string, clerkSatellite?: string, clerkSignInUrl?: string, maxWorlds?: number, maxRunning?: number,
  *           minFreeMb?: number, worldHeapMb?: number, createLimit?: number, base?: string,
  *           soulCli?: string, soulSkill?: string, soulInstructions?: string, maxWorldsPerAccount?: number,
  *           newAccountHours?: number, newAccountWorldLimit?: number, newAccountCreateLimit?: number, newAccountWindowMinutes?: number }} cfg
@@ -188,7 +190,7 @@ export async function openLauncher(cfg = {}) {
   const publicOrigin = (cfg.publicOrigin ?? origin).replace(/\/$/, '');
   const authEnvFile = cfg.authEnvFile ?? process.env.SIM_AUTH_ENV_FILE;
   const prod = { ...productionSettings({ ...cfg, authEnvFile, range }, origin), build: BUILD };
-  const auth = clerkAuth(authEnvFile, dataDir, publicOrigin);
+  const auth = clerkAuth(authEnvFile, dataDir, publicOrigin, cfg);
   const MAX_WORLDS = prod.maxWorlds;
   const behindProxy = publicOrigin !== origin;
   const B = prod.base, wp = (slug) => `${B}/w/${slug}`;
@@ -273,7 +275,7 @@ export async function openLauncher(cfg = {}) {
   async function actorOf(w, authorization) {
     const tok = /^Bearer\s+(god_\S+)$/i.exec(authorization ?? '')?.[1];
     if (tok) {
-      const label = tokenLabel(join(registry.worldDir(w.slug), 'sim.db'), `${w.slug}-1`, tok);
+      const label = tokenLabel(join(registry.worldDir(w.slug), 'sim.db'), worldIdOf(w), tok);
       if (label === null) return null;
       const co = /^cobuilder:([^:]+):/.exec(label);
       return co ? { account: co[1], via: 'token', cobuilder: true } : { account: safeOwner(w.slug), via: 'token' };
@@ -391,7 +393,7 @@ export async function openLauncher(cfg = {}) {
     const file = join(registry.worldDir(slug), 'sim.db');
     if (!existsSync(file)) return null;
     const db = new DatabaseSync(file, { readOnly: true });
-    try { const r = db.prepare('SELECT body FROM world_meta_v1 WHERE world_id=?').get(`${slug}-1`); return r ? JSON.parse(r.body).owner ?? null : null; }
+    try { const r = db.prepare('SELECT body FROM world_meta_v1 WHERE world_id=?').get(worldIdOf(registry.get(slug))); return r ? JSON.parse(r.body).owner ?? null : null; }
     finally { db.close(); }
   }
   /** Under Clerk: is this an account of the shared registry (account id only; nothing else is read)? */
@@ -749,9 +751,16 @@ export async function openLauncher(cfg = {}) {
     const sock = req.socket; sock.simBusy = (sock.simBusy ?? 0) + 1; res.once('close', () => { sock.simBusy--; });
     if (closed) res.shouldKeepAlive = false;   // stopping: answered, then this connection ends (see close())
     if (retiredTo) { forward(req, res); return; }
+    let url; try { url = new URL(req.url ?? '/', origin); } catch { json(res, 400, { ok: false, code: 'bad-url' }); return; }
+    const canonical = canonicalRequest(url.pathname, B, registry);
+    if (canonical && canonical !== url.pathname) {
+      if ((req.method === 'GET' || req.method === 'HEAD') && (canonical === `${B}/` || canonical === `${B}/index.html` || /^.*\/w\/[a-z][a-z0-9-]*\/?$/.test(canonical))) {
+        res.writeHead(308, { location: (canonical === `${B}/index.html` ? `${B}/` : canonical.replace(/\/?$/, '/')) + url.search }).end(); return;
+      }
+      url.pathname = canonical; req.url = url.pathname + url.search;
+    }
     // while the next launcher is being prepared, creations and operator changes wait: they run here if it fails, there if not
     if (gate && req.method === 'POST' && (req.url ?? '').startsWith(`${B}/__sim/`)) { await gate.p; if (retiredTo) { forward(req, res); return; } }
-    let url; try { url = new URL(req.url ?? '/', origin); } catch { json(res, 400, { ok: false, code: 'bad-url' }); return; }
     // Under --base everything of ours is <base>/…; `path` is the part after the base. Outside the base only the
     // public static files a world page also asks for at the root (/modular, /mars-assets, …) are answered, the way
     // the other release on the origin answers them in production; the rest is not ours.
@@ -767,6 +776,12 @@ export async function openLauncher(cfg = {}) {
         const p = (req.method === 'GET' || req.method === 'HEAD') && /^\/(modular|mars-assets|engine|browser|models|history|2020|world-assets)\/|^\/data\/manifest\.json$/.test(path) && anyRunning();
         if (p) { proxyHttp(req, res, p); return; }
         json(res, 404, { ok: false, code: 'not-found', message: `this server answers under ${B}/` }); return;
+      }
+      // Independently proxyable primary sign-in route; never derives trusted settings from request headers.
+      if (path === '/__sim/clerk-sign-in' && (req.method === 'GET' || req.method === 'HEAD')) {
+        const page = primarySignInPage(auth?.public, url.search);
+        if (!page) { json(res, 400, { ok: false, code: 'invalid-sign-in' }); return; }
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex', 'x-frame-options': 'DENY', 'content-security-policy': page.csp }).end(req.method === 'HEAD' ? undefined : page.html); return;
       }
       if (path === '/__sim/client-errors') {
         // lane ERR: a page's error beacon (anyone; body-capped, per-address and site-wide limits) and the operator's summary
@@ -960,6 +975,9 @@ export async function openLauncher(cfg = {}) {
   server.on('upgrade', async (req, socket, head) => {
     socket.simUpgraded = true;
     if (retiredTo) { pipeUpgrade(req, socket, head, port); return; }
+    const raw = req.url ?? '', q = raw.indexOf('?'), pathname = q < 0 ? raw : raw.slice(0, q);
+    const canonical = canonicalRequest(pathname, B, registry);
+    if (canonical) req.url = canonical + (q < 0 ? '' : raw.slice(q));
     const u = req.url ?? '', rel = !B ? u : u.startsWith(`${B}/`) ? u.slice(B.length) : '';
     const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
     const w = slug && !closing.has(slug) && registry.get(slug);
@@ -1130,18 +1148,21 @@ export async function openLauncher(cfg = {}) {
 
 /**
  * Clerk mode from an env file, used by path only: a one-shot `node --env-file` child hands back just the public
- * settings (publishable key, issuer) for the homepage. Nothing else in the file is read here or logged.
+ * settings (publishable key, issuer, authorized origins) for validation and the homepage. Nothing else in the file is read here or logged.
  */
-export function clerkAuth(envFile, dataDir, publicOrigin) {
-  if (!envFile) return null;
+export function clerkAuth(envFile, dataDir, publicOrigin, cfg = {}) {
+  const satellite = satelliteSettings(cfg.clerkSatellite, cfg.clerkSignInUrl, publicOrigin);
+  if (!envFile) { if (satellite) throw new Error('launcher: Clerk satellite requires --auth-env'); return null; }
   const file = resolve(envFile);
   if (!existsSync(file)) throw new Error(`launcher: --auth-env file not found: ${file}`);
-  const out = execFileSync(process.execPath, [`--env-file=${file}`, '-e', 'process.stdout.write(JSON.stringify({k:process.env.CLERK_PUBLISHABLE_KEY??"",i:process.env.CLERK_ISSUER_URL??""}))'], { encoding: 'utf8', env: { PATH: process.env.PATH }, timeout: 10_000 });
-  const { k, i } = JSON.parse(out);
-  if (!/^pk_(live|test)_[A-Za-z0-9+/=_-]+$/.test(k) || !/^https:\/\/[^/]+$/.test(i)) throw new Error('launcher: the --auth-env file must set CLERK_PUBLISHABLE_KEY and CLERK_ISSUER_URL (https origin)');
+  const out = execFileSync(process.execPath, [`--env-file=${file}`, '-e', 'process.stdout.write(JSON.stringify({k:process.env.CLERK_PUBLISHABLE_KEY??"",i:process.env.CLERK_ISSUER_URL??"",a:process.env.CLERK_AUTHORIZED_PARTIES??""}))'], { encoding: 'utf8', env: { PATH: process.env.PATH }, timeout: 10_000 });
+  const { k, i, a } = JSON.parse(out);
+  if (satellite && ![publicOrigin, new URL(satellite.signInUrl).origin].every(origin => a.split(',').map(s => s.trim()).includes(origin))) throw new Error('launcher: CLERK_AUTHORIZED_PARTIES must include the satellite and primary sign-in origins');
+  let issuer; try { issuer = new URL(i); } catch {}
+  if (!/^pk_(live|test)_[A-Za-z0-9+/=_-]+$/.test(k) || issuer?.protocol !== 'https:' || issuer.origin !== i || issuer.username || issuer.password || !/^[a-z0-9.-]+$/.test(issuer.hostname)) throw new Error('launcher: the --auth-env file must set CLERK_PUBLISHABLE_KEY and CLERK_ISSUER_URL (https origin)');
   return {
-    child: { envFile: file, registryPath: join(resolve(dataDir), 'accounts.sqlite') },
-    public: { provider: 'clerk', clerkPublishableKey: k, clerkIssuer: i, authenticationOrigin: publicOrigin },
+    child: { envFile: file, registryPath: join(resolve(dataDir), 'accounts.sqlite'), ...(satellite ? { satellite } : {}) },
+    public: { provider: 'clerk', clerkPublishableKey: k, clerkIssuer: i, authenticationOrigin: publicOrigin, ...(satellite ? { clerkSatellite: satellite } : {}) },
   };
 }
 
@@ -1182,7 +1203,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const num = (k) => (flag(k) === undefined ? undefined : Number(flag(k)));
     const l = await openLauncher({ port: num('port'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: num('eager'),
-      publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
+      publicOrigin: flag('public-origin'), clerkSatellite: flag('clerk-satellite'), clerkSignInUrl: flag('clerk-sign-in-url'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
       maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), sleepMs: num('sleep-ms'), exitMs: flag('idle-exit-min') === undefined ? undefined : num('idle-exit-min') * 60_000, createLimit: num('create-limit'),
       maxWorldsPerAccount: num('max-worlds-per-account'), newAccountHours: num('new-account-hours'), newAccountWorldLimit: num('new-account-world-limit'), newAccountCreateLimit: num('new-account-create-limit'), newAccountWindowMinutes: num('new-account-window-minutes'),
       marsWebDir: flag('mars-web'), cobuilders: argv.includes('--cobuilders') ? true : undefined, webDir: flag('web'), base: flag('base'), oldWorldsRoot: argv.includes('--old-worlds-root') ? true : undefined, soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
