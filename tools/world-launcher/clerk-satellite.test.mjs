@@ -23,7 +23,9 @@ test('primary return allowlist retains SDK sync, queries and pairing fragment, r
 });
 async function runPage({ session = null, hash = '', search = '', currentOrigin = 'https://primary.example.test', fail = false } = {}) {
   const page = primarySignInPage(auth, search), calls = [], root = { textContent: '' };
-  const script = page.html.match(/<script>([\s\S]*)<\/script>/)[1];
+  // This is our generated fixture, not an HTML sanitizer: extract its one inline bootstrap exactly.
+  const start = page.html.indexOf('<script>') + '<script>'.length;
+  const script = page.html.slice(start, page.html.lastIndexOf('</script>'));
   assert.ok(page.csp.includes("'sha256-"+createHash('sha256').update(script).digest('base64')+"'"));
   const context = { URL, URLSearchParams, document: { getElementById: () => root }, location: { origin: currentOrigin, hash, search, replace: url => calls.push(['replace', url]) }, Clerk: { session, load: async opts => { calls.push(['load', opts]); if (fail) throw Error('failed'); }, mountSignIn: (_root, opts) => calls.push(['mount', opts]) } };
   await vm.runInNewContext(script, context);
