@@ -1,11 +1,23 @@
-// E1 observes two cache layers: the launcher C3 cache keys the URL (1s, 2s hot),
+// E1/F1 observe two cache layers: the launcher C3 cache keys the URL (1s, 2s hot),
 // while the world's snapshot cache keys edit/model revisions. A unique query bypasses
 // only C3; seq and the exact entity state still have to prove the accepted edit.
 import { randomUUID } from 'node:crypto';
 export const EDIT_OBSERVATION_BOUND_MS = 3000; // hot C3 TTL 2000ms + 1000ms observation budget
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function observeEdit({ snapshotUrl, action, entity, present, fetchImpl = fetch,
+export function observeEdit({ entity, present, ...options }) {
+  return observeChange({ ...options, cacheBust: 'e1-edit',
+    select: body => ({ entitiesValid: Array.isArray(body.entities),
+      entities: Array.isArray(body.entities) ? body.entities.filter(e => e.id === entity.id || e.name === entity.name).map(e => ({ id: e.id, name: e.name })) : [] }),
+    matchesState: sample => sample.entitiesValid && (present ? sample.entities.length === 1 && sample.entities[0].id === entity.id && sample.entities[0].name === entity.name : sample.entities.length === 0) });
+}
+
+export function observeWeather({ weather, ...options }) {
+  return observeChange({ ...options, cacheBust: 'f1-weather', select: body => ({ weather: body.state?.weather ?? null }),
+    matchesState: sample => sample.weather?.kind === weather.kind && sample.weather?.rain === weather.rain && sample.weather?.intensity === weather.intensity });
+}
+
+async function observeChange({ snapshotUrl, action, select, matchesState, cacheBust, fetchImpl = fetch,
   now = () => performance.now(), sleep = pause, pageErrors = () => [] }) {
   const startedAtMs = now(), ack = await action(), ackAtMs = now();
   const deadline = ackAtMs + EDIT_OBSERVATION_BOUND_MS;
@@ -19,14 +31,13 @@ export async function observeEdit({ snapshotUrl, action, entity, present, fetchI
       const body = await response.json();
       return { atMs, endedAtMs: now(), status: response.status, seq: body.seq ?? null,
         cache: response.headers.get('x-sim-cache'), age: response.headers.get('age'), cacheControl: response.headers.get('cache-control'),
-        entitiesValid: Array.isArray(body.entities),
-        entities: Array.isArray(body.entities) ? body.entities.filter(e => e.id === entity.id || e.name === entity.name).map(e => ({ id: e.id, name: e.name })) : [] };
+        ...select(body) };
     } catch (error) { return { atMs, endedAtMs: now(), error: String(error) }; }
   };
   const matches = sample => sample.status === 200 && Number.isSafeInteger(sample.seq) && sample.seq >= ack.body.seq &&
-    sample.entitiesValid && (present ? sample.entities.length === 1 && sample.entities[0].id === entity.id && sample.entities[0].name === entity.name : sample.entities.length === 0);
+    matchesState(sample);
   if (accepted) {
-    const unique = new URL(snapshotUrl); unique.searchParams.set('e1-edit', randomUUID());
+    const unique = new URL(snapshotUrl); unique.searchParams.set(cacheBust, randomUUID());
     // Preserve both first responses before polling or screenshots; no later read repairs
     // an immediate authoritative failure. A unique-URL MISS is not an assertion by itself.
     [report.firstSameUrl, report.immediateAuthoritative] = await Promise.all([read(snapshotUrl), read(unique.href)]);

@@ -23,7 +23,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { observeEdit } from './edit-observation.mjs';
+import { observeEdit, observeWeather } from './edit-observation.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../..');
@@ -177,9 +177,16 @@ try {
     { entity, undo, redo, undoObservation, redoObservation });
 
   // F. weather
-  await page.locator('[data-weather-kind="rain"]').click(); const rain = await note(/Rain\./);
-  const weather = (await snapshot()).state?.weather;
-  await check('F1 weather: Rain is one press and the world rains', !!rain && weather?.kind === 'rain', { rain, weather });
+  const weatherObservation = await observeWeather({ snapshotUrl: `${base}/v1/world/snapshot`,
+    weather: { kind: 'rain', rain: 0.8, intensity: 0.8 }, pageErrors: () => report.pageErrors,
+    action: async () => {
+      const pending = page.waitForResponse(r => r.url() === `${base}/v1/god/env` && r.request().method() === 'POST');
+      await page.locator('[data-weather-kind="rain"]').click();
+      const response = await pending; return { status: response.status(), body: await response.json() };
+    } });
+  const rain = await note(/Rain\./);
+  await check('F1 weather: Rain is one press and the world rains', !!rain && weatherObservation.ok && report.pageErrors.length === 0,
+    { rain, weatherObservation });
   await shot('06-rain');
 
   // G. Forsake world: confirmations

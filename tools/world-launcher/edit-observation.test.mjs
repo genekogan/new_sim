@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MicroCache } from './flood.mjs';
 import { SnapshotCache } from '../../apps/server/src/god/snapshot-cache.ts';
-import { observeEdit, EDIT_OBSERVATION_BOUND_MS } from '../god-skill/e2e/edit-observation.mjs';
+import { observeEdit, observeWeather, EDIT_OBSERVATION_BOUND_MS } from '../god-skill/e2e/edit-observation.mjs';
 
 const url = 'http://fixture.test/v1/world/snapshot', entity = { id: 'original-bench', name: 'e2e-bench' };
 function fixture({ ttl = 1000, broken = null } = {}) {
@@ -83,4 +83,75 @@ test('page errors fail otherwise-correct Undo/Redo observation', async () => {
   const f = fixture(); await f.prime(); const result = await f.run(false, { pageErrors: () => ['owner UI error'] });
   assert.equal(result.authoritativeOk, true); assert.equal(result.converged, true); assert.equal(result.ok, false);
   assert.deepEqual(result.pageErrors, ['owner UI error']);
+});
+
+
+const rainy = { kind: 'rain', rain: 0.8, intensity: 0.8 };
+const automatic = { kind: 'auto', rain: 0, intensity: 1 };
+function weatherFixture({ ttl = 1000, broken = null } = {}) {
+  let clock = 0, seq = 2, exists = false, weather = automatic, weatherAction = false;
+  const c3 = new MicroCache({ now: () => clock });
+  const worldCache = new SnapshotCache({ now: () => clock, key: () => String(seq), build: () => ({
+    ...(weatherAction && broken === 'missing-seq' ? { editSeq: seq } : { seq: weatherAction && broken === 'stale-seq' ? seq - 1 : seq }),
+    entities: exists ? [entity] : [], state: { weather } }) });
+  const fetchImpl = async input => {
+    const response = await c3.get(String(input), ttl, async () => {
+      const snapshot = await worldCache.respond(undefined);
+      return { status: 200, headers: { 'cache-control': 'no-store' }, body: snapshot.body };
+    });
+    return new Response(response.body, { status: response.status, headers: { ...response.headers, 'x-sim-cache': response.cache } });
+  };
+  const common = { snapshotUrl: url, fetchImpl, now: () => clock, sleep: async ms => { clock += ms; } };
+  const action = async () => {
+    weatherAction = true;
+    if (broken === 'rejected') return { status: 200, body: { accepted: false, seq } };
+    seq++; weather = broken === 'physical' ? automatic : { ...rainy,
+      ...(broken === 'wrong-kind' ? { kind: 'fog' } : {}), ...(broken === 'wrong-amount' ? { rain: 0 } : {}),
+      ...(broken === 'wrong-intensity' ? { intensity: 0.1 } : {}) };
+    return { status: 200, body: { accepted: true, seq } };
+  };
+  return { fetchImpl, prime: () => fetchImpl(url),
+    redo: () => observeEdit({ ...common, entity, present: true, action: async () => {
+      seq++; exists = true; return { status: 200, body: { accepted: true, seq } };
+    } }), rain: (extras = {}) => observeWeather({ ...common, weather: rainy, action, ...extras }) };
+}
+for (const ttl of [1000, 2000]) {
+  test(`E1 Redo then Rain: primed real ${ttl}ms cache preserves both verdicts`, async () => {
+    const f = weatherFixture({ ttl }); await f.prime(); const redo = await f.redo();
+    assert.equal(redo.ok, true); assert.equal(redo.ack.body.seq, 3);
+    assert.equal(redo.convergence.at(-1).cache, 'miss', 'E1 refreshes same-URL cache immediately before F1');
+    const rain = await f.rain();
+    assert.equal(rain.ok, true); assert.equal(rain.ack.body.seq, 4);
+    assert.equal(rain.firstSameUrl.cache, 'hit'); assert.equal(rain.firstSameUrl.seq, 3);
+    assert.deepEqual(rain.firstSameUrl.weather, automatic, 'old F1 immediate snapshot assertion fails here');
+    assert.equal(rain.immediateAuthoritative.cache, 'miss'); assert.equal(rain.immediateAuthoritative.seq, 4);
+    assert.deepEqual(rain.immediateAuthoritative.weather, rainy);
+    assert.equal(rain.convergedAfterAckMs, ttl); assert.deepEqual(rain.convergence.at(-1).weather, rainy);
+  });
+}
+for (const broken of ['physical', 'wrong-kind', 'wrong-amount', 'wrong-intensity', 'stale-seq', 'missing-seq', 'rejected']) {
+  test(`${broken} Rain remains failed after cache observation`, async () => {
+    const f = weatherFixture({ broken }); await f.prime(); const result = await f.rain();
+    assert.equal(result.ok, false); assert.equal(result.authoritativeOk, false);
+    if (broken === 'rejected') { assert.equal(result.firstSameUrl, null); assert.deepEqual(result.convergence, []); }
+  });
+}
+test('wrong immediate Rain cannot be repaired by eventual correct weather', async () => {
+  const f = weatherFixture(); await f.prime();
+  const fetchImpl = async input => {
+    const r = await f.fetchImpl(input);
+    if (String(input).includes('f1-weather=')) return new Response(JSON.stringify({ seq: 3, state: { weather: automatic } }), { headers: { 'x-sim-cache': 'miss' } });
+    return r;
+  };
+  const result = await f.rain({ fetchImpl });
+  assert.equal(result.authoritativeOk, false); assert.equal(result.converged, true); assert.equal(result.ok, false);
+});
+test('Rain unchanged URL beyond the declared bound still fails', async () => {
+  const f = weatherFixture({ ttl: 4000 }); await f.prime(); const result = await f.rain();
+  assert.equal(result.authoritativeOk, true); assert.equal(result.converged, false); assert.equal(result.ok, false);
+  assert.deepEqual(result.firstSameUrl.weather, automatic);
+});
+test('page errors fail otherwise-correct Rain observation', async () => {
+  const f = weatherFixture(); await f.prime(); const result = await f.rain({ pageErrors: () => ['weather UI error'] });
+  assert.equal(result.authoritativeOk, true); assert.equal(result.converged, true); assert.equal(result.ok, false);
 });
